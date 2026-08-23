@@ -11,7 +11,44 @@ import { editorStripHost } from './uiUtils.js';   // t2155 — the badge is a ST
 
 let _mgr = null;
 let badge = null, label = null, pop = null;
+let iconEl = null, textEl = null;
 let lastResult = null;
+
+// t2171 — COLLAPSE TO ICON. Dispatch: "make it collapse after 2 seconds, both green or red" (a shorthand for
+// "whichever colour it's showing" — amber/info/red all collapse the same way, not just the two named). Three
+// rules, all load-bearing (this chip is the ONLY travel check a jog-start/relative program gets, so it must
+// never go silently unreadable):
+//   1. collapsed is NOT hidden — the className (and so the background colour) stays on `badge` the whole time;
+//      only the TEXT span disappears, the icon (and the colour behind it) survives at a glance.
+//   2. a STATE CHANGE (new status/text — not just any render() call; typing that doesn't change the verdict must
+//      not keep resetting the clock) re-expands and restarts the timer.
+//   3. never collapse while the popover is open, or while the pointer is over the badge.
+// Rule 2 is MORE than the human literally asked for (2s collapse, both colours) — it's this turn's own call to
+// make "re-check the same thing twice" not read as "it changed," and easy to overrule if it reads wrong live.
+let collapseT = null, collapsed = false, hovering = false, lastLabelKey = null;
+function cancelCollapse() { clearTimeout(collapseT); collapseT = null; }
+function expandBadge() { collapsed = false; badge.classList.remove('collapsed'); cancelCollapse(); }
+function scheduleCollapse() {
+    cancelCollapse();
+    if (hovering || !pop.hidden) return;   // rule 3 — guarded at arm time AND re-checked at fire time below
+    collapseT = setTimeout(() => {
+        if (hovering || !pop.hidden) return;   // state may have changed during the wait
+        collapsed = true; badge.classList.add('collapsed');
+    }, 2000);
+}
+// icon+text as separate persistent nodes (not one textContent string) — collapse hides ONLY the text span,
+// so the icon (and the className driving the background colour) is unaffected by collapse state.
+function setLabel(icon, text) { iconEl.textContent = icon; textEl.textContent = text; }
+// rule 2 — re-expand + restart the timer, but ONLY on an actual state change (className+icon+text), not on
+// every render() (typing that leaves the verdict unchanged must not keep resetting the clock).
+function afterRender() {
+    const visible = !badge.hidden;
+    const key = visible ? `${badge.className}|${iconEl.textContent}|${textEl.textContent}` : null;
+    if (key === lastLabelKey) return;
+    lastLabelKey = key;
+    if (visible) { expandBadge(); scheduleCollapse(); }
+    else { cancelCollapse(); collapsed = false; badge.classList.remove('collapsed'); }
+}
 
 const editorProgram = () => { const ed = document.getElementById('editor'); return ed ? ed.value : ''; };
 const settings = () => (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
@@ -118,9 +155,9 @@ function renderAnnotations(res) {
 function render() {
     if (!badge) return;
     const prog = editorProgram();
-    if (!prog || !prog.trim()) { badge.hidden = true; pop.hidden = true; renderAnnotations(null); return; }
+    if (!prog || !prog.trim()) { badge.hidden = true; pop.hidden = true; renderAnnotations(null); afterRender(); return; }
     let res;
-    try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; renderAnnotations(null); return; }
+    try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; renderAnnotations(null); afterRender(); return; }
     // t1568 — SECOND CONTRIBUTOR, same surface. An unresolvable expression means a coordinate never became a
     // number, so the envelope check on that line was never actually performed — which is precisely what amber
     // ("can't verify") declares. It can only RAISE green → amber; a red verdict is a stronger claim that stands
@@ -150,7 +187,7 @@ function render() {
         badge.hidden = !wholeProgram; pop.hidden = true;
         if (wholeProgram) {
             badge.className = 'preflight-badge preflight-red';
-            label.textContent = '⚠ needs more travel than the machine has';
+            setLabel('⚠', ' needs more travel than the machine has');
             label.title = res.violations.filter((v) => v.line == null).map((v) => `${v.axis}: needs ${fmt(v.needed)} mm, the machine has ${fmt(v.span)} mm`).join('\n');
             renderPop(res);
         }
@@ -158,7 +195,7 @@ function render() {
         // AMBER (can't verify) — keep a SMALL chip (there are no lines to annotate); the popover carries the reason.
         renderAnnotations(null);
         badge.hidden = false; badge.className = 'preflight-badge preflight-amber';
-        label.textContent = '⚠ can’t verify';
+        setLabel('⚠', ' can’t verify');
         label.title = [res.reason, probeNote(res), softLimitNote()].filter(Boolean).join('\n\n');
         renderPop(res);
     } else {
@@ -172,12 +209,13 @@ function render() {
         if (note) {
             badge.className = 'preflight-badge preflight-info';
             const e = res.extent;
-            label.textContent = `↔ needs ${fmt(e.x)} × ${fmt(e.y)} × ${fmt(e.z)} mm`;
+            setLabel('↔', ` needs ${fmt(e.x)} × ${fmt(e.y)} × ${fmt(e.z)} mm`);
             label.title = note;
             renderPop({ ...res, violations: [] });
             pop.insertBefore(Object.assign(document.createElement('div'), { className: 'preflight-pop-note', textContent: note }), pop.firstChild.nextSibling);
         }
     }
+    afterRender();
 }
 
 export function initPreflightBadge(mgr) {
@@ -188,8 +226,22 @@ export function initPreflightBadge(mgr) {
 
     badge = document.createElement('div'); badge.id = 'preflight-badge'; badge.className = 'preflight-badge'; badge.hidden = true;
     label = document.createElement('button'); label.type = 'button'; label.className = 'preflight-badge-label'; label.setAttribute('aria-label', 'Pre-flight envelope check');
+    iconEl = document.createElement('span'); iconEl.className = 'preflight-badge-icon';
+    textEl = document.createElement('span'); textEl.className = 'preflight-badge-text';
+    label.appendChild(iconEl); label.appendChild(textEl);
     pop = document.createElement('div'); pop.className = 'preflight-pop'; pop.hidden = true;
-    label.addEventListener('click', () => { if (badge.hidden) return; pop.hidden = !pop.hidden; });
+    label.addEventListener('click', () => {
+        if (badge.hidden) return;
+        pop.hidden = !pop.hidden;
+        // rule 3 — opening un-collapses (reading the popover with only the icon showing above it read oddly)
+        // and pauses the timer for as long as it's open; closing resumes the normal 2s countdown.
+        if (pop.hidden) scheduleCollapse(); else expandBadge();
+    });
+    // rule 3 — the pointer being over the badge (reading it, about to click it) pauses collapse the same way
+    // an open popover does; it does not force-expand an ALREADY-collapsed icon (nothing to protect there — the
+    // icon stays clickable either way), only stops it from collapsing mid-hover.
+    badge.addEventListener('mouseenter', () => { hovering = true; cancelCollapse(); });
+    badge.addEventListener('mouseleave', () => { hovering = false; if (pop.hidden) scheduleCollapse(); });
     badge.appendChild(label); badge.appendChild(pop);
     host.insertBefore(badge, host.firstChild);   // ⭐ FIRST child, so it reads leftmost regardless of module init order (also backed by `order` in CSS)
 

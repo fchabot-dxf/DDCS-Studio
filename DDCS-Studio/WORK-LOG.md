@@ -50507,3 +50507,82 @@ downstream references them. Kept `t2169-v2-390.png` (the round-3 correction) and
 `t2169-final-3-3-split.png` (the shipped, flex-sized final state) as the surviving record.
 
 🔨 turn 2169
+
+## turn 2171 — THE PRE-FLIGHT BADGE COLLAPSES TO ITS ICON after 2s (spec file not found on disk; proceeded from the dispatch note itself)
+
+### ⚠ the referenced spec was missing
+
+The dispatch pointed at `scratchpad/t-badge-collapse.md`, told to be read IN FULL before starting. Searched the
+whole repo (`DDCS-Studio/scratchpad/` — the one shared, gitignored scratch location both roles write to — plus a
+repo-wide filename search, plus every branch and worktree ref) and it is not there; nothing under that name
+exists anywhere on this machine's checkout. Not a stall-worthy blocker, though, because the dispatch note itself
+carried a complete, actionable spec inline — not just a pointer: the exact timing (2s), the trigger ("both green
+or red" — i.e. every visible colour, not only the two named), and three explicitly enumerated safety rules with
+their own reasoning. Proceeded from that note verbatim rather than guessing further detail into existence.
+Flagging this loudly rather than silently treating the note as sufficient: if the missing file said something
+the note didn't cover, this is the seam where that gap would live.
+
+### What "collapse" means here, concretely
+
+`preflightBadge.js`'s label used to be one `textContent` string per state (e.g. `'⚠ can’t verify'`) — no way to
+hide part of it. Split into two persistent child spans (`.preflight-badge-icon`, `.preflight-badge-text`),
+introduced once in `initPreflightBadge()` and filled by a new `setLabel(icon, text)` helper that replaces the
+three former `label.textContent = ...` sites (red-wholeProgram, amber, info). `label.textContent` (read, not
+written) still concatenates both spans back to the exact old string, so nothing that reads it — including this
+turn's own `badgeState()` test helper and the pre-existing `preflight-badge-838.spec.js` — needed to change.
+CSS: `.preflight-badge.collapsed .preflight-badge-text { display: none }` — the icon span and the badge's own
+colour-driving className are untouched by the `collapsed` class, so rule 1 (colour survives) is true by
+construction, not by a separate mechanism that could drift from it.
+
+### The three rules, and where each lives
+
+1. **Collapsed is not hidden — colour + icon survive.** Structural, per above: collapse only ever toggles the
+   text span's `display`; the className stays. Verified with the actual failure mode named in the dispatch: a
+   width-only test would pass on a badge that collapsed to a colourless dot, so the shipped test asserts
+   `getComputedStyle(label).backgroundColor` is byte-identical before/after collapse, not just that the text
+   disappeared.
+2. **A state change re-expands and restarts the timer.** THIS IS BEYOND THE LITERAL ASK — the human said "2
+   seconds, both colours," not "and re-arm on every change." Added because the alternative (an old collapse
+   timer silently expiring mid-way through a NEW, different warning) reads as a worse bug than the one being
+   fixed, but it's this turn's own judgment call, not an instruction, so: SAY SO, and if it reads wrong live,
+   it's a one-line revert (drop the `afterRender()` change-detection gate and always collapse on a flat 2s from
+   page load). Implemented via a `lastLabelKey` (className+icon+text) comparison in a new `afterRender()`, called
+   at every `render()` exit point — including both early returns (empty program, a `checkEnvelope` throw) so a
+   badge disappearing also resets collapse state cleanly for whenever it next reappears. Deliberately does NOT
+   re-arm on a `render()` call that leaves the key unchanged (typing that doesn't change the verdict), so an
+   already-collapsed badge doesn't keep popping open while someone edits an unrelated line.
+3. **Never collapse while the popover is open or the pointer is over the badge.** Two independent guards, both
+   re-checked twice (once when the 2s timer is armed, once when it actually fires, since state can change during
+   the wait): the existing popover-toggle click handler now also cancels/reschedules the timer on open/close, and
+   new `mouseenter`/`mouseleave` listeners on `badge` (not just `label`, so hovering the icon or the future
+   popover area both count) pause/resume it. Deliberately did NOT force-expand an already-collapsed badge on
+   hover alone (nothing to protect — the icon stays clickable regardless of collapse state, so "pause the
+   countdown" is suffient for the stated rule) — but opening the popover DOES un-collapse, since reading a full
+   violation list under a bare icon read as an inconsistent, not-thought-through UI, and the click handler was
+   already the natural place to pair that with.
+
+### Test, and its non-vacuity check
+
+New file `preflight-badge-collapse-2171.spec.js`, 5 tests — one per rule, plus a RED-state repeat of rule 1
+(the dispatch's own "both green or red" phrasing) and a dedicated hover-then-resume case for rule 3. Reused the
+existing deterministic seeding helpers from `preflight-badge-838.spec.js` (undeclared-placement amber) and
+`envelope-extent-1323.spec.js` (the SKIM/setMachine pattern, tightened travel for a whole-program red) rather
+than inventing new ones — both already avoid the debounce-timing races this turn's own t2169 diagnosis (see the
+turn-2169 entry above) had to work around.
+
+Non-vacuity, run before committing: saved the edited `preflightBadge.js`/`styles.css` aside, restored BOTH to
+their committed (pre-t2171) content from `HEAD` (t2169's own release, `6d14c4ae` — no collapse code in it), ran
+the new suite — **all 5 failed** (4 on the missing `.collapsed` class / unchanged text visibility, 1 on
+`getComputedStyle` throwing outright because `.preflight-badge-text` doesn't exist pre-change) — then restored
+the real implementation from the saved copies (not from `HEAD`, since `HEAD` predates this turn's own work) and
+re-ran: all 5 green again, plus the full pre-flight collateral (preflight-badge-838, preflight-names-unresolved-
+expr-1568, envelope-extent-1323, soft-limit-awareness-973, traverse-clarity-893) and the editor-strip/chrome
+suite (editor-focus-ring-2151, editor-chip-space-1323, editor-chrome, op-chips-2159 — the badge's own DOM
+structure change is close enough to that turn's own re-split to be worth re-checking) — 53/53. Smoke 76/76, node
+227/227, lint clean.
+
+Verified live at 900×500 (`verification/t2171-badge-expanded.png` / `t2171-badge-collapsed.png`) — sent to the
+human directly for visual confirmation before committing (a chip whose ONLY job is a safety-critical glance-
+readable colour warranted seeing it, not just asserting it).
+
+🔨 turn 2171

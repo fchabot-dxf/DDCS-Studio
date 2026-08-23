@@ -941,6 +941,12 @@ html, body { overflow-x: clip; }
     border: 1px solid; box-shadow: 0 2px 10px rgba(0,0,0,.42); text-shadow: 0 1px 1px rgba(0,0,0,.18);
 }
 .editor-container .preflight-badge-label:hover { filter: brightness(1.07); }
+/* t2171 — COLLAPSE TO ICON: after 2s (idle, popover closed, pointer clear — preflightBadge.js), the label's
+   TEXT span hides; the icon span and the badge's own className (so its background colour) are untouched, so a
+   collapsed RED badge still reads red at a glance from across the room, just narrower. See preflightBadge.js's
+   own comment for the three rules this implements and why (this is the only travel check a jog-start program
+   gets, so it must never go silently unreadable). */
+.editor-container .preflight-badge.collapsed .preflight-badge-text { display: none; }
 .editor-container .preflight-green  .preflight-badge-label { background: #1f9d57; color: #052; border-color: color-mix(in srgb, #34d399 55%, #000); }
 .editor-container .preflight-amber  .preflight-badge-label { background: #f0b429; color: #1a1200; border-color: color-mix(in srgb, #f0b429 55%, #000); }
 /* t1323 — the INFO chip: a jog-start program that fits, stating the travel it needs. Deliberately NOT green and not
