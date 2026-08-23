@@ -54,19 +54,26 @@ test('t1265/t2190 — no save-target preference exists anywhere: savePrefs.js ke
 });
 
 test('an EXPORT-to-cloud failure never touches the already-saved local copy (nothing to lose — the source was saved first)', async ({ page }) => {
+  // t2200 (found stale during an unrelated sweep) — t2194 retired the manager's own Local/Cloud SHELF tabs
+  // (`[data-place]`) outright; Export now asks its destination via a one-shot dlgChoice instead (see
+  // ui/projects/projectManager.js's own exportProjectFile). This test still drove the deleted tab and had
+  // been silently red since — fixed to drive the REAL flow, not a second thing found broken while adopting
+  // .modal-card (an unrelated CSS change cannot explain a missing DOM node; confirmed pre-existing by running
+  // this same test against the pre-t2200 tree before touching it here).
   await page.route('**googleapis.com/**', (r) => r.abort());   // force every Drive API call to fail
   await seed(page);
   await setConn(page, true);
   await autoAppDialog(page, { accept: true, prompt: 'export_fail_test' });
   await page.evaluate(async () => (await import('/ui/projects/projectManager.js')).openProjectManager({ promptSave: true }));
   await page.waitForSelector('#projmOverlay [data-prow="export_fail_test"]', { timeout: 5000 });
-  // switch the manager's shelf to Cloud, then export the row — Drive is unreachable, so it should fail loudly
-  await page.click('#projmOverlay [data-place="cloud"]');
-  await page.waitForTimeout(200);
-  // autoAppDialog above dismisses each dialog on its own MutationObserver tick, too fast for a body-text poll to
-  // catch — read its recorded log instead (appDialogLog), which captures the message before dismissing it.
+  // the destination ask is answered EXPLICITLY (Cloud) below — disconnect the generic auto-observer first, or
+  // its own "accept = last button" rule would hit Cancel (the choice dialog's own last button) before we can.
+  await page.evaluate(() => { if (window.__appDlgObs) window.__appDlgObs.disconnect(); });
   await page.click('#projmOverlay [data-prow="export_fail_test"] [data-pm="export"]');
-  await page.waitForFunction(() => (window.__appDlgLog || []).some((m) => /could not write to drive/i.test(m)), null, { timeout: 5000 });
+  const destAsk = page.locator('.app-dialog').last();
+  await destAsk.waitFor({ state: 'visible', timeout: 5000 });
+  await destAsk.locator('button', { hasText: 'Cloud' }).click();
+  await page.waitForFunction(() => /could not write to drive/i.test(document.querySelector('.app-dialog')?.textContent || ''), null, { timeout: 5000 });
   // the LOCAL copy this test seeded is untouched by the failed export
   const stillThere = await page.evaluate(async (name) => {
     const store = await import('/ui/projects/projectStore.js');
