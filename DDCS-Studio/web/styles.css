@@ -5582,7 +5582,16 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
        two edges. This is also the fix for the phone-width inconsistency flagged in t2153 amendment 5 (the
        toolbar used to sit geometrically INSIDE the focus ring on phone, since the ring's own box didn't change
        with this override): the ring now belongs to `.editor-code` alone, so the strip is OUTSIDE it at every
-       width, phone included, with no separate reasoning needed for the phone case. */
+       width, phone included, with no separate reasoning needed for the phone case.
+       ⚠ ACCEPTED, RULED (human, 2026-08-22), NOT AN OVERSIGHT: with the 3D drawer open on phone, `.viz3d-drawer`
+       covers the full panel, so the strip — the pre-flight safety badge included — sits behind it until the
+       preview closes. Before this turn the badge (top-anchored) and toolbar (bottom-anchored) were split across
+       two edges, so opening the drawer only ever covered the toolbar; moving them together as one strip means
+       the badge is now covered too while the drawer is open. Flagged, not fixed unasked — two mockups were put
+       to the human (scope the drawer to `.editor-code` so the strip stays visible, vs. leave it as shipped);
+       the alternative was REJECTED, this is the kept behaviour. Do not "fix" this by re-splitting the strip or
+       rescoping the drawer without a fresh ruling — the next reader finding a hidden safety readout is the
+       exact trap this comment exists to prevent. */
     .editor-strip { order: 2; }
 }
 
