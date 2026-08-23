@@ -3,7 +3,7 @@
 // (see [[live-cnc-readonly-when-away]]). Polled while visible.
 import { el } from '../util.js';
 import { deriveStatus, deviceName } from '../../../shared/js/client.js';
-import { EXE_DOWNLOAD_URL, roleInfoFromDescriptor } from '../../gatewayStatus.js';   // t2151 — the workspace-relative role, applied to THIS view's own freshly-fetched `d` below (not gatewayStatus.js's separately-polled cache — see that function's own comment)
+import { EXE_DOWNLOAD_URL, roleInfoFromDescriptor, roleIdentity } from '../../gatewayStatus.js';   // t2151 — the workspace-relative role, applied to THIS view's own freshly-fetched `d` below (not gatewayStatus.js's separately-polled cache — see that function's own comment). t2173 — roleIdentity() is the declared headline/detail wording, this view's own STATED-identity line below
 import { readGatewayHeartbeat, canSendViaDrive } from '../../cloud/driveJobs.js';   // t2112 - the machine's OWN report, when this device has no gateway
 import { fileSavedStem } from '../../../data/backup.js';   // t2101/t2145 - the Drive folder the gateway publishes under is keyed by the workspace's name — now the last-saved .ddcs file's name
 
@@ -12,6 +12,12 @@ export default {
   label: 'Status',
 
   mount(ctx) {
+    // t2173 (ROLES S3) — THE STATED IDENTITY. Above Connection/Controller (unchanged below), a loud line that
+    // answers "is this PC the gateway, or a client?" without making the reader infer it from which rows show up
+    // further down. Reuses the pre-flight badge's PILL language (styles.css `.role-identity`) — bold, coloured,
+    // never `.muted` — because that is this app's established way of stating a state a screenshot must still
+    // carry with no surrounding context (see this view's onPoll() for the three renderings).
+    this.identity = el('section', { class: 'block' });
     this.conn = el('section', { class: 'block' });
     this.desc = el('section', { class: 'block' });
     this.vars = el('section', { class: 'block' });
@@ -49,7 +55,7 @@ export default {
       try { this._hb = await readGatewayHeartbeat(fileSavedStem()); }
       catch (_) { this._hb = { state: 'unreadable' }; }   // ignorance, not absence
     };
-    ctx.root.append(this.conn, this.desc, this.vars);
+    ctx.root.append(this.identity, this.conn, this.desc, this.vars);
     this.onPoll(ctx);
   },
 
@@ -65,6 +71,14 @@ export default {
     // workspace-relative seam the identity line and admin.js's gating now both read.
     const { role, reason: roleReason } = roleInfoFromDescriptor(d);
     const askMachine = role === 'client';   // t2151 — was `!d`; a client with a local daemon still asks this
+
+    // t2173 — THE IDENTITY LINE. roleInfoFromDescriptor's own role/reason (just derived above) map 1:1 onto
+    // roleIdentity's three kinds (gateway / plain client / mismatch) — no new data, this is presentation only.
+    const id = roleIdentity(d);
+    this.identity.replaceChildren(
+      el('div', { class: 'role-identity role-' + id.kind },
+        el('div', { class: 'role-headline' }, id.headline),
+        id.detail ? el('div', { class: 'role-detail' }, id.detail) : null));
 
     this.conn.replaceChildren(
       el('div', { class: 'section-label' }, 'Connection'),
@@ -88,9 +102,13 @@ export default {
       //    its state is UNKNOWN and must never be drawn as 'off'. Same rule and same dots as Send.
       const on = live.controller_connected === true;
       const host = live.hostname ? ' (' + live.hostname + ')' : '';
+      // t2173 (ROLES S3, human: "should be clear its a remote gateway") — "Gateway (SHOP-PC) is running" only
+      // reads as remote to someone who already knows SHOP-PC isn't their own machine. This branch is reached
+      // ONLY when role === 'client' (askMachine, above) — true by construction that the gateway for THIS
+      // workspace is not this PC — so saying "remote" here needs no second check, it is a fact of the branch.
       this.desc.append(
         el('div', { class: 'row hb-row' }, el('span', { class: 'hb-dot ok' }),
-           el('span', {}, 'Gateway' + host + ' is running')),
+           el('span', {}, 'Remote gateway' + host + ' is running')),
         el('div', { class: 'row hb-row' }, el('span', { class: 'hb-dot ' + (on ? 'ok' : 'bad') }),
            el('span', {}, on ? 'Machine is powered on' : 'Machine is switched off')),
         el('div', { class: 'muted', style: 'margin-top:6px' },

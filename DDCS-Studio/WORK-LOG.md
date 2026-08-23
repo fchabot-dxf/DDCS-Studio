@@ -50586,3 +50586,129 @@ human directly for visual confirmation before committing (a chip whose ONLY job 
 readable colour warranted seeing it, not just asserting it).
 
 🔨 turn 2171
+
+## turn 2173 — ROLES S3: THE STATED IDENTITY (arc step) + literal file-menu labels (tail, separate commit)
+
+### ⚠ the spec file, again, and where it actually was
+
+Same shape as t2171's missing `t-badge-collapse.md`: `scratchpad/t-roles-s3.md` did not exist anywhere in the
+repo (`DDCS-Studio/scratchpad/` or otherwise) or on any branch. This time traced it to ground: a full-filesystem
+search found it at `…/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/<advisor's own session
+id>/scratchpad/t-roles-s3.md` — the advisor's SESSION-LOCAL temp scratchpad (the same per-session directory this
+worker also has, described in its own system prompt as "isolated from the user's project"), not the shared,
+git-relative `DDCS-Studio/scratchpad/` both roles are meant to write to (the one `.gitignore`'s own comment
+names: "Agent scratch probes — both the advisor and the worker write throwaway .mjs"). Readable from here only
+because both sessions happen to run on the same machine with no permission boundary between their temp dirs —
+not something to rely on. Read it from that path rather than blocking a second time; flagging clearly so the
+convention actually gets fixed rather than "fixed" twice.
+
+### THE RULING, briefly (full reasoning is in the spec)
+
+Human, three times: "the status tab should be explicitly client or gateway by presentation" / "client needs to
+show if a gateway is connected" / "ok but it should be clear." The Gateway panel's Status tab now STATES,
+unmissably, whether this PC is the CLIENT or the GATEWAY for the open workspace — not left for the reader to
+infer from which rows happen to render below.
+
+### A presentation turn, not a plumbing one — confirmed true
+
+`roleInfoFromDescriptor(d)` (gatewayStatus.js, t2151) already returns everything needed: `role` ('client' /
+'gateway') and `reason` (non-empty ONLY in the mismatch case — a real daemon here, wired to a controller that
+isn't the open workspace's). status.js's own `onPoll()` already computed both at the top, for its own `askMachine`
+branching. So the THREE identity states map 1:1 onto data this view already had in hand:
+  - `role === 'gateway'` → GATEWAY
+  - `role === 'client' && reason` → MISMATCH
+  - `role === 'client' && !reason` → plain CLIENT
+No new API calls, no new plumbing — exactly what the spec predicted.
+
+### THE DECLARATION SEAM
+
+New export `roleIdentity(d)` in gatewayStatus.js, beside `roleInfoFromDescriptor` (its natural home — same file,
+same input). Pure strings, no DOM: `{ kind, headline, detail }`. This is the seam the spec asked for ("EXTEND
+THAT DECLARATION to role, so each view states its own role stance... do NOT hand-write role text into seven
+views") — status.js is this turn's only consumer, but a LATER turn giving Send/Tracker/etc. their own role stance
+calls this SAME function instead of re-deriving wording that would drift. Mirrors the existing declared-not-
+hand-rolled shape `tracker.js`'s `requiresModbus`/`requiresGateway` + `gatewayPanel.js`'s `viewUnavailable()`
+already established for CAPABILITY gating — this is the same pattern one level up, for STATEMENT rather than
+gating.
+  - GATEWAY detail: `Serving ${ctrlLabel(profileId)} from ${deviceName(d)}` — "what it serves, and from where,"
+    using only fields already in the descriptor (no new call).
+  - CLIENT detail: `Targets ${ctrlLabel(getMachine().controllerId)}` — what the OPEN WORKSPACE wants, not this
+    PC's own (irrelevant, plain-client) wiring.
+  - MISMATCH detail: `reason`, unchanged, verbatim — the spec's own instruction ("roleReason already carries the
+    second half. Do not drop it in favour of a shorter sentence") followed literally.
+
+### status.js: the identity line, and the REMOTE wording fix
+
+A new `this.identity` section, mounted FIRST (before Connection/Controller, which the spec said must stay
+exactly as they are — they do; zero lines in that existing block changed except the one text swap below).
+Renders `<div class="role-identity role-{kind}"><div class="role-headline">…</div><div class="role-detail">…
+</div></div>` from `roleIdentity(d)` each poll.
+
+Separately — the spec's other explicit ruling, independent of the identity line: "Gateway (SHOP-PC) is running"
+only reads as remote to someone who already knows SHOP-PC isn't their own machine. Changed to "Remote gateway
+(SHOP-PC) is running" in the one branch that renders it — reached ONLY when `role === 'client'` (askMachine),
+so remote is true by construction there, no second check needed (the spec's own reasoning, verified against the
+actual branch structure rather than assumed). Did NOT touch the stale/unseen/unreadable branch's wording (its
+existing "for this machine" phrasing wasn't named in the dispatch's own example, and touching it risked scope
+creep past what was actually specced).
+
+### THE ANTI-SPEC, and a real bug it caught
+
+Reused the pre-flight badge's PILL colour tokens exactly (styles.css `.role-identity` + `.role-gateway`/
+`.role-client`/`.role-mismatch`, mapped to the SAME `#1f9d57`/info-panel/`#f0b429` values `preflight-green`/
+`-info`/`-amber` use) — not the component, per the spec's own distinction. Building the headline/detail font
+rule, a computed-style check (`getComputedStyle(...).fontWeight`) came back `400` instead of the `700` the rule
+declared. Root cause: `font: 700 13px/1.3 inherit` — copied verbatim from `.preflight-badge-label`'s own existing
+pattern — is INVALID CSS. `inherit` is a wide keyword; it can only be a property's SOLE value, never a component
+inside a shorthand's family slot, so the whole declaration is silently dropped by the parser and every property
+in it falls back to whatever the ancestor cascades. **This is a real, pre-existing bug in the shipped
+`.preflight-badge-label` rule (and likely others sharing the same `font: … inherit` shorthand pattern elsewhere
+in styles.css) — the pre-flight badge's text has probably never actually rendered at its stated 700-weight/
+11px; some ancestor's cascade has been standing in unnoticed.** Fixed ONLY in the two new rules this turn adds
+(`.role-headline`/`.role-detail`, now separate `font-family`/`font-weight`/`font-size`/`line-height`
+declarations) — the pre-existing rules are NOT touched (wide blast radius across many unrelated rules, out of
+this turn's scope) but are named here as a real, worth-a-backlog-item bug, not a hypothetical one — caught by
+measuring, the same discipline this session applied to t2169's cascade-order bug and t2171's badge-hide race.
+
+### Test + non-vacuity, in spirit if not the literal restore-and-rerun ritual
+
+New `role-identity-status-2173.spec.js`, 7 tests: the three states (gateway/client/mismatch, each asserting
+class + headline + detail — the mismatch test explicitly checks it reads CLIENT, not gateway, and still carries
+BOTH facts), the `.muted`-avoidance rule (a real background colour present, not transparent), the bold-headline
+rule (font-weight ≥700 — this is the assertion that caught the shorthand bug above; it failed red before the
+CSS fix, confirming it is not vacuous), the dispatch's own literal acceptance test (cropped screenshots of all
+three states, saved to `verification/t2173-role-identity-{gateway,client,mismatch}.png` and sent to the human
+directly), and a full 5-theme × 3-state sweep asserting a real background colour renders everywhere. Reused the
+existing `descFor`/mount-status-directly patterns from `role-workspace-relative-2151.spec.js` and
+`status-remote-machine-2112.spec.js` rather than inventing a new harness.
+
+**Collateral, required not optional:** the "Remote gateway" wording change breaks two existing exact-text
+assertions in `status-remote-machine-2112.spec.js` ('Gateway (RenderRanchy) is running', both FRESH_ON/FRESH_OFF
+cases) — fixed both to the new text, with a one-line comment on WHY the wording changed. Full sweep after: those
+two files plus `role-workspace-relative-2151`, `role-derived-client-side-2145`, `settings-role-gate-2111`, and
+every `gateway-*` spec (jobs-history, local-reach, mismatch-gate, position-stub, quiet-offline, state-contract) —
+29 passed, 1 pre-existing skip unrelated to this change. Smoke 76/76, node 227/227, lint clean.
+
+## TAIL (separate commit) — the three "open a saved thing" doors get literal labels
+
+Human ruling, direct: "open load are gcode vs project it should be more litteral." headerPost.js's own t2149
+comment already SPELLED OUT the three distinct file formats behind Open/Load/Library ("Genuinely three
+different file formats, not one act with three names — CHECKED, not assumed") — the knowledge existed, it just
+never reached the visible button text, which all read like synonyms of one "open a thing" verb.
+  - `wsOpen` (workspaceRow): "📂 Open" → "📂 Open workspace"
+  - `fileLoad` (fileRows): "📂 Load…" → "📂 Load G-code…"
+  - `library` (libraryRow): "Library…" → "Open project…" — its door also still reaches Wizards (unchanged,
+    title unchanged too), but Projects is the "open a saved thing" case this literalisation is about; noted in
+    the code comment rather than silently narrowing what the label implies.
+Titles were already literal (t2149's own disambiguation work) — left untouched; only the always-visible label
+text changed, since that was the actual gap named.
+
+Collateral: every consumer of these three `data-act` rows selects by the attribute, never by visible text
+(confirmed by reading each — `canvas-handle-writable-1804`, `editor-file-menu-1227`, `header-account-row-742`,
+`header-menu-split-2149`, `header-profile-menu`, `header-responsive`, `library-854`, `workspace-manager-1223`),
+so none needed a functional change — ran all 36 of their tests anyway, all green, rather than trusting the
+read. Updated two stale comments in `library-854.spec.js` that described the old "Library…" text for a human
+reader (not an assertion). Verified live via a real quick-menu screenshot (`verification/t2173-tail-literal-
+labels.png`, sent to the human). Smoke/node/lint re-run clean.
+
+🔨 turn 2173

@@ -45,7 +45,7 @@
  * vs cached is not a stylistic choice here: a hand-mounted view under test supplies its OWN mock descriptor
  * and never starts gatewayStatus.js's separate polling loop, so a cache read would silently see nothing.
  */
-import { makeClient, deriveStatus } from '../shared/js/client.js';
+import { makeClient, deriveStatus, deviceName } from '../shared/js/client.js';
 import { getMachine } from '../data/workspaceMachine.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -79,6 +79,31 @@ export function roleInfoFromDescriptor(d) {
         }
     }
     return { role: 'gateway', baseRole, reason: '' };
+}
+
+/**
+ * t2173 (ROLES S3, human across three messages: "the status tab should be explicitly client or gateway by
+ * presentation" / "it should be clear") — THE DECLARATION SEAM. `roleInfoFromDescriptor` answers WHICH role;
+ * this answers WHAT TO SAY about it, once, in plain language — so the Status tab's identity line (this turn's
+ * own consumer) and any LATER view that wants to state its own role stance (send.js, tracker.js, …) read the
+ * SAME headline/detail instead of each hand-writing its own prose that drifts. Pure strings, no DOM — a caller
+ * renders them however fits its own surface.
+ * ⛔ Deliberately does NOT decide loud-vs-muted styling here — that is a presentation choice per caller (this
+ * turn's Status tab reuses the pre-flight badge's PILL language for it; see styles.css `.role-identity`). This
+ * function's job stops at "what is true and how to phrase it."
+ */
+export function roleIdentity(d) {
+    const { role, reason } = roleInfoFromDescriptor(d);
+    if (role === 'gateway') {
+        return {
+            kind: 'gateway',
+            headline: 'This PC is the gateway',
+            detail: `Serving ${ctrlLabel((d && d.controller_profile_id) || null)} from ${deviceName(d) || 'this machine'}`,
+        };
+    }
+    if (reason) return { kind: 'mismatch', headline: 'This PC is a client', detail: reason };
+    const wsId = getMachine().controllerId;
+    return { kind: 'client', headline: 'This PC is a client', detail: wsId ? `Targets ${ctrlLabel(wsId)}` : '' };
 }
 
 /**

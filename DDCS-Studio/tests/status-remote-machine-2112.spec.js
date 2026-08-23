@@ -96,7 +96,9 @@ test('NO DAEMON + the machine reported in: Status names the GATEWAY and the MILL
     await boot(page);
     await mountStatus(page, { hb: FRESH_ON, hasDaemon: false });
     expect(await page.evaluate(() => window.__statusErr), 'the status view rendered').toBeNull();
-    await expect(root(page).getByText('Gateway (RenderRanchy) is running')).toHaveCount(1);
+    // t2173 (ROLES S3) — "Remote gateway", not bare "Gateway": this branch only reaches here when role is
+    // client (askMachine), so the gateway it names is never this device.
+    await expect(root(page).getByText('Remote gateway (RenderRanchy) is running')).toHaveCount(1);
     await expect(root(page).getByText('Machine is powered on')).toHaveCount(1);
     // ⛔ the phone-hostile copy must be gone in this state
     await expect(root(page).getByText(/still looking on this PC/), 'no "looking on this PC" once the machine has answered').toHaveCount(0);
@@ -105,7 +107,7 @@ test('NO DAEMON + the machine reported in: Status names the GATEWAY and the MILL
 test('NO DAEMON + the mill is OFF: stated as off, and NOT confused with the gateway being down', async ({ page }) => {
     await boot(page);
     await mountStatus(page, { hb: FRESH_OFF, hasDaemon: false });
-    await expect(root(page).getByText('Gateway (RenderRanchy) is running')).toHaveCount(1);
+    await expect(root(page).getByText('Remote gateway (RenderRanchy) is running')).toHaveCount(1);
     await expect(root(page).getByText('Machine is switched off')).toHaveCount(1);
 });
 
