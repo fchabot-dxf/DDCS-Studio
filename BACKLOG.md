@@ -1294,3 +1294,57 @@ theming, which is the wrong trade in a file built on tokens.
 
 ⚠ **Both known instances are already flagged in the WORK-LOG and NOT fixed** — the handle one was fixed at
 t2155, the badge-label one is outstanding. Confirm which is which before starting.
+
+### 16. THE DECLARED COMPONENTS EXIST AND NOBODY USES THEM — modals, and the Local/Cloud switcher
+*(human, 2026-08-23, comparing the Wizards, Workspace and Projects modals side by side: "the project modal
+seems different then the others, is it actually sharing assets?" then "the local cloud tab also needs to be
+reused")*
+
+Their answer, measured: **they share the paint, not the component.**
+
+### The modal shell
+
+```
+  .modal-card          styles.css:2072      the declared shared modal shell
+                                            → ZERO consumers. No JS, no HTML.
+
+  instead: 15 separate rules each re-read the SAME four tokens by hand
+    .library-modal        Projects      .wss-box            Workspace
+    .setup-sheet-modal    .proj-savepanel    .cloud-modal-panel    …
+```
+
+Every modal repaints itself from `--modal-face` / `--modal-edge` / `--modal-radius` / `--modal-shadow` under
+its own class name. ⭐ **That is why they nearly match and drift everywhere the tokens do not reach** — colour,
+radius and shadow agree; padding, header layout, button sizing and controls do not.
+
+⚠ Projects looks the most different for a specific reason: it still wears `.library-modal`, the shell built for
+a **tabbed container**. t2180 deleted the tab strip; the body is still laid out to sit inside one.
+
+### The Local/Cloud switcher
+
+```
+  .proj-voltab    libraryModal.js:68          "☁ Cloud"           Projects
+  .proj-voltab    projectModal.js:76          "☁ Cloud"           save modal
+  .proj-starget   projectModal.js:377         "☁ Cloud"           save target
+  .wsm-place      wizardManager.js:167-168    "📁 Local folder"  ⎫ the same two lines,
+  .wsm-place      workspaceManager.js:285-6   "📁 Local folder"  ⎭ verbatim, including
+                                                                    the is-active ternary
+```
+
+Five markup sites, two class families, and ⛔ **two different vocabularies for the same concept** — a user reads
+`Local` in one modal and `📁 Local folder` in the next and has to work out they mean the same volume.
+
+### ⭐ Why this is one item and not two
+
+Both are the same failure: **a declaration exists, is correct, and every caller bypasses it.** Same shape as
+`.viz3d-handle`'s dead studio override (t2155) and `wizardManagerPanel`'s claimed-but-absent Fork (t2180) —
+things that are true in the source and untrue in the running app.
+
+⇒ Adopt `.modal-card` at all 15 sites; extract ONE volume switcher and use it at all five.
+⚠ **Fix the vocabulary while unifying** — one name for the local volume, chosen once.
+
+⛔ **A turn of its own.** 20 call sites across two concerns is not a tail, and a half-migration leaves three
+spellings instead of two.
+
+⚠ **Verify by screenshot matrix, not by diff**: the three modals side by side, in all five themes, before and
+after. The whole point is that they currently agree by coincidence — a diff cannot show you that they stopped.
