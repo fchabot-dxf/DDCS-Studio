@@ -54727,3 +54727,87 @@ regression.
 ### Capacity
 
 Full working room this turn — no flag.
+
+## t2255 — AMENDMENT 11 REPORT: WHY ATC DIVERGED (no fix this turn, as instructed)
+
+A pure investigation turn — no code changed. The question: should ATC declare a sim node like every other
+wizard (fix = a declaration, inherits the sizer for free), or does its preview need something a sim node
+can't express (fix = the sizer must stop depending on one DOM shape)? Answer, with evidence: **neither
+cleanly** — the sizer's own root cause is a THIRD thing, smaller than both options, and it doesn't wait on
+either.
+
+### The direct cause, found in the static HTML, confirmed live
+
+All 6 ATC wizard bodies in `index.html` (`wiz_atc_length`, `wiz_atc_check`, `wiz_atc_warmup`, `wiz_atc_table`,
+`wiz_atc_change`, `wiz_atc_test`) build `.wiz-visual` with a BARE `.viz-container[data-viz-pane="preview3d"]`
+directly inside it — no `.viz-split` wrapper. Every other built-in wizard (`wiz_drill`, `wiz_pocket`,
+`wiz_contour`, `wiz_slot`, `wiz_surfacing`, `wiz_text`, `wiz_user`) wraps its pane(s) in `.viz-split`, even
+though these are ALSO static HTML, not the dynamic declared-node system — so "wrap it in `.viz-split`" was
+never actually gated on the wizards-as-data migration at all. `paneAccordion.js:533`'s selector is exactly
+`.wiz-visual .viz-split` — it finds nothing for ATC, so `addPaneSplitter`/`addVisualSizer` (the functions
+that create the resize handles) are never even CALLED, not called-and-failing.
+
+Confirmed empirically (`scratchpad/t2255-atc-live.mjs`, all 6 ATC types, desktop 1280px AND mobile 390px per
+the dispatch's own "check desktop too, don't inherit the hedge"): `hasVizSplit: false`, `hasSizer: false`
+for every one, both viewports. `addVisualSizer` (paneAccordion.js:301) ALREADY degrades correctly for a
+single pane — its ratio math is guarded behind `panes.length > 1` throughout — so a bare wrap-in-`.viz-split`
+would very likely just work, no new params or branches needed inside the sizer itself. Did not attempt this
+— report only, per the explicit instruction.
+
+### The `formWidgets.js` 'sim' node genuinely CANNOT express what ATC needs — a real, separate finding
+
+Checked whether ATC's own wizards-as-data TWIN (`blocks/dataOps/atc*Data.js`, all 6 files) already declares
+a sim node — it does, and unexpectedly ALSO a `panel` node ahead of it: `uiChildren: [{ type: 'panel', ... },
+{ type: 'sim', ... }]`. This is NOT what the recap in the dispatch said ("none of the atc*.js files declares
+one") — the recap was checking `wizards/atc*.js`, which is a different, older location from where the
+wizards-as-data twins actually live (`blocks/dataOps/`); the declaration exists, just not where the recap
+looked. Traced why it doesn't matter yet regardless: `formWidgets.js`'s `'sim'` branch (line 1335) ALWAYS
+builds BOTH a `preview3d` AND a `layout2d` pane, unconditionally — it never reads the node's own `params`
+(`rotary`/`magazine`/`toolMachine`) to decide what to omit. ATC has no 2D geometry to lay out; a live 'sim'
+node would give it an unwanted, empty 2D pane it doesn't need, and the ALSO-declared 'panel' node ahead of
+it would append a SECOND, redundant `.wiz-visual` box before that. **If the ATC twins were registered as
+currently written, the result would be two stacked visual boxes, one of them pointless — a real design
+defect in the twin's own declaration, independent of the sizer bug**, and not something "just declare it"
+resolves as-is.
+
+### Confirmed dead end: `registerUserOp(atc*DataDef())` is not called anywhere live
+
+Grepped `web/` (not `tests/`) for `registerUserOp(atc` — zero matches. The twins are exercised only inside
+their own byte-diff verification tests (`atc-change-twin.spec.js`, `atc-table-twin.spec.js`,
+`atc-test-twin.spec.js` — Length/Check/Warmup have NO twin test file yet, so they're behind even those
+three), each explicitly self-documented as **"NOT registered/in-place yet (E2)"**. So this isn't a case
+where a working declaration sits unused by oversight — it's a KNOWN, already-named pending migration step,
+and the twin's own uiChildren tree needs the panel/sim duplication fixed before E2 makes sense for ATC, or
+the migration would ship the double-box regardless.
+
+### What else ATC lost — checked, not assumed, per the dispatch's "rarely costs exactly one thing"
+
+- **The collapse chevron works.** `enhancePane()` (called on ANY `.wiz-visual [data-viz-pane]`, no
+  `.viz-split` required) ran for all 6 wizards, both viewports (`hasPaneBar: true`, `hasPaneBody: true`
+  confirmed live) — folding the 3D pane away is NOT broken.
+- **The global persisted height silently reaches ATC anyway, with no way to escape it.** `applyVisualHeight()`
+  targets `document.querySelectorAll('.wiz-visual')` directly, not `.wiz-visual .viz-split` — so ATC's box
+  IS subject to the same app-wide persisted height every other wizard's drag writes. Verified live: called
+  `setVisualHeight(650)` via `panePrefs.js` (simulating a drag on some OTHER wizard), then opened ATC Length
+  fresh — its own box rendered at exactly 650px (`--viz-explicit-h: 650px`), with `hasSizerToFixIt: false`.
+  This is the actual, concrete shape of "resize is broken": not a fixed size, but a size ATC never chose and
+  cannot change, inherited from whatever wizard was last dragged.
+- **The keyboard-accessible resize (arrow keys on the splitter) is also absent** — `addPaneSplitter` early-
+  returns when `panes.length !== 2` (line 391), so the keydown handler that lets `Shift+↓` etc. resize never
+  attaches either. Same root cause (no `.viz-split`), a second, less-visible casualty.
+- **The ratio splitter's absence is correct, not a loss** — ATC has one pane; a share-of-two makes no sense
+  and nothing expects it.
+
+### Recommendation (not built — reporting per instruction)
+
+The sizer bug's fix is the smallest of the three things found: wrap each ATC wizard's existing single pane
+in a `.viz-split` div in `index.html` (six small, mechanical edits, no JS changes expected given
+`addVisualSizer`'s existing single-pane guards) — independent of and much smaller than the wizards-as-data
+registration question. The twin's own `panel`+`sim` duplication is a separate, pre-existing defect in
+`blocks/dataOps/atc*Data.js` that should be resolved before E2, regardless of when E2 happens. Did not
+implement either — screenshots at `scratchpad/t2255-atc-atc_length-desktop.png` /
+`-atc_change-desktop.png` show the current, handle-less box for reference.
+
+### Capacity
+
+Full working room this turn — no flag.
