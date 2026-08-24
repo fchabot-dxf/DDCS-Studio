@@ -54273,3 +54273,72 @@ pilot), and the interstice-flattening step from amendment 4 are all untouched �
 work the advisor explicitly said to sequence AFTER this turn's two small fixes, and explicitly invited
 splitting across turns rather than bundling. Amendment 11 (ATC 3D preview resize) is a separate, unrelated
 investigation — not started.
+
+## t2245 — SHIP THE SPACED DROPDOWN FOR REAL, THREE CARES CHECKED, renderEvents QUEUED
+
+Human picked B (spaced pills) after seeing both t2243 screenshots. This turn makes it real CSS, checks the
+three named cares by measuring rather than assuming, and queues (does not build) the renderEvents ruling.
+
+### What "spacing" actually meant, corrected before writing any CSS
+
+Measured live before assuming: `.toolbar-dropdown-content` already declares `gap: 4px` in its BASE rule — a
+genuine flex gap, not padding (confirmed via `getBoundingClientRect()` on adjacent items: exactly 4px between
+them). The t2243 "flush" look wasn't a missing gap; it was the restored 14px radius exposing that already-
+existing 4px gap as pinched notches, WHILE a `border-top` separator line (existing to divide items that used
+to touch, back when the radius was 0) sat inside that same narrow gap adding clutter. So the real fix is
+narrower than "add spacing" — remove the now-redundant `border-top` for organic; the gap that makes it read as
+separate pills was there all along.
+
+`[data-theme="organic"] .toolbar-dropdown-content button { border-top: none !important; ... }` — one line
+added to the existing organic override block.
+
+### The three cares, each checked by measuring or rendering, not assumed
+
+**(1) The separator is gone** — done above, and it's the actual fix, not a side effect.
+
+**(2) The group label ("ROTARY") reading as a heading** — measured BEFORE fixing: gap above the label
+(Align→Rotary) and below it (Rotary→Centreline) were BOTH exactly 4px, confirming the advisor's own
+prediction — "just another gap in the rhythm." Added `.toolbar-dropdown-content > div { margin-top: 4px; }`
+(plus a `:first-child` reset) — the label is the ONLY plain `<div>` among this flex column's children
+(confirmed by reading `commandDeck.js`'s `wizGroupHtml`: every other child is a `<button>`), so this selector
+reaches exactly it. Re-measured after: 8px above, 4px below — asymmetric, reads as attached to what follows.
+**Universal, not organic-scoped** — every theme shares this same flex layout and the same symmetric-gap
+shape; organic's own restored radius just made the dropdown's rhythm visible enough to notice. Verified
+studio's own dropdown picked up the same improvement with no regression
+(`verification/t2245-dropdown-studio.png`).
+
+**(3) The menu getting taller / overflow risk** — measured the real 8-item Probe menu at 430×800: total height
+324.75px (was 320.75px before the label fix — the asymmetric margin adds a negligible 4px), opening at y=59,
+comfortably inside an 800px viewport. **Named honestly, not glossed over**: the dropdown has **zero**
+overflow/scroll protection — no `max-height`, no `overflow-y`, no JS-side viewport clamping (grepped both the
+CSS and `commandDeck.js`, confirmed absent) — this is PRE-EXISTING, not introduced by this turn's ~4px
+addition, but it means on a genuinely short viewport (a landscape phone under ~400px tall) this exact 8-item
+menu would extend past the screen edge with nothing to scroll it. Flagging as a separate, pre-existing gap
+rather than fixing it under this turn's "ship B" scope.
+
+Confirmed the light-cream fill and dark ink from t2237 are unaffected: `background: rgb(232, 220, 192)`,
+`border: 0px none` (now genuinely zero on every side), radius `14px`, no box-shadow — matches t2243 exactly,
+spacing changes touched layout only.
+
+### renderEvents — ruled, queued, not built this turn
+
+Advisor ruled for the expandable-row-in-Send-list proposal based on last turn's evidence, but explicitly said
+not to build it this turn ("it is a new surface, not a fix... Queue it"). Noting the one design constraint
+the advisor named for whenever it IS built: the beacon-count entries are genuinely Modbus-sourced and need the
+same honest "unavailable" treatment Track already gives that data, not an empty row on a non-Expert
+controller.
+
+### Verified
+
+Full suite (required — a shared, universal CSS rule this time, not organic-scoped): 2792 passed, 17 flaky, **1
+unexpected**, 25 skipped (34.9m). Checked its error text (`wizard-face-1599.spec.js:130`): the identical
+`waitReady`/`__blkws` boot-timeout family from t2233, unrelated to the dropdown/label spacing changes.
+Cleanest of the four full-suite runs this session (1 unexpected vs 2/2/2 on the prior three).
+
+### What this turn did NOT do
+
+Amendments 6/7 (the sub-tab CSS seam — hoisting `settingsPanel.js`/`macrosApp.js`'s duplicated inline styles
+into tokens), 8/9, and the interstice flattening remain untouched, per the advisor's own explicit sequencing.
+A same-turn amendment sharpened scope for whenever that work starts (noted, not acted on here): the human
+wants ALL FIVE themes naming their own sub-tab values through the same seam, not organic-fixed-plus-four-
+defaults, and wants amendments 6+7 taken as their own whole turn rather than bundled with 8/9/4.
