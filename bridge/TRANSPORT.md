@@ -183,13 +183,19 @@ phone can see a gateway whose roads do not reach it.
 ⇒ **OBSERVED: the heartbeat payload already carries `backend`**, so this costs nothing but wording. Render
 *"running — LOCAL transport, cannot send from this device"* and the remedy, never a Send button that fails.
 
-**⑤ Security — STILL OPEN**, and narrower than §5 implied.
-The Drive folder is scoped to the human's own Google account, so that IS the auth boundary; and **nothing
-auto-runs** — a hostile job cannot start itself, because a person presses Cycle Start at the machine.
-⇒ The residual exposure is **folder SHARING**: if `DDCS Bridge` is ever shared, someone else can place a job
-that looks legitimate to whoever walks up next.
-⇒ Advisor's recommendation, NOT yet ruled: **warn if the folder carries any sharing permission**, rather than
-building an identity scheme. Needs the human's answer before anything is built.
+**⑤ Security — RULED OUT OF SCOPE.** *Human, 2026-08-24: "dont worry about permissions at all."*
+⇒ **No sharing warning, no identity scheme, no permission checks.** Build none of it.
+
+⚠ Recorded as a DECISION, not an oversight, because in a spec those look identical unless someone says
+which it is. The reasoning that makes it defensible: the Drive folder is scoped to the owner's own Google
+account, so the account IS the boundary; and **nothing auto-runs** — `send.js` states it plainly, *"a WRITE op
+— the operator still presses Cycle Start."* A job placed by anyone still needs a person standing at the
+machine to start it, so the manual start is the real mitigation and it is already there.
+
+⚠ What would REOPEN this, so a future reader knows the boundary of the ruling: anything that makes a job run
+without a person present. Auto-start, a queue that drains itself, or a remote Cycle Start would each turn an
+inbox into remote code execution on a machine that moves. **This ruling is scoped to a gateway a human starts
+by hand.**
 
 ---
 
