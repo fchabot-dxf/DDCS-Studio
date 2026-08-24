@@ -1708,7 +1708,7 @@ downstream consumed (see BACKLOG #10's t1468 note).
 
 ---
 
-### 20. THE ATC TWINS DECLARE BOTH A `panel` AND A `sim` NODE — registering them as-is ships TWO stacked boxes
+### 20. [ATC HALF FIXED t2257 — the SYSTEMIC half is open, see below] THE ATC TWINS DECLARE BOTH A `panel` AND A `sim` NODE — registering them as-is ships TWO stacked boxes
 
 *(found at t2255 while reporting why ATC's 3D preview cannot be resized. NOT the resize bug — that one is six
 missing wrappers in index.html and is being fixed separately. This is a defect waiting at E2.)*
@@ -1730,3 +1730,24 @@ declaration cleanup into a debugging session in the middle of a migration.
 
 ⚠ **And decide which node is redundant rather than deleting the one that looks easier** — `panel` and `sim` are
 not synonyms, and whichever survives has to carry what the other was doing.
+
+
+#### ⚠ UPDATE t2257 — it is NOT ATC-only, but "broken" is only PROVEN for ATC
+
+**OBSERVED:** **30 of ~32** dataOps files declare a `panel` node, and **24 of those also declare `sim`.** So the
+shape is nearly universal, not an ATC quirk.
+
+⭐ **But the shape is not the defect.** `params.panel`'s own declared value (`form3d+2d` / `form3d` / `form` /
+`commscreen`) is **never read** by `formWidgets.js`'s panel branch, so for the other 23 the duplication may be
+inert. What made it real for ATC specifically is that `panel` and `sim` **hardcode the same `layout2d`
+container ids** — an actual id collision, not a cosmetic overlap.
+
+**Fixed for ATC at t2257:** `sim` gained an additive `layout2d: false` opt-out (byte-identical for all 23 other
+callers) and `panel` was removed from the six `atc*Data.js`.
+
+⛔ **STILL OPEN, and it is the bigger half:** whether the other 23 are inert or merely un-triggered. ⚠ Do NOT
+assume inert because ATC's symptom was an id collision — establish it per file, or establish that the panel
+branch genuinely cannot fire, before E2 registers anything beyond ATC.
+
+**STILL REAL IF (systemic half):** `grep -l "panel" DDCS-Studio/web/blocks/dataOps/*Data.js | wc -l`
+→ **any count above 6 means the systemic half is STILL REAL.**
