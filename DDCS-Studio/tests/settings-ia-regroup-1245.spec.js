@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
  *
  * So the strip is Look and feel │ Controller │ Hardware, and every deep link that pointed at a deleted panel now
  * points at the surface that actually owns the job. That remapping is what these tests are for.
+ * (t2217 — the strip's first tab is labelled UI now, not "Look and feel"; the group key stays "lookfeel".)
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -47,7 +48,7 @@ const openAppMenu = async (page) => {
     await page.waitForSelector('#hdrAppMenu:not([hidden])', { timeout: 6000 });
 };
 
-test('the strip is FOUR tabs — Look and feel, Controller, Hardware, Workspace', async ({ page }) => {
+test('the strip is FOUR tabs — UI, Controller, Hardware, Workspace', async ({ page }) => {
     // t2192 — Workspace joined as a fourth, for a different job than the three above (the inventory, not
     // settings): scratchpad/t-workspace-tab.md. Not a return of the DELETED t1245 Workspace subtab (that one
     // duplicated the workspace manager's Save/Open) — this one answers what IS in the file.
@@ -55,7 +56,7 @@ test('the strip is FOUR tabs — Look and feel, Controller, Hardware, Workspace'
     const strip = await page.evaluate(() => [...document.querySelectorAll('#settings-app .settings-tabs .settings-main-tab')]
         .map((b) => ({ group: b.dataset.group, label: b.textContent.trim() })));
     expect(strip).toEqual([
-        { group: 'lookfeel', label: 'Look and feel' },
+        { group: 'lookfeel', label: 'UI' },
         { group: 'controller', label: 'Controller' },
         { group: 'hardware', label: 'Hardware' },
         { group: 'workspace', label: 'Workspace' },
@@ -63,7 +64,7 @@ test('the strip is FOUR tabs — Look and feel, Controller, Hardware, Workspace'
     expect(await page.locator('.settings-main-tab[data-group="general"]').count(), 'the catch-all is gone').toBe(0);
 });
 
-test('Look and feel holds FOUR subtabs (t2196 — Wizard bar retired as a sub-tab; its tree moved into a row on Appearance)', async ({ page }) => {
+test('UI holds FOUR subtabs (t2196 — Wizard bar retired as a sub-tab; its tree moved into a row on Appearance)', async ({ page }) => {
     // t2125 (SOUND-PLAN.md amendment 4) — Sound joined as a sub-tab peer of Appearance (not a 4th MAIN
     // tab: ~11 toggle rows is too thin for one and too big to bolt onto Appearance), so this grew from
     // four to five. Adjacent to Appearance on purpose — sound follows the theme, which lives there.

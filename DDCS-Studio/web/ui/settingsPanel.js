@@ -3,7 +3,7 @@
  *
  * A header ⚙ button opens an overlay with three L1 groups (t1245 — after THE SHRINK, which took Workspace, Cloud,
  * FAQ, Feedback and About out of Settings entirely: none of them was a setting):
- *   - Look and feel: Appearance · Preview · Editor · Wizard bar
+ *   - UI:             Appearance · Preview · Editor · Wizard bar   (t2217 — was "Look and feel"; label only, group key stays "lookfeel")
  *   - Controller:    Profile · WCS · Variables · Program · Gateway
  *   - Hardware:      Machine · Head · Input · Output · Tool table  (subsystems added via "+ Add")
  *
@@ -1164,7 +1164,7 @@ function buildSettingsOverlay() {
                          Cloud tab, FAQ + About are not settings, and Feedback was a second door to the Rate toast. What
                          REMAINS is the one thing General actually was — how the app looks and behaves for you. -->
                     <div class="settings-tabs" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="settings-main-tab active" data-group="lookfeel">Look and feel</button>
+                        <button class="settings-main-tab active" data-group="lookfeel">UI</button>
                         <button class="settings-main-tab" data-group="controller">Controller</button>
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                         <!-- t2192 — WORKSPACE: the .ddcs made visible. Its job is the INVENTORY, not navigation — a
@@ -1178,7 +1178,7 @@ function buildSettingsOverlay() {
             </div>
             <div class="settings-body">
                 <div class="settings-sidebar">
-                    <div class="sidebar-group-label" data-group-label="lookfeel">Look and feel</div>
+                    <div class="sidebar-group-label" data-group-label="lookfeel">UI</div>
                     <button class="settings-tab active" data-group="lookfeel" data-target="set_tab_appearance">Appearance</button>
                     <!-- t2125 (SOUND-PLAN.md amendment 4) — a sub-tab, not a 4th main tab: ~11 toggle rows is too
                          thin for a main tab and too big to bolt onto Appearance. Adjacent to Appearance on purpose
@@ -1733,7 +1733,7 @@ function buildSettingsOverlay() {
                 <div id="set_tab_workspace" style="display:none">
                     <div class="settings-section" style="border-top:none; padding-top:0;">
                         <div class="settings-identity" id="set_identity_band"></div>
-                        <div class="settings-hint">Everything below travels INSIDE this workspace's <b>.ddcs</b> file — opening it elsewhere brings all of it. The one exception is the theme (Look and feel ▸ Appearance), saved on this device only.</div>
+                        <div class="settings-hint">Everything below travels INSIDE this workspace's <b>.ddcs</b> file — opening it elsewhere brings all of it. The one exception is the theme (UI ▸ Appearance), saved on this device only.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">WHAT'S IN THIS WORKSPACE</div>
@@ -3602,7 +3602,7 @@ function wireSettingsOverlay(ov) {
 
     // Machine → AXES: the vertical per-axis role list (renderAxesGui) attaches its own change listeners (commit + re-render), so no static wiring here (t648).
 
-        // Two-level tab logic: main L1 (Look and feel | Controller | Hardware) → filters sidebar items.
+        // Two-level tab logic: main L1 (UI | Controller | Hardware) → filters sidebar items.
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
@@ -3660,7 +3660,7 @@ function wireSettingsOverlay(ov) {
     // group that has been renamed, split or merged since the call site was written. A group with no panel still works
     // (it lands on that group's first tab), which is what a plain "open Settings at Hardware" wants.
     _settingsNavTo = (group, panelId) => { if (panelId) showPanel(panelId); else if (group) showGroup(group); };
-    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (Look and feel) where the head body dims live.
+    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (UI) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
     if (_headSimLink) _headSimLink.addEventListener('click', () => showPanel('set_tab_preview'));   // t1245 — the panel names its own group
     // Spindle attachments are I/O pins — deep-link out to the Input / Output pin tables (no codegen/interlock logic here).

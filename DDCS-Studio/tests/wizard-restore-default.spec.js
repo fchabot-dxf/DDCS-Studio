@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { autoAppDialog } from './_appDialog.js';
 
 // t1107 — a per-BUILT-IN "Restore default" in the wizard-bar arrangement panel (ui/wizardManagerPanel.js, t2196 —
-// reached from Settings → Look and feel → Appearance → "Wizard bar…", its own small panel). The safety net now built-ins are
+// reached from Settings → UI → Appearance → "Wizard bar…", its own small panel). The safety net now built-ins are
 // becoming editable: revert JUST one built-in to factory — its layout override (rename/reorder/regroup/icon/hide) AND its
 // opensAs data-twin — leaving every other wizard and every custom op untouched. Shown ONLY when that built-in is actually
 // customized (a layout override OR a diverged twin). Distinct from the blanket ↺ Reset to factory (whole bar).

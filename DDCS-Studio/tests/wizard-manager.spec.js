@@ -3,7 +3,7 @@ import { autoAppDialog } from './_appDialog.js';   // t684 d — the in-app dial
 
 /**
  * The wizard bar arrangement manager (ui/wizardManagerPanel.js) — a section tree that designs the bar. Drives
- * the real overlay: t2196 — reached from Settings → Look and feel → Appearance → "Wizard bar…", opening in its
+ * the real overlay: t2196 — reached from Settings → UI → Appearance → "Wizard bar…", opening in its
  * own small panel (#wizbarOverlay) rather than a sixth sidebar sub-tab. Exercises every control (hide, rename,
  * regroup, reorder, reset) and asserts each edit flows LIVE to the wizard bar. A custom op (authored in Dev
  * mode) shows in its Custom dropdown.

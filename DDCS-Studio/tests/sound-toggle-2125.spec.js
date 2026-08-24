@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * t2125 (SOUND-PLAN.md) — a MASTER mute plus a PER-SOUND toggle, stored in the workspace (not
  * localStorage-only), governing every UI earcon AND the job-event samples (the gateway's own toggle test
  * is bridge/bridge-app/tests/test_sound_toggle_2125.py — a browser can't drive winsound). This spec proves
- * the real-app surface: Settings → Look and feel → Sound (a sub-tab, peer of Appearance — amendment 4) is
+ * the real-app surface: Settings → UI → Sound (a sub-tab, peer of Appearance — amendment 4) is
  * SELF-RENDERED from ACTION with one row + preview button per declared sound, the master toggle persists
  * into workspace settings (not just a DOM checkbox), a per-sound off-list survives independently of the
  * master, the three gateway-side job WAVs are actually reachable, and firing sfx() never throws either way.
@@ -128,7 +128,7 @@ test('t2134 iOS UNLOCK: the first real pointer/touch gesture on the page starts 
     expect(second.synthCount, 'a second gesture must not re-arm the unlock — it already removed its own listeners').toBe(1);
 });
 
-test('Sound is its own sub-tab under Look and feel, a peer of Appearance (amendment 4) — not bolted onto it', async ({ page }) => {
+test('Sound is its own sub-tab under UI, a peer of Appearance (amendment 4) — not bolted onto it', async ({ page }) => {
     await boot(page);
     await openSoundTab(page);
     const tabs = await page.evaluate(() => [...document.querySelectorAll('.settings-sidebar .settings-tab[data-group="lookfeel"]')].map((b) => b.dataset.target));

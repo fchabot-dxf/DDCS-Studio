@@ -52968,3 +52968,81 @@ tab-feet clipping trap, active-tab-into-view on open, across all four strips and
 substantial enough to be its own turn — not started this turn, per "Priority if you must split: the shelf and
 fields first... the tab row second." Reporting this explicitly rather than rushing a partial mobile fix into
 an already-large commit.
+
+## t2217 — THE UI RENAME + TAB COMPACTION (amendment 3 supersedes amendment 2's scroll ask)
+
+Amendment 3 (human, reasoning it through in the open — "ui?" → "interface" → settled "ui buys alot"):
+measured all six label candidates against the four strip widths, both as-is and compacted. "UI" was the only
+one clearing every width (430/390/360/320) with margin to spare — so the fix is rename + compact, and DROP
+the horizontal scroll entirely (it reverses amendment 2's own "do both" instruction, on the grounds that a
+scroller would be machinery for a case that no longer exists once the label fits — and it takes the
+tab-feet-clipping hazard off the table with it, since there is nothing left to clip).
+
+### The rename — label only, key untouched
+
+Grepped for every "Look and feel" site rather than trusting the advisor's own list as exhaustive (they said so
+themselves — "I may not have found them all"). Found ONE genuine second render site beyond what was named:
+`ui/settingsPanel.js:1181`, the L2 sidebar's own group-label div (`data-group-label="lookfeel"`) — a second
+place the string painted to screen, not just the L1 tab button at :1167. Fixed both, plus a `settings-hint`
+line naming the path (`ui/settingsPanel.js`, the theme-lives-on-this-device note) and the breadcrumb
+(`ui/helpPanel.js`'s `FAQ_LINKS['settings-wizardbar']`). Comments updated so they don't misdirect the next
+reader: `settingsPanel.js:6`, `:3605`, `:3663`, `headerPost.js:22`, `styles.css` (the `.hq-theme-chip`
+retirement note). Left untouched, exactly as instructed: `data/releaseNotes.js:51` (a dated historical record —
+rewriting it to match the present would make the log itself a lie), the internal key `lookfeel` and every
+`data-group`/`set_tab_*` panel id (addresses, not labels — `helpPanel.js` opens Settings by panel id, and
+renaming addresses to match a label change breaks working deep links for zero benefit).
+
+Tests: grepped literally for "Look and feel" across `tests/` (not the advisor's named list alone) — found the
+same 7 files. `settings-ia-regroup-1245.spec.js:58`'s `{ group:'lookfeel', label:'Look and feel' }` and
+`settings-done-faq.spec.js:148`'s breadcrumb regex were the two REAL assertions (would have failed for real,
+not just read stale); the rest were test titles and doc comments, updated for the same non-misdirection
+reason. Confirmed the four "lookfeel"-adjacent specs the broader grep also caught
+(`editor-focus-ring-2151`/`header-responsive`/`replace-confirm-2184`/`wizardbar-panel-2196`) all reference only
+the `group:'lookfeel'` KEY or the `[data-group="lookfeel"]` selector, never the literal label text — correctly
+left untouched.
+
+### The compaction
+
+`.settings-tabs .settings-main-tab` (styles.css): padding 6/14 → 6/9, font-size 12.5px → 11.5px,
+letter-spacing 1px → 0 — the advisor's own measured numbers, applied to the shared (theme-agnostic) rule
+directly rather than gated behind a breakpoint, since a modestly tighter tab reads fine at any width and this
+is the ONE definition every consumer shares.
+
+### Verification — and a premise correction
+
+Measured structurally (`getBoundingClientRect().top` distinct-count per tab, not just a screenshot glance) at
+430/390/360/320px across **all five themes**: Settings' L1 strip (UI/Controller/Hardware/Workspace) renders on
+ONE row, zero wraps, at every width × every theme — 20/20 combinations. Screenshots confirm the active tab's
+curved "feet" render intact at 320px in every theme that has them (studio/steampunk/organic); no scroller was
+built, matching amendment 3's instruction that none is needed. `verification/t2217-<theme>-320-settings.png`.
+
+**Premise check, not assumed**: the dispatch described this as "all four strips (Settings, Macros, Gateway,
+Blocks) since they share the rule." Grepped every `ui/*.js` for actual `.settings-main-tab` renders rather than
+trusting that framing — it's used in exactly TWO places: `ui/settingsPanel.js` (Settings' own 4-tab L1 strip)
+and `ui/gatewayPanel.js` (Gateway's own 7-tab strip: Status/Send/Merge/Tracking/Files (CNCDISK)/Jobs/Console).
+Confirmed by direct count: `#macros-app .settings-main-tab` and `#blocks-app .settings-main-tab` are both
+**zero** — Macros and Blocks don't use this mechanism at all (they share the OTHER "four strips" rule, t2213's
+`--band-bg` one, a completely different CSS selector list — the two got conflated in the dispatch's framing).
+Gateway's own 7-tab strip already wraps to TWO rows at every width tested, 430px included, unaffected either
+way by this turn's compaction (it inherited the shared rule's new numbers, but 7 tabs including "Files
+(CNCDISK)" still doesn't fit one row even compacted). This is PRE-EXISTING behaviour, not something introduced
+or worsened this turn, and the human never reported it — screenshotted for the record
+(`t2217-gateway-320.png`, a clean readable 2-row layout, nothing broken) but NOT touched, since forcing
+Gateway's 7 tabs onto one row was never the reported problem and wasn't asked for.
+
+### Full suite
+
+Ran the project's full gate (`npm test`, not just smoke, per the dispatch's own explicit instruction since this
+touches 8 test files): 2785 passed, 6 failed, 19 flaky, 25 skipped (25.1 min). None of the 7 files this turn
+edited appear in either the failed or flaky list. Checked the 5 uniquely-named failing files for any reference
+to the settings-tab mechanism (`grep -i "look.*feel\|lookfeel\|settings-main-tab\|settings-tabs"`) — one match,
+`send-history-real-path-2065.spec.js`, but its OWN failure (`stageAndSend`'s "the send is attempted" assertion,
+a Send-button click unrelated to any tab) had nothing to do with the match (the file separately clicks
+Gateway's own Jobs/Tracking sub-tabs elsewhere, for a different test). Verified by stashing every t2217-touched
+file and re-running that one test against the pre-change tree: **identical failure, same line, same message** —
+pre-existing, not introduced this turn. The other 4 unique failures (`pane-sizer-1353`,
+`screenshot-baselines-1792` ×2, `send-gate-wiring-1585`, `validation-divzero-not-syntax-1603`) don't mention
+the settings-tab mechanism at all. `save-dialog-declared-1615.spec.js` reappears in the flaky list — the
+SAME residual case t2206 already root-caused and closed as "absorbed by retries:2," not a new issue.
+
+Threw away `tests/_tabrow.spec.js` after use.

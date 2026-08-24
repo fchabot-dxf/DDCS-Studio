@@ -19,7 +19,7 @@
  * the .ddcs, so it travels with the workspace exactly as Wizards does, even though opening it doesn't "bring
  * something in" the way Load does. The mechanical rule going forward: in backup.js's registry → workspace
  * (file-scoped); not in it → app/device (stays app-scoped, e.g. FAQ/About/Rate/the desktop download/website).
- * ⚠ THEME IS NOT A ROW HERE: t2147 already moved the theme picker to Settings (#set_theme, Look and feel →
+ * ⚠ THEME IS NOT A ROW HERE: t2147 already moved the theme picker to Settings (#set_theme, UI →
  * Appearance) and it already switches independently. A `Theme ▸` row would only point at Settings one click
  * deeper for no reason — BACKLOG item 1's own warning — so it is deliberately absent, not forgotten.
  *

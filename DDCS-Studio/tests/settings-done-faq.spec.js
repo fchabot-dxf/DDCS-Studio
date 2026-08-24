@@ -145,7 +145,7 @@ test('every Settings path the FAQ names actually resolves — the claim cannot o
   const CLAIMED = [
     { says: /Settings → Controller → Gateway/, panel: 'set_tab_gateway', group: 'controller' },
     { says: /Settings → Controller → Profile/, panel: 'set_tab_profile', group: 'controller' },
-    { says: /Settings → Look and feel → Appearance → Wizard bar…/, panel: 'set_tab_appearance', group: 'lookfeel' },
+    { says: /Settings → UI → Appearance → Wizard bar…/, panel: 'set_tab_appearance', group: 'lookfeel' },
     { says: /Settings → <?b?>?Hardware/, panel: 'set_tab_machine', group: 'hardware' },
   ];
   for (const c of CLAIMED) {

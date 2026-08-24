@@ -879,7 +879,7 @@ html, body { overflow-x: clip; }
 .hq-caret { margin-left: auto; flex: 0 0 auto; opacity: .55; transition: transform .12s ease; }
 .hdr-quick-sub.is-open .hq-caret { transform: rotate(90deg); }
 /* t2147 (BACKLOG #1) — the theme picker (a row of .hq-theme-chip swatches under .hdr-quick-subitems) is RETIRED
-   from this menu: Settings' own #set_theme picker (Look and feel → Appearance) already switched independently
+   from this menu: Settings' own #set_theme picker (UI → Appearance) already switched independently
    of these chips, so the destination needed nothing new — only this duplicate needed to go. .hdr-quick-sub /
    .hq-caret below were the generic collapsible-submenu shell theme's markup never actually wired up to (its
    header row was a plain .hdr-quick-head div, not a toggle) — pre-existing dead CSS, not part of this removal,
@@ -3453,7 +3453,12 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
    with the panel below — a browser tab. Scoped to .settings-tabs so it out-specifies the generic
    [data-theme="x"] button skin (no theme button styling leaks onto the tabs). */
 .settings-tabs .settings-main-tab, .settings-tabs .settings-main-tab:hover, .settings-tabs .settings-main-tab:active {
-    position: relative; padding: 6px 14px; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; font-family: inherit;
+    /* t2217 (amendment 2/3) — compacted so all four L1 tabs (now UI/Controller/Hardware/Workspace, "UI" itself
+       an amendment-3 rename that did most of the fitting work) stay on ONE row down to a 320px phone, no
+       scroller: was padding 6/14, font 12.5px, letter-spacing 1px (measured 437px needed against 398px
+       available at 430 — overflows every phone width, not just small ones). Advisor measured the compacted
+       numbers against all four widths (430/390/360/320) before recommending them; not tuned further here. */
+    position: relative; padding: 6px 9px; font-size: 11.5px; font-weight: 700; letter-spacing: 0; font-family: inherit;
     color: var(--text-dim); background: transparent; border: none; border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
     box-shadow: none; text-shadow: none; filter: none; transform: none; cursor: pointer; transition: 120ms;
 }

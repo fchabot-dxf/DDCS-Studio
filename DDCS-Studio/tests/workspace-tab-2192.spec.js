@@ -22,7 +22,7 @@ async function openWorkspaceTab(page) {
     await page.waitForSelector('[data-wsrow]', { timeout: 5000 });
 }
 
-test('the Workspace tab exists beside Look and feel / Controller / Hardware, and shows the identity band', async ({ page }) => {
+test('the Workspace tab exists beside UI / Controller / Hardware, and shows the identity band', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1');
     await openWorkspaceTab(page);
