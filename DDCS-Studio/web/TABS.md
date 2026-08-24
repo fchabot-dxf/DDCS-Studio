@@ -157,11 +157,11 @@ the running app. Where a row says UNVERIFIED, it has not been counted on screen.
 | system | class | rendered by | depth | tones needed | status |
 |---|---|---|---|---|---|
 | App header | `.app-header .tab` | `index.html` | 1 ? | 2 | UNVERIFIED — same `--tab-*` tokens as Settings; carried the 1.36:1 defect unreported until t2213 |
-| Settings | `.settings-main-tab` + `.settings-tab` | `ui/settingsPanel.js` | **2** | 3 | CONFIRMED depth 2. L2+content already merge; L1 sits on tone B when it should be A |
-| Gateway | `.settings-main-tab` + `.settings-tab` | `ui/gatewayPanel.js` | 2 ? | 3 | UNVERIFIED — shares the L1 rule with Settings, so a shared-rule change reaches it |
-| Macros | `.settings-main-tab` + `.settings-tab` | `ui/macrosApp.js` | ? | ? | ⚠ **CONTRADICTION TO RESOLVE** — t2217 reported only Settings and Gateway render `.settings-main-tab`; a grep finds `macrosApp.js` too. One of those is wrong |
+| Settings | `.settings-main-tab` + `.settings-tab` | `ui/settingsPanel.js` | **2** | 2 | CONFIRMED depth 2. t2249 — contract classes (`tab-strip`/`tab-l1`/`tab-l2`/`tab-interstice`/`tab-panel`) + `data-tabs="2"` landed; `--tab-strip`/`--tab-body`/`--tab-edge-w` declared per-theme (aliasing `--panel`/`--bg` on the SAME selector, not frozen); the L1/L2 overlap (`margin-bottom: calc(-1 * var(--tab-edge-w))`) now wired and verified opaque/seamless across all 5 themes. `elementFromPoint` scan STILL shows the interstice's own tone interposed between L1 and the panel (not yet 2 contiguous tones) — deliberately: amendment 4 (flattening `.tab-interstice` into tone B, and `.tab-panel`'s own border) is excluded from this turn by explicit instruction. The mechanism is proven and inert-safe; landing amendment 4 alone should complete the 2-tone shape with no further CSS invention |
+| Gateway | `.settings-main-tab` + `.settings-tab` | `ui/gatewayPanel.js` | 2 ? | 2 | UNVERIFIED — shares the L1 rule with Settings, so a shared-rule change reaches it |
+| Macros | `.settings-tab` only | `ui/macrosApp.js` | **1** | 2 | t2249 — **CONTRADICTION RESOLVED.** Grepped for an actual rendered element (not the word): `macrosApp.js` has NO `class="settings-main-tab"` anywhere — only a stale comment at line 58 ("`.settings-main-tab` styling is shared/global in styles.css") copy-pasted from Settings' own file, describing a class this file never emits. Macros renders `.settings-tab` (L2-styled pills) as its ONLY tier — a depth-1 system borrowing the L2 look, same situation as the Help/setup row below. t2217's original report was correct |
 | Keyboard dock | `.deck-tab` | `ui/commandDeck.js` | 1 ? | 2 | UNVERIFIED — MOVE / G-M / MATH / LOGIC / VARIABLES |
-| Icon editor | `.ie-tabs` | `ui/iconEditor.js` | 1 ? | 2 | ⚠ **NOT THEMED** — local CSS, `border-bottom: 2px solid #0ea5e9` hardcoded, no theme override anywhere |
+| Icon editor | `.ie-tabs` | `ui/iconEditor.js` | 1 ? | 2 | ⚠ **NOT THEMED** — local CSS, `border-bottom: 2px solid #0ea5e9` hardcoded, no theme override anywhere. Not touched t2249 (Settings-only pilot) |
 | Blocks topbar | `.blk-topbar` | `blocks/` | ? | ? | UNVERIFIED — may not be a tab system at all |
 | Help / setup | `.settings-tab` | `ui/helpPanel.js`, `ui/setupChecklist.js` | ? | ? | UNVERIFIED — reuse the L2 class outside a two-level strip, which may be fine or may be a borrowed look |
 
@@ -171,8 +171,10 @@ the running app. Where a row says UNVERIFIED, it has not been counted on screen.
 
 1. Open the surface. Count the strips between the tab bar and the content. That is the depth.
 2. From inside the active tab, walk `elementFromPoint` straight down every 10px and record each painted
-   colour. A correct depth-N system shows **exactly N+1 distinct tones**, each held for a contiguous run.
-   A repeated or interposed extra value is the BELOW defect.
+   colour. A correct system — **any depth** — shows **exactly 2 distinct tones** (strip C, body B), each held
+   for a contiguous run, per THE RULE above. (t2249 — this step used to say "N+1 tones", a holdover from the
+   retracted three-tone draft THE RULE section already disowns; a repeated or interposed THIRD value at any
+   depth is the BELOW defect, not an expected extra tone.)
 3. Measure the strip against the active tab. Under ~1.5:1 it is the BEHIND defect regardless of how it looks
    in a crop.
 4. ⚠ **Then look at a screenshot of the seam.** Both defects found so far survived a numeric check that said

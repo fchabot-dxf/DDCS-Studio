@@ -95,6 +95,13 @@ svg [id*="Zfirst_travel"] {
 :root {
     --bg: #e0e0e0;
     --panel: #f0f0f0;
+    /* t2249 (TABS.md, the declared tab CONTRACT) — --tab-strip/--tab-body alias --panel/--bg, declared on the
+       SAME selector as --panel/--bg themselves (not at a shared root a theme block doesn't also touch) so the
+       var() resolves against THIS element's own cascaded --panel/--bg, never freezing to one theme's value —
+       see css-var-default-freezes-at-declaring-element. Repeated verbatim in every theme block below. */
+    --tab-strip: var(--panel);
+    --tab-body: var(--bg);
+    --tab-edge-w: 1px;
     --accent: #666666;
     --text: #000;
     --text-main: #000;
@@ -392,6 +399,22 @@ html, body { overflow-x: clip; }
 [data-theme="organic"]    { --tab-radius: 16px; --tab-flare: 11px; --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }
 [data-theme="futuristic"] { --tab-radius: 0;    --tab-flare: 0;    --tab-edge: rgba(45,226,255,.7); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 -2px 10px rgba(45,226,255,.3); }  /* square; glow relocated from the dead ::after rule + the redundant box-shadow duplicate below (see t2085 comment there) */
 [data-theme="normal"]     { --tab-radius: 5px;  --tab-flare: 0;    --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }          /* flat, no feet */
+
+/* t2249 (TABS.md, amendments 8+9) — THE CONTRACT: additive classes (applied ALONGSIDE each system's own
+   class names, never a rename — see #settings-app's markup) that hand a tabbed system the shared overlap
+   mechanism .app-header .tab.active / .dock-body .deck-tab.active already prove, without a hardcoded -1px
+   (amendment 8's own hazard: the offset must DERIVE from a real border-width token). tab-l1.active /
+   tab-l2.active is the ONLY new behavior here — each system's own fill + edge-ring rule (background /
+   box-shadow) already resolves to --tab-body / --tab-edge at higher specificity than these bare classes,
+   so nothing regresses; margin-bottom is uncontested by any existing rule, so it applies regardless.
+   SETTINGS ONLY this turn (the pilot). tab-strip / tab-interstice / tab-panel are markup-only readiness —
+   deliberately NOT wired to background/border here: amendment 4 (flattening the interstice's own fill into
+   the shape) is a SEPARATE turn, and Settings' own strip/content borders already carry their own per-theme
+   treatment (see the t2213 comment below on .settings-head/--band-bg — a matching-background merge, not a
+   drawn edge; this contract does not invent a second mechanism for the same seam). */
+.tab-strip { background: var(--tab-strip); }
+.tab-panel { background: var(--tab-body); }
+.tab-l1.active, .tab-l2.active { margin-bottom: calc(-1 * var(--tab-edge-w)); }
 
 .app-header .tab,
 .app-header .tab:hover,
@@ -3075,6 +3098,8 @@ button.primary:hover {
 [data-theme="normal"] {
     --bg: #f4f4f4;
     --panel: #fff;
+    --tab-strip: var(--panel);
+    --tab-body: var(--bg);
     --accent: #4a90e2;
     --text: #333333;
     --text-main: #000;
@@ -3154,6 +3179,8 @@ button.primary:hover {
 [data-theme="studio"] {
     --bg:            #c4bfb5;   /* silver chassis */
     --panel:         #cfcabf;   /* silver plate */
+    --tab-strip:     var(--panel);
+    --tab-body:      var(--bg);
     --screen:        #000;   /* readout / editor black */
     --screen-caret-shape: block;   /* t2079 amendment (human) — a block caret reads as a real CRT terminal, matching this skin's whole identity */
     --accent:        #1668ff;   /* electric-blue selection */
@@ -3609,6 +3636,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 [data-theme="steampunk"] {
     --bg: #2a1810;
     --panel: #3d2817;
+    --tab-strip: var(--panel);
+    --tab-body: var(--bg);
     --accent: #8b6914;
     --text: #d4a574;
     --text-main: #f5d7a8;
@@ -3692,6 +3721,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 [data-theme="futuristic"] {
     --bg: #070b14;
     --panel: #0e1626;
+    --tab-strip: var(--panel);
+    --tab-body: var(--bg);
     --accent: #2de2ff;
     --text: #d4e3ff;
     --text-main: #fff;
@@ -3920,6 +3951,8 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        panel/blocks view-toggle and looking, per the human's own "at a glance, without hovering" test, not by
        computing a contrast ratio in the dark browns where perceived separation isn't linear anyway. */
     --panel: #1c140c;         /* bark shadow — was #211a11 */
+    --tab-strip: var(--panel);
+    --tab-body: var(--bg);
     --panel2: #3d3120;        /* bark — was #2d2417, now distinctly lighter (its own ladder role, not a duplicate of panel) */
     --accent: #d9a03c;        /* sap amber — was coral/arterial */
     --text: #ece0c6;          /* sapwood — was bone */

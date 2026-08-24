@@ -1094,6 +1094,11 @@ function buildSettingsOverlay() {
     if (!parent) return;
     if (parent.querySelector('.settings-body')) return;
         parent.classList.remove('hidden');
+        // t2249 (BACKLOG amendment 9, TABS.md) — the declared depth, additive: names how many tone-C-strip
+        // levels this system nests (Settings is the CONFIRMED depth-2 pilot). Never read by any selector
+        // itself — the contract classes below are the actual seam — but keeps TABS.md's own register
+        // honest, and is where a future system's own depth gets stamped once counted on screen.
+        parent.setAttribute('data-tabs', '2');
     parent.innerHTML = `
         <style>
             #settings-app { display: flex; flex-direction: column; }
@@ -1161,7 +1166,7 @@ function buildSettingsOverlay() {
             <div class="settings-headerrow">
                 <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
             </div>
-            <div class="settings-head">
+            <div class="settings-head tab-strip">
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <!-- t1245 (user ruling — THE SHRINK, chosen over a 3-way split of the same nine subtabs). "General"
                          was a catch-all of nine, and the honest answer turned out to be that most of them did not belong
@@ -1169,48 +1174,48 @@ function buildSettingsOverlay() {
                          Cloud tab, FAQ + About are not settings, and Feedback was a second door to the Rate toast. What
                          REMAINS is the one thing General actually was — how the app looks and behaves for you. -->
                     <div class="settings-tabs" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="settings-main-tab active" data-group="lookfeel">UI</button>
-                        <button class="settings-main-tab" data-group="controller">Controller</button>
-                        <button class="settings-main-tab" data-group="hardware">Hardware</button>
+                        <button class="settings-main-tab tab-l1 active" data-group="lookfeel">UI</button>
+                        <button class="settings-main-tab tab-l1" data-group="controller">Controller</button>
+                        <button class="settings-main-tab tab-l1" data-group="hardware">Hardware</button>
                         <!-- t2192 — WORKSPACE: the .ddcs made visible. Its job is the INVENTORY, not navigation — a
                              number and a button per row, reading data/backup.js's own declared BACKUP_STORES counts
                              directly. See scratchpad/t-workspace-tab.md. Not a return of t1245's deleted Workspace
                              subtab (that one duplicated the workspace manager's Save/Open); this one answers a
                              different question — what IS in the file, not how to save or open it. -->
-                        <button class="settings-main-tab" data-group="workspace">Workspace</button>
+                        <button class="settings-main-tab tab-l1" data-group="workspace">Workspace</button>
                     </div>
                 </div>
             </div>
             <div class="settings-body">
-                <div class="settings-sidebar">
+                <div class="settings-sidebar tab-interstice">
                     <div class="sidebar-group-label" data-group-label="lookfeel">UI</div>
-                    <button class="settings-tab active" data-group="lookfeel" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab tab-l2 active" data-group="lookfeel" data-target="set_tab_appearance">Appearance</button>
                     <!-- t2125 (SOUND-PLAN.md amendment 4) — a sub-tab, not a 4th main tab: ~11 toggle rows is too
                          thin for a main tab and too big to bolt onto Appearance. Adjacent to Appearance on purpose
                          (sound follows the theme, which lives there). -->
-                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_sound">Sound</button>
-                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_preview">Preview</button>
-                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_compose">Editor</button>
+                    <button class="settings-tab tab-l2" data-group="lookfeel" data-target="set_tab_sound">Sound</button>
+                    <button class="settings-tab tab-l2" data-group="lookfeel" data-target="set_tab_preview">Preview</button>
+                    <button class="settings-tab tab-l2" data-group="lookfeel" data-target="set_tab_compose">Editor</button>
                     <!-- t2196 — the "Wizard bar" sub-tab (t1245's rename of the old "Wizards" tab) is RETIRED: a
                          400+-line tree buried Appearance's own theme/setup-health controls under it. The tree
                          itself is unchanged and lives on — reached via ONE row in Appearance, in its own small
                          panel (openWizardBarManager, ui/wizardManagerPanel.js), not a sixth sidebar button. -->
                     <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
-                    <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
-                    <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
-                    <button class="settings-tab" data-group="controller" data-target="set_tab_variables">Variables</button>
-                    <button class="settings-tab" data-group="controller" data-target="set_tab_program">Program</button>
-                    <button class="settings-tab" data-group="controller" data-target="set_tab_gateway">Gateway</button>
+                    <button class="settings-tab tab-l2" data-group="controller" data-target="set_tab_profile">Profile</button>
+                    <button class="settings-tab tab-l2" data-group="controller" data-target="set_tab_wcs">WCS</button>
+                    <button class="settings-tab tab-l2" data-group="controller" data-target="set_tab_variables">Variables</button>
+                    <button class="settings-tab tab-l2" data-group="controller" data-target="set_tab_program">Program</button>
+                    <button class="settings-tab tab-l2" data-group="controller" data-target="set_tab_gateway">Gateway</button>
                     <div class="sidebar-group-label" data-group-label="hardware" style="display:none;">Hardware</div>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>
-                    <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
+                    <button class="settings-tab tab-l2" data-group="hardware" data-target="set_tab_machine" style="display:none;">Machine</button>
+                    <button class="settings-tab tab-l2" data-group="hardware" data-target="set_tab_spindle" style="display:none;">Head</button>
+                    <button class="settings-tab tab-l2" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
+                    <button class="settings-tab tab-l2" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>
+                    <button class="settings-tab tab-l2" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
                     <div class="sidebar-group-label" data-group-label="workspace" style="display:none;">Workspace</div>
-                    <button class="settings-tab" data-group="workspace" data-target="set_tab_workspace" style="display:none;">Inventory</button>
+                    <button class="settings-tab tab-l2" data-group="workspace" data-target="set_tab_workspace" style="display:none;">Inventory</button>
                 </div>
-                <div class="settings-content">
+                <div class="settings-content tab-panel">
                 <!-- LOOK AND FEEL: PREVIEW (3D/2D toolpath view + simulation) -->
                 <div id="set_tab_preview" style="display:none;">
                     <div class="settings-section">

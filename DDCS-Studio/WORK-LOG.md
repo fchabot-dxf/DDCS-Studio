@@ -54439,3 +54439,130 @@ unexpected**, 25 skipped (36.8m). Checked its error text (`wizard-face-1599.spec
 family this time — it's the SEPARATE, already-documented t1766 "reproject echo race" in the same file's own
 `waitForEmpty` helper, unrelated to Blockly boot timing and unrelated to any CSS this turn touched. Confirmed
 rather than assumed, matching this session's own standing discipline for every full-suite run.
+
+## t2249 — THE TAB CONTRACT LANDS FOR SETTINGS (amendments 8+9), amendment 4 deliberately deferred
+
+**Scope taken, stated up front**: the contract classes + tokens + the overlap half of the outline mechanism,
+Settings only, per the explicit dispatch. NOT amendment 4 (flattening `.tab-interstice` into tone B) — the
+dispatch named it excluded this turn ("it moves the ground and I want the contract landed and looked at
+first"), and TABS.md's own literal CSS example (`.tab-interstice, .tab-panel { background: var(--tab-body); }`
++ `.tab-panel { border: ... }`) turned out to BE amendment 4's own content — so I built everything around that
+one deliberately-empty slot rather than around it.
+
+### The markup: five additive classes, one attribute, nothing renamed
+
+`ui/settingsPanel.js`: `#settings-app` gets `data-tabs="2"` (set via JS at build time, since the container's
+own attributes aren't part of the injected-HTML template). `.settings-head` gets `tab-strip`. The four
+`.settings-main-tab` buttons get `tab-l1`. `.settings-sidebar` gets `tab-interstice`. All ~17 `.settings-tab`
+buttons get `tab-l2` (one `replace_all` on the exact `class="settings-tab"` / `class="settings-tab active"`
+substrings — verified unique enough not to catch anything unintended). `.settings-content` gets `tab-panel`.
+Every existing class name stays; these are pure additions.
+
+### The tokens: `--tab-strip` / `--tab-body` / `--tab-edge-w`, declared where `--panel`/`--bg` already live
+
+Nearly repeated the [[css-var-default-freezes-at-declaring-element]] mistake here: the obvious move is
+`--tab-strip: var(--panel);` once at `:root`. Caught it before writing it — `--panel`/`--bg` are each
+declared FRESH inside every theme's OWN block (`:root`, `[data-theme="normal"]`, `[data-theme="studio"]`,
+`[data-theme="steampunk"]`, `[data-theme="futuristic"]`, `[data-theme="organic"]` — six separate rules, not
+one token overridden five times), so a single shared declaration would freeze to whichever theme's `--panel`
+happened to resolve at the declaring point. Fixed by adding `--tab-strip: var(--panel); --tab-body: var(--bg);`
+literally INTO each of the six blocks, matching where `--panel`/`--bg` themselves live — same element, same
+cascade, so the `var()` reads that element's own already-cascaded value rather than an inherited-then-frozen
+one. `--tab-edge-w: 1px` is a genuine new token (no width token existed before this turn — `.app-header
+.tab.active`'s own proven overlap just hardcodes `-1px`), declared once at `:root` since it's a literal, not
+a `var()` — no freezing risk, safe to share.
+
+### What actually reads the tokens, and why background/border stayed hands-off
+
+`.tab-strip { background: var(--tab-strip); }` and `.tab-panel { background: var(--tab-body); }` are in
+styles.css now, but they're CONTESTED — Settings' own inline `<style>` block scopes everything under
+`#settings-app`, so its existing rules (background: var(--panel)/var(--bg) directly, plus organic's own
+`!important` override at line ~448 for `.settings-head`) win on specificity regardless. Checked this is
+harmless rather than assuming it: `--tab-strip`/`--tab-body` resolve to the SAME values those rules already
+paint, so adding the bare-class rules is inert for Settings today (verified via computed style, all 5 themes,
+byte-identical stripBg/panelBg before and after) while still making the tokens genuinely LIVE for any future
+system that doesn't already have a competing rule — the whole point of a shared contract.
+
+I did NOT add `.tab-l1.active, .tab-l2.active { background: var(--tab-body); }` from TABS.md's own example —
+same reasoning, `.settings-main-tab.active`/`.settings-tab.active` already set `--tab-fill`/background at
+higher specificity resolving to the identical `--bg` value, so it would be dead weight; the token is already
+proven consistent through the EXISTING rule.
+
+**The one genuinely new, uncontested piece**: `.tab-l1.active, .tab-l2.active { margin-bottom: calc(-1 *
+var(--tab-edge-w)); }` — no existing rule sets margin-bottom on either selector, so this is the ONLY new
+visible behavior this turn, and it applies regardless of specificity. This is the overlap `.app-header
+.tab.active`/`.dock-body .deck-tab.active` already prove, generalized off the hardcoded `-1px` onto the new
+token (amendment 8's own hazard). Deliberately did NOT tokenize `.settings-head`'s own `border-bottom: 1px
+solid var(--border)` to `--tab-edge` — checked `.app-header`'s own border-bottom first and found it's a
+per-theme LITERAL too (organic: `#5c4a30`, styles.css:4092), not derived from `--tab-edge` anywhere in the
+codebase; inventing that unification wasn't asked for and isn't the existing pattern.
+
+### Why `.tab-panel` gets no border this turn — a real prior ruling, not an oversight
+
+Found a t2213 comment sitting right next to where I was about to add one: "Do NOT restore --tab-edge/--border
+for this — the active tab's own fill (--bg) already correctly matches .settings-content's background...
+per the browser-tab 'merges with the content below' design... the STRIP is what needed to move, not the
+tab." The established mechanism for "active tab merges with what's below it" in this codebase is MATCHING
+BACKGROUND COLOR, not a drawn border — `.app-header .tab.active` has no border on the content below it
+either. Building `.tab-panel { border: var(--tab-edge-w) solid var(--tab-edge); }` per TABS.md's own literal
+example would have introduced a SECOND, inconsistent mechanism for the identical seam. Left it out.
+
+### Verified: elementFromPoint scan, all 5 themes, opacity, and the honest (not-yet-2-tone) result
+
+Wrote `scratchpad/t2249-contract-probe.mjs` (Playwright, all 5 themes): scans straight down through the L1
+active tab's own x-center, records every background-colour stop. Confirmed for every theme: `l1MarginBottom`/
+`l2MarginBottom` compute to `-1px` (matching `--tab-edge-w`), every fill is a solid `rgb()` (opaque — hazard 1
+satisfied), and the punch-through is clean — no leftover strip-colour sliver squeezed under the active tab at
+either level (hazard "seam" check). Screenshots (`scratchpad/t2249-contract-{organic,futuristic}.png`) confirm
+no visible artifact from adding the overlap.
+
+**The scan does NOT yet show 2 contiguous tones** — it alternates `--bg` (L1 active tab) → `--panel`
+(interstice) → `--bg` (L2 active tab) → `--panel` (interstice's own gap between wrapped pill rows) → `--bg`
+(panel), for all 5 themes. This is the expected, honest result given amendment 4 is deferred: the interstice
+genuinely still carries its own tone between the two `--bg` surfaces. Reporting this straight rather than
+forcing the scan to read as done — amendment 9's own original text asked for exactly 2 contiguous tones, and
+this turn does not deliver that; it delivers the mechanism that should make amendment 4 alone sufficient to
+close it, with no further CSS invention needed once the interstice's own fill moves to `--tab-body`.
+
+### TABS.md itself: two stale numbers fixed, one contradiction resolved with real evidence
+
+Found "HOW TO FILL A ROW IN" step 2 and the REGISTER's own "tones needed" column still said **N+1 tones per
+depth** — a leftover from the three-tone draft THE RULE section explicitly retracts a few hundred lines
+earlier ("AN EARLIER DRAFT OF THIS FILE CLAIMED DEPTH N NEEDS N+1 TONES. THAT WAS WRONG"). The file was
+contradicting itself. Fixed both to say what THE RULE actually rules: 2 tones, every depth.
+
+Resolved the Macros contradiction (t2217's "only Settings and Gateway render `.settings-main-tab`" vs. a
+grep that "finds macrosApp.js too") by checking the RENDERED MARKUP, not the word: grepped for
+`class="settings-main-tab"` specifically in `macrosApp.js` — zero matches. The earlier grep was catching a
+stale COMMENT at line 58 ("`.settings-main-tab` styling is shared/global in styles.css"), copy-pasted from
+Settings' own file, describing a class Macros never actually emits. Macros renders `.settings-tab` (L2 pills)
+as its ONLY tier — depth 1, borrowing the L2 look, same situation as the already-noted Help/setup row. t2217
+was right; the grep-based "contradiction" was a text-match false positive, not a real inconsistency. Updated
+the register row accordingly, plus Settings' own row to reflect this turn's actual (not-yet-2-tone) state.
+
+### Amendments polled, none change this turn
+
+Three landed mid-task, all explicitly scoped to the QUEUED (not-this-turn) job-history-mirrors-disk work:
+one added a three-state disk-presence signal (gone/present/replaced, mtime vs. the gateway's own last
+delivery), a second WITHDREW it entirely ("forget that... no badge, no index cross-reference, no mtime
+logic" — the underlying queue-mirrors-disk ruling itself stands, only the disk-presence indicator is
+cancelled), a third queued a small, separate analytics addition (gateway backend + drive_connected events,
+explicitly flagged to verify the Worker's own receiving side has no allow-list before touching anything near
+`ui/analytics.js`, since `/analytics` belongs to a second concurrent agent). None require action this turn;
+noted here so the next turn that picks up the job-queue work knows the disk-presence idea is dead, not just
+unstarted.
+
+### Verified (full suite)
+
+Required — shared `styles.css` tokens (`--tab-strip`/`--tab-body`/`--tab-edge-w`, all six theme blocks) plus
+a structural markup change reaching every Settings render. 2794 passed, 14 flaky, **2 unexpected**, 25 skipped
+(28.8m). Checked both error texts before concluding anything (not just test names): `palette-by-role-1623` and
+`shared-labels-1611`, both `TimeoutError` after exhausting all 3 retries — both are the already-documented
+`__blkws`-family race, explicitly named in this session's own history as "still occasionally surfacing under
+heavy contention," not a new regression. Neither test touches Settings, TABS.md, or any token this turn
+changed. Flaky count (14) sits inside the previously-observed 14–18 trend range, reported as trend per the
+advisor's own standing ruling, not as a verdict from this one run.
+
+### Capacity
+
+Full working room this turn — no flag.
