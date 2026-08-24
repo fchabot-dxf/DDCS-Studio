@@ -53670,6 +53670,80 @@ instances that failed under the old code now pass under the new code, same batch
 mentally (the git history/diff shown above) shows exactly why the old assertion could never have reliably
 passed once the race was removed — the fix isn't a guess, the failure was reproduced and explained.
 
+## t2235 — ORGANIC/GATEWAY STACK, PART ONE: the mechanical audit + the fill/ink token question, NOT the fixes yet
+
+Dispatched a large stack (amendments 5-19: organic fill/ink pairing, settings-tab/dropdown/gear theming,
+gateway tab restructure, toast/settings-duration, quick-menu wizard-save). Explicitly told to split across
+turns and settle the organic fill/ink token pair FIRST since it governs the sub-tab/dropdown/gear work. This
+turn = the foundational investigation only: the mechanical audit (amendment 2) and the fill/ink retroactive
+check (amendment 3's question about the 3 t2214 surfaces). NO CSS changed yet — report, per the explicit
+"report first, don't fix them all silently" instruction.
+
+### The audit script — `scripts/organic-border-audit.mjs`, a declared, re-runnable tool
+
+First version swept EVERY DOM element for (border gone) AND (own effective background == nearest painted
+ancestor's) — returned ~2900 "candidates" across 21 surfaces, almost all false positives: an ordinary `<span>`
+inheriting its parent's colour is completely normal, not a defect. Restricted to INTERACTIVE elements only
+(native button/input/select/textarea/summary/a[href], or anything carrying onclick/role=button|tab|menuitem/a
+real tabindex) — itself a mechanical, DOM-queryable restriction, not a judgement call — and the count dropped
+to 492 raw hits / **87 distinct elements** after deduping the same chrome repeating across every settings
+sub-tab. Walked: Studio/Blocks/Macros/Gateway tabs, one wizard-bar dropdown, Settings' default view + all 15
+sub-tabs. Stated blind spots in the script's own header: zero-contrast only (a technically-nonzero-but-tiny
+gap, like the 1.04:1 tab that started this whole thread, would pass), can't see a fill that's present but
+WRONG, can't judge active-vs-resting collapsing, and only sees elements the DOM already marks interactive.
+
+**Full list is NOT all real defects** — many of the 87 are text-only nav tabs sitting on a coloured bar
+(header STUDIO/BLOCKS/MACROS/GATEWAY tabs, `.settings-main-tab`, gateway's own tab strip) that read via text
+colour + active-state against the bar's own colour, a legitimate and common pattern the mechanical check
+can't distinguish from a genuinely inert control — named as a blind spot rather than treated as 87 equally
+real bugs. Full JSON: `verification/t2235-organic-audit-findings.json`.
+
+### One CONFIRMED, previously-unknown real defect, visually verified
+
+Settings numeric/text `<input>` fields are completely invisible in organic — no border, no fill, blending
+into the page background — while the `<select>` dropdowns sitting in the SAME panel, same row, correctly
+show a light tan fill. Screenshotted directly: `verification/t2235-organic-invisible-settings-inputs.png`
+(Hardware → Head sub-tab: Max RPM, Default RPM, Spin-up/down dwell all invisible; the Type and Direction
+`<select>`s beside them are fine). Root cause not yet fully chased (out of this turn's report-don't-fix scope):
+t2214's `[data-theme="organic"] input, select, textarea { --field-face: var(--panel2) }` rule (styles.css:440)
+does not appear to be reaching these specific inputs — their rendered background is organic's bare `--bg`
+(#14110b), matching neither `--panel` nor `--panel2`, which means some more-specific settings-page rule or a
+component that doesn't route through `--field-face` is winning here. This is a genuine gap in an
+already-shipped fix, not a duplicate-declaration problem — flagging for the token-settling turn, since the
+right fix (once the fill/ink pair is decided) is likely to give these the SAME light register their sibling
+`<select>`s already correctly use, not a second ad-hoc dark patch.
+
+### Amendment 3's retroactive check — macros shelf: looks fine; text fields/FAQ: not fully checked
+
+Screenshotted the Macros tab's SYSDISK/ shelf and its M-code editor cards directly
+(`scratchpad/organic-check-macros-shelf.png`, not yet moved to verification/ — kept as a working screenshot,
+not committed evidence). It reads coherently: the sidebar file rows show a clear --panel2 fill with a correct
+amber left-accent on the active row; the single-line "Extracted M0"-style name fields already render in a
+LIGHT tan register (matching the light-fill/dark-ink identity amendment 3 asks for), while the multi-line
+G-code body textareas stay in the darker --panel2 register — a deliberate, working visual hierarchy (name
+pops, body recedes), not a "reads wrong" case. Did NOT find an obvious problem here — reporting as "looks
+fine," per the instruction not to silently redo something that isn't actually broken.
+
+The FAQ accordion could not be reached programmatically this turn (`window.openHelp('faq')` did not navigate
+away from the currently-open surface in the harness — likely needs the quick-menu's own click path rather
+than a direct global call) — genuinely unverified, not silently assumed fine. Left for the next pass.
+
+### What this turn did NOT do (left, per "split across turns" and "say what you took and what you left")
+
+Did not: decide or declare the actual fill/ink token pair (amendment 3's core ask), widen `.settings-tab`
+to cover its second home (amendment 1), fix the wizard-bar dropdown items (amendment 2's named by-product),
+theme `.wiz-gear`/`.wiz-templates` (amendment 4/5), investigate whether `.wiz-templates` is dead
+(amendment 5's explicit gate before styling it), or touch ANY of the gateway-tab-restructure /
+toast-duration / quick-menu-save-as-wizard amendments (6-19) — all of those depend on or come after the
+token-pairing decision this turn only investigated, per the advisor's own stated dependency order.
+
+Recommending the NEXT turn open with: (1) decide the fill/ink token pair using organic's own existing
+--btn-face/--btn-ink precedent, informed by this turn's macros-shelf finding that a light-register/dark-ink
+pair is ALREADY working for single-line fields elsewhere in the app; (2) apply it to the newly-found invisible
+settings-input defect and the previously-named settings-tab/dropdown/gear sites in one pass, since they all
+want the SAME declared pair rather than N separate patches; (3) chase why t2214's blanket input rule isn't
+reaching the settings-page inputs specifically, as its own small root-cause step.
+
 ## t2229 — PART ONE: STILL REAL IF, RUN FOR REAL — #10, F1, F3, F4
 
 ### F1 — appears STALE; the STILL REAL IF check itself had a bug

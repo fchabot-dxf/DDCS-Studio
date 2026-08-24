@@ -1,0 +1,6440 @@
+{
+  "studio-tab": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Setup▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 10,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 529,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 641,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 753,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 865,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    }
+  ],
+  "blocks-tab": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "STUDIO",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 214,
+        "y": 9,
+        "w": 111,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "g",
+      "id": "7}JHCdg5CQot1n3^sG1~",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 136,
+        "w": 1049,
+        "h": 864
+      }
+    },
+    {
+      "tag": "g",
+      "id": "blockly-0",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 934,
+        "y": 873,
+        "w": 100,
+        "h": 124
+      }
+    },
+    {
+      "tag": "g",
+      "id": "blockly-1",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 889,
+        "y": 761,
+        "w": 100,
+        "h": 128
+      }
+    },
+    {
+      "tag": "g",
+      "id": "blockly-2",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 921,
+        "y": 727,
+        "w": 96,
+        "h": 128
+      }
+    },
+    {
+      "tag": "g",
+      "id": "blockly-3",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 949,
+        "y": 684,
+        "w": 100,
+        "h": 128
+      }
+    }
+  ],
+  "macros-tab": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "STUDIO",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 214,
+        "y": 9,
+        "w": 111,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "macros_ctrl_chip",
+      "cls": "toolbar-btn settings-io",
+      "text": "⚙ DDCS Expert M350",
+      "bg": "rgb(28, 20, 12)",
+      "rect": {
+        "x": 100,
+        "y": 116,
+        "w": 139,
+        "h": 24
+      }
+    },
+    {
+      "tag": "summary",
+      "id": null,
+      "cls": "sidebar-group-label",
+      "text": "SYSDISK/",
+      "bg": "rgb(28, 20, 12)",
+      "rect": {
+        "x": 22,
+        "y": 179,
+        "w": 163,
+        "h": 21
+      }
+    },
+    {
+      "tag": "button",
+      "id": "mac_add_file",
+      "cls": "toolbar-btn settings-io",
+      "text": "＋ New file",
+      "bg": "rgb(28, 20, 12)",
+      "rect": {
+        "x": 26,
+        "y": 529,
+        "w": 155,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Generate",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 223,
+        "y": 380,
+        "w": 72,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬆ Push to controller",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 303,
+        "y": 380,
+        "w": 118,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "op-btn",
+      "text": "✕",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1333,
+        "y": 380,
+        "w": 24,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Generate",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 223,
+        "y": 591,
+        "w": 72,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬆ Push to controller",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 303,
+        "y": 591,
+        "w": 118,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "op-btn",
+      "text": "✕",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1333,
+        "y": 591,
+        "w": 24,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Generate",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 223,
+        "y": 803,
+        "w": 72,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "⬆ Push to controller",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 303,
+        "y": 803,
+        "w": 118,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "op-btn",
+      "text": "✕",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1333,
+        "y": 803,
+        "w": 24,
+        "h": 28
+      }
+    }
+  ],
+  "gateway-tab": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "STUDIO",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 214,
+        "y": 9,
+        "w": 111,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Send",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 75,
+        "y": 62,
+        "w": 45,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Merge",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 128,
+        "y": 62,
+        "w": 53,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Tracking",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 189,
+        "y": 62,
+        "w": 64,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Files (CNCDISK)",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 261,
+        "y": 62,
+        "w": 103,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Jobs",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 372,
+        "y": 62,
+        "w": 42,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Console",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 422,
+        "y": 62,
+        "w": 61,
+        "h": 26
+      }
+    }
+  ],
+  "wizard-bar-dropdown": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    }
+  ],
+  "settings-default": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_wizbar_open",
+      "cls": "toolbar-btn settings-io",
+      "text": "Wizard bar…",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 388,
+        "w": 80,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_profile": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_profile_pull",
+      "cls": "toolbar-btn settings-io",
+      "text": "↧ Pull from controller",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 269,
+        "y": 277,
+        "w": 125,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_appearance": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_wizbar_open",
+      "cls": "toolbar-btn settings-io",
+      "text": "Wizard bar…",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 388,
+        "w": 80,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_preview": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "select",
+      "id": "set_pv_view",
+      "cls": null,
+      "text": "3D2D (top-down)",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 224,
+        "w": 240,
+        "h": 33
+      }
+    },
+    {
+      "tag": "select",
+      "id": "set_pv_speed",
+      "cls": null,
+      "text": "1×2×5×10×",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 283,
+        "w": 240,
+        "h": 33
+      }
+    },
+    {
+      "tag": "select",
+      "id": "set_pv_gridstep",
+      "cls": null,
+      "text": "Auto\n                                5 mm\n        ",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 365,
+        "w": 240,
+        "h": 33
+      }
+    }
+  ],
+  "settings-set_tab_compose": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    }
+  ],
+  "settings-set_tab_sound": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 312,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 366,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 421,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 475,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 529,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 562,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 594,
+        "w": 68,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "▶ Preview",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1269,
+        "y": 627,
+        "w": 68,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_variables": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_export",
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Export CSV",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 165,
+        "y": 204,
+        "w": 82,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_program": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_end_retractz",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 318,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_end_parkx",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 394,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_end_parky",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 394,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_end_insert",
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Insert end-of-program",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 478,
+        "w": 143,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_gateway": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    }
+  ],
+  "settings-set_tab_machine": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_safez_apply",
+      "cls": "toolbar-btn settings-io",
+      "text": "Apply to #520 →",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 352,
+        "y": 573,
+        "w": 102,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-up",
+      "text": "▲",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 102,
+        "y": 731,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-down",
+      "text": "▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 132,
+        "y": 731,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-up",
+      "text": "▲",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 102,
+        "y": 816,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-down",
+      "text": "▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 132,
+        "y": 816,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-up",
+      "text": "▲",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 102,
+        "y": 900,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hm-down",
+      "text": "▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 132,
+        "y": 900,
+        "w": 22,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_homing_reset",
+      "cls": "toolbar-btn settings-io",
+      "text": "↺ Safe default (Z → X → Y)",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 975,
+        "w": 154,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_wcs": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    }
+  ],
+  "settings-set_tab_spindle": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_spin_maxrpm",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 299,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_spin_defrpm",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 299,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_spin_up",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 348,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_spin_down",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 348,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_head_inputlink",
+      "cls": "toolbar-btn",
+      "text": "Sensor inputs → Input ↗",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 458,
+        "w": 143,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_head_outputlink",
+      "cls": "toolbar-btn",
+      "text": "Coolant / pump outputs → Output ↗",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 210,
+        "y": 458,
+        "w": 209,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_head_simlink",
+      "cls": "toolbar-btn",
+      "text": "Spindle / collet sizes → Preview ↗",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 544,
+        "w": 191,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_input": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn",
+      "text": "✕",
+      "bg": "rgba(255, 255, 255, 0.72)",
+      "rect": {
+        "x": 1294,
+        "y": 239,
+        "w": 30,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn",
+      "text": "✕",
+      "bg": "rgba(255, 255, 255, 0.72)",
+      "rect": {
+        "x": 1294,
+        "y": 312,
+        "w": 30,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn",
+      "text": "✕",
+      "bg": "rgba(255, 255, 255, 0.72)",
+      "rect": {
+        "x": 1294,
+        "y": 385,
+        "w": 30,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn",
+      "text": "✕",
+      "bg": "rgba(255, 255, 255, 0.72)",
+      "rect": {
+        "x": 1294,
+        "y": 458,
+        "w": 30,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn",
+      "text": "✕",
+      "bg": "rgba(255, 255, 255, 0.72)",
+      "rect": {
+        "x": 1294,
+        "y": 531,
+        "w": 30,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "+ Add input",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 587,
+        "w": 78,
+        "h": 28
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_radius",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 691,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_ffast",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 691,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_fslow",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 918,
+        "y": 691,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_retract",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 748,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_safez",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 748,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_maxdist",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 918,
+        "y": 748,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_pd_qstop",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 805,
+        "w": 419,
+        "h": 31
+      }
+    }
+  ],
+  "settings-set_tab_output": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "+ Add output",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 252,
+        "w": 86,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_atc": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Workspace",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 242,
+        "y": 84,
+        "w": 77,
+        "h": 26
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_basevar",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 222,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_atc_library",
+      "cls": "toolbar-btn settings-io",
+      "text": "🛠 Tool library…",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 290,
+        "w": 97,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_atc_insert",
+      "cls": "toolbar-btn settings-io",
+      "text": "⬇ Insert tool table",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 168,
+        "y": 290,
+        "w": 107,
+        "h": 28
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_blockheight",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 400,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_safez",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 400,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_maxdist",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 918,
+        "y": 400,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_retract",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 457,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_ffast",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 490,
+        "y": 457,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_fslow",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 918,
+        "y": 457,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "input",
+      "id": "set_atc_qstop",
+      "cls": null,
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 514,
+        "w": 419,
+        "h": 31
+      }
+    },
+    {
+      "tag": "button",
+      "id": "set_atc_add_btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "➕ Add tool changer (ATC)",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 63,
+        "y": 730,
+        "w": 157,
+        "h": 28
+      }
+    }
+  ],
+  "settings-set_tab_workspace": [
+    {
+      "tag": "button",
+      "id": "hdrAppBtn",
+      "cls": "brand hdr-menu-trigger",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "w": 198,
+        "h": 38
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "BLOCKS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 325,
+        "y": 9,
+        "w": 112,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "MACROS",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 436,
+        "y": 9,
+        "w": 118,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "tab",
+      "text": "GATEWAY",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 554,
+        "y": 9,
+        "w": 141,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": "hdrPostBtn",
+      "cls": "hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger",
+      "text": "Not saved",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1239,
+        "y": 12,
+        "w": 110,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "hdr-acct-btn",
+      "text": "",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1359,
+        "y": 14,
+        "w": 26,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Probe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 531,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "ATC▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 643,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Mill▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 755,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn wizard-btn",
+      "text": "Lathe▼",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 867,
+        "y": 65,
+        "w": 100,
+        "h": 30
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-cam-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "▾",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1181,
+        "y": 114,
+        "w": 42,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "align-rotate-btn",
+      "cls": "toolbar-btn settings-io",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1226,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-undo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↶",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1262,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-redo",
+      "cls": "toolbar-btn settings-io",
+      "text": "↷",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1297,
+        "y": 114,
+        "w": 27,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "btn-clear",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1328,
+        "y": 114,
+        "w": 32,
+        "h": 24
+      }
+    },
+    {
+      "tag": "button",
+      "id": "editor-copy-btn",
+      "cls": "toolbar-btn",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1364,
+        "y": 114,
+        "w": 28,
+        "h": 24
+      }
+    },
+    {
+      "tag": "textarea",
+      "id": "editor",
+      "cls": "editor-layer",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 0,
+        "y": 146,
+        "w": 1400,
+        "h": 854
+      }
+    },
+    {
+      "tag": "button",
+      "id": "view-toggle",
+      "cls": "viz3d-handle",
+      "text": "",
+      "bg": "rgb(18, 13, 9)",
+      "rect": {
+        "x": 1372,
+        "y": 496,
+        "w": 28,
+        "h": 72
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-close",
+      "text": "✕",
+      "bg": "color(srgb 0.169098 0.122353 0.0621176)",
+      "rect": {
+        "x": 1327,
+        "y": 31,
+        "w": 44,
+        "h": 44
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "UI",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 45,
+        "y": 84,
+        "w": 30,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Controller",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 83,
+        "y": 84,
+        "w": 73,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "settings-main-tab",
+      "text": "Hardware",
+      "bg": "rgb(37, 48, 26)",
+      "rect": {
+        "x": 164,
+        "y": 84,
+        "w": 71,
+        "h": 26
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "Open settings",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1249,
+        "y": 288,
+        "w": 88,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "Open manager",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1244,
+        "y": 363,
+        "w": 93,
+        "h": 28
+      }
+    },
+    {
+      "tag": "button",
+      "id": null,
+      "cls": "toolbar-btn settings-io",
+      "text": "Open manager",
+      "bg": "rgb(20, 17, 11)",
+      "rect": {
+        "x": 1244,
+        "y": 643,
+        "w": 93,
+        "h": 28
+      }
+    }
+  ]
+}
