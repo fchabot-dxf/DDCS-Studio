@@ -172,7 +172,7 @@ this actually fixes.
 
 ---
 
-### 4. The lathe icon doesn't read as a lathe setup
+### 4. [STALE - BOTH ICONS DRAWN, VERIFIED t2220] The lathe icon doesn't read as a lathe setup
 > ## ✅ RULED 2026-08-22 — the last blocker is gone, this is now DISPATCHABLE
 > *(human: "item 4, yes remove centerline, and draw the 2 missing")*
 >
@@ -279,7 +279,7 @@ tool-on-a-cross-slide; the current op family draws bar + centreline + cut only, 
 post — which is a plausible reason it reads as "a rod" rather than "a lathe". ⚠ Whatever changes, it must
 survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
 
-### 5. ⛔ A raw NUL byte makes `macrosApp.js` INVISIBLE TO GREP
+### 5. [STALE - VERIFIED CLEAN t2220] ⛔ A raw NUL byte makes `macrosApp.js` INVISIBLE TO GREP
 *(found 2026-08-22 while re-running the t2139 orphan sweep)*
 
 `web/ui/macrosApp.js:658`, inside `autostartGenSig()`, contains an actual **0x00 byte** in a string literal
@@ -1583,3 +1583,53 @@ dock handle this session. Worth checking, in this order:
 
 **Do not close this on a passing test.** It must be confirmed on the human's actual phone against the deployed
 site, or confirmed as a stale-cache artefact and closed for that reason with the evidence.
+
+---
+
+## STALENESS - THE FILE'S REAL DEFECT, AND THE FIX FOR IT
+
+**2026-08-23. EIGHT of eighteen entries were stale in a single evening.** Four had shipped and never left the
+file. Two (#6, #8) were fixed at t2143 and cost a worker turn to re-prove. Two more (#5, #4) were verified
+stale by the advisor in under a minute each.
+
+**The cause is not carelessness.** The file's own rule already says an item is done when it LEAVES the file,
+and that entries must name where the evidence is. What went wrong is subtler: the entries name evidence as
+PROSE - "the icon does not read as a lathe", "a NUL byte makes the file invisible to grep" - so deciding
+whether an entry is still real requires reading it, understanding it, and then designing a check. That is
+expensive enough that nobody does it, so entries accumulate instead of retiring.
+
+**THE FIX: every entry carries a STILL REAL IF line - ONE runnable command whose output decides it.**
+Not a description of the bug. A check that answers yes or no without being understood first.
+
+Worked examples, all run at t2220, all decisive in one command:
+
+    #5   python -c "print(open('ui/macrosApp.js','rb').read().count(b'\x00'))"
+         -> 0. The NUL is gone. STALE.
+         (note: grep -P is NOT usable here - this environment's grep rejects -P on a non-unibyte locale
+          and exits non-zero, which reads as "no match" if the exit code is trusted. It fooled me once.)
+
+    #4   grep -c "user_lathe_polygon\|user_lathe_faceprobe" ui/wizIcons.js
+         -> 2. Both icons this entry says are undrawn are drawn. STALE.
+
+    #14  grep -n "getElementById('editor-comment')" ui/editorTextOps.js
+         -> line 133, and the element is gone from index.html. STILL REAL.
+
+**A check that cannot be written as one command is a sign the entry is an ARC, not a backlog item** - and by
+this file's own opening rule it belongs in ROADMAP.md instead. That test is worth applying when adding, not
+only when retiring.
+
+### Still-real checks for what remains
+
+    #10  design/feature gap, no mechanical check - confirm by opening a 3-op wizard and looking
+    #14  grep -n "getElementById('editor-comment')" ui/editorTextOps.js        -> STILL REAL (t2220)
+    F1   grep -rn "role" ui/gateway/ ui/gatewayPanel.js | grep -i "gate|client|server"   -> UNVERIFIED
+    F3   grep -n "ui.click|ui.toggle" ui/sound.js                              -> entries still present,
+         but this item asks for a JUDGEMENT (which sounds to keep), not a deletion - UNVERIFIED
+    F4   grep -rn "Advanced machining" --include=*.js .                        -> 0 hits, i.e. UNBUILT,
+         which for an ADD item means STILL REAL rather than stale
+    17   the dirty dot - see the entry; every negative result is already recorded there
+    18   the keyboard dock - same, and read its history warning before touching it
+
+⚠ Note the F4 shape: for an entry that asks to ADD something, "no hits" means STILL REAL. A staleness check
+has to know which direction it is pointing. Write the check so its PASSING output is the stale one, and say
+which that is - otherwise the check is as ambiguous as the prose it replaced.
