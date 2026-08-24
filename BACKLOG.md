@@ -1289,6 +1289,21 @@ Prove the *id* is unreferenced, not the *feature* — they are not the same ques
 
 ⇒ **A tail-sized item.** Two clusters, one commit each, with the grep evidence for each deletion in the message.
 
+#### ✅ UPDATE (t2221) — SHIPPED, all three clusters (a third turned up during the sweep, not just the two named above)
+
+`#editor-comment`'s dead lookup (`editorTextOps.js`) and the two `bottom:` override blocks for
+`#align-rotate-btn`/`#editor-cam-btn` are both deleted. The second cluster was verified BY RENDERING, not by
+reading, per this entry's own standing doctrine: `getComputedStyle` at both media conditions (portrait, and
+landscape+keyboard ≥700px) returned `position: static` for both real buttons in every case — a `bottom`
+override on a static element computes but has zero layout effect, so both blocks were genuinely inert.
+
+A THIRD cluster turned up mid-sweep, not named in this entry's original text: `globalFunctions.js`'s
+`EDITOR_FILE_ACTIONS` + `window.ddcsEditorFileMenu` (the editor's retired corner FILE menu, t1227) — already
+self-documented as dead code in its own comment, confirmed live (DOM ids absent, function unreferenced except
+by its own now-updated boot-wait in `editor-file-menu-1227.spec.js`), deleted the same way. Full suite green
+(2782 passed; the same 6 pre-existing failures already queued for their own turn, plus one new transient
+confirmed non-blocking by isolated re-run — none related to this change).
+
 ### 15. [SHIPPED t2206 - 20 font shorthands] INVALID CSS SHORTHANDS THAT SILENTLY VOID THEIR WHOLE DECLARATION — a category, not two bugs
 *(found twice in two days, both by measuring rather than by reading — t2155 tail and t2173; a relative found at
 t2190, one level up: a comment that ends itself)*
