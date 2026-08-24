@@ -52447,3 +52447,82 @@ would have been pure duplication for its own sake). `brand/icons.json`'s `missin
 `rows` list emptied, and a `resolved_2026-08-23_t2184` note added explaining what happened and why, kept
 alongside the original text rather than deleted — this file's own convention (matching BACKLOG.md's own
 "UPDATE, left the original intact" pattern) of showing what changed and when instead of rewriting history.
+
+## t2202 — BACKLOG 15: THE INVALID-SHORTHAND SWEEP — 19 more `font: … inherit` voids found and fixed
+
+Both t2196/t2198's shipped work merged and released. This turn takes up BACKLOG 15: the category t2155/t2173/
+t2190 each hit independently — a CSS shorthand is all-or-nothing, so one invalid COMPONENT silently drops the
+WHOLE declaration, with no error, no warning, and a source that reads completely correct. The dispatch's own
+lead: sweep for shorthands whose value contains a `var()`, since that is the shape that hides it — the token's
+actual contents aren't visible at the call site.
+
+### The border/outline/animation/transition family: checked, clean
+
+Grepped every `border`/`border-*`/`outline`/`animation`/`transition` shorthand carrying a `var()` (the
+`background` family was excluded — a single-value color/gradient slot can't be arity-invalidated the way a
+multi-component shorthand can, and grep confirmed zero `margin`/`padding`/`flex`/`grid`/`gap`/`inset`
+shorthand+`var()` usage exists in this file at all). For every distinct custom-property NAME used inside one of
+these slots (`--edge`/`--border`/`--menu-edge`/`--btn-edge`/`--modal-edge`/`--kbd-edge`/`--accent`/`--line`/
+`--field-focus-edge`/the matching `-w` width tokens/`--edit-glow-speed`), dumped its ACTUAL resolved value
+across all 5 themes via `getComputedStyle(document.body)` (not `document.documentElement` — `data-theme` lives
+on `<body>`, a mistake that produced an all-identical, all-wrong first dump before catching it) — every single
+one resolves to a single valid value for its slot, in every theme. `--dock-handle-edge` (the ORIGINAL
+`.viz3d-handle` bug's own token, studio = `"#fff #3a362f #3a362f #fff"`, still genuinely 4-valued) is no longer
+used inside a `border:` shorthand anywhere — confirms t2155's fix (splitting it onto `border-color`, a longhand
+that legitimately accepts 1–4 values) is intact. This family is clean; nothing to fix.
+
+### The font family: t2173's own prediction, confirmed — 20 instances, not 1
+
+`inherit` is a CSS-wide keyword: valid as a property's SOLE value, never as a component alongside explicit
+weight/size inside the `font` shorthand. `.preflight-badge-label`'s `font: 700 11px/1 inherit` (found at t2173,
+flagged, left unfixed — "likely others sharing the same … pattern elsewhere in styles.css") was the ONE known
+case. A file-wide grep for `font:[^;]*inherit[^;]*;` returned 39 hits; filtering out the SAFE bare form
+(`font: inherit;` alone — valid, means "inherit everything") left **20 genuinely broken instances**, every one
+the same copy-pasted shape: `.editor-container .xform-badge-label`/`.xform-badge-x`, `.preflight-badge-label`
+(the known one), `.preflight-pop`, `#editor-highlight .g-line .preflight-annot`, `.time-estimate-chip`,
+`.op-ctx-item`, `.sl-active-badge`, `.sl-primary`, `.form-sec > .form-sec-hdr`, and TEN inside `#blocks-app`
+(`.blk-search`, `.blk-sug-chip`, `.blk-dev-savebtn`, `.blk-edit-chip`, `.blk-sug-opt`, `.blk-sug-opt kbd`,
+`.blk-pane-title`, `.blk-view-btn`, `.blk-tools-handle`, `.blk-openmodal`, `.blk-drawer-handle` — the last one
+inside the `@media (max-width: 860px)` mobile block). Fixed by splitting every one into `font-family`/
+`font-weight`/`font-size`/`line-height` longhands (the size the codebase's own t2173 fix already established
+for `.role-headline`/`.role-detail`) — never by inlining a literal, and never by dropping `font-family` (an
+explicit `inherit` documents the intent instead of relying on the property's own default inheritance to do the
+same thing silently).
+
+### Verified by computed value, never by eye — the whole point of this item
+
+Built the minimal DOM each compound selector actually needs (e.g. `#editor-highlight .g-line .preflight-annot`
+needs its real ancestor chain, not just the leaf class) and read `getComputedStyle` for 18 of the 20 fixed
+rules (the 19th/20th — `.preflight-badge-label` itself and `.blk-sug-opt kbd` — share the exact same verified
+shape as siblings already checked). BEFORE the fix: 0/18 matched their declared size or weight (mostly reading
+16px/13px — inherited ambient defaults, not what the rule declared). AFTER: 16/18 match on BOTH; the remaining
+2 (`.op-ctx-item`, `.sl-primary`) are real `<button>` elements whose font-WEIGHT loses a cascade battle to this
+file's own generic `button, .btn, .op-btn, .toolbar-btn` rule regardless of whether this fix landed — confirmed
+by an unrelated bare `<button>` (no class, appended purely to test the hypothesis) showing the identical
+non-declared weight. That is a real, but DIFFERENT, category — cascade specificity, not parse-time shorthand
+validity — and out of this item's own scope; verified instead via the CSSOM directly (the parsed rule's own
+`style.fontSize`/`style.fontWeight` are non-empty, proving the declaration itself now exists and parses,
+independent of what wins the cascade afterward).
+
+### A chased-down false alarm, not swept under the rug
+
+`tests/save-dialog-declared-1615.spec.js` (2 of its 3 tests) started timing out waiting for Blockly's own boot
+signal (`window.__blkws`) after this fix landed — in a ROTATING pattern across repeated runs (a different pair
+of the 3 tests failed each time). Before accepting that as a real regression, ran the SAME file against the
+UNMODIFIED pre-t2202 tree (via `git stash`) TWICE: the identical rotating 2-of-3 failure pattern reproduced
+BOTH times, on code this turn never touched. Pre-existing test-timing flakiness (Blockly's own workspace init
+is evidently sensitive to something — likely just machine load after a long session's worth of Playwright
+invocations, not this file's own logic), not caused by this fix. Reported here rather than either quietly
+believed-fixed or quietly ignored.
+
+### Verification
+
+New `tests/css-shorthand-inherit-2202.spec.js` — 2 tests (18 selector cases + the mobile-only drawer handle,
+which needs its own `@media` viewport and a CSSOM check since it shares the SAME real-`<button>` cascade
+confound as `.op-ctx-item`). Non-vacuity: `git stash` of `styles.css` alone (keeping the new test) → both fail
+against pre-fix code; `git stash pop` restored cleanly, both green again. Collateral: full smoke tier (77)
+green before and after; every test file directly named after a touched selector or its immediate area run in
+full (`preflight-badge-838`, `preflight-badge-collapse-2171`, `preflight-names-unresolved-expr-1568`,
+`time-estimate-844`, `transform-declared-736`, `form-section-collapse-820`, `pane-header-1768`,
+`blocks-mobile-drawers`, four `context-menu-*` files, `save-dialog-declared-1615`) — all green except the
+confirmed-pre-existing flake above. Lint clean (no JS touched; only `styles.css`).

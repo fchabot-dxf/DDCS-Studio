@@ -1307,6 +1307,35 @@ theming, which is the wrong trade in a file built on tokens.
 ⚠ **Both known instances are already flagged in the WORK-LOG and NOT fixed** — the handle one was fixed at
 t2155, the badge-label one is outstanding. Confirm which is which before starting.
 
+⭐ **UPDATE (t2202): SWEPT AND CLOSED.** `border`/`outline`/`animation`/`transition` shorthands carrying a
+`var()` were checked across all 5 themes (every token resolves to a single valid value in its slot — no
+second `.viz3d-handle`-shaped bug anywhere in that family). `font` was the one that had more: t2173's own
+prediction ("likely others sharing the same font: … inherit shorthand pattern elsewhere in styles.css") was
+right — a file-wide grep for `font:[…]inherit` (component, not sole value) found **20 instances**, not 1: the
+known `.preflight-badge-label` plus 19 more, every one a copy-paste of the same invalid shape
+(`font: <weight> <size>[/<line-height>] inherit;` — `inherit` can only be the shorthand's SOLE value, never a
+component beside explicit weight/size, so the whole declaration was silently dropped by the parser). Every one
+split into `font-family`/`font-weight`/`font-size`/`line-height` longhands — never inlined, per this item's own
+rule.
+
+**Verified by computed value, not by eye**, exactly as this item demanded: built the minimal DOM each compound
+selector needs and read `getComputedStyle` — 16 of 18 tested cases now show their declared size AND weight
+(0 of either matched before the fix, on any of them). The remaining 2 (`.op-ctx-item`, `.sl-primary`, both real
+`<button>` elements) show their declared font-SIZE correctly but lose the font-WEIGHT cascade battle to this
+codebase's own generic `button, .btn, .op-btn, .toolbar-btn` rule — a genuine, but DIFFERENT and pre-existing,
+category (cascade specificity, not parse-time shorthand validity) and out of this item's own scope; verified
+via the CSSOM directly (the parsed rule DOES carry the longhand, confirming the fix landed) rather than
+asserting a computed value the fix was never going to control.
+
+New `tests/css-shorthand-inherit-2202.spec.js` — non-vacuous (`git stash` of styles.css → both tests fail
+against pre-fix code; restored, both pass). Full smoke tier + every test file directly named after a touched
+selector (44 candidate files found by grep; the ~15 most directly relevant run in full) — all green. One
+apparent regression chased down and RULED OUT, not swept under the rug: `save-dialog-declared-1615.spec.js`
+timed out waiting for Blockly's own boot signal (`window.__blkws`) in 2 of 3 tests, in a ROTATING pattern
+across repeated runs — confirmed via `git stash` bisection run TWICE that the SAME flaky pattern reproduces on
+the unmodified pre-t2202 tree too (a coin-flip on which 2 of 3 fail, both with and without this turn's CSS).
+Pre-existing test-timing flakiness, unrelated to this fix.
+
 ### 16. THE DECLARED COMPONENTS EXIST AND NOBODY USES THEM — modals, and the Local/Cloud switcher
 *(human, 2026-08-23, comparing the Wizards, Workspace and Projects modals side by side: "the project modal
 seems different then the others, is it actually sharing assets?" then "the local cloud tab also needs to be
