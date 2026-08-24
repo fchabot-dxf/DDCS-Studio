@@ -1705,3 +1705,28 @@ wizards they want in a group.
 ⚠ **A max-height must be viewport-derived, not a constant.** A fixed pixel cap is wrong on both a phone and a
 1440p monitor, and this codebase has already been bitten once by a hard 400px preview height that nothing
 downstream consumed (see BACKLOG #10's t1468 note).
+
+---
+
+### 20. THE ATC TWINS DECLARE BOTH A `panel` AND A `sim` NODE — registering them as-is ships TWO stacked boxes
+
+*(found at t2255 while reporting why ATC's 3D preview cannot be resized. NOT the resize bug — that one is six
+missing wrappers in index.html and is being fixed separately. This is a defect waiting at E2.)*
+
+**STILL REAL IF:** `grep -n "panel\|sim" DDCS-Studio/web/blocks/dataOps/atc*Data.js`
+→ **both node types present in one def means STILL REAL.**
+
+Each ATC twin (`blocks/dataOps/atc*Data.js`) declares a `sim` node — good, that is the declared route every
+other wizard takes. But it **also** declares a `panel` node ahead of it, and `formWidgets.js`'s `sim` branch
+builds the 3D *and* 2D panes unconditionally. So the two overlap: register the twin as it stands and the wizard
+renders two stacked preview boxes rather than one.
+
+**OBSERVED at t2255:** `registerUserOp(atc*DataDef())` appears nowhere live, and all three existing twin tests
+self-document as *"NOT registered/in-place yet (E2)"*. ⇒ Nothing is broken for a user today. It breaks the day
+someone registers them.
+
+⚠ **Fix this BEFORE E2, not during it.** Discovering it while flipping the twins live turns a one-line
+declaration cleanup into a debugging session in the middle of a migration.
+
+⚠ **And decide which node is redundant rather than deleting the one that looks easier** — `panel` and `sim` are
+not synonyms, and whichever survives has to carry what the other was doing.
