@@ -423,6 +423,27 @@ html, body { overflow-x: clip; }
 [data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255, 255, 255, .82); }
 [data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255, 255, 255, .7); }
 
+/* t2214 — amendment 1: the MACROS /DISK/ file shelf (ui/macrosApp.js's `.settings-tab` rows, same class/shape
+   used by #settings-app's own secondary rail) had `background: transparent` at rest and no border ever (not a
+   t2208 regression — it never drew a shape). On organic that reads as plain text with zero row separation;
+   human's ruling verbatim: "these can get a lighter or different color". --panel2 is the ladder's own "raised"
+   rung (t2208 built it for exactly this). :hover/.active already move to var(--bg) — kept as-is, only the
+   RESTING state gets a surface here. */
+[data-theme="organic"] #macros-app .settings-sidebar .settings-tab,
+[data-theme="organic"] #settings-app .settings-sidebar .settings-tab { background: var(--panel2); }
+/* t2214 — text fields: --field-face defaults to var(--panel), which on organic sits directly on an equally
+   --panel-toned surface in several places (e.g. the M-code name/body fields inside the Macros tree, measured
+   byte-identical rgb(28,20,12) on rgb(28,20,12) — human's own words, "dark-on-dark"). --field-edge (->
+   --border) is already transparent, same as everywhere else in this theme, so the fill is the only thing left
+   to carry the shape. --field-focus-edge (outline, -> var(--accent)) and --field-placeholder-ink (->
+   var(--text-dim)) were BOTH already fine — neither aliases --border, checked by tracing rather than assumed. */
+[data-theme="organic"] input, [data-theme="organic"] select, [data-theme="organic"] textarea { --field-face: var(--panel2); }
+/* t2214 — the Help panel's FAQ accordion (ui/helpPanel.js's `<details>` items): border-only, no background at
+   all (not even var(--panel)) — found during the audit sweep, not in the original dispatch, but the same
+   shape (a clickable disclosure control with nothing but --border giving it a boundary). Each item is its own
+   surface now instead of floating text with no grouping. */
+[data-theme="organic"] #help_faq details { background: var(--panel2); }
+
 /* --- Active-tab outward "feet": concave quarter-curves at the bottom-outer corners that flare into the bar.
    Sized by --tab-flare; filled with --tab-fill (the tab colour) with a 1px --tab-edge ring tracing the curve so
    the outline wraps the foot. Applies to studio/steampunk/organic; futuristic (square) + normal (flat) opt out. --- */

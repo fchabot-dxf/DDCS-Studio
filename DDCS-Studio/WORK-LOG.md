@@ -52875,3 +52875,96 @@ up or silently re-tuning the canopy colour to force a pass.
 
 Full smoke tier green (77) — CSS-only, one selector list gained one entry. Threw away
 `tests/_organictabs.spec.js` after use.
+
+## t2214 — THE ORGANIC AUDIT: the shelf, the fields, and everything else "what is still drawing this"
+
+Two amendments landed together (verbatim text in `.handoff/amendments.tsv`, turn 2214): (1) the human circled
+the Macros `/DISK/` file shelf and its M-code fields on a phone screenshot — "these can get a lighter or
+different color and text field can also get a diff color in organic" — plus an instruction to stop doing
+one-off patches and audit organic's WHOLE borderless pass, class by class, reporting even the ones already
+fine; (2) the advisor's own ruling that t2213's 1.36:1 stands (see below) plus a new mobile ask (a settings-tab
+row that must stay on one line — DEFERRED this turn, see Pending). Priority stated explicitly: shelf + fields
+first, "the human is looking at that screen right now."
+
+### The shelf and the fields
+
+`.settings-tab` (the file-shelf rows, `ui/macrosApp.js`, same class/shape on `#settings-app`'s own rail) never
+had a border at all — `background: transparent`, no border rule. Not a t2208 regression; it simply never drew
+a shape, so on organic's black sidebar the six non-selected rows (sysstart.nc, T.nc, error.nc, probe.nc,
+key-N.nc, camN.nc) were unstyled text with zero row separation — confirmed by the human's own screenshot.
+Measured the fields too rather than trusting the screenshot alone: `.mc-f[data-f="name"]` (the M-code name
+input) computed `background-color: rgb(28,20,12)` — and its own parent context resolves to the SAME
+`rgb(28,20,12)` (`--panel`, ui/settingsPanel.js's `--field-face: var(--panel)` default) — literally identical,
+"dark-on-dark" in the human's own words, not a figure of speech.
+
+Fixed both onto `--panel2` (t2208's own "raised" rung, built for exactly this): `[data-theme="organic"]
+#macros-app .settings-sidebar .settings-tab, [data-theme="organic"] #settings-app .settings-sidebar
+.settings-tab { background: var(--panel2); }` for the shelf rows' RESTING state (hover/active already move to
+`var(--bg)`, untouched); `[data-theme="organic"] input, select, textarea { --field-face: var(--panel2); }` for
+every field theme-wide. Checked focus and placeholder per the dispatch's own explicit ask rather than only the
+resting fill: `--field-focus-edge` reads `var(--accent)` (amber, untouched by t2208) and `--field-placeholder-
+ink` reads `var(--text-dim)` (a text token, also untouched) — both already fine, traced not assumed.
+
+Verified by screenshot at 1280px and 430px (the human's own width): every shelf row now reads as a distinct
+warm-brown card; the M-code name bar and macro-body textareas are clearly legible boxes instead of invisible
+against the page. `verification/t2214-organic-{shelf,mcfields,field-focus}-after.png` +
+`t2214-organic-430-after.png`. `t2214-normal-shelf-sanity.png` confirms the other four themes are untouched
+(the selectors are `[data-theme="organic"]`-scoped).
+
+### The audit — every token/class checked, verdict for each, including the ones already fine
+
+Extended t2213's token-indirection sweep (which covered CSS custom-property aliases of `--border`) with a
+literal grep across every `ui/*.js` inline `<style>` block, since several `.settings-head`-style rules live
+there rather than in `styles.css` — a literal-only grep of `styles.css` alone would have missed all of these:
+
+- **`#help_faq details`** (the Help panel's FAQ accordion, `ui/helpPanel.js`) — **STATE, found this turn, not
+  in the original dispatch.** `border: 1px solid var(--border)`, no background at all — on organic, zero
+  border AND zero fill means a disclosure control (independently clickable, needs its own visible boundary)
+  read as floating text with no grouping between questions. Fixed the same way: `[data-theme="organic"]
+  #help_faq details { background: var(--panel2); }`. Screenshot: `t2214-organic-faq-after.png` — nineteen
+  FAQ rows, each now a distinct card.
+- **Modal cards** (`#cl-modal .cl-panel`, `#iconed-modal .ie-panel`, two `globalFunctions.js` overlay panels) —
+  **SEPARATION, same proven pattern as t2208's own already-verified modals** (a real `--panel` fill sitting on
+  a much-darker scrim, not on an equally-toned surface). Not individually re-screenshotted this turn — high
+  confidence by precedent, not zero-confidence, but flagging the distinction honestly rather than claiming an
+  equal verification depth to the shelf/fields.
+- **Modal head/foot dividers** (`.cl-head`/`.cl-foot`, `.ie-head`/`.ie-foot`/`.ie-tabs`/`.ie-lyr` border-top/
+  -bottom) — SEPARATION, boundary lines inside already-filled cards, same class as t2213's `--modal-foot-edge`
+  finding.
+- **`#macros_header`** (the "CONTROLLER · DDCS Expert M350" identity bar) — its own `border-bottom` is a
+  divider, not a state indicator, classified SEPARATION — but noted as a standing systemic fact rather than
+  waved off: its `background: var(--panel)` sits on a `--bg`-toned area, the SAME thin panel-vs-bg gap
+  measured at 1.36:1 for the settings-tab strip. Not fixed this turn (lower risk — nothing here is asking to
+  be clicked, it's a label bar) but named so it isn't rediscovered as a surprise later.
+- **`ui/iconEditor.js`** (`.ie-rail button`, `.ie-tile`) — **UNVERIFIED**, flagged rather than assumed fine.
+  Both have real fills (`var(--bg)`/`#000`) so likely survive border loss the same way the toolbar dropdown
+  did, but the icon editor is a deep, rarely-used power tool outside this turn's stated priority path — not
+  screenshotted.
+- **`globalFunctions.js`'s `data-canvas` divs** — UNVERIFIED, same reasoning (real `#000` fill, likely fine,
+  not on the priority path, not screenshotted).
+- **"Wells"** — searched for the term literally; the only well-shaped mechanism in the file is
+  `--dock-well-edge`, which is `[data-theme="studio"]`-only (a brushed-metal bevel gradient, never derived
+  from `--border`) — organic has no well-class surface at all. Nothing to audit here.
+- Everything t2213 already covered (`--tab-edge`, `--edge`, `--menu-edge` via both `.hdr-quick-menu` and
+  `.toolbar-dropdown-content`, `--modal-foot-edge`, `--line`) stands as classified there — not re-walked.
+
+### The 1.36:1 ruling (closes t2213's open question)
+
+Advisor rendered the t2213 fix themselves at 430px, looked at it, and ruled 1.36:1 stands: "3:1 is the
+standard for a graphical object distinguished PURELY BY COLOUR; this tab is separated by shape, hue, fill AND
+text weight at once... a luminance-only ratio measures one of four signals and understates it badly." They
+also rendered three brighter `--band-bg` candidates (#31411f/#3d5227/#4f6b2e, 1.71/2.18/3.12:1) before
+deciding NOT to move it — confirms this was a look-at-it call, not a shrug, and confirms declining to retune
+the human's own t2127 colour on a formula was the right call. No further action.
+
+### Verification
+
+Full smoke tier green (77) — CSS-only. Threw away `tests/_organicaudit.spec.js` after use.
+
+### Pending — split per the dispatch's own explicit permission
+
+Amendment 2's mobile ask (settings-tabs must stay on one row at 430/390/360/320px, compact + scroll, the
+tab-feet clipping trap, active-tab-into-view on open, across all four strips and all five themes) is
+substantial enough to be its own turn — not started this turn, per "Priority if you must split: the shelf and
+fields first... the tab row second." Reporting this explicitly rather than rushing a partial mobile fix into
+an already-large commit.
