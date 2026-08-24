@@ -54,8 +54,10 @@ export function atcTestDataStack(params = ATC_TEST_DEFAULTS) {
     return [{
         type: 'user_root', params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
+            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
+            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
+            // building the pane ATC never had content for.
+            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true, layout2d: false } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
 
             { type: 'param_group', params: { group: 'ATC Test' }, children: [] },
         ],

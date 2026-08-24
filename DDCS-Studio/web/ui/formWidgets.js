@@ -1336,9 +1336,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                 const simBox = document.createElement('div');
                 simBox.className = 'wiz-visual';
                 simBox.style.cssText = 'width:100%; height:100%; min-height:300px; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
-                
+
+                // t2257 (BACKLOG 20) — layout2d: false is a NEW, additive opt-out: a 3D-only sim (ATC — no
+                // param_field/block ever declares 2D geometry for it, so a layout2d pane was always empty
+                // dead weight) omits the pane entirely rather than building an unused one. Unset/true is the
+                // ORIGINAL, unchanged shape for every other op. The 3D pane starts VISIBLE (not the usual
+                // display:none-until-toggled) since it is the ONLY content when there is no 2D to default to.
+                const want2d = node.params && node.params.layout2d === false ? false : true;
                 // IMPORTANT: Construct the viz-split structure exactly as it is in index.html for Corner
-                simBox.innerHTML = `
+                simBox.innerHTML = want2d ? `
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
                     <div class="viz-container" id="userViz3dBox_tree" data-viz-pane="preview3d" style="display:none">
@@ -1349,8 +1355,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                         <div id="userVizStatus_tree" class="viz-status"></div>
                         <div id="userVizContainer_tree" class="viz-canvas"></div>
                     </div>
+                </div>` : `
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container" id="userViz3dBox_tree" data-viz-pane="preview3d">
+                        <div id="userViz3dStatus_tree" class="viz-status"></div>
+                        <div id="userViz3dContainer_tree" class="viz-canvas"></div>
+                    </div>
                 </div>`;
-                
+
                 container.appendChild(simBox);
                 import('./paneAccordion.js').then(m => m.makePanesCollapsible(simBox)).catch(() => {});
             } else if (node.type === 'panel') {

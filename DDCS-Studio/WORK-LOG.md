@@ -54811,3 +54811,190 @@ implement either — screenshots at `scratchpad/t2255-atc-atc_length-desktop.png
 ### Capacity
 
 Full working room this turn — no flag.
+
+## t2257 — AMENDMENT 11 BUILT: ATC PANE WRAPPED IN `.viz-split`, ALL SIX, VERIFIED BY DRAGGING
+
+Built my own t2255 recommendation, exactly scoped: six HTML edits in `index.html`, no JS changed. Each ATC
+wizard body (`wiz_atc_length`, `wiz_atc_check`, `wiz_atc_warmup`, `wiz_atc_table`, `wiz_atc_change`,
+`wiz_atc_test`) had its existing `.viz-container[data-viz-pane="preview3d"]` wrapped in a `.viz-split` div —
+nothing else in the markup moved. `wiz_atc_table`/`wiz_atc_change`'s own `#atc*Tools` tool-rack row stayed a
+SIBLING of `.viz-split` (not moved inside it) — it isn't a `[data-viz-pane]`, and `.viz-split`'s own
+resize/collapse logic only ever looks at direct `[data-viz-pane]` children, so leaving it outside is the
+smaller, more literal change. Did NOT touch the twin route — BACKLOG 20 (the panel+sim duplication) stays
+exactly where the advisor filed it, out of scope.
+
+### Verified by dragging, not by the handle existing — per the explicit instruction
+
+`scratchpad/t2257-atc-verify.mjs`: confirmed `.viz-split` + `.viz-pane-sizer` now exist for all 6 wizards, at
+both 1280px and 430px (the dispatch's own "don't inherit the mobile-only hedge").
+
+`scratchpad/t2257-atc-drag2.mjs`: a REAL `page.mouse` drag (down→pointerdown→move→up), shrink-then-grow, on
+ATC Length. First attempt (drag-down-only, `t2257-atc-drag.mjs`) showed a false 0px delta on desktop — the
+starting height happened to already be at `visualMaxHeight`'s own ceiling, so a grow-only drag couldn't move
+it; re-ran shrink-then-grow to sidestep that confound. Desktop 1280px: 707 → 501 (shrink) → 595 (grow), both
+directions genuinely move the box. Mobile 430px: 258 → 109 (shrink) confirmed; the SUBSEQUENT grow attempt
+stayed flat — traced this to `visualMaxHeight`'s own real geometry, not a defect in the wrap: ATC Length's
+own form content (hint + button + a long G-code `<pre>` block) runs ~716px tall on a 430px-wide viewport, so
+the derived growth ceiling is genuinely close to the floor there. Confirmed this is content-driven, not
+regression-driven, by running the IDENTICAL shrink-then-grow sequence on `drill` (a shorter form) at the same
+430px viewport — it grew back cleanly (286 → 380) — same shared, untouched `visualMaxHeight` mechanism,
+different result because ATC Length's own content is simply taller relative to the viewport. Not fixed this
+turn (out of scope — the ask was restoring the resize AFFORDANCE, not rebalancing ATC's mobile height
+budget); noted here so it isn't rediscovered as a surprise.
+
+### The actual reported defect — the inherited-height trap — confirmed ESCAPABLE
+
+This was the specific check the advisor named as the one that matters: set a height via `panePrefs.js`
+(simulating a drag on some OTHER, unrelated wizard) to 650px, opened ATC Length fresh — it inherited exactly
+650px with no handle (`hasSizerNow` was `true` after this turn's fix, `false` before it, per t2255's own
+finding). Then ACTUALLY dragged the new sizer up ~300px: live height dropped to 344px and — critically — the
+PERSISTED value (`getVisualHeight()`) also became 344, proving the drag doesn't just cosmetically resize the
+box but genuinely writes the escape back to the same shared preference the trap read from. The trap is
+closed: an ATC wizard can no longer be stuck at a size it never chose.
+
+### Keyboard resize returns too — checked as asked
+
+`scratchpad/t2257-atc-keyboard.mjs`: focused the new `.viz-pane-sizer`, `ArrowUp`×10 then `ArrowDown`×3 then
+one `Shift+ArrowDown`. 707 → 587 (shrink) → 623 → 663 (grow, plain vs. the 40px shift-step both moved it the
+expected relative amount). `addPaneSplitter`'s own keydown handler needs `panes.length === 2` to attach at
+all (early-return at line 391) — ATC has one pane, so that handler still never attaches, but
+`addVisualSizer`'s OWN keydown block (a separate function, lines ~500-514) attaches unconditionally once
+`.viz-split` exists, which is exactly the piece ATC needed and now has.
+
+### The collapse chevron — confirmed unaffected, both pane kinds
+
+Clicked the 3D pane's own `.wiz-pane-bar` (needed to disambiguate from the SEPARATE G-code-preview pane's own
+bar, which `enhancePane` also wires via `.preview-block`, both correctly present) — `data-collapsed` flips to
+`'1'` exactly as before. Never depended on `.viz-split` in the first place (t2255's own finding), so this
+was never expected to change; confirmed rather than assumed.
+
+### Verified (targeted + full suite)
+
+Targeted first: `atc-preview.spec.js` (all 5 wired types), `atc-wizards.spec.js`, `atc-length-in-place.spec.js`,
+`tooltable-gate-1890.spec.js`, and all 3 twin byte-diff suites — 31/32 passed, 1 flaky (a field-gate poll
+timeout, passed on retry #1, unrelated to preview markup). Full suite (required — `index.html` is shared app-
+wide): 2792 passed, 17 flaky (back inside the 14–18 trend band after last turn's 22), **1 unexpected** —
+checked the error text: `param-group-rows-1605.spec.js`, plain `TimeoutError` after 3 retries, no reference
+to ATC/`viz-split`/`wiz_atc_*` anywhere in the spec file — unrelated.
+
+### Capacity
+
+Full working room this turn — no flag.
+
+## t2257 (REVISED MID-TASK) — BACKLOG 20 FIXED FOR ALL 6 ATC TWINS, BYTE-PARITY PROVEN, ONE REAL REGRESSION CAUGHT AND FIXED. index.html untouched.
+
+**Started as**: build the t2255 recommendation (wrap ATC in `.viz-split`, 6 HTML edits). Built and verified it
+fully (drag both directions confirmed on desktop, shrink confirmed on mobile, the inherited-height trap
+confirmed escapable, keyboard resize confirmed, collapse confirmed unaffected — see the drag/keyboard/trap
+scratch scripts). **Then a mid-task amendment arrived and reversed the plan entirely**: the human re-aimed
+this at the wizards-as-data ARC — patching `index.html` is work on code the arc intends to delete, and ATC
+becomes the E2 pilot instead. Reverted `index.html` cleanly (`git checkout --`, uncommitted, nothing lost).
+The rest of this entry is the REVISED task: fix BACKLOG 20 (the panel+sim duplication), prove byte-parity,
+report — explicitly NOT register anything or touch the hand-written wizards, per the dispatch's own stop.
+
+### The systemic check the dispatch asked for — one grep, the count
+
+`grep type: 'panel'` across `blocks/dataOps/*.js`: **30 of ~32** files. `grep type: 'sim'`: **24**, and every
+one of those 24 ALSO declares `panel` — so the shape isn't ATC-only, it's the norm for anything with a live
+preview. **But "declares both" isn't automatically "broken both"**: `params.panel`'s own declared value
+varies meaningfully — `'form3d+2d'` (drill/pocket/corner/… — genuinely wants an interactive 2D handle canvas
+alongside 3D, per t716's own comments: "the FeatureCanvas 2D with the hole pattern + pos + pattern-size
+handles"), `'form3d'` (only the 6 ATC files — no 2D content at all), `'form'` (wcsData — no preview needed),
+`'commscreen'` (commData — a DDCS-screen preview, not a 3D/2D split). Read `formWidgets.js`'s own 'panel'
+branch: **it never reads `params.panel` at all** — every value produces the identical generic 2D-only box.
+The vocabulary is declared; the renderer never implements it. That gap is real and systemic, but whether it's
+FUNCTIONALLY harmful for the other 23 depends on whether their 2D content actually gets attached by id or by
+some other mechanism (panelTypes.js's own decls, maybe) — I did NOT chase that; it's a separate, bigger
+investigation than what was asked, and the dispatch's own scope was ATC. Flagging it precisely rather than
+either fixing 23 files unprompted or staying silent about what the grep actually found.
+
+### The mechanism, precisely — a real DOM id collision, not just "two boxes"
+
+`formWidgets.js`'s 'sim' branch and 'panel' branch both hardcode the SAME ids for their own layout2d
+container: `userVizStatus_tree` / `userVizContainer_tree`. Any `uiChildren` declaring both — which is all 24
+`sim`-users — would, if rendered through this traverse() path, produce two elements sharing one id. Verified
+this is real by reading both branches side by side (formWidgets.js:1335-1372), not by inference.
+
+### BACKLOG 20, fixed for ATC's 6 files — declared, not duplicated
+
+Extended `formWidgets.js`'s 'sim' branch with an additive, opt-in param: `layout2d: false` skips building the
+layout2d pane entirely (the 3D pane starts VISIBLE instead of the usual display:none-until-toggled, since it
+is the only content when there's no 2D to default to). Unset/true is BYTE-IDENTICAL to every other caller —
+verified via the existing 23 non-ATC callers' own tests staying green (see the full-suite run below).
+Removed the `{ type: 'panel', ... }` node from all 6 `atc*Data.js` files (confirmed first that none of the 6
+had `children`/`uiChildren` of their own — safe to delete outright, not just hide) and added `layout2d: false`
+to each one's own `sim` params. This is "the survivor carries what the other did" per the dispatch's own
+instruction: `sim`, once it can express 3D-only, is the correct, sufficient declaration ATC always needed —
+`panel` was never adding anything real for ATC (no `previewGeometry`, no interactive handles, an inert
+`params.panel` value the renderer never reads), it was only ever a copy-paste artifact riding alongside `sim`.
+
+### The regression I introduced and caught myself, before the advisor ever saw it
+
+Full-suite run after the fix: **11 unexpected failures**, all tracing to `user_atc_warmup_data` failing to
+register at all ("the twin ... is seeded/registered: Expected true, Received false", cascading through
+`fork-parity-1593`, `mill-atc-in-place`, `palette-sufficient-1591`, `twin-form-completeness-1581`,
+`preview-intent-single-source-714`, `tooltable-gate-1890`, `value-fidelity-1520`). Root-caused precisely, not
+guessed: `atcWarmupData.js` has its OWN, older, hardcoded-index binding system (unlike Length/Check/Change/
+Table/Test's identity-based `deriveBindingsFor`/`bindingSpecs`) — `WRAP_PREFIX_COUNT = 4 // user_root + panel
++ sim + param_group`, added to every binding's raw exec-relative `blockIndex` to get its real position in the
+flattened template. Removing `panel` dropped the real prefix to 3; the constant still said 4; every binding
+resolved one slot too late, and `registerUserOp`'s own validation caught it honestly ("binding (block
+16.rpm) does not resolve in the template") rather than silently mis-wiring a field. Fixed the constant to 3
+with a comment explaining why; re-ran the isolated 6-op byte-parity sweep (0 diffs, 42 combos) and all 11
+previously-failing spec files (23/23 green) to confirm, before re-running the full suite one more time to be
+sure nothing else was still broken. Named here in full because this is exactly the failure mode "prove
+byte-parity before proceeding" exists to catch — a change that renders correctly-looking code but breaks
+something adjacent — and it worked: the full suite caught it before I ever reported success.
+
+### Byte-parity, proven for all 6 — the actual ask, not the comment's claim
+
+Change/Table/Test: re-ran their EXISTING dialect-swept twin tests (7 dialects × their own param matrices) —
+all green, unchanged behavior. Length/Check: no existing twin test file, so wrote
+`scratchpad/t2257-parity-lc.mjs` — 7 dialects × 2 param sets each = 28 combos, **0 diffs**. Warmup: same
+sweep once the WRAP_PREFIX_COUNT fix landed — clean. Combined (`scratchpad/t2257-parity-all6.mjs`): **all 6
+ops, 42 combos, 0 diffs.** No byte differed at any point across any op — the comment claims in the dataOps
+files ("emit byte-identical") hold, now backed by a real diff run rather than trusted as written.
+
+### What I could NOT verify — reported honestly rather than overclaimed
+
+Tried to visually confirm the fix on a LIVE render (not just a code read) via both known "twin preview"
+routes: `openWiz(opType)` (the "in-place" open, `#wiz_user`) and `ddcsEditWizardDef(opType)` +
+`showApp('blocks')` (the "Customize" route, `#blk_wiz_user`). **Neither exercises `formWidgets.js`'s
+traverse()/uiChildren path at all** — both reuse their OWN separate static HTML shells with their OWN
+separate hardcoded id namespaces (plain `userVizContainer` for in-place, `blk_userVizContainer` for
+Customize), neither matching formWidgets.js's `_tree`-suffixed dynamic ids. So the id-collision defect I
+found and fixed is real in the CODE (verified by reading both branches) and the BYTE-parity is real
+(verified by diffing emit), but I could not find any LIVE path today that would actually SHOW the
+two-stacked-boxes symptom for ATC specifically, or confirm my fix visually end-to-end. Reporting this gap
+rather than either claiming a live confirmation I don't have or staying quiet about the uncertainty — the
+fix is correct for whatever DOES reach this code path (a genuinely custom-authored op with a `sim` node, per
+the traverse() code existing and being called from somewhere real), but ATC's OWN two live preview
+mechanisms don't currently touch it either way.
+
+### Verified (full suite, twice — once mid-investigation to catch the regression, once final)
+
+First run (after the BACKLOG 20 fix, before the WRAP_PREFIX_COUNT fix): 2782 passed, 17 flaky, **11
+unexpected** — all warmup-registration cascades, root-caused and fixed as above. Second run (after the fix,
+before reporting): the machine crashed mid-run (human's own note, unrelated to this work) and the first
+run's output was lost; re-ran fresh. Final: **2796 passed, 12 flaky (well inside the 14–18 band), 1
+unexpected** — `modal-pre-canvas-1654.spec.js`, plain `TimeoutError` after 3 retries, no reference to ATC,
+`formWidgets.js`, or any file this turn touched.
+
+### Files changed
+
+`web/ui/formWidgets.js` (the `sim` branch's new `layout2d` opt-out), `web/blocks/dataOps/atc{Change,Length,
+Table,Test,Check,Warmup}Data.js` (panel removed, `layout2d: false` added, `WRAP_PREFIX_COUNT` fixed on
+Warmup only). `web/index.html` is UNCHANGED (reverted mid-task, confirmed via `git status` before this
+commit).
+
+### Not done this turn, by explicit instruction
+
+Nothing registered live. The hand-written HTML/wizard files are untouched. The other 23 non-ATC files'
+`params.panel` vocabulary gap is reported, not fixed. Stopping here to report, per the dispatch's own "REPORT
+AFTER STEP 2 BEFORE PROCEEDING."
+
+### Capacity
+
+Heavy turn — a full plan reversal mid-task, a systemic-scope investigation, a self-caught regression with a
+precise root cause, and three full-suite runs (one lost to a PC crash). Full working room throughout; no
+flag, but noting the weight since it's the highest-density turn of this thread so far.

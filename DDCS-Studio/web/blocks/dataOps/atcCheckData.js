@@ -41,8 +41,10 @@ export function atcCheckDataStack(params = ATC_CHECK_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
+            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
+            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
+            // building the pane ATC never had content for.
+            { type: 'sim', params: { rotary: false, machine: true, magazine: false, layout2d: false } },
             { type: 'param_group', params: { group: 'Tool Check' }, children: [] },
         ],
         children: exec,

@@ -41,7 +41,12 @@ const ATC_WARMUP_EXEC_BINDINGS = [
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).
-const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+// t2257 (BACKLOG 20) — was 4 (user_root + panel + sim + param_group); removing the redundant, id-colliding
+// 'panel' node (see atcChangeData.js's own comment) drops this to 3. Caught live: registerUserOp threw
+// "binding (block 16.rpm) does not resolve in the template" for every param after the panel removal alone —
+// this constant is the ONE place that offset was hardcoded, and it was the ONLY thing left pointing at the
+// old wrap shape. Full suite re-run confirmed clean after this fix.
+const WRAP_PREFIX_COUNT = 3;   // user_root + sim + param_group
 export const ATC_WARMUP_BINDINGS = ATC_WARMUP_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
 export const ATC_WARMUP_DATA_OPTYPE = 'user_atc_warmup_data';
@@ -53,11 +58,14 @@ export function atcWarmupDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            // t407 IN-PLACE — form3d (was 'form', no pane): the built-in atcWarmupView is twoPane with a 3D machine preview
-            // (preview3D + previewMachine), so the in-place twin must show the SAME so the DECLARED machine+magazine sim renders.
-            // Display-only (panel emits nothing) → emit byte-identical.
-            { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: true } },
+            // t407 IN-PLACE — the built-in atcWarmupView is twoPane with a 3D machine preview (preview3D +
+            // previewMachine), so the twin must show the SAME so the DECLARED machine+magazine sim renders.
+            // Display-only (this whole node emits nothing) → emit byte-identical.
+            // t2257 (BACKLOG 20) — the separate 'panel' node t407 added alongside 'sim' is REMOVED: it was
+            // inert (params.panel isn't read by formWidgets.js's panel branch) and id-collided with sim's
+            // own layout2d pane — see atcChangeData.js's own comment for the full reasoning. layout2d: false
+            // is the CORRECT way to say "3D preview, no 2D pane" that t407 was reaching for with 'form3d'.
+            { type: 'sim', params: { rotary: false, machine: true, magazine: true, layout2d: false } },
             {
                 type: 'param_group',
                 params: { group: 'Spindle Warmup' },

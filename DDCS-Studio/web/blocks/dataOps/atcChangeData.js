@@ -59,8 +59,12 @@ export function atcChangeDataStack(params = ATC_CHANGE_DEFAULTS) {
     return [{
         type: 'user_root', params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
+            // t2257 (BACKLOG 20) — the 'panel' node this used to carry alongside 'sim' was inert (params.panel
+            // isn't read by formWidgets.js's panel branch, which always builds a generic 2D-only box) AND
+            // collided on id with sim's own layout2d pane (both hardcode userVizContainer_tree) — removed;
+            // layout2d: false tells 'sim' to skip building that pane at all, since ATC has no param_field/
+            // block that ever declares 2D geometry for it to hold.
+            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true, layout2d: false } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
 
             { type: 'param_group', params: { group: 'Tool Change' }, children: [] },
         ],
