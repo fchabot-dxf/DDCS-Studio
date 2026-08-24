@@ -46,6 +46,41 @@ The human caught it. Do not reintroduce it.
 
 ⛔ **Both must be checked. Neither implies the other.** Organic passed the first and failed the second.
 
+### The OUTLINE half of the same rule
+
+Human, 2026-08-24, on a gateway screenshot: *"in theme where the tab has an outline it should continue around
+the panel too, just make sure the selected tab body is offset to hide the outline exactly below it and connects
+with the panel outline."*
+
+⇒ The rule above governs the FILL. This is the same rule governing the EDGE: **the active tab and its panel are
+ONE SHAPE, so one outline traces both.** It runs up the tab's left side, across its top, down its right side,
+then along the panel's top edge and around the panel — and the segment of panel edge *directly beneath the
+active tab* is not drawn, because the tab's own body covers it.
+
+```
+        ┌────────┐
+   ─────┘        └──────────      the outline is CONTINUOUS,
+   │                       │      and BROKEN only under the active tab
+   │        panel          │
+   └───────────────────────┘
+```
+
+The mechanism is an overlap: the active tab sits one border-width lower than the strip and paints an opaque
+fill over that border. `.app-header .tab.active` and `.deck-tab.active` already do this with
+`margin-bottom: -1px`. `.settings-main-tab.active` does NOT, and `.settings-content` carries no border at all —
+so Settings and Gateway have neither half.
+
+⭐ **This needs no exemption for borderless themes.** Organic's `--border` is transparent, so the same
+continuous outline is traced and is simply invisible. One declaration, both cases — no per-theme branch, which
+is the kind of special case this file exists to avoid.
+
+⚠ **Two things that break it:**
+- **A translucent tab fill.** The overlap works by COVERING the panel's border. If the active tab's fill is not
+  fully opaque, that border shows through and the joint reads as a seam with a line across it.
+- **A hardcoded `-1px`.** The offset must equal the border WIDTH. A theme setting a 2px edge needs a 2px
+  offset, so derive it from the same token the border reads rather than restating `1px` — otherwise the two
+  drift and the joint gains or loses a hairline in exactly one theme.
+
 ---
 
 ## THE DECLARATION — `data-tabs="1"` / `data-tabs="2"`
