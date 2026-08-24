@@ -219,6 +219,16 @@ svg [id*="Zfirst_travel"] {
     --modal-close-edge: #8e1408; --modal-close-edge-w: 1px; --modal-close-radius: 6px;
     --modal-close-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
     --modal-close-text-shadow: 0 1px 1px rgba(0,0,0,.35);
+    /* t2237 — the wizard-header gear's own material, DECLARED HERE (not on the consuming .wiz-head .wiz-gear
+       selector) for the same reason every --modal-close-* token above is: a theme's [data-theme="X"] override
+       has LOWER specificity than a class-combination selector like .wiz-head .wiz-gear, so declaring the
+       default value directly on the consumer would make it un-overridable by any theme block — the consuming
+       rule must only ever read via var(), never redeclare. Defaults below are the ORIGINAL literal steel-grey
+       values (byte-identical to before this turn for every theme that doesn't override them). */
+    --wiz-gear-face: linear-gradient(180deg, #cfd4da 0%, #aab2bb 45%, #8d97a2 50%, #a0a9b3 100%);
+    --wiz-gear-edge: #444c55; --wiz-gear-edge-w: 1px; --wiz-gear-radius: 6px;
+    --wiz-gear-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
+    --wiz-gear-text-shadow: 0 1px 1px rgba(0,0,0,.35); --wiz-gear-ink: #fff;
 
     /* t2087 (P5a) — MODAL z-index SCALE: named tokens replacing scattered literals, scoped to true
        scrim-backed modals only (not popovers/toasts/tooltips/dropdowns — those have their own separate
@@ -436,8 +446,22 @@ html, body { overflow-x: clip; }
    byte-identical rgb(28,20,12) on rgb(28,20,12) — human's own words, "dark-on-dark"). --field-edge (->
    --border) is already transparent, same as everywhere else in this theme, so the fill is the only thing left
    to carry the shape. --field-focus-edge (outline, -> var(--accent)) and --field-placeholder-ink (->
-   var(--text-dim)) were BOTH already fine — neither aliases --border, checked by tracing rather than assumed. */
-[data-theme="organic"] input, [data-theme="organic"] select, [data-theme="organic"] textarea { --field-face: var(--panel2); }
+   var(--text-dim)) were BOTH already fine — neither aliases --border, checked by tracing rather than assumed.
+   t2237 — split by REGISTER (human's ruling, amendment 3: "lighter fill means dark font" is a PAIR, applied
+   to SMALL surfaces; LARGE ones stay as they were). textarea (multi-line, can hold a screenful of G-code)
+   keeps this darker --panel2/light-ink pair unchanged — verified via computed style this stays legible
+   (measured luminance contrast ~10:1 against --text-main) and a cream slab full of G-code would fight the
+   editor beside it. input/select (single-line) move to the new light pair below instead. */
+[data-theme="organic"] textarea { --field-face: var(--panel2); }
+/* t2237 — the field-light pair: NOT --btn-face/--btn-ink (a field says "type here", not "press me" — giving
+   it a button's glossy two-stop gradient would make it read as clickable). Derived from the same warm palette
+   (the resting stop of --btn-face, #e7dbc0, flattened to one solid tone rather than a gradient) with organic's
+   OWN already-declared dark ink for a light surface (--accent-ink, the same token --btn-ink-hover already
+   reuses) — visibly a relative of the button material, not a duplicate of it. */
+[data-theme="organic"] input, [data-theme="organic"] select, [data-theme="organic"] textarea {
+    --field-face-light: #e8dcc0; --field-ink-light: var(--accent-ink);
+}
+[data-theme="organic"] input, [data-theme="organic"] select { --field-face: var(--field-face-light); --field-ink: var(--field-ink-light); }
 /* t2214 — the Help panel's FAQ accordion (ui/helpPanel.js's `<details>` items): border-only, no background at
    all (not even var(--panel)) — found during the audit sweep, not in the original dispatch, but the same
    shape (a clickable disclosure control with nothing but --border giving it a boundary). Each item is its own
@@ -2008,6 +2032,10 @@ input, select, textarea {
     --field-face: var(--panel); --field-edge: var(--border); --field-edge-w: 1px;
     --field-ink: var(--text); --field-radius: var(--radius); --field-focus-edge: var(--accent);
     --field-placeholder-ink: var(--text-dim);
+    /* t2237 — a SEPARATE pair for small/single-line surfaces that want a lighter register (a theme's own
+       amendment 3): defaults to the normal pair (no-op everywhere unless a theme overrides both halves
+       together, never one alone — see organic's own block for the one theme that does). */
+    --field-face-light: var(--field-face); --field-ink-light: var(--field-ink);
     background: var(--field-face);
     color: var(--field-ink);
     border: var(--field-edge-w) solid var(--field-edge);
@@ -2528,32 +2556,17 @@ button.primary:hover {
 }
 
 /* --- FOOTER (Flush Fit) --- */
-/* Wizard header keys — glossy boxes, same look across all themes:
-   red ✕ to close, steel-grey ⚙ for settings */
+/* Wizard header keys — glossy boxes, same look across all themes: red ✕ to close, steel-grey ⚙ for settings.
+   t2237 — .wiz-templates DELETED: zero references anywhere in the JS/HTML (confirmed by grep), a dead CSS
+   selector for a control that was removed, not hidden by a runtime condition — matches the human's own "it's
+   not visible anymore, that's why I didn't say" exactly. Went to the sweep pile, not the token pile. */
 .wiz-head .wiz-close,
-.wiz-head .wiz-gear,
-.wiz-head .wiz-templates {
+.wiz-head .wiz-gear {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px; cursor: pointer;
-    color: #fff; font-size: 14px; font-weight: 700; line-height: 1;
+    font-size: 14px; font-weight: 700; line-height: 1;
 }
-/* t2077 (P4b) — .wiz-gear/.wiz-templates keep their own literal steel-grey look (never diverges per theme,
-   out of this turn's scope — only "the close key" was named); .wiz-close moves to the modal-close tokens
-   below. Same shared radius/shadow/text-shadow values, just no longer entangled with the close key's own
-   per-theme overrides. */
-.wiz-head .wiz-gear,
-.wiz-head .wiz-templates {
-    border-radius: 6px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
-    text-shadow: 0 1px 1px rgba(0,0,0,.35);
-}
-.wiz-head .wiz-templates {
-    border: 1px solid #444c55;
-    background: linear-gradient(180deg, #cfd4da 0%, #aab2bb 45%, #8d97a2 50%, #a0a9b3 100%);
-    font-size: 13px;
-}
-.wiz-head .wiz-templates:hover { filter: brightness(1.08); }
-.wiz-head .wiz-templates:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+.wiz-head .wiz-close { color: #fff; }   /* always a saturated face in every theme (incl. organic's own red) — no ink token needed */
 
 /* t794 P3 — the adaptive PRESET ROW at the top of every wizard form (replaces the retired header 📑 button). */
 .wiz-preset-row { display: flex; align-items: center; gap: 8px; padding: 3px 2px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border, #2a3340); font-size: 12px; }
@@ -2602,8 +2615,8 @@ button.primary:hover {
 .wiz-tpl-pop .wt-del:hover { color: #ef4d33; }
 /* t2077 (P4b) — was border:1px solid #8e1408; background:<gradient> directly; the modal-close tokens default
    to exactly this same gradient (see the :root contract), so byte-identical on its own — each theme's own
-   block below now overrides the tokens instead of a 6th selector-based variant. text-shadow reads the shared
-   token too (was already 0 1px 1px rgba(0,0,0,.35) via the .wiz-gear/.wiz-templates rule above, same value). */
+   block below now overrides the tokens instead of a 6th selector-based variant. text-shadow was already
+   0 1px 1px rgba(0,0,0,.35), the same value .wiz-gear's own tokens now carry (t2237). */
 .wiz-head .wiz-close {
     border: var(--modal-close-edge-w) solid var(--modal-close-edge);
     border-radius: var(--modal-close-radius);
@@ -2624,9 +2637,17 @@ button.primary:hover {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+/* t2237 — token-driven the SAME way t2077 did .wiz-close: declared once (at :root, see the defaults above),
+   each theme's own block overrides the tokens instead of a per-theme selector variant. This rule only READS
+   them via var() — the defaults live at :root so a theme override (lower specificity than this class
+   combinator) can actually win; see the comment on the :root declaration for why that ordering matters. */
 .wiz-head .wiz-gear {
-    border: 1px solid #444c55;
-    background: linear-gradient(180deg, #cfd4da 0%, #aab2bb 45%, #8d97a2 50%, #a0a9b3 100%);
+    border: var(--wiz-gear-edge-w) solid var(--wiz-gear-edge);
+    border-radius: var(--wiz-gear-radius);
+    background: var(--wiz-gear-face);
+    box-shadow: var(--wiz-gear-shadow);
+    text-shadow: var(--wiz-gear-text-shadow);
+    color: var(--wiz-gear-ink);
 }
 .wiz-head .wiz-close:hover,
 .wiz-head .wiz-gear:hover { filter: brightness(1.08); }
@@ -3889,6 +3910,15 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --modal-close-edge: #b8432f; --modal-close-radius: 10px;
     --modal-close-face: #d9533e;
     --modal-close-shadow: 0 1px 3px rgba(0,0,0,.2); --modal-close-text-shadow: none;
+    /* t2237 (BACKLOG amendment 4/5) — the wizard-header gear, following its own close-key neighbour's
+       precedent: flat solid face (no gradient), an outer shadow only (no inset highlight), no text-shadow.
+       --wiz-gear-face is --accent (organic's OWN sap amber — a bold, on-brand plate, not a muted ghost blend,
+       matching how --btn-primary-face already uses --accent for a primary action); --wiz-gear-ink pairs with
+       it as --accent-ink (the SAME dark-ink token --btn-ink-hover already reuses) — the light-fill/dark-ink
+       pair, amendment 3, applied together as the one ruling requires. --wiz-gear-edge goes transparent,
+       matching this theme's own border-removal convention everywhere else. */
+    --wiz-gear-face: var(--accent); --wiz-gear-edge: transparent; --wiz-gear-ink: var(--accent-ink);
+    --wiz-gear-shadow: 0 1px 3px rgba(0,0,0,.2); --wiz-gear-text-shadow: none;
 
     /* contract */
     --scrim: rgba(12,8,5,.72);
@@ -5570,9 +5600,15 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .settings-section-title.sub { margin-top: 10px; font-size: 11px; }
 .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .settings-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-dim); }
-.settings-grid input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-size: 13px; }
+/* t2237 — was background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+   a hand-rolled duplicate of the shared `input, select, textarea` field-material rule (declared once, above
+   in the file) with DIFFERENT values (--bg instead of --field-face) — the exact reason organic's inputs here
+   stayed invisible even after t2214's fix: this more-specific, later-declared rule silently outvoted it.
+   Deleting the duplicate lets the declared token rule apply; only the LAYOUT properties (not material) were
+   ever genuinely specific to the settings grid. */
+.settings-grid input { padding: 6px 8px; font-size: 13px; }
 .settings-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-dim); margin-top: 8px; max-width: 240px; }
-.settings-field select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-size: 13px; }
+.settings-field select { padding: 6px 8px; font-size: 13px; }
 .settings-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .settings-check { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; cursor: pointer; }
 .settings-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }

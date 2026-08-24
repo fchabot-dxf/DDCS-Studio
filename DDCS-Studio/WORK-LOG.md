@@ -53836,3 +53836,140 @@ assert the NEW per-theme material, plus a standing guard that none of the four s
 blue by accident. Re-ran the file: 3/3 pass. This is exactly the "full suite before calling any turn done"
 discipline this whole run has been building — noting it here as a gap in t2227's own verification, not
 papering over it.
+
+## t2237 — ORGANIC/GATEWAY STACK PART TWO: the token pair, ruled and built; two amendment claims corrected against the live code; one root cause found and fixed
+
+⚠ **Housekeeping note, not this turn's content**: turns 2231/2233/2235's own entries (appended earlier this
+session) landed physically BEFORE this file's existing t2229 entries rather than after them — the anchor text
+used for those appends matched a string that existed earlier in the file, not the true end. Nothing was
+overwritten or lost (append-only held), just the physical ordering doesn't read strictly chronologically from
+this point back to t2229. Anchoring to the literal file tail from here on.
+
+### The ruling this turn executed
+
+Advisor (t2236) ruled: TWO pairs, not one — a NEW light pair (face + dark ink together, never one without the
+other) for SMALL/single-line controls, and the EXISTING dark pair (--panel2/light-ink) stays for LARGE/multi-
+line surfaces. Derive the light pair from organic's own palette but declare it SEPARATELY from --btn-face/
+--btn-ink (a field says "type here", a button says "press me" — a field wearing a button's glossy gradient
+would read as clickable). Apply the settled pair to: the invisible settings inputs (root-cause the mechanism,
+not a more-specific override), the `.settings-tab` second home, the dropdown items, and the gear + templates
+(settle whether templates is dead first). Full suite required (shared-token change).
+
+### CORRECTION, made honestly: the macros-shelf "already-light" claim from t2235 was wrong
+
+t2235 reported the macros shelf's single-line "Extracted M0" name field already sat in a light register,
+proving organic already had a working light/dark split — advisor used that to close amendment 3's retroactive
+question. Verified via ACTUAL COMPUTED STYLE before designing anything (not trusting the earlier screenshot
+read a second time): `.mc-f[data-f="name"]` was `rgb(61, 49, 32)` — exactly `--panel2`, the SAME dark register
+as its own multi-line body textarea beside it, not a lighter one. The earlier report was a genuine visual
+misjudgment (it looked relatively lighter only against the surrounding near-black chrome). Flagging this
+plainly rather than quietly building on a wrong premise — the ruling to build a genuine light pair still
+stands on its own merits (amendment 3's actual instruction), it just wasn't already half-built as reported.
+
+### Root cause: settings-page inputs were never bypassed by a missing selector — a HAND-ROLLED duplicate outvoted the declared one
+
+`.settings-grid input` and `.settings-field select` (styles.css, pre-existing, older than t2075's field-
+material tokens) each hand-roll their own `background: var(--bg); border: 1px solid var(--border); ...` —
+equal specificity to the shared `input, select, textarea` token rule, later in source order, so they silently
+won regardless of what `--field-face` resolved to. This is the exact same "declared thing exists, a hand-
+rolled duplicate sits beside it and wins" disease this whole session keeps finding (clickBtn, the boot-wait
+timeouts, the settings-tab class in two homes) — just discovered here instead of assumed. Fixed by DELETING
+the duplicated material properties (background/border/border-radius/color), keeping only the genuinely
+settings-grid-specific layout ones (padding, font-size) — the shared token rule now applies as designed.
+
+### The declared light pair
+
+Added `--field-face-light`/`--field-ink-light` to the base `input, select, textarea` rule (default = identical
+to the normal pair, a no-op for every theme that doesn't override both). Organic overrides both together:
+`--field-face-light: #e8dcc0` (the resting stop of --btn-face's own gradient, flattened to one solid tone —
+visibly a relative of the button material, not a copy of it) and `--field-ink-light: var(--accent-ink)` (reused,
+not a new hex — the same dark-ink token --btn-ink-hover already uses). Applied to `input`/`select` only;
+`textarea` keeps the existing `--field-face: var(--panel2)` pair unchanged (measured ~10:1 contrast, still
+legible, and a G-code-filled textarea should not become a cream slab). Contrast measured directly: settings
+input 12.48:1. Screenshot of the previously-invisible spindle fields, now fixed:
+`verification/t2237-organic-spindle-fixed.png`.
+
+**A genuinely nice side effect of declaring it at the shared source rather than patching each site**: the
+macros shelf's own single-line M-code name fields (`.mc-f`, no dedicated CSS of their own — they fall through
+to the same base rule) picked up the new light register FOR FREE, for real this time. Screenshot:
+`verification/t2237-organic-macros-lightpair.png` (was `scratchpad/t2237-organic-macros.png` this turn,
+promoted).
+
+### Two of the four named sites did NOT reproduce — verified against the live code, not rebuilt speculatively
+
+**`.settings-tab` "second home" (amendment 1): does not exist.** Read `settingsPanel.js:1180-1198` directly —
+the L2 sub-tab buttons (Appearance/Sound/Preview/Editor, etc) are genuinely `<div class="settings-sidebar">
+...<button class="settings-tab">`, literally inside `.settings-sidebar` in the current markup. Confirmed live
+via `.settings-sidebar .settings-tab` query: matches, and already renders with a real `--panel2` fill (resting)
+/ `--bg` fill + accent underline (active). The pill-shaped horizontal look in screenshots is CSS flex layout
+of that same sidebar, not a second DOM location. No second home found anywhere in the rendered tree. Not
+fixed, because there was nothing to fix — reporting the correction rather than building a speculative patch.
+
+**`.toolbar-dropdown-content button` items (amendment 2's by-product): already correct.** Screenshotted the
+real "Setup ▼" dropdown open in organic (`verification/t2237-organic-dropdown-fine.png`, was
+`scratchpad/organic-check-dropdown2.png`): fully legible, each item separated by a real border line, the panel
+itself has a visible edge/shadow against the page. Items share `var(--menu-face)` with their own container BY
+DESIGN — standard menu/list UX (like a native context menu), not a missing-fill defect; the mechanical audit
+flagged it only because it can't distinguish "intentionally shares its list's background" from "genuinely
+orphaned." No change made.
+
+### `.wiz-templates`: confirmed dead, swept (not themed)
+
+Grepped every `.js` file and `index.html` for `wiz-templates`: zero hits outside `styles.css` itself. Not
+hidden by a condition, not gated by state — a CSS selector with no element anywhere that could ever match it.
+Matches the human's own "it's not visible anymore, that's why I didn't say" exactly. Deleted its CSS (the
+combined layout rule, the gradient/border block, :hover/:active) rather than theming a control that renders
+nothing. Went to the sweep pile per the advisor's own explicit instruction.
+
+### The gear: tokenized, organic flattened, other four byte-identical — plus one specificity bug caught before it shipped
+
+Declared `--wiz-gear-face/-edge/-edge-w/-radius/-shadow/-text-shadow/-ink`, following `.wiz-close`'s own t2077
+precedent exactly. **First attempt declared the DEFAULT values directly on the consuming `.wiz-head .wiz-gear`
+selector — caught via verification, not assumed correct**: a class-combinator selector has HIGHER specificity
+than a bare `[data-theme="organic"]` block, so organic's override of the same custom property never won,
+silently no-op. Fixed by moving the defaults to the SAME `:root` block `--modal-close-*`'s own defaults live
+in (matching the actually-working precedent exactly, not just its shape) — the consuming rule now only reads
+via `var()`, never redeclares. Organic's override: `--wiz-gear-face: var(--accent)` (flat, bold, on-brand —
+matches how `--btn-primary-face` already uses `--accent`, not a muted ghost blend), `--wiz-gear-ink: var(--accent-ink)`
+(the pair moves together), `--wiz-gear-edge: transparent`, `--wiz-gear-shadow`/`--wiz-gear-text-shadow` reusing
+the EXACT same values `--modal-close-shadow`/`--modal-close-text-shadow` already declare for organic (outer-only,
+none) — explicit reuse of the close-key's own structural precedent, not just its shape. Verified live in an
+actually-open wizard header (`verification/t2237-wizhead-organic.png` vs `verification/t2237-wizhead-studio.png`,
+was `scratchpad/t2237-wizhead-{organic,studio}.png`): organic's gear now reads flat and on-brand beside the
+already-flat close key — the exact defect the human named ("the contrast between the two buttons IS the whole
+spec") is resolved. Studio's gear is confirmed byte-identical to before (steel-grey gradient, unchanged).
+Contrast measured: 7.3:1 (amber face vs dark ink).
+
+**Left open, per instruction to report rather than fix**: the gear is still a `<span onclick>` (index.html:306),
+with no `:focus-visible` rule anywhere (confirmed via grep) — the same gap `.wiz-close` had until t2089 fixed
+it by converting to a real `<button>`. Not touched this turn; surfacing for the human's own ruling as asked.
+
+### FAQ accordion: reached and verified this time — genuinely fine, not a harness gap after all
+
+t2235 reported `window.openHelp('faq')` didn't navigate — root cause found: `helpPanel.js` is DYNAMICALLY
+imported only by the real quick-menu click handler (`headerPost.js:129`, `import('./helpPanel.js').then(...)`),
+never eagerly loaded at boot, so the bare global genuinely doesn't exist until that import resolves — a real
+harness gap, not a styling one, exactly as the advisor predicted. Reached it correctly this time by driving
+the same dynamic import the real click path uses (`await import('/ui/helpPanel.js')`).
+Screenshot: `verification/t2237-organic-faq-fine.png` (was `scratchpad/t2237-faq-direct.png`) — every `<details>`
+row shows a clear, distinct `--panel2` fill against the modal's darker background, legible amber disclosure
+triangles, no defect. Closes amendment 3's FAQ question for real this time.
+
+### Non-vacuity / regression check
+
+Re-ran the mechanical audit (`scripts/organic-border-audit.mjs`) before vs after: 492 → 467 raw candidates,
+concentrated exactly in the settings sub-tabs that hold numeric/text inputs (spindle 29→25, input 35→28, atc
+33→25, program 26→23, preview 25→22, editor 24→22) — the drop tracks the fix precisely, not a blanket change.
+No surface's count went UP, meaning nothing regressed elsewhere. Screenshots for every touched site captured
+live, not assumed from the CSS.
+
+**Full suite** (required — shared-token/CSS change, the standing rule): 2793 passed, 15 flaky (down from 17 at
+t2233), **2 unexpected**, 25 skipped (28.1m). Checked both unexpected failures directly rather than assuming
+they're this turn's fault: `fork-parity-1593.spec.js` and `subscriber-error-surface-1656.spec.js:21` BOTH fail
+with the identical, already-documented `TimeoutError: page.waitForFunction: Timeout 60000ms exceeded` on
+`window.__blkws` — the exact open, undiagnosed Blocks-boot slowness flagged as its own follow-up at t2233 and
+still un-investigated (explicitly not this turn's job). Neither failure touches CSS, DOM structure, or any
+rendering assertion this turn's changes could plausibly affect — confirmed by reading the actual error text,
+not inferred. `fork-parity-1593` wasn't even in the flaky/failed set at t2233's own full-suite run — matches
+this project's own documented "the contention-starved population shifts run to run" phenomenon
+(playwright.config.js's own t1718/t1719/t1724 comment), not a regression from this turn.
