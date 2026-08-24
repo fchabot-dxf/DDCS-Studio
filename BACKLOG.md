@@ -652,7 +652,7 @@ shape the warning: a mismatch in the dangerous direction deserves louder treatme
   against, so the warning must be ABSENT, not falsely reassuring and not falsely alarming.
 - ⚠ `family` is `"unknown"` when the fingerprint fails (`ops.py:374`). Unknown must NOT read as a mismatch.
 
-### 12. A ring appears around the editor when you CLICK it — kill it for mouse, keep it for keyboard
+### 12. [SHIPPED t2156-t2160] A ring appears around the editor when you CLICK it — kill it for mouse, keep it for keyboard
 *(human, 2026-08-22, with screenshots in futuristic AND steampunk: "can we remove this border and instead make
 the editor panel a different color than the top row" → then the key clarification: **"the border appear when i
 click in the editor"**.)*
@@ -712,7 +712,7 @@ around the PANEL, and the left edge would still visibly disagree with the other 
 - ⛔ If it turns out NOT to be a UA default but a deliberate rule someone added for a reason, REPORT it rather
   than deleting — the reason may be a real one nobody wrote down.
 
-### 13. On mobile the CLEAR button dwarfs its siblings - and the siblings are the bug
+### 13. [SHIPPED t2162] On mobile the CLEAR button dwarfs its siblings - and the siblings are the bug
 *(human, 2026-08-22, from a phone screenshot: "on mobile the clear button appears larger then its sibling")*
 
 **It looks like clear is oversized. It is not — the other five are UNDERSIZED.** `styles.css:5380`:
@@ -1257,7 +1257,7 @@ Prove the *id* is unreferenced, not the *feature* — they are not the same ques
 
 ⇒ **A tail-sized item.** Two clusters, one commit each, with the grep evidence for each deletion in the message.
 
-### 15. INVALID CSS SHORTHANDS THAT SILENTLY VOID THEIR WHOLE DECLARATION — a category, not two bugs
+### 15. [SHIPPED t2206 - 20 font shorthands] INVALID CSS SHORTHANDS THAT SILENTLY VOID THEIR WHOLE DECLARATION — a category, not two bugs
 *(found twice in two days, both by measuring rather than by reading — t2155 tail and t2173; a relative found at
 t2190, one level up: a comment that ends itself)*
 
@@ -1336,7 +1336,7 @@ across repeated runs — confirmed via `git stash` bisection run TWICE that the 
 the unmodified pre-t2202 tree too (a coin-flip on which 2 of 3 fail, both with and without this turn's CSS).
 Pre-existing test-timing flakiness, unrelated to this fix.
 
-### 16. THE DECLARED COMPONENTS EXIST AND NOBODY USES THEM — modals, and the Local/Cloud switcher
+### 16. [SHIPPED t2200 - 8 of 9 shells] THE DECLARED COMPONENTS EXIST AND NOBODY USES THEM — modals, and the Local/Cloud switcher
 *(human, 2026-08-23, comparing the Wizards, Workspace and Projects modals side by side: "the project modal
 seems different then the others, is it actually sharing assets?" then "the local cloud tab also needs to be
 reused")*
@@ -1463,3 +1463,91 @@ cloud failure" test drove `[data-place="cloud"]` — the manager shelf tab t2194
 before this one. The test had been silently red since t2194, in a file that turn's own sweep never touched;
 fixed to drive the real `dlgChoice` destination-ask flow instead. Confirmed pre-existing (not something this
 turn's CSS change could cause) by running it against the pre-t2200 tree before touching it.
+
+---
+
+## THE QUEUE - 2026-08-23, human: "yes loop them all"
+
+The human asked for the whole list to be worked through rather than picked from. This is the ORDER, and the
+reasoning behind it, so the loop does not need re-deciding every turn.
+
+**Ranked by what a defect COSTS, not by what it costs to fix.**
+
+    1. #6   hand-authored T.nc / error.nc DISCARDED on reload      <- outright data loss
+    2. #8   M6.rc offered as editable; it is a compiled GUI resource  <- invites corrupting a controller file
+    3. #5   a raw NUL byte makes macrosApp.js invisible to grep     <- a landmine under every future search
+    4. #14  three dead-code clusters in the editor chrome
+    5. #4   lathe icons - centreline removed; polygon + face-probe still undrawn
+    6. #10  wizard preview shows ONE op with no idea where it sits
+    7. F1   gateway tabs do not gate by role
+    8. F3   remove the clicking sounds; propose sounds for invisible states
+    9. F4   the V4.1 "Advanced machining" tab
+
+#6 and #8 go together: same surface (the macros /DISK/ shelf), and both are the app inviting a loss.
+
+---
+
+### 17. THE DIRTY DOT IS ON AT BOOT ON THE HUMAN'S PHONE - and a fresh browser cannot reproduce it
+
+*(human, 2026-08-23: "so the dot in filename is still there on open without changing anything". Reported once
+before and "fixed"; still present on ddcs-studio.pages.dev.)*
+
+**WHAT I MEASURED (advisor, t2214) - do not redo this, it is all negative and that is the useful part:**
+
+    fresh browser, settled 9s      dot off, dirty false, sig == watermark, changed []
+    idle a further 6s              signature did NOT drift
+    reload (returning-user path)   watermark survived, signature identical, still clean
+    theme via raw localStorage     no change to the signature at all
+
+So the boot path, the settle-and-watermark loop, and the returning-user path are all CLEAN in a fresh browser.
+Two obvious theories are DEAD: it is not boot-time drift, and it is not the theme.
+
+**WHAT IS STILL UNTESTED, in the order I would test it:**
+  - **the DEPLOYED build vs localhost.** Every probe above ran against 127.0.0.1:3001. The human is on
+    ddcs-studio.pages.dev on Android, and asked how to hard-refresh on Android earlier the same day. ES modules
+    cache per-URL. A stale bundle would explain this AND #18 with ONE cause - check this FIRST.
+  - **a build-driven default change.** The watermark is a hash of the backed-up stores' CONTENT. A release that
+    changes any default (a new built-in wizard, a new display pref, a re-seed) shifts that content for every
+    existing user, so a watermark taken on the older build no longer matches and the dot lights with nothing the
+    user did. Six releases shipped on 2026-08-23 alone. If this is it, the question is not how to silence the
+    dot but whether a build-driven default change should count as unsaved USER work. It should not.
+  - **the human's real controller.** Their workspace is V4.1 / Expert M350; every probe booted the default
+    machine. app.js's seedDefaultPortedUserOps() is controller-dependent and backup.js:190 already records it
+    genuinely diverging once.
+
+**The code already knows something is wrong here:** blocks/saveStates.js:74 calls it "a separate, deeper bug
+traced but not fixed".
+
+---
+
+### 18. THE KEYBOARD DOCK IS OPEN AT BOOT ON THE HUMAN'S PHONE - mobile only, and also not reproducible
+
+*(human, 2026-08-23: "also still always opening on the keyboad opened", then "the dock thing is on mobile only
+from what ive seen", then the lead: "possibly has to do with the new button row we added earlier".)*
+
+**PRIOR ART, AND THE WARNING IN IT:** db239642 "t2176 amendment 1 (tail): dock-closed-at-boot investigated,
+NOT REPRODUCED, regression-locked". A test was added asserting the dock boots collapsed. It passes. The human
+still sees a keyboard. **A green test asserting the wrong thing is exactly what that commit produced** - do not
+let this one end the same way.
+
+**WHAT I MEASURED (advisor, t2214), Pixel 7 emulation, settled 9s:**
+
+    is-expanded class     absent
+    dock height           43px = 5% of an 839px viewport
+    visible inside it     the handle, and nothing else
+    suggest bar           hidden      tab strip   hidden
+
+So emulation agrees with the test and disagrees with the human's screenshot, which plainly shows the suggest
+row (G0 G1 G31 IF M3 # "("), the BACK/SPACE/ENTER row AND the MOVE/G-M/MATH/LOGIC/VAR tab strip.
+
+**THE HUMAN'S OWN LEAD, WHICH IS THE BEST ONE: the new editor button row.** It was added directly above the
+dock handle this session. Worth checking, in this order:
+  - does anything in the new row's mount focus the editor, or synthesise a click that reaches the dock?
+  - dockManager.js has a delegated dock click handler (~:98) below the direct handle listeners - can a tap
+    aimed at a toolbar button land on the 43px handle, or can one event be handled TWICE (direct + delegated)?
+  - is the auto-expand at dockManager.js:83 reachable without a real drag? It sits inside pointermove behind a
+    >4px threshold, so a stray pointermove during layout settling is worth ruling in or out.
+  - **and check the DEPLOYED build before any of it** - see #17. One stale bundle would explain both.
+
+**Do not close this on a passing test.** It must be confirmed on the human's actual phone against the deployed
+site, or confirmed as a stale-cache artefact and closed for that reason with the evidence.
