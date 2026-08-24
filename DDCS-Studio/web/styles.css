@@ -229,6 +229,11 @@ svg [id*="Zfirst_travel"] {
     --wiz-gear-edge: #444c55; --wiz-gear-edge-w: 1px; --wiz-gear-radius: 6px;
     --wiz-gear-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
     --wiz-gear-text-shadow: 0 1px 1px rgba(0,0,0,.35); --wiz-gear-ink: #fff;
+    /* t2237 — a TRUE root-level default (not scoped to input/select/textarea, which would leave it invisible
+       to any other element — the exact mistake this fixes) so any surface can reuse the pair. Default matches
+       --field-face/-ink's own default (var(--panel)/var(--text)) — a no-op for every theme that doesn't
+       override both together. */
+    --field-face-light: var(--panel); --field-ink-light: var(--text);
 
     /* t2087 (P5a) — MODAL z-index SCALE: named tokens replacing scattered literals, scoped to true
        scrim-backed modals only (not popovers/toasts/tooltips/dropdowns — those have their own separate
@@ -453,14 +458,12 @@ html, body { overflow-x: clip; }
    (measured luminance contrast ~10:1 against --text-main) and a cream slab full of G-code would fight the
    editor beside it. input/select (single-line) move to the new light pair below instead. */
 [data-theme="organic"] textarea { --field-face: var(--panel2); }
-/* t2237 — the field-light pair: NOT --btn-face/--btn-ink (a field says "type here", not "press me" — giving
-   it a button's glossy two-stop gradient would make it read as clickable). Derived from the same warm palette
-   (the resting stop of --btn-face, #e7dbc0, flattened to one solid tone rather than a gradient) with organic's
-   OWN already-declared dark ink for a light surface (--accent-ink, the same token --btn-ink-hover already
-   reuses) — visibly a relative of the button material, not a duplicate of it. */
-[data-theme="organic"] input, [data-theme="organic"] select, [data-theme="organic"] textarea {
-    --field-face-light: #e8dcc0; --field-ink-light: var(--accent-ink);
-}
+/* t2237 — the field-light pair itself (--field-face-light/-ink-light VALUES) is declared on organic's own
+   root theme block below, not here — a property declared only on `input, select, textarea` does not cascade
+   to a plain <button> elsewhere in the DOM (custom properties inherit through ANCESTORS, and these elements
+   are none of that), which is exactly why the dropdown-item reuse of this pair silently resolved to nothing
+   at first (caught via computed style, not assumed correct). Declaring it at the theme root makes it a true
+   reusable token; this rule just CONSUMES it for the field case specifically. */
 [data-theme="organic"] input, [data-theme="organic"] select { --field-face: var(--field-face-light); --field-ink: var(--field-ink-light); }
 /* t2214 — the Help panel's FAQ accordion (ui/helpPanel.js's `<details>` items): border-only, no background at
    all (not even var(--panel)) — found during the audit sweep, not in the original dispatch, but the same
@@ -1477,6 +1480,30 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 .toolbar-dropdown-content button:first-child { border-top: none; }
 
+/* t2239 (human, via the advisor: "it is legible, and it is also still bordered, in the one theme whose
+   defining decision was to remove borders") — the base rule above resets border/background/color but was
+   NEVER meant to touch border-radius/box-shadow (studio's own override two blocks down customizes exactly
+   those two, deliberately, for its "mini key tray" look — see its own comment). That means the generic bare
+   `button` rule's border-radius: var(--btn-radius) + box-shadow: var(--btn-shadow) leak straight through
+   UNLESS a theme explicitly claims them. Studio claims them on purpose; organic needs the opposite: its whole
+   identity is borderless, so a per-item rounded pill with a bright inset highlight (organic's own --btn-shadow)
+   reads as exactly the border it deliberately removed everywhere else. getComputedStyle confirmed the
+   mechanism directly (border-radius: 14px = --btn-radius; box-shadow = the literal --btn-shadow value) before
+   writing this — not the border-top hairline, which is a separate, intentional 1px item separator. */
+[data-theme="organic"] .toolbar-dropdown-content button {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* the light/dark pair (t2237) applied here too — dropdown items are the same "small control" category as
+       the sub-tabs/settings-inputs it was declared for. Reusing --field-face-light/-ink directly rather than
+       inventing a third pair (this session's own repeated "declare once" lesson) — the alternative considered
+       and rejected was leaving items flat/dark (matching the menu's own --menu-face, relying on hover alone
+       for any light moment), which would have satisfied "borderless" without extending the light register;
+       reused the field pair instead since the trigger button beside it is already this same cream register,
+       and every other "small control" fixed this session converged on it too. */
+    background: var(--field-face-light) !important;
+    color: var(--field-ink-light) !important;
+}
+
 /* No custom hover override here: dropdown items use the theme's normal (solid) button:hover — genuinely true
    now, verified (t2085): `.toolbar-dropdown-content button` sets background/color/border with !important, so
    only properties it does NOT touch (box-shadow, filter) can flow through from the generic `button:hover`
@@ -2032,10 +2059,11 @@ input, select, textarea {
     --field-face: var(--panel); --field-edge: var(--border); --field-edge-w: 1px;
     --field-ink: var(--text); --field-radius: var(--radius); --field-focus-edge: var(--accent);
     --field-placeholder-ink: var(--text-dim);
-    /* t2237 — a SEPARATE pair for small/single-line surfaces that want a lighter register (a theme's own
-       amendment 3): defaults to the normal pair (no-op everywhere unless a theme overrides both halves
-       together, never one alone — see organic's own block for the one theme that does). */
-    --field-face-light: var(--field-face); --field-ink-light: var(--field-ink);
+    /* t2237 — --field-face-light/-ink-light (the light register for small single-line surfaces, amendment 3)
+       is declared at the shared theme root instead of here, on purpose: a property declared only on this
+       selector would not be visible to a plain <button> elsewhere in the DOM (custom properties inherit
+       through ANCESTORS, and no button is a descendant of an input/select/textarea) — the exact mistake this
+       comment replaces. See the :root defaults + organic's own theme block for the real declaration. */
     background: var(--field-face);
     color: var(--field-ink);
     border: var(--field-edge-w) solid var(--field-edge);
@@ -3919,6 +3947,13 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        matching this theme's own border-removal convention everywhere else. */
     --wiz-gear-face: var(--accent); --wiz-gear-edge: transparent; --wiz-gear-ink: var(--accent-ink);
     --wiz-gear-shadow: 0 1px 3px rgba(0,0,0,.2); --wiz-gear-text-shadow: none;
+    /* t2237 — the field-light pair's REAL values, declared once here (a true root-level theme property, so
+       any descendant can reuse it — buttons included, unlike input/select/textarea-scoped custom properties).
+       NOT --btn-face/--btn-ink directly (a field says "type here", not "press me" — a button's glossy
+       two-stop gradient would misrepresent a text-entry surface as clickable). Derived from the same warm
+       palette (the resting stop of --btn-face, #e7dbc0, flattened to one solid tone) paired with organic's
+       own already-declared dark ink for a light surface (--accent-ink, same token --btn-ink-hover reuses). */
+    --field-face-light: #e8dcc0; --field-ink-light: var(--accent-ink);
 
     /* contract */
     --scrim: rgba(12,8,5,.72);

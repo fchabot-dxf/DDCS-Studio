@@ -53973,3 +53973,76 @@ rendering assertion this turn's changes could plausibly affect — confirmed by 
 not inferred. `fork-parity-1593` wasn't even in the flaky/failed set at t2233's own full-suite run — matches
 this project's own documented "the contention-starved population shifts run to run" phenomenon
 (playwright.config.js's own t1718/t1719/t1724 comment), not a regression from this turn.
+
+## t2239 — THE DROPDOWN WAS NOT FINE: the advisor's own re-render caught what "legible" hid
+
+### The correction, and why it happened
+
+t2237 reported the wizard-bar dropdown items were fine — legible, sharing their menu's own background by
+design, standard menu UX. The advisor rendered it themselves (from their own http-server, having learned at
+t2237 that port 3001 in this environment is VS Code Live Preview, which caches ES modules) and found every row
+is a visible ROUNDED CAPSULE WITH A LIGHT OUTLINE on the shared dark fill — identical to the human's own
+screenshot. **The test I applied was wrong, not the observation**: I checked LEGIBILITY (it is legible) when
+the actual bar is CONSISTENCY WITH THE THEME'S OWN DECLARED RULE (organic's whole identity is borderless, and
+this is still bordered). Same surface the advisor got wrong in the other direction at t2213 — legible is not
+the bar; consistent with the theme's own decision is.
+
+### Root cause, found before writing any CSS (not guessed)
+
+The advisor's own computed-style read disagreed with their own screenshot: `border-width: 1px 0px 0px` (a
+top-only hairline) cannot produce a full rounded capsule. Traced it rather than assuming: the GLOBAL bare
+`button, .btn, .op-btn, .toolbar-btn { border-radius: var(--btn-radius); box-shadow: var(--btn-shadow); }`
+rule (styles.css ~2066) applies to EVERY `<button>`, including dropdown items. `.toolbar-dropdown-content
+button`'s own `!important` overrides reset `border`/`background`/`color` — but never `border-radius` or
+`box-shadow`, which are DIFFERENT properties `!important`-on-border doesn't touch. Confirmed directly:
+`getComputedStyle` on a real open dropdown item showed `borderRadius: 14px` (= organic's own `--btn-radius`)
+and `boxShadow` matching organic's own `--btn-shadow` literally, inset highlight and all — that inset white
+top-highlight is exactly what reads as a light outline ring on each pill.
+
+**This leak is INTENTIONAL, not an oversight** — a t2085 comment on the very same rule already documents that
+studio's dropdown deliberately RELIES on it: studio's own `[data-theme="studio"] .toolbar-dropdown-content
+button { border-radius: 5px !important; ... }` (two blocks down) customizes exactly these two leaked
+properties into a "mini key tray" look, its own stated design intent. Organic needs the opposite of studio's
+choice, not a global fix — so the fix is a per-theme override, matching how studio already has one, not a
+change to the shared base rule.
+
+### The fix
+
+`[data-theme="organic"] .toolbar-dropdown-content button { border-radius: 0 !important; box-shadow: none !important; }`
+— flat, no per-item shape, matching organic's borderless identity precisely.
+
+### Then applying the light/dark pair, as instructed — and a real structural bug caught along the way
+
+Reused `--field-face-light`/`--field-ink-light` (declared at t2237) rather than inventing a third pair —
+the most literal reading of "the pair you just declared," already contrast-checked, and visually continuous
+with the already-light dropdown TRIGGER button beside it. Considered and rejected: leaving items flat/dark
+(matching the menu's own background, relying on hover alone) — would have satisfied borderlessness without
+extending the light register; flagging this alternative in case the advisor intended something narrower.
+
+**First attempt silently failed** — applying `background: var(--field-face-light) !important` on the dropdown
+button computed to `rgba(0, 0, 0, 0)`, not the cream value. Root cause: I had declared `--field-face-light`'s
+actual values scoped ONLY to `input, select, textarea` selectors (at t2237) — a custom property declared that
+way is invisible to a `<button>` element anywhere else in the DOM, since CSS custom properties inherit through
+ANCESTORS, and no button is a descendant of an input/select/textarea. Caught via `getComputedStyle`, not
+assumed correct from the CSS alone (the SAME discipline that caught the gear's specificity bug at t2237).
+Restructured: the token's default now lives at the shared `:root`-equivalent block (alongside `--wiz-gear-*`'s
+own defaults, matching the SAME precedent that fixed the gear), organic's real light values live on organic's
+own root theme block (alongside `--wiz-gear-*`'s override) — both now genuinely inherited by any element in
+the DOM, buttons included. Removed the now-redundant (and actually CONFLICTING — an explicit declaration on
+a matching selector always beats an inherited value, so it would have silently reverted the fix for
+input/select specifically) leftover declaration on the base field rule.
+
+### Verified
+
+Screenshotted the real Probe wizard-family dropdown open in organic at 430px
+(`verification/t2239-dropdown-organic.png`, was `scratchpad/t2239-dropdown-organic.png`): every row now a
+flat, light-cream strip, no individual rounding or ring, separated by thin dark hairlines
+(`--menu-sep: rgba(0,0,0,.06)`, already correct against a light background without any change — checked
+before assuming it needed one). Studio's own dropdown confirmed byte-identical to before
+(`verification/t2239-dropdown-studio.png`) — still its own bevelled "mini key" look, untouched.
+
+Full suite re-run after this additional change (required — still a shared-token/CSS turn): 2787 passed, 23
+flaky, **0 unexpected**, 25 skipped (25.1m). Scanned the flaky list by name: none touch the dropdown, gear, or
+settings-input surfaces this turn changed — all match the same already-documented `__blkws`-boot-timeout
+family (t2233's open follow-up) and the project's own "contention-starved population shifts run to run"
+phenomenon. 0 unexpected is the clean confirmation: nothing this turn's CSS touched actually broke.
