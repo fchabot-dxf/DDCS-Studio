@@ -52676,3 +52676,82 @@ collateral check on the rethrow — one incidental failure (`blocks-live-form.sp
 function`) reproduced as a CLEAN PASS in isolation immediately after, confirming it was the SAME session-wide,
 load-driven flakiness this whole investigation has been chasing, not something the rethrow introduced (a
 `TypeError: is not a function` is not a shape a `throw err` inside an existing catch block could ever produce).
+
+## t2208 — ORGANIC LOSES ITS BORDERS, TWO EDITS SHIPPED TOGETHER (per the advisor's own amendment)
+
+The dispatch: remove organic's visible seams (`--border`, `--btn-edge`/`-hover`, `--modal-edge` → `transparent`,
+ORGANIC ONLY) for the flatter look the human had already approved. Explicit instruction: build it, screenshot
+it, look — don't reason from the hex values — before committing, because organic's tonal steps (#14110b bg /
+#211a11 panel / #2d2417 panel2) are close enough that removing the seam might flatten surfaces into each other
+rather than modernise them.
+
+### Part 1 — border removal, and the regression the "look, don't reason" instruction was FOR
+
+Set `--border`/`--btn-edge`/`--btn-edge-hover`/`--modal-edge` to `transparent` in organic's block (each keeping
+its old literal in a comment). Screenshotted full-page, the wizard-manager modal, and the settings panel —
+these general panel/modal surfaces looked genuinely clean, NOT flattened; whitespace + typography + the
+existing box-shadow amber glow still carry separation fine. The advisor's own named worry (tonal-step mush on
+generic panels) did not materialise.
+
+A FOCUSED crop of the wizard-manager's row actions (`.wizm-act` — Rename/Duplicate/Export/Fork) found a
+DIFFERENT, concrete regression the panel-level screenshots hid at their resolution: `.wizm-act` is a
+border-only "ghost" button (`background: transparent`, shape carried ENTIRELY by `border: 1px solid
+var(--border)`) — with `--border` now transparent, these buttons became completely invisible as buttons until
+hovered. A grep for the same `background: transparent` + `border: 1px solid var(--border|--line|--edge)` shape
+across `styles.css` found this is not a one-off: 8 sites total share it (`.wizm-act`, `.wiz-preset-row
+.wpr-save`, `.wiz-tpl-pop .wt-save`, `#blocks-app .blk-view-btn`, `.ddcs-update-bar .upd-what`/`.upd-dl-
+fallback`, `.ddcs-welcome-modal .wcm-nav button`, `.ddcs-rate-toast .rate-btn`) — every text-labelled secondary
+button in the app, as distinct from icon-only affordances (`.upd-x`, `.blk-drawer-x`, `.wcm-skip`, `.rate-
+star`) which never had a border in the first place and are unaffected (hover-reveal is the normal, expected
+convention for those). Reported this mid-turn as an open question for the human, since it's a genuine design
+trade-off, not something to resolve unilaterally.
+
+### Part 2 — the human's own amendment: it's a colour problem, and it's ONE commit, not two
+
+Direct human reasoning, relayed as an amendment: "then button color need to be lighter right?" — YES, and per
+the advisor's framing this is the actual fix, not a fallback: removing a border only works if the SURFACE takes
+over the separation the line was doing. Explicit instruction: do NOT ship the border removal alone even as an
+interim step (it would read as the idea failing rather than half-applied); widen the tonal step in the SAME
+commit; pick tones by screenshotting and looking (near-black browns don't separate linearly); the acceptance
+test is "can you tell what's clickable at a glance, without hovering"; the inset highlight lever
+(`--btn-shadow`'s existing `inset 0 1px 0 rgba(255,255,255,.5)`) stays out unless the tonal step alone reads
+weak — arguably a border wearing another name, the human's call to add, not mine.
+
+Implemented as a DECLARED token pair rather than 8 individual `[data-theme="organic"]` overrides, consistent
+with the file's own existing `--btn-*` button-material convention (t2075) — a real, recurring "ghost button"
+material group had never been named:
+- `--btn-ghost-face: transparent; --btn-ghost-edge: var(--border);` at `:root` (the contract) — byte-identical
+  to what every site already rendered, so declaring it changes nothing for the other four themes.
+- Organic overrides only `--btn-ghost-face: var(--panel2)` — reusing the theme's own existing "raised surface"
+  token (already the hover-fill for `.wpr-save`, the fill for headers/pills/stat cards elsewhere) rather than
+  inventing a second ladder. `--btn-ghost-edge` stays on the default (`var(--border)`), which already resolves
+  to transparent here — full fill IS the shape now, no ring.
+- All 8 call sites relocated from their literal `background: transparent` / `border: 1px solid var(--border)`
+  onto `var(--btn-ghost-face, transparent)` / `var(--btn-ghost-edge, var(--border))` (kept the old literal as
+  the `var()` fallback at each site — a theme with no opinion renders identically to before).
+
+Widened the ladder itself: `--panel` #211a11 → #1c140c (darkened slightly, more room below), `--panel2` #2d2417
+→ #3d3120 (lightened distinctly — relative luminance step went from ~4pt/38% to roughly 2.5x, picked by
+screenshotting and looking per the human's own instruction, not computed off a contrast formula). `--bg` stays
+`#14110b`, untouched — nobody flagged the bg→panel step as the problem.
+
+### Verification
+
+Rebuilt the throwaway screenshot script (the earlier one was already deleted) and re-shot: full page, the
+wizard-manager modal (all 6 user rows + all 6 built-in Fork rows), a tight crop of one `.wizm-row`, and the
+Blocks tab's Form/3D view-toggle. `.wizm-act` buttons now show a clearly visible warm-brown fill, distinct from
+both the row and the modal behind it — reads as a button at a glance, no hover needed. The inactive Blocks
+view-toggle segment (`3D`) shows the same fill against the topbar; the active segment (`Form`) is unaffected
+(it uses `--accent`, not ghost material). The wizard-manager modal as a whole still reads clean, not flattened
+— the wider panel/panel2 step reads as an intentional two-tier "wood" surface rather than a computed patch.
+Screenshots: `verification/t2208b-organic-{fullpage,wizard-manager,wizm-row-crop,blk-view-toggle}.png` (after),
+alongside the earlier `verification/t2208-organic-*` set (before/border-intact and the first after/no-fill-yet
+pass that surfaced the regression). Full smoke tier re-run clean (77 passed) — the change is CSS-only, no
+selector/markup touched, so this was a sanity check rather than an expected catch.
+
+The 6 remaining `background: transparent` + bordered sites the earlier grep also matched (`.blk-drawer-x`,
+`.upd-x`, `.wcm-skip`, `.rate-star`, plus two unrelated accent-bordered elements at 6143) were left untouched —
+icon-only or already `border: none`, never relied on `--border` for shape, out of scope for this fix.
+
+Threw away `tests/_organicghost.spec.js` after use, same convention as every other screenshot-verification
+turn this session.

@@ -184,6 +184,14 @@ svg [id*="Zfirst_travel"] {
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 
+    /* t2208 — GHOST BUTTON MATERIAL: the "no fill, border does all the shape work" variant (Rename/Duplicate/
+       Export row-actions, the update-bar's secondary links, the rate-toast actions, etc — 8 sites total, all
+       relocated onto this pair rather than left as scattered `background: transparent; border: 1px solid
+       var(--border)` literals). Default is transparent/var(--border), byte-identical to what every site already
+       rendered — declaring this changes nothing on its own. Only organic overrides --btn-ghost-face (its own
+       --border is transparent, so a ghost button there needs an actual fill to keep reading as a button). */
+    --btn-ghost-face: transparent; --btn-ghost-edge: var(--border);
+
     /* t2155 tail — THE 3D-PREVIEW PULL-TAB joins the theme, same house pattern as t2075's button material:
        defaults here match exactly what `.editor-container .viz3d-handle` already renders (below) — every skin
        is byte-identical until it opts in by overriding these in its own block. Studio does (see its own block);
@@ -2523,7 +2531,7 @@ button.primary:hover {
 .wiz-preset-row { display: flex; align-items: center; gap: 8px; padding: 3px 2px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border, #2a3340); font-size: 12px; }
 .wiz-preset-row .wpr-lbl { color: var(--text-dim, #9aa); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: 10.5px; }
 .wiz-preset-row .wpr-pick { flex: 1 1 auto; min-width: 0; max-width: 240px; padding: 3px 6px; font-size: 12px; }
-.wiz-preset-row .wpr-save { flex: 0 0 auto; padding: 3px 10px; font-size: 12px; cursor: pointer; border: 1px solid var(--border, #3a414d); border-radius: 5px; background: transparent; color: var(--text-main, #e6edf3); }
+.wiz-preset-row .wpr-save { flex: 0 0 auto; padding: 3px 10px; font-size: 12px; cursor: pointer; border: 1px solid var(--btn-ghost-edge, #3a414d); border-radius: 5px; background: var(--btn-ghost-face, transparent); color: var(--text-main, #e6edf3); }
 .wiz-preset-row .wpr-save:hover { background: var(--panel2, rgba(255,255,255,.08)); }
 .wiz-preset-row .wpr-link { border: none; background: transparent; color: var(--text-dim, #9aa); opacity: .85; padding: 3px 2px; }
 .wiz-preset-row .wpr-link:hover { color: var(--accent, #0ea5e9); opacity: 1; }
@@ -2553,7 +2561,7 @@ button.primary:hover {
 }
 .wiz-tpl-pop .wt-head { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim, #9aa); padding: 4px 6px 6px; }
 .wiz-tpl-pop .wt-save {
-    width: 100%; text-align: left; border: 1px dashed var(--border, rgba(255,255,255,.25)); background: transparent;
+    width: 100%; text-align: left; border: 1px dashed var(--btn-ghost-edge, rgba(255,255,255,.25)); background: var(--btn-ghost-face, transparent);
     color: var(--accent, #0ea5e9); border-radius: 6px; padding: 7px 9px; cursor: pointer; font: inherit; margin-bottom: 6px;
 }
 .wiz-tpl-pop .wt-save:hover { background: rgba(255,255,255,.05); }
@@ -3728,13 +3736,24 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
    soft is as true of a tree as of a body. ===== */
 [data-theme="organic"] {
     --bg: #14110b;            /* forest floor */
-    --panel: #211a11;         /* bark shadow */
-    --panel2: #2d2417;        /* bark */
+    /* t2208 (amendment) — WIDENED, not just de-bordered. Panel was #211a11 and panel2 #2d2417: ~4pt apart in
+       relative luminance (10.6% vs 14.6%), a step the border was doing the real work of announcing. Panel
+       darkened a touch (more room below), panel2 lightened distinctly (it is now the fill several ghost
+       buttons use directly, see --btn-ghost-face above) — picked by screenshotting the wizard manager/settings
+       panel/blocks view-toggle and looking, per the human's own "at a glance, without hovering" test, not by
+       computing a contrast ratio in the dark browns where perceived separation isn't linear anyway. */
+    --panel: #1c140c;         /* bark shadow — was #211a11 */
+    --panel2: #3d3120;        /* bark — was #2d2417, now distinctly lighter (its own ladder role, not a duplicate of panel) */
     --accent: #d9a03c;        /* sap amber — was coral/arterial */
     --text: #ece0c6;          /* sapwood — was bone */
     --text-main: #f8f0da;
     --text-dim: #a08d69;      /* weathered — was aged bone */
-    --border: #5c4a30;        /* bark seam */
+    /* t2208 (human's early idea, approved; ORGANIC ONLY — the other four themes keep their borders) — the flatter,
+       modern look: no visible seam on generic panels/buttons/modals. Transparent, not deleted, so any rule still
+       reading var(--border) degrades to "no line" rather than falling through to an unthemed default. Kept as
+       its own literal comment below (#5c4a30, "bark seam") for whoever compares this against the other themes'
+       own --border values later. */
+    --border: transparent;   /* was #5c4a30 ("bark seam") */
     --radius: 16px;           /* organic curvature — untouched, soft is as true of a tree as a body */
     --block-edited: #e6c04a;  /* pale gold */
     --success: #4f9d5d;       /* a REAL green — semantic, not harmonised into the wood palette */
@@ -3769,11 +3788,18 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        deleted). Organic's resting ink (#2a2117) is dark — the light bone-coloured face needs it, unlike the
        page's own light --text on a dark page background; --btn-ink-hover reuses the ALREADY-declared
        --accent-ink above rather than restating the same hex a second time. */
-    --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: #8b7355; --btn-ink: #2a2117;
+    --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: transparent; --btn-ink: #2a2117;   /* t2208 — was #8b7355; the resting FACE gradient already reads as a button without a seam */
     --btn-radius: 14px; --btn-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
     --btn-text-shadow: none;
-    --btn-face-hover: linear-gradient(180deg, #f2dba0, #d9a03c); --btn-edge-hover: var(--accent);   /* t2127 — was coral (#f1c6af, #d98a6f); interactive = amber, per the plan's own rule */
+    --btn-face-hover: linear-gradient(180deg, #f2dba0, #d9a03c); --btn-edge-hover: transparent;   /* t2127 — was coral; t2208 — edge was var(--accent), now transparent too: the face gradient's own colour shift already carries hover, an edge ring would be the one border this theme re-grew */
     --btn-ink-hover: var(--accent-ink);
+    /* t2208 (amendment) — GHOST buttons (Rename/Duplicate/Export, the update-bar links, rate-toast actions…)
+       had NOTHING but var(--border) giving them a shape; now that --border is transparent here, they need an
+       actual fill to still read as clickable at a glance. --panel2 is already this theme's "raised surface"
+       tone (headers, pills, hover states) — reusing it rather than inventing a second ladder. --btn-ghost-edge
+       is left on the :root default (var(--border)), which already resolves to transparent here — no border,
+       full fill is what now carries the shape. */
+    --btn-ghost-face: var(--panel2);
     /* the OLD hover rule never touched box-shadow, so the resting shadow just kept showing through hover —
        relocated as an explicit self-reference rather than left to fall through the :root default (none),
        which would have silently dropped the shadow on hover (caught via getComputedStyle(body) diffing). */
@@ -3792,7 +3818,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        brighter sap amber) — a quieter rim than the semantic accent, kept as its own literal. --modal-radius is
        the FOUR-VALUE shorthand itself (not a single number) — organic's dialog corners are asymmetric by
        design, the exact reason this token accepts a full shorthand rather than one radius value. */
-    --modal-face: var(--panel); --modal-edge: #6e5840; --modal-edge-w: 1px; --modal-radius: 30px 12px 30px 12px;
+    --modal-face: var(--panel); --modal-edge: transparent; --modal-edge-w: 1px; --modal-radius: 30px 12px 30px 12px;   /* t2208 — was #6e5840 ("a muted bark brown"); the shadow below still carries a faint amber rim */
     --modal-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,160,60,.20);  /* t2127 — the accent rim moves with the accent */
     --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
     --modal-close-edge: #b8432f; --modal-close-radius: 10px;
@@ -6063,7 +6089,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk-view-btn {
     /* t2202 (BACKLOG 15) — see .preflight-badge-label's own comment: invalid `font: … inherit`, split. */
     font-family:inherit; font-weight:700; font-size:10px; line-height:1; letter-spacing:.03em; padding:5px 10px; cursor:pointer;
-    border:1px solid var(--line); background:transparent; color:var(--text-dim,var(--screen-dim)); border-radius:6px;
+    border:1px solid var(--btn-ghost-edge,var(--line)); background:var(--btn-ghost-face,transparent); color:var(--text-dim,var(--screen-dim)); border-radius:6px;
 }
 #blocks-app .blk-view-btn:hover { color:var(--text-main,var(--screen-ink)); }
 #blocks-app .blk-view-btn[aria-pressed="true"] { color:#fff; background:var(--accent,#3b82f6); border-color:var(--accent,#3b82f6); }
@@ -6252,10 +6278,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     padding:5px 12px; border-radius:7px; border:1px solid var(--accent); background:var(--accent); color:#fff;
     cursor:pointer; text-decoration:none; font:inherit; font-weight:600;
 }
-.ddcs-update-bar .upd-what { background:transparent; color:var(--text); border-color:var(--border); }
+.ddcs-update-bar .upd-what { background:var(--btn-ghost-face,transparent); color:var(--text); border-color:var(--btn-ghost-edge,var(--border)); }
 /* t2066 — when the in-place same-name update is available, Download is a manual fallback, not an equal peer: demote it to
    secondary styling so the one-click in-place path is visibly primary and users stop grabbing the dated Downloads copy. */
-.ddcs-update-bar .upd-dl-fallback { background:transparent; color:var(--text-dim); border-color:var(--border); font-weight:500; }
+.ddcs-update-bar .upd-dl-fallback { background:var(--btn-ghost-face,transparent); color:var(--text-dim); border-color:var(--btn-ghost-edge,var(--border)); font-weight:500; }
 .ddcs-update-bar .upd-x { margin-left:auto; background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:15px; padding:0 4px; }
 .ddcs-update-bar .upd-notes { flex-basis:100%; max-height:180px; overflow:auto; margin-top:4px; color:var(--text-dim); font-size:12px; line-height:1.5; }
 
@@ -6285,7 +6311,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .ddcs-welcome-modal .wcm-dots { color:var(--accent); letter-spacing:3px; font-size:10px; }
 .ddcs-welcome-modal .wcm-nav { display:flex; gap:8px; }
 .ddcs-welcome-modal .wcm-nav button {
-    padding:5px 14px; border-radius:var(--radius); border:var(--edge-w) solid var(--edge); background:transparent; color:var(--text);
+    padding:5px 14px; border-radius:var(--radius); border:var(--edge-w) solid var(--btn-ghost-edge,var(--edge)); background:var(--btn-ghost-face,transparent); color:var(--text);
     cursor:pointer; font:inherit; font-weight:600;
 }
 /* t2073 — --outline/--border-w/--surface-1 (used above until this turn) are RETIRED, not aliased; this was
@@ -6334,7 +6360,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .ddcs-rate-toast .rate-comment { width:100%; box-sizing:border-box; resize:vertical; min-height:38px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg,#0b0f14); color:var(--text-main,#e6edf3); font:inherit; }
 .ddcs-rate-toast .rate-actions { display:flex; align-items:center; gap:8px; }
 .ddcs-rate-toast .rate-btn {
-    padding:5px 13px; border-radius:7px; border:1px solid var(--border); background:transparent;
+    padding:5px 13px; border-radius:7px; border:1px solid var(--btn-ghost-edge,var(--border)); background:var(--btn-ghost-face,transparent);
     color:var(--text-main, var(--text)); cursor:pointer; text-decoration:none; font:inherit; font-weight:600;
 }
 .ddcs-rate-toast .rate-never { color:var(--text-dim); }
@@ -6486,7 +6512,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wizm-prov { flex: 1 1 24%; min-width: 0; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wizm-when { flex: 0 0 74px; text-align: right; color: var(--text-dim); font-size: 11px; }
 .wizm-acts { flex: 0 0 auto; display: flex; gap: 4px; }
-.wizm-act { font: inherit; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--text-main); cursor: pointer; }
+.wizm-act { font: inherit; font-size: 11px; padding: 3px 8px; border: 1px solid var(--btn-ghost-edge,var(--border)); border-radius: 5px; background: var(--btn-ghost-face,transparent); color: var(--text-main); cursor: pointer; }
 .wizm-act:hover:not(:disabled) { background: color-mix(in srgb, var(--accent, #2d7ff9) 14%, transparent); }
 .wizm-act:disabled { opacity: .4; cursor: not-allowed; }
 .wizm-act.is-danger:hover { color: #ef4444; background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); }
