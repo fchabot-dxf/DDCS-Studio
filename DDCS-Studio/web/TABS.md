@@ -41,6 +41,65 @@ DEPTH 1                          DEPTH 2
 
 ---
 
+## THE DECLARATION — `data-tabs="1"` / `data-tabs="2"`
+
+Human, 2026-08-24, on what this file is actually for: *"the idea is to declare a 2 level tab vs 1 level."*
+Not a prose register — **a property the markup carries, that the stylesheet reads.**
+
+A tab system declares its depth ONCE, on the container that owns the strip:
+
+```html
+<div class="settings-modal" data-tabs="2">   <!-- Settings: L1 + L2 -->
+<div class="gateway-app"    data-tabs="1">   <!-- Gateway: one strip -->
+<div id="controller-dock"   data-tabs="1">   <!-- the keyboard deck -->
+```
+
+and the tone ladder follows from that number alone:
+
+```css
+/* the three tones, per theme — declared beside the other --tab-* tokens */
+--tab-strip: …;   /* C — behind the tabs. MUST differ from the active tab. */
+--tab-mid:   …;   /* A — the L1 tab AND the interstice band. Depth 2 only. */
+--tab-body:  …;   /* B — the deepest active tab AND the content it opens. */
+
+[data-tabs] .tab-strip            { background: var(--tab-strip); }
+
+[data-tabs="1"] .tab-l1.active    { background: var(--tab-body); }   /* merges into content */
+
+[data-tabs="2"] .tab-l1.active,
+[data-tabs="2"] .tab-interstice   { background: var(--tab-mid); }    /* L1 merges into the band */
+[data-tabs="2"] .tab-l2.active    { background: var(--tab-body); }   /* L2 merges into content */
+```
+
+⭐ **At depth 1, `--tab-mid` is simply unused.** One declaration covers both shapes — there is no depth-1
+branch and no depth-2 branch to keep in step, which is the entire point. A third level, if one ever appears,
+adds a tone and a line rather than a new special case.
+
+⭐ **And a new tab system gets the whole ladder by declaring one attribute.** Nobody has to remember the rule,
+which is the failure mode this file exists to end: the rule WAS known, written in a comment on the shared strip
+rule, and four themes still shipped without a band.
+
+### ⚠ What this does NOT do
+
+⛔ It does not merge the systems into one component, restyle anything by itself, or replace per-theme
+character. `--tab-strip` in steampunk is brass and in futuristic is cyan-black; the DECLARATION is shared, the
+VALUES are not.
+
+⛔ It does not license renaming every existing class at once. See the adoption note below.
+
+### Adoption — pilot first, per this project's own habit
+
+⛔ Do NOT convert seven systems in one turn. Settings is being fixed anyway and is the only CONFIRMED depth-2
+system, so it is the pilot: declare `data-tabs="2"`, wire the three tones, prove the `elementFromPoint` scan
+shows exactly three contiguous tones. **Everything else adopts when it is next touched**, and its row here
+moves from UNVERIFIED to a depth only once it has been counted on screen.
+
+⚠ The existing class names (`.settings-main-tab`, `.settings-tab`, `.deck-tab`) do not have to become
+`.tab-l1`/`.tab-l2` on day one — the attribute can select through whatever a system already calls its parts.
+Renaming is a separate, optional tidy; the DECLARATION is the part that carries the value.
+
+---
+
 ## THE REGISTER — to be completed by survey, not by guess
 
 ⚠ Depths below are the ADVISOR'S READ from grepping renderers, **not measured**. The worker fills this in from
