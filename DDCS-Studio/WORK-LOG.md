@@ -53281,3 +53281,101 @@ Playwright's own diff images directly rather than inferring from the summary lin
 -S` on both the spec files and the product code they cover. No fixes proposed for deletion — every one of the
 six needs a TEST-SIDE correction (an assertion or helper update), not removal; BACKLOG.md is not touched this
 turn pending the advisor's ruling on how each should be fixed.
+
+## t2225 — FIXING THE CAUSE: ONE shared clickBtn, the matcher decided deliberately, and two deeper finds
+
+The advisor's own follow-up investigation found what my parallel triage missed: `clickBtn` isn't a shared
+helper at all — it's FOUR separate local closures (`send-beacon-warning-2057`, `send-gate-wiring-1585`,
+`send-history-real-path-2065`, `validation-divzero-not-syntax-1603`), and they'd diverged (1585 alone edited
+to `.trim().startsWith(t)` at t2113; the other three stayed on `.includes(t)`). That's why t2113's own fix
+never reached the other three call sites — there was nothing for it to travel through. Dispatch: consolidate
+to ONE shared helper, delete the four copies, decide the matcher deliberately (not by majority), reconcile
+1603's actual failure mode (it uses `.includes()`, not `.startsWith()`, so my earlier report's "identical bug
+shape as 1585" line couldn't be literally true), and re-run everything shown green, not assumed.
+
+### The reconciliation, done first, with fresh evidence
+
+Re-ran 1603 in isolation and read the real DOM snapshot: the button reads `"Send (deliver-only)"`, not
+`"Send (tracked)"` — beacons are force-disabled by the V4.1/M350-family Modbus gate. `.includes('Send
+(tracked)')` fails for the SAME reason `.startsWith()` would have: the substring simply isn't present
+anywhere in the real button's text. **Confirmed: 1603's failure is genuinely NOT the same mechanism as
+1585's** (a matcher regression against a static, icon-prefixed button) — it's the SAME originating commit
+(`ffc4626e`/t2113) but a DIFFERENT specific cause (the target button's text is conditional on beacon state,
+and nothing in this call site accounted for that). My earlier report's phrasing conflated the two during
+parallel synthesis; this turn's fix treats them as the distinct causes they are.
+
+### The shared helper and the matcher decision
+
+`tests/support/gatewaySend.js` (new) — one `clickBtn(page, txt)`, matching the file's own existing
+`support/*.js` convention (`simControls.js` et al: `export async function name(page, ...)`). **Matcher:
+`.includes(t)`, deliberately, not the majority vote.** Every real call site across all four specs needs to
+find a button by a NAME FRAGMENT regardless of a leading icon glyph — proven necessary by 1585's own
+`'Use current Studio program'` call against the real `"⬆ Use current Studio program"` button, which
+`.startsWith()` can never match. The shortest-textContent-length tiebreak (unchanged) already disambiguates
+the one case `.includes()` alone wouldn't: `clickBtn('Send')` after a transport button has also rendered —
+the plain "Send" tab, being shorter, sorts first. All four local closures deleted; each file now does
+`const clickBtn = (txt) => clickBtnImpl(page, txt);` at the same call site, keeping every existing
+`clickBtn('...')` call unchanged.
+
+### Two deeper finds, surfaced by fixing the shallow one first
+
+**1585's SECOND bug**, previously masked: once `'Use current Studio program'` started matching correctly, the
+test got one step further and failed at a DIFFERENT line — `clickBtn('Send')` (plain, no parenthetical) was
+matching the L1 GATEWAY nav tab (`button "Send"`, 4 chars) instead of the transport button (`"Send
+(deliver-only)"`, 19 chars) — shorter wins the tiebreak. Clicking the tab is a no-op re-select; the real send
+never fired. Fixed to `clickBtn('Send (')`, matching only a transport button. Applied the same fix to 1603's
+own hardcoded `'Send (tracked)'` (see reconciliation above) — `'Send ('` matches whichever transport mode
+actually rendered, the same generalization `send-history-real-path-2065` already handles explicitly via its
+own `beaconsOn` parameter.
+
+**A THIRD bug, one layer deeper still**: even after both button-matching fixes, 1585 raised a dialog — but
+the WRONG one. `send.js:117`'s `ctx.client.profile()` hits the real, unmocked `/api/profile`; on this dev
+machine (a real local gateway auto-adopted, exactly as the file's own t2113 comment already warned) it
+answers with genuine V4.1 identity, mismatching the workspace's own default target (DDCS Expert M350) and
+raising `"Wrong controller — send blocked"` — completely unrelated to the syntax gate either test is actually
+about. **Caught, not assumed, for 1603 too**: a throwaway diagnostic confirmed 1603 hit the IDENTICAL
+mismatch dialog — meaning my earlier "fix" (before this discovery) would have made 1603 pass VACUOUSLY, its
+negative assertion (`.not.toContain('The controller cannot read this file')`) trivially satisfied by a dialog
+about something else entirely, never actually exercising the div-zero validation gate the test exists to
+verify. Fixed by mocking `/api/profile` to answer as the workspace's own controller (`ddcs-expert-m350`,
+matching an existing working pattern from `tests/pull-machine-truth.spec.js`) in both 1585 and 1603 — the
+same environmental determinism t2057 already established for `/api/descriptor`/`/api/jobs`, extended to the
+one endpoint these two files' own flow actually reaches. Re-verified 1603's dialog content directly after the
+fix: empty string — no false refusal, no mismatch, a genuine pass this time, not a vacuous one.
+
+### What's still open — reported, not pushed through
+
+`send-history-real-path-2065`'s "tracked" variant (Beacons ON) still fails, unrelated to any of the above: it
+spawns a REAL bridge process against an empty synthetic `tmpRoot`, so `bridge-app/fairy/ops.py`'s
+`detect_controller()` can never fingerprint it as `expert-m350` (no SYSDISK firmware `.out` file to read),
+permanently force-disabling Beacons regardless of the test's own `beaconsOn: true` intent. The "deliver-only"
+variant (same file) passes clean — confirmed by re-running the whole file, not assumed unaffected. Found
+genuine candidate firmware captures already in the repo (`bridge/controllers/expert-m350/assets/capture/
+20260731T181343Z/SYSDISK/` and others) that COULD seed the test's `tmpRoot`, but did not wire one in: this
+touches Python bridge-side fingerprinting logic I haven't verified this session, and "report before fixing
+anything substantial" applies here as much as it did to the six's own triage — a wrong guess at exactly which
+file(s) `detect_controller()` needs would be worse than reporting the lead and stopping.
+
+### Baseline regeneration — ruled correct by the advisor, done and dated
+
+`tests/screenshot-baselines-1792.spec.js-snapshots/{modal,pane}-corner-win32.png` regenerated via
+`--update-snapshots` against **commit 59de97ff, released as V2026.08.24.1** (per `web/version.json` at the
+time of regeneration). Re-ran without `--update-snapshots` afterward to confirm a clean pass against the new
+baseline. This baseline can no longer fail for the OLD reason (245 commits of drift since the t2075 baseline)
+— a future reader comparing against it is comparing against V2026.08.24.1's actual rendering, not t2075's.
+
+### Verification
+
+`pane-sizer-1353`'s stale assertion (from the t2223 triage) also fixed this turn: rewrote the persisted-heal
+assertion to match the t2113 contract directly (`expect(g.stored).toBe('900')` — untouched, since healing is
+a render-time clamp now, not a write) rather than the old `Number(g.stored) < 900`.
+
+All six directly-relevant files re-run together: 11 passed, 1 failed (2065's tracked variant, reported above,
+not fixed).
+
+**Full suite: 2787 passed, 2 failed, 21 flaky, 25 skipped (27.7 min) — down from 6 named failures to 1.** The
+one remaining failure is exactly the reported, deferred `send-history-real-path-2065` tracked-variant. The
+other name in the "2 failed" list, `wizard-face-1599.spec.js:129`, is new and unrelated to anything this turn
+touched (grepped for zero matches to `clickBtn`/`gatewaySend`/`pane-sizer`/`screenshot-baselines`); re-ran in
+isolation and it passes clean — the same session-wide transient-contention pattern documented repeatedly this
+run, not a regression.

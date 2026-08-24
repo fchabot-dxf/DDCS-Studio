@@ -91,10 +91,14 @@ test('a PERSISTED oversize heals on open — a stored 900 must not reopen broken
     const g = await geom(page);
     expect(g.overflow, 'the poisoned height does not overflow the host on reopen').toBeLessThanOrEqual(0);
     expect(g.sizerReachable, 'and the handle is reachable without dragging anything first').toBe(true);
-    // THE DAMAGE IS REPAIRED, NOT MERELY SURVIVED: the stored value itself comes down, so the next wizard — and the
-    // next session — starts from a height that fits. A clamp alone would leave the 900 in localStorage forever.
-    expect(Number(g.stored), 'the stored value itself healed').toBeLessThan(900);
-    expect(Number(g.stored), 'to the height the container actually allows').toBeGreaterThan(0);
+    // t2225 — REWRITTEN to match the t2113 contract (ui/paneAccordion.js:289-298): the heal is CLAMP-ONLY now,
+    // deliberately not persisted. A stored 900 leaking into every device's own preference (a phone's clamp
+    // becoming a desktop's stored height too) was the bug t2113 fixed; the two assertions above already prove
+    // the runtime clamp itself works (no overflow, handle reachable). What used to be asserted here — the
+    // stored value coming DOWN — was the pre-t2113 contract this test was written against, and it no longer
+    // holds by design. The stored value must stay exactly what was seeded: recomputed on every render, never
+    // rewritten.
+    expect(g.stored, 'the raw stored value is untouched — healing is a render-time clamp, not a write').toBe('900');
 });
 
 test('the handle keeps a grab target far larger than the 2px line it draws', async ({ page }) => {

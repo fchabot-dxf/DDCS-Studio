@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickBtn as clickBtnImpl } from './support/gatewaySend.js';
 
 /**
  * t1585 — THE GATE IS ACTUALLY WIRED: the real Send view, the real click, the real dialog.
@@ -8,16 +9,29 @@ import { test, expect } from '@playwright/test';
  * has a rule about. So this drives the app: load a program with a typo'd identifier, open Gateway → Send, click
  * "Use current Studio program", click Send, and read the dialog that appears.
  *
- * ⚠ ONE THING IS LIFTED, AND ONLY ONE. `send.js:222` disables the Send button when no machine is answering
+ * ⚠ TWO THINGS ARE LIFTED, NOT ONE. `send.js:222` disables the Send button when no machine is answering
  * ("staging stays usable; SENDING is what needs a machine"), which is a CONNECTION contract orthogonal to the
  * syntax gate under test and cannot be satisfied without hardware. The button's `disabled` flag is cleared and
- * nothing else is stubbed: the click, the handler, the parser, the dedupe and the dialog are all the real ones.
- * If that lift is ever the reason this passes, the assertions below would still fail — they read the dialog's
- * TEXT, which only the gate can produce.
+ * nothing else about the click/handler/parser/dedupe/dialog chain is stubbed. If that lift is ever the reason
+ * this passes, the assertions below would still fail — they read the dialog's TEXT, which only the gate can
+ * produce.
+ * t2225 — the SECOND lift, found the hard way: `send.js:117`'s `ctx.client.profile()` hits the REAL
+ * `/api/profile` with no mock, and on a dev machine with a genuine local gateway auto-adopted, it answers with
+ * a real V4.1 identity — mismatching this workspace's own default target (DDCS Expert M350) and raising a
+ * COMPLETELY DIFFERENT dialog ("Wrong controller — send blocked") before the syntax gate this test is actually
+ * about ever runs. `/api/profile` is now mocked to answer as the workspace's own controller, so this test's
+ * result no longer depends on what happens to be running locally — the same discipline t2057 already used for
+ * `/api/descriptor`/`/api/jobs`, applied to the ONE endpoint this file's own flow actually reaches.
  */
 test.use({ viewport: { width: 1300, height: 850 } });
 
 test('the real Send button raises the real gate dialog, naming the line', async ({ page }) => {
+    // t2225 — see the file header: matches the workspace's own default controller so the mismatch gate
+    // (an unrelated, real machine-identity check) never fires and masks the syntax gate under test.
+    await page.route('**/api/profile', (r) => r.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }),
+    }));
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsLoadBlockStack, undefined, { timeout: 30_000 });
 
@@ -29,15 +43,10 @@ test('the real Send button raises the real gate dialog, naming the line', async 
         await new Promise((r) => setTimeout(r, 700));
     });
 
-    const clickBtn = (txt) => page.evaluate((t) => {
-        const hit = [...document.querySelectorAll('button')]
-            .filter((e) => (e.textContent || '').trim().startsWith(t))   // t2113: prefix, so the transport label may vary
-            .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
-        if (!hit) return false;
-        hit.disabled = false;   // see the header: the CONNECTION contract only, never the gate
-        hit.click();
-        return true;
-    }, txt);
+    // t2225 — was a local closure (t2113 had edited its matcher to .startsWith(), which broke THIS file's
+    // own 'Use current Studio program' call site against the real "⬆ Use current Studio program" button —
+    // see support/gatewaySend.js for the full story). Now the one shared implementation.
+    const clickBtn = (txt) => clickBtnImpl(page, txt);
 
     // t2145 — no longer a unique text match: the quick-menu identity line now also shows the PC role ("gateway"
     // / "client"), which matches this loose case-insensitive locator too. Target the real header tab directly.
@@ -53,7 +62,12 @@ test('the real Send button raises the real gate dialog, naming the line', async 
     // began failing on a dev machine with a real V4.1 attached, because the app auto-adopts a local gateway
     // and the descriptor is real. ⭐ This test is about the GATE DIALOG, not about which transport label the
     // button happens to carry, so it should never have pinned the label.
-    expect(await clickBtn('Send'), 'and the send is attempted').toBe(true);
+    // t2225 — a SECOND, previously-masked bug found once the earlier 'Use current Studio program' step
+    // started succeeding: plain 'Send' also matches the L1 GATEWAY nav tab (button "Send", 4 chars) — shorter
+    // than "Send (deliver-only)" (19 chars) — so the shortest-match sort picked the TAB (a no-op re-click,
+    // already active) instead of the transport button, and the gate dialog never fired. 'Send (' requires the
+    // parenthetical only the transport buttons carry, same fix as validation-divzero-not-syntax-1603.
+    expect(await clickBtn('Send ('), 'and the send is attempted').toBe(true);
     await page.waitForTimeout(12_000);   // the mismatch probe must time out against a dead gateway first
 
     const dlg = await page.evaluate(() => [...document.querySelectorAll('dialog,.dlg,.modal,[role=dialog]')]

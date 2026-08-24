@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickBtn as clickBtnImpl } from './support/gatewaySend.js';
 
 /**
  * t1603 — DIVISION BY ZERO DURING VALIDATION IS NOT A SYNTAX ERROR.
@@ -71,13 +72,22 @@ test('the lathe line validates; runtime /0 is untouched; every family refusal st
 /**
  * THE SYMPTOM ITSELF: the real Send view, the real click, the real dialog — with the real lathe program.
  * t1601 asserted the verdict through `defaultSyntaxVerify`; this act is ABOUT the dialog's false alarm, so
- * the dialog is what must be seen NOT to appear. Same one-and-only lift as send-gate-wiring-1585: the Send
- * button's connection-contract `disabled` flag is cleared (staging needs no machine); everything else —
- * click, handler, parser, dialog — is the shipped chain.
+ * the dialog is what must be seen NOT to appear. Two lifts, same as send-gate-wiring-1585 (see its own header
+ * for the full story of the second): the Send button's connection-contract `disabled` flag is cleared
+ * (staging needs no machine), and `/api/profile` is mocked to match this workspace's own default controller
+ * so the UNRELATED mismatch gate can never fire and produce a dialog this test's negative assertion could not
+ * tell apart from a genuinely-passed syntax gate. Everything else — click, handler, parser, dialog — is the
+ * shipped chain.
  */
 test.use({ viewport: { width: 1300, height: 850 } });
 
 test('the real Send dialog does NOT falsely refuse the shipped lathe OD-turn program', async ({ page }) => {
+    // t2225 — see the file header: matches the workspace's own default controller so the mismatch gate
+    // never fires and masks whatever gate actually decided the send (the one this test is about).
+    await page.route('**/api/profile', (r) => r.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }),
+    }));
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsLoadBlockStack, undefined, { timeout: 30_000 });
 
@@ -93,15 +103,9 @@ test('the real Send dialog does NOT falsely refuse the shipped lathe OD-turn pro
     });
     expect(staged.ok, `the OD-turn program is in the editor (${staged.why || staged.len + ' bytes'})`).toBe(true);
 
-    const clickBtn = (txt) => page.evaluate((t) => {
-        const hit = [...document.querySelectorAll('button')]
-            .filter((e) => (e.textContent || '').includes(t))
-            .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
-        if (!hit) return false;
-        hit.disabled = false;   // the CONNECTION contract only, never the gate
-        hit.click();
-        return true;
-    }, txt);
+    // t2225 — was a local closure duplicated across 4 specs; now the one shared implementation
+    // (support/gatewaySend.js). The CONNECTION contract only, never the gate.
+    const clickBtn = (txt) => clickBtnImpl(page, txt);
 
     // t2145 — no longer a unique text match: the quick-menu identity line now also shows the PC role ("gateway"
     // / "client"), which matches this loose case-insensitive locator too. Target the real header tab directly.
@@ -111,7 +115,14 @@ test('the real Send dialog does NOT falsely refuse the shipped lathe OD-turn pro
     await page.waitForTimeout(700);
     expect(await clickBtn('Use current Studio program'), 'the current program stages').toBe(true);
     await page.waitForTimeout(900);
-    expect(await clickBtn('Send (tracked)'), 'and the send is attempted').toBe(true);
+    // t2225 — was hardcoded 'Send (tracked)'. This test is about the div-zero VALIDATION gate, orthogonal to
+    // which transport mode is offered — beacons are gated off by default for a V4.1/M350-family descriptor
+    // (ui/gateway/views/send.js's Modbus capability check, t2113), so the real button here reads
+    // "Send (deliver-only)", not "Send (tracked)" (confirmed live: the previous hardcoded string never matched
+    // anything, on either .includes() or .startsWith() — the substring simply isn't present). 'Send (' matches
+    // whichever transport mode actually rendered, the same way send-history-real-path-2065 handles it
+    // explicitly via its own beaconsOn parameter — this test has no such parameter and doesn't need one.
+    expect(await clickBtn('Send ('), 'and the send is attempted').toBe(true);
     await page.waitForTimeout(12_000);   // the mismatch probe must time out against a dead gateway first
 
     const dlg = await page.evaluate(() => [...document.querySelectorAll('dialog,.dlg,.modal,[role=dialog]')]

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickBtn as clickBtnImpl } from './support/gatewaySend.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -125,15 +126,9 @@ const stageAndSend = async (page, { beaconsOn }) => {
         ]);
         await new Promise((r) => setTimeout(r, 700));
     });
-    const clickBtn = (txt) => page.evaluate((t) => {
-        const hit = [...document.querySelectorAll('button')]
-            .filter((e) => (e.textContent || '').includes(t))
-            .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
-        if (!hit) return false;
-        hit.disabled = false;
-        hit.click();
-        return true;
-    }, txt);
+    // t2225 — was a local closure duplicated across 4 specs; now the one shared implementation
+    // (support/gatewaySend.js).
+    const clickBtn = (txt) => clickBtnImpl(page, txt);
     // t2145 — no longer a unique text match: the quick-menu identity line now also shows the PC role ("gateway"
     // / "client"), which matches this loose case-insensitive locator too. Target the real header tab directly.
     await page.locator('.tab[data-app="gateway"]').click();
