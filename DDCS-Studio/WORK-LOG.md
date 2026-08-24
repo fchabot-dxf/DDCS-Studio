@@ -53466,6 +53466,104 @@ the "tracked" variant (the one red, now green). Re-ran twice: 2/2 clean, determi
 
 **All six originally red tests from t2223's triage are now fixed.**
 
+## t2231 — THE 22 FLAKY TESTS: TRIAGED AND GROUPED, ONE DOMINANT CAUSE FOUND, STOPPING HERE PER THE DISPATCH
+
+Dispatched to triage (not fix) the 22 intermittents from the last full run, classify each as TIMING /
+SHARED-RESOURCE / genuine product bug, group by cause not by file, and — explicitly — stop and report if one
+cause covers most of them rather than proposing 22 patches. It does.
+
+### The measurement, in order
+
+1. **Ran all 17 source files together, default parallelism, `--retries=0`** (not the full 2788-test suite —
+   just these): 9 failed, every one a `TimeoutError` on the exact same line —
+   `page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 })` inside a `boot()`-style helper.
+2. **Re-ran the SAME batch with `--workers=1`** (zero parallel-worker contention): 8 failed — a DIFFERENT set
+   of 8 (some overlap with run 1, some not), but the SAME dominant signature. **This rules out pure
+   parallel-worker contention as the sole cause** — the advisor's own hypothesis about a known serialization
+   constraint is real but incomplete; something fails even fully serialized.
+3. **Isolated one representative file** (`wizard-face-1599.spec.js`, `--repeat-each=5 --workers=1`, single
+   file, nothing else running): **8 failed out of 20 runs — a measured 40% failure rate**, alone, serialized,
+   with zero suite-wide contention. This is a rate, not an adjective, and it's high.
+
+### The shared cause — the SAME shape t2206 already root-caused and fixed, just for ONE file
+
+`window.__blkws` (the Blocks workspace global) is waited on with a HARDCODED inner timeout — grepped across
+the flaky files:
+
+```
+wizard-face-1599.spec.js     inner 60000ms   outer test.setTimeout: 120000/180000/300000  (wasted slack)
+shared-labels-1611.spec.js   inner 60000ms   outer test.setTimeout: 120000/180000          (wasted slack)
+guard-roundtrip-1595.spec.js inner 60000ms   outer test.setTimeout: 300000/600000          (wasted slack, extreme)
+subscriber-error-surface-1656.spec.js  inner 30000ms   outer 60000                          (wasted slack)
+modal-pre-canvas-1654.spec.js          inner 30000ms   outer 60000                          (wasted slack)
+palette-by-role-1623.spec.js           inner 60000ms   outer DEFAULT 60000 (playwright.config.js:36)  — ZERO margin
+blocks-live-form.spec.js               inner DEFAULT (inherits 60000)  outer DEFAULT 60000  — ZERO margin
+formfield-block.spec.js                inner 8000ms(!)  outer DEFAULT 60000                — the tightest, most fragile
+formfield-opparam-1640.spec.js         inner 8000ms(!) ×3  outer DEFAULT 60000              — same
+```
+
+This is the EXACT shape `save-dialog-declared-1615.spec.js` had at t2206 (an inner wait undercutting the
+test's own already-generous outer budget) — except THAT fix was applied to one file, and — like `clickBtn`
+before t2225's consolidation — this `boot()`-shaped helper is duplicated across many files rather than
+declared once, so t2206's fix never traveled. `collapse-on-delete-1948`/`group-canvas-knob`/
+`probe-port-gate-1880` don't use `__blkws` specifically but share the same broader family (a Blocks/wizard
+canvas boot-readiness wait with its own hardcoded, frequently-tight timeout — 10000/20000ms in
+`collapse-on-delete-1948`, default in `group-canvas-knob`) — very likely the same underlying cause (Blocks-tab
+boot genuinely taking longer than these numbers assume, some of the time), not independently verified to the
+same depth as the `__blkws` cluster.
+
+### What this is NOT (the forbidden fixes, confirmed not applicable)
+
+Not a missing sleep (there's no missing wait — the wait exists, its budget is just too tight or has zero
+margin against a genuinely-slow real boot). Not solved by retries (the project's own `retries: 2` already
+absorbs SOME of this at real gate-time, which is exactly why these show as "flaky" — passed on retry — rather
+than "failed" in the full-suite summary; but a 40% single-run failure rate means retries are carrying more
+load than they should). Not solved by marking anything flaky-tolerant (that hides the number, doesn't fix
+it). The fix, per the t2206 precedent, is raising each hardcoded inner wait to a number that actually reflects
+how long Blocks/wizard boot can genuinely take — likely paired with a genuine SHARED helper (matching t2225's
+own `clickBtn` consolidation) so the fix travels to every caller instead of needing to be reapplied per file.
+
+### The confirmed full list (from the actual full-suite run, 22 flaky, 0 unexpected)
+
+All 22, by file: `blocks-live-form` (2), `collapse-on-delete-1948` (2), `formfield-block` (1),
+`formfield-opparam-1640` (1), `group-canvas-knob` (1), `guard-prune` (1), `guard-roundtrip-1595` (1),
+`modal-pre-canvas-1654` (1), `option-b-slice3-live-visibility-1874` (1), `palette-by-role-1623` (1),
+`pocket-depth` (1), `probe-port-gate-1880` (1), `shared-labels-1611` (1), `subscriber-error-surface-1656` (3),
+`wizard-face-1599` (2), `workspace-cloud-tab-1233` (1), `workspace-dirty-dot-2188` (1). = 22.
+
+**16 of the 17 files share the boot-readiness-wait-timeout cause above** (`workspace-cloud-tab-1233.spec.js`'s
+own `boot()` fits the same shape too — waits on `window.openWorkspaceManager && window.ddcsFileSavedPlace`
+with no explicit inner-timeout override visible, same "zero margin against the 60000ms default" pattern as
+`palette-by-role-1623`/`blocks-live-form` — different specific globals, same structural mistake).
+
+**One file is a genuinely SEPARATE, second cause — a real product-adjacent timing race, not a wait-condition
+bug:** `workspace-dirty-dot-2188.spec.js:66` asserts the dirty-state dot's bounding-box width equals the
+clean-state one (`toBe`, exact float equality). It failed BOTH the original run and its retry, with two
+DIFFERENT received values each time (3.74169921875, then 3.74261474609375, against an expected
+3.20001220703125) — the width itself is unstable across runs, not just off by a fixed amount. That points at
+either sub-pixel font-metric jitter (measuring before webfont/layout has fully settled) or a genuine flex/text
+reflow race in the dirty-dot chip itself. This is worth its own look — it is the "genuine intermittent product
+bug" category the dispatch explicitly warned not to assume away, and grouping it into the boot-timeout bucket
+would be wrong.
+
+### Not independently verified: whether this is ALSO a genuine product-side slowness
+
+t2206 measured one real slow-boot case at 61-70+ seconds. Whether Blocks-tab boot has gotten slower over the
+course of this session's own accumulated feature work (more registered ops, more toolbox categories, etc.) —
+a genuine performance regression rather than just "the timeout was always too tight" — is a real, distinct
+possibility this triage did NOT rule in or out. Worth asking as part of the fix turn, not assumed either way.
+
+### Stopping here, per the dispatch's own explicit instruction
+
+One cause covers a clear majority of the 22 (the `__blkws`/Blocks-boot-readiness family: at minimum 9-10 of
+the 17 source files, likely more once `collapse-on-delete-1948`/`group-canvas-knob`/`probe-port-gate-1880`
+are confirmed). Reporting this as its own focused turn rather than patching timeouts across 17 files in the
+same breath as the triage — the fix itself (raising each number to a verified-sufficient value, ideally via
+one shared helper) is exactly the kind of change that deserves its own commit and its own full-suite
+verification, not folded into a triage report.
+
+Read-only turn — no test files edited, only run and measured.
+
 ## t2229 — PART ONE: STILL REAL IF, RUN FOR REAL — #10, F1, F3, F4
 
 ### F1 — appears STALE; the STILL REAL IF check itself had a bug
