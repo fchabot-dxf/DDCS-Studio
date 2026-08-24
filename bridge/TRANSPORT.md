@@ -51,6 +51,30 @@ read is definitionally pointless. On one-box nobody needs one at all — Studio 
 auth action, *Connect Google Drive*. Nobody has to learn the word "backend", and the human's original failure
 **cannot recur, because there is no wrong setting to be in.**
 
+### ⭐ RULED — the toggle IS the login
+
+Human, 2026-08-24: *"the toggle become the login conmection."*
+
+⇒ There is **no Use-Drive checkbox at all**. One control: **Connect / Disconnect Google Drive**.
+**Connected = the cloud road is open. Disconnected = local only.** Nothing else expresses the choice, and
+nothing can disagree with it.
+
+⛔ Do NOT keep the checkbox "for explicitness" or ship it disabled. Two controls for one state is exactly the
+two-homes divergence that produced the original bug: a signed-in account and a `backend` field that could
+silently disagree about whether the cloud road existed.
+
+⚠ **Three consequences that follow, and each needs building deliberately:**
+
+- **The connect button must say what it ENABLES, not just what it authenticates.** "Connect Google Drive" is an
+  auth verb; the user is actually choosing *can other devices send to this machine*. The label and its hint
+  carry that, or the setting is invisible again in a new way.
+- **Disconnecting is now destructive-ish.** It closes a road jobs may be in flight on — which is open question
+  §4 arriving from the other direction. Disconnect must state what it will do to in-flight remote jobs, and
+  must not be a silent toggle.
+- **Auth failure is now a transport outage.** A token expiring is no longer "cloud sending is unavailable", it
+  is *this machine just became unreachable from every other device*. It has to be reported that way, on both
+  ends, rather than as a login notice.
+
 ---
 
 ## 3. THE DESIGN — a fan-out facade
