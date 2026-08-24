@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { clickBtn as clickBtnImpl } from './support/gatewaySend.js';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,21 @@ async function waitForBridge(timeoutMs = 15000) {
 test.beforeAll(async () => {
     tmpRoot = mkdtempSync(path.join(tmpdir(), 'fairy-realpath-e2e-'));
     const dest = path.join(tmpRoot, 'cncdisk');
+    // t2227 — a REAL SYSDISK firmware fixture, not a mock: ops.py's detect_controller()/_fingerprint_sysdisk()
+    // reads the first *.out file (sorted) under <tmpRoot>/SYSDISK (the sibling _sysdisk_for() derives from
+    // `dest`'s own "cncdisk" suffix) and string-scans it for family signals when the filename alone is
+    // ambiguous. Without one, the bridge fingerprints as "unknown" and send.js's Modbus capability gate
+    // force-disables Beacons regardless of this test's own beaconsOn intent — the root cause the t2223/t2225
+    // triage found. `parse.out` from a genuine Expert M350 capture (this repo's own ground truth for this
+    // controller family, same standing as the M350 dumps elsewhere) — VERIFIED to fingerprint as
+    // "expert-m350" by running _fingerprint_sysdisk's own exact scan against it directly (contains "M350" and
+    // "Modbus", not "DDCSV4"), not assumed from its name or location.
+    const sysdisk = path.join(tmpRoot, 'SYSDISK');
+    mkdirSync(sysdisk, { recursive: true });
+    copyFileSync(
+        path.resolve(__dirname, '..', '..', 'bridge', 'controllers', 'expert-m350', 'assets', 'capture', '20260731T181343Z', 'SYSDISK', 'parse.out'),
+        path.join(sysdisk, 'parse.out'),
+    );
     bridgeProc = spawn(PY, [
         '-m', 'fairy.bridge', 'run',
         '--backend', 'local', '--root', tmpRoot, '--dest', dest,

@@ -53425,3 +53425,43 @@ unchanged silver) with no seam gap or overlap where the handle meets the editor 
 either width — the seam the human reported and fixed earlier this run stays intact. Full smoke tier green
 (77) — CSS-only, four theme blocks each gained four token lines. Threw away
 `tests/_backlog14bhandle.spec.js` after use.
+
+## t2227 (tail) — THE LAST RED: 2065's tracked variant, a real fixture, no bridge code touched
+
+The advisor's ruling on the one remaining red from t2225: wire the fixture (genuine capture files are this
+project's own ground truth for controller identity, same standing as the M350 dumps elsewhere), but VERIFY
+the chosen file actually fingerprints correctly through the bridge's own code path — not assumed from its
+name or location — and if wiring it required changing PYTHON BRIDGE LOGIC rather than just supplying a file,
+stop and report instead.
+
+### Read the exact fingerprint mechanism before picking anything
+
+`bridge/bridge-app/fairy/ops.py`'s `_fingerprint_sysdisk()` (:370): lists `*.out` files under the SYSDISK
+share (sorted, first one wins), checks the FILENAME for `ddcsv4`/`ddcse`/`expert`/`m350` first, and only
+string-scans the binary's own ASCII content as a tiebreaker when the filename is ambiguous — checking for
+`DDCSV4`/`DDCSE`/`Expert`/`M350`/`MSETDATA`/`MGETDATA`/`Modbus`. The real Expert M350 captures in this repo
+(`bridge/controllers/expert-m350/assets/capture/*/SYSDISK/`) have their `.out` files named `parse.out` and
+`pidMonitor.out` — NEITHER name is family-indicating, so picking one blind and trusting the filename would
+have been exactly the unverified assumption the ruling warned against.
+
+**Verified by running the exact scan logic directly** (not the bridge process, just `_fingerprint_sysdisk`'s
+own algorithm, transcribed faithfully and run against the real file) against `parse.out` from the
+`20260731T181343Z` capture: `sorted()` picks it first (alphabetically before `pidMonitor.out`); its content
+contains `M350` and `Modbus`, not `DDCSV4` — resolves to `family: "expert-m350"`, unambiguous. Ground truth,
+confirmed through the real path, not assumed.
+
+### The fix — test-side fixture only, zero Python touched
+
+`tests/send-history-real-path-2065.spec.js`'s `beforeAll` now creates `<tmpRoot>/SYSDISK` (the sibling
+`_sysdisk_for()` derives from the `dest`'s own `cncdisk` suffix) and copies `parse.out` into it before
+spawning the bridge — three new lines (`mkdirSync` + `copyFileSync`), no change to `ops.py` or any other
+Python file. This is squarely within the ruling's own bar: a fixture supplies data, it doesn't bend the code
+under test to accept something artificial.
+
+### Verification
+
+Both tests in the file pass — the "deliver-only" variant (already passing, confirmed still unaffected) and
+the "tracked" variant (the one red, now green). Re-ran twice: 2/2 clean, deterministic. Full smoke tier green
+(77) after this additional change too.
+
+**All six originally red tests from t2223's triage are now fixed.**
