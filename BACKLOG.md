@@ -1664,7 +1664,12 @@ only when retiring.
 
     #10  design/feature gap, no mechanical check - confirm by opening a 3-op wizard and looking
     #14  grep -n "getElementById('editor-comment')" ui/editorTextOps.js        -> STILL REAL (t2220)
-    F1   grep -rn "role" ui/gateway/ ui/gatewayPanel.js | grep -i "gate|client|server"   -> UNVERIFIED
+    F1   [STALE - VERIFIED t2229] the entry's own named blocker is gone: status.js descriptor() now
+         degrades to a real client-role render on an unreachable daemon (t2151, postdates the entry)
+         MY CHECK ABOVE WAS ITSELF BROKEN - grep -i "gate|client|server" has no -E, so the pipe was
+         matched LITERALLY and the check reported nothing for the wrong reason. Caught by the worker.
+         This is the section's own warning landing on the section: a check that cannot fail loudly is
+         worse than prose, because prose does not look like evidence. WRITE CHECKS THAT CAN ERROR.
     F3   grep -n "ui.click|ui.toggle" ui/sound.js                              -> entries still present,
          but this item asks for a JUDGEMENT (which sounds to keep), not a deletion - UNVERIFIED
     F4   grep -rn "Advanced machining" --include=*.js .                        -> 0 hits, i.e. UNBUILT,
