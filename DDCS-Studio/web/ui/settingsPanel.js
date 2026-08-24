@@ -1102,7 +1102,12 @@ function buildSettingsOverlay() {
     parent.innerHTML = `
         <style>
             #settings-app { display: flex; flex-direction: column; }
-            #settings-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
+            /* t2253 (BACKLOG amendment 1 half A, TABS.md) — background was the literal var(--panel), which is
+               why organic needed a separate !important override elsewhere in styles.css just to show its own
+               real band colour here. Reads var(--band-bg) directly instead — the token IS --panel for every
+               theme that doesn't override it, so this is byte-identical everywhere except organic (now real
+               without the !important hack) and the four themes t2253 also gave real values to. */
+            #settings-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--band-bg); flex: 0 0 auto; display: flex; align-items: center; }
             /* .settings-main-tab styling is shared/global in styles.css */
             #settings-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
             /* t1239 (user) — THE RAIL DIES. The subtabs were a 160px left column; they are now a HORIZONTAL strip

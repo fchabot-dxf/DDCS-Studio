@@ -38,13 +38,28 @@ The human caught it. Do not reintroduce it.
 **The two ways it breaks, and they are independent:**
 
 - **BEHIND** — the strip is too close to the active tab, so nothing distinguishes the selection.
-  Measured 2026-08-24: steampunk 1.22:1, studio 1.12:1, organic 1.36:1, futuristic 1.09:1, normal 1.10:1.
-  Only organic has a real band, and only because t2213 gave it one.
+  Measured 2026-08-24 (before): steampunk 1.22:1, studio 1.12:1, organic 1.36:1, futuristic 1.09:1, normal
+  1.10:1 — only organic had a real band, and only because t2213 gave it one.
+  **t2253 (amendment 1 half A) — CLOSED, all 5 themes.** `--band-bg` (the pre-existing "strip" token —
+  `--tab-strip` was consolidated onto it, not kept as a second one) now holds a real, theme-derived value for
+  every theme, not just organic: steampunk `var(--border)` (its own brass-frame tone, 2.34:1 — the biggest
+  jump), futuristic `var(--surface-raised)` (its own "raised HUD" tone, 1.27:1), studio `var(--plate-lo)`
+  (its own header-ladder tone, already used by `--hdr-bg` for the same purpose, 1.17:1), normal
+  `color-mix(in srgb, var(--accent) 8%, var(--panel))` (the SAME wash `.settings-headerrow`/`.settings-
+  identity` already use, 1.01:1), organic unchanged (1.36:1) — re-examined with fresh eyes as asked, once
+  the BELOW seam under it closed at t2251: the canopy green reads MORE clearly now, not less, against a
+  continuous dark surface instead of one broken by an interposed `--panel` band; kept `#25301a` as-is, a
+  deliberate human-chosen value (t2127), not something to second-guess without a real defect. No theme's
+  number was chased toward a target; each was judged against a full-panel screenshot, not the ratio alone —
+  normal and studio read as genuinely subtle bands by design (their own themes' restraint), not as failed
+  attempts at a bolder one.
 - **BELOW** — a surface of a *different* tone sits between the active tab and what it opens, so the tab never
   touches the thing it is supposed to be continuous with. Found by walking `elementFromPoint` down the screen
   from inside the tab; a comparison of tab-vs-content alone reports "merged" and misses it entirely.
+  **t2251 — CLOSED for Settings** (see REGISTER). Not yet checked for any other system.
 
-⛔ **Both must be checked. Neither implies the other.** Organic passed the first and failed the second.
+⛔ **Both must be checked. Neither implies the other.** Organic passed the first and failed the second, until
+t2251/t2253 closed BELOW then BEHIND, in that order, for Settings specifically.
 
 ### The OUTLINE half of the same rule
 
@@ -156,7 +171,7 @@ the running app. Where a row says UNVERIFIED, it has not been counted on screen.
 
 | system | class | rendered by | depth | tones needed | status |
 |---|---|---|---|---|---|
-| App header | `.app-header .tab` | `index.html` | 1 ? | 2 | UNVERIFIED — same `--tab-*` tokens as Settings; carried the 1.36:1 defect unreported until t2213 |
+| App header | `.app-header .tab` | `index.html` | 1 ? | 2 | t2253 — `--tab-fill: var(--band-bg)` was already wired here (t2073), so giving `--band-bg` real per-theme values reached this strip for free, no separate work. Screenshotted all 5 themes at the app-header level specifically (not just Settings) to confirm — reads correctly, same real bands. Depth itself still unverified (1 assumed, not counted) |
 | Settings | `.settings-main-tab` + `.settings-tab` | `ui/settingsPanel.js` | **2** | 2 | **DONE.** t2249 landed the contract (classes/tokens/overlap); t2251 (amendment 4) flattened `.settings-sidebar` to `--tab-body` — `elementFromPoint` now shows exactly 2 contiguous tones, tab through interstice into content, all 5 themes, no further CSS invention needed beyond the mechanism t2249 already proved. The interstice losing its own tone meant resting L2 sub-tabs lost their distinguishing ground too (they used to read against `--panel`, now they'd be invisible against the flattened `--bg`) — fixed by moving `--subtab-face`'s default off a `transparent` root literal onto a live `var(--panel)` fallback on the consuming rule, so RESTING sub-tabs carry a real chip and hover/active stay flush with the new ground, per THE RULE's own "inactive carries the chip" direction. Verified resting+hover+active together (not 3 crops) for all 5 themes; organic keeps its own `--panel2` chip (unaffected, still an explicit per-theme override), the other 4 now share the same `--panel` fallback |
 | Gateway | `.settings-main-tab` + `.settings-tab` | `ui/gatewayPanel.js` | 2 ? | 2 | UNVERIFIED — shares the L1 rule with Settings, so a shared-rule change reaches it |
 | Macros | `.settings-tab` only | `ui/macrosApp.js` | **1** | 2 | t2249 — **CONTRADICTION RESOLVED.** Grepped for an actual rendered element (not the word): `macrosApp.js` has NO `class="settings-main-tab"` anywhere — only a stale comment at line 58 ("`.settings-main-tab` styling is shared/global in styles.css") copy-pasted from Settings' own file, describing a class this file never emits. Macros renders `.settings-tab` (L2-styled pills) as its ONLY tier — a depth-1 system borrowing the L2 look, same situation as the Help/setup row below. t2217's original report was correct |

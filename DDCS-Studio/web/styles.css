@@ -95,11 +95,16 @@ svg [id*="Zfirst_travel"] {
 :root {
     --bg: #e0e0e0;
     --panel: #f0f0f0;
-    /* t2249 (TABS.md, the declared tab CONTRACT) — --tab-strip/--tab-body alias --panel/--bg, declared on the
-       SAME selector as --panel/--bg themselves (not at a shared root a theme block doesn't also touch) so the
-       var() resolves against THIS element's own cascaded --panel/--bg, never freezing to one theme's value —
-       see css-var-default-freezes-at-declaring-element. Repeated verbatim in every theme block below. */
-    --tab-strip: var(--panel);
+    /* t2249 (TABS.md, the declared tab CONTRACT) — --tab-strip/--tab-body alias --band-bg/--bg, declared on
+       the SAME selector as --band-bg/--bg themselves (not at a shared root a theme block doesn't also touch)
+       so the var() resolves against THIS element's own cascaded values, never freezing to one theme's —
+       see css-var-default-freezes-at-declaring-element. Repeated verbatim in every theme block below.
+       t2253 (BACKLOG amendment 1 half A) — --tab-strip aliases --band-bg, not --panel directly: --band-bg
+       is the PRE-EXISTING "strip behind the tabs" token (organic's own real canopy green already flows
+       through it) — --tab-strip duplicated that intent under a new name without noticing the overlap when
+       it was declared. Consolidated onto the one that already had a real, live-rendering value for one
+       theme rather than compounding the duplication by giving both tokens independent per-theme colours. */
+    --tab-strip: var(--band-bg);
     --tab-body: var(--bg);
     --tab-edge-w: 1px;
     --accent: #666666;
@@ -466,20 +471,24 @@ html, body { overflow-x: clip; }
    with. The remaining four selectors are ONE band with the tab (the file's own comment already said so) — they
    move to the SAME coral (#bf6850, the gradient's own top stop) rather than splitting off and staying green. */
 [data-theme="organic"] .app-header .tab.active,
-[data-theme="organic"] #settings-app .settings-head,
 [data-theme="organic"] #macros-app .settings-head,
 [data-theme="organic"] #gateway-app .settings-head,
 [data-theme="organic"] #blocks-app .blk-topbar { background: var(--band-bg) !important; }
-/* t2213 — #settings-app ADDED to this list (was missing since t2071, the patch's own origin — not a t2208
-   regression, just never noticed until --border going transparent removed the LAST thing giving the active
-   settings-tab any separation from its own strip: both were --panel, one darkened by a few points in t2208,
-   leaving ~1:1 contrast with the tab-edge outline gone too). Settings' own .settings-head independently
-   hardcodes background:var(--panel) inline (ui/settingsPanel.js) exactly like Macros' (ui/macrosApp.js) and
-   Gateway's (styles.css:549) own — nothing in its code suggests the omission was deliberate, and the fix here
-   is the SAME mechanism already proven for the other three strips, not a new one. Do NOT restore --tab-edge/
-   --border for this — the active tab's own fill (--bg) already correctly matches .settings-content's
-   background (var(--bg), ui/settingsPanel.js:1112) per the browser-tab "merges with the content below" design
-   this rule's own comment describes; the STRIP is what needed to move, not the tab. */
+/* t2253 — #settings-app REMOVED from this list: ui/settingsPanel.js's own .settings-head rule now reads
+   var(--band-bg) directly instead of a hardcoded var(--panel) (this turn, amendment 1 half A), so the
+   !important override this list existed to force is no longer needed for Settings specifically — Macros/
+   Gateway/Blocks still hardcode var(--panel) in their own component CSS (untouched, out of this turn's
+   Settings-only scope) and still need it. */
+/* t2213 — #settings-app was ADDED to this list at the time (was missing since t2071, the patch's own
+   origin — not a t2208 regression, just never noticed until --border going transparent removed the LAST
+   thing giving the active settings-tab any separation from its own strip). REMOVED again by t2253 above,
+   once Settings' own .settings-head stopped hardcoding background:var(--panel) inline and started reading
+   var(--band-bg) directly — Macros' (ui/macrosApp.js) and Gateway's (styles.css:549) own still hardcode it,
+   so they still need this list; nothing in their code suggests that was deliberate either. Do NOT restore
+   --tab-edge/--border for the settings-head/content seam — the active tab's own fill (--bg) already
+   correctly matches .settings-content's background (var(--bg), ui/settingsPanel.js) per the browser-tab
+   "merges with the content below" design this rule's own comment describes; the STRIP is what needed to
+   move, not the tab. */
 /* t2073 — was the literal #bf6850 restated a second time; now derives from organic's own --band-bg (its
    theme block), the exact gap point (c) of this turn's dispatch named as the reason this patch existed at
    all. Same resolved colour. */
@@ -3106,7 +3115,7 @@ button.primary:hover {
 [data-theme="normal"] {
     --bg: #f4f4f4;
     --panel: #fff;
-    --tab-strip: var(--panel);
+    --tab-strip: var(--band-bg);
     --tab-body: var(--bg);
     --accent: #4a90e2;
     --text: #333333;
@@ -3141,7 +3150,12 @@ button.primary:hover {
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: var(--panel2, color-mix(in srgb, var(--panel) 86%, var(--text)));
-    --band-bg: var(--panel);
+    /* t2253 (BACKLOG amendment 1 half A) — was var(--panel), byte-identical to the active tab (--tab-body),
+       so the strip never read as a band at all. A light accent tint, not a new literal: the SAME
+       color-mix(in srgb, var(--accent) 8%, var(--panel)) ui/settingsPanel.js already uses twice
+       (.settings-headerrow / .settings-identity) for "a subtle accent-tinted strip" — "something plainer"
+       for Clean Modern means reusing that established wash, not inventing a bolder one. */
+    --band-bg: color-mix(in srgb, var(--accent) 8%, var(--panel));
 
     /* t2075 (P4a) — button material, relocated from the two selector-based overrides this replaces (below,
        now deleted): a 6px toolbar radius, and hover: deep navy rather than the accent blue — the base hover
@@ -3187,7 +3201,7 @@ button.primary:hover {
 [data-theme="studio"] {
     --bg:            #c4bfb5;   /* silver chassis */
     --panel:         #cfcabf;   /* silver plate */
-    --tab-strip:     var(--panel);
+    --tab-strip:     var(--band-bg);
     --tab-body:      var(--bg);
     --screen:        #000;   /* readout / editor black */
     --screen-caret-shape: block;   /* t2079 amendment (human) — a block caret reads as a real CRT terminal, matching this skin's whole identity */
@@ -3214,7 +3228,11 @@ button.primary:hover {
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
-    --band-bg: var(--panel);
+    /* t2253 (BACKLOG amendment 1 half A) — was var(--panel), byte-identical to the active tab (--tab-body).
+       --plate-lo is studio's OWN header ladder already — --hdr-bg (above) reads it for exactly this
+       "recessed plate behind the chrome" purpose. Reusing it, not inventing a sixth shade — "studio's own
+       ladder" per the dispatch. */
+    --band-bg: var(--plate-lo);
 
     /* t2075 (P4a) — button material: relocated from the selector-based rules this replaces (below). Studio's
        "edge" is a GRADIENT (the bevel), which a plain border-color can't hold — the bevel lives in --btn-face's
@@ -3650,13 +3668,13 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 [data-theme="steampunk"] {
     --bg: #2a1810;
     --panel: #3d2817;
-    --tab-strip: var(--panel);
+    --tab-strip: var(--band-bg);
     --tab-body: var(--bg);
     --accent: #8b6914;
     --text: #d4a574;
     --text-main: #f5d7a8;
     --text-dim: #8b7355;
-    --border: #6b5329;
+    --border: #6b5329;   /* t2253 — reused below as --band-bg: the theme's own brass frame tone, not a new hex */
     --radius: 4px;
     --block-edited: #e6a832;   /* burnished brass */
 
@@ -3679,7 +3697,12 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
-    --band-bg: var(--panel);
+    /* t2253 (BACKLOG amendment 1 half A) — was var(--panel), byte-identical to the active tab (--tab-body).
+       --hdr-bg (above) deliberately MATCHES --bg here (t2073's own fix for a different collision), so it
+       can't double as the band — needs its OWN third tone. var(--border) (#6b5329) is steampunk's already-
+       declared brass-frame colour, distinct from both --bg and --panel — "brass for steampunk" per the
+       dispatch, no new hex invented. */
+    --band-bg: var(--border);
 
     /* t2075 (P4a) — button material, relocated from the two selector-based rules this replaces (below, now
        deleted). ⚠ CORRECTION to this comment's own first draft: "resolve correctly through the :root
@@ -3735,7 +3758,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 [data-theme="futuristic"] {
     --bg: #070b14;
     --panel: #0e1626;
-    --tab-strip: var(--panel);
+    --tab-strip: var(--band-bg);
     --tab-body: var(--bg);
     --accent: #2de2ff;
     --text: #d4e3ff;
@@ -3778,7 +3801,11 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        --surface/--surface-raised/--edge are already declared above (the relocated distinct values); only
        the ink family and --band-bg were still missing here. */
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
-    --band-bg: var(--panel);
+    /* t2253 (BACKLOG amendment 1 half A) — was var(--panel), byte-identical to the active tab (--tab-body).
+       var(--surface-raised) (#16243c, declared above) is already this theme's own "raised HUD surface" tone
+       — distinctly lighter/bluer than both --bg and --panel, part of the surface/surface-raised/edge ladder
+       already declared for this skin. "its own cyan-black" per the dispatch, no new hex invented. */
+    --band-bg: var(--surface-raised);
 
     /* t2075 (P4a) — button material, relocated from the selector-based rules this replaces (below). Futuristic
        uses a genuine colour change on hover (not a filter) — its OWN general button hover, unlike the
@@ -3965,7 +3992,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        panel/blocks view-toggle and looking, per the human's own "at a glance, without hovering" test, not by
        computing a contrast ratio in the dark browns where perceived separation isn't linear anyway. */
     --panel: #1c140c;         /* bark shadow — was #211a11 */
-    --tab-strip: var(--panel);
+    --tab-strip: var(--band-bg);   /* t2253 — organic already has a real --band-bg (canopy green, below); no change needed, just consolidated onto it instead of --panel */
     --tab-body: var(--bg);
     --panel2: #3d3120;        /* bark — was #2d2417, now distinctly lighter (its own ladder role, not a duplicate of panel) */
     --accent: #d9a03c;        /* sap amber — was coral/arterial */

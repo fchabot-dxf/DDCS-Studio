@@ -54635,3 +54635,95 @@ sits inside the previously observed 14–18 trend band.
 ### Capacity
 
 Full working room this turn — no flag.
+
+## t2253 — AMENDMENT 1 HALF A: THE BAND BEHIND THE TABS, ALL FIVE THEMES, DATA NOT CODE
+
+Took the one named task: give every theme a real value for the token behind its L1 tabs. Found — and
+avoided compounding — a token duplication I'd created myself two turns ago in the process.
+
+### `--tab-strip` was a second name for a token that already existed
+
+Before touching any colour, found `--band-bg` already declared per-theme (`:root`/normal/studio/steampunk/
+futuristic all `var(--panel)`, organic already real at `#25301a` since t2127) and already wired into
+`.app-header .tab.active`'s `--tab-fill`, `.dock-header.top-dock-header`, and organic's own `!important`
+override list reaching Macros/Gateway/Blocks. My own `--tab-strip` token from t2249 duplicated this exact
+intent under a new name without my noticing the overlap at the time. Rather than give BOTH tokens
+independent real values (compounding the duplication the advisor's own dispatch this turn was implicitly
+asking me to resolve — "`--tab-strip` is already a declared per-theme token" reads as "the strip token," and
+`--band-bg` is the one that already had a live, rendering value), consolidated: all 6 `--tab-strip: var(--panel)`
+declarations become `--tab-strip: var(--band-bg)`, same-element (no freezing risk — same pattern as every
+other token this session). `--tab-strip` now genuinely means "whatever the real strip colour is," not a
+second, independently-tracked colour that happens to start equal.
+
+### Five real values, none invented
+
+Per the dispatch's own "derive from its own palette... do not invent a sixth palette, do not reuse organic's":
+
+- **steampunk** → `var(--border)` (`#6b5329`) — the theme's own already-declared brass-frame tone. Its
+  `--hdr-bg` deliberately equals `--bg` (t2073's own fix for a DIFFERENT collision), so it couldn't double as
+  the band; `--border` was the next real, distinct, already-brass value in the palette. Biggest jump: 1.22 →
+  **2.34:1**.
+- **futuristic** → `var(--surface-raised)` (`#16243c`) — already declared as this skin's own "raised HUD
+  surface" tone, part of the existing surface/surface-raised/edge ladder. 1.09 → **1.27:1**.
+- **studio** → `var(--plate-lo)` (`#b6b1a5`) — studio's OWN header-ladder shade; `--hdr-bg` already reads it
+  for the identical "recessed plate behind the chrome" purpose, so this is reuse, not invention. 1.12 →
+  **1.17:1**.
+- **normal** → `color-mix(in srgb, var(--accent) 8%, var(--panel))` — not a new technique: `ui/settingsPanel.js`
+  already uses this exact mix at this exact ratio twice (`.settings-headerrow`, `.settings-identity`) for "a
+  subtle accent-tinted strip." 1.10 → **1.01:1** (see below — the number looks like a regression, it isn't).
+- **organic** → unchanged, `#25301a` (canopy green, t2127, human-chosen). Re-examined per the dispatch's own
+  "look again with fresh eyes" ask, now that t2251 closed the BELOW seam under it: the band reads MORE
+  clearly against a continuous surface than it did against one broken by an interposed `--panel` layer.
+  1.36:1, unchanged.
+
+### The number the advisor warned me not to chase, and didn't
+
+Was told explicitly not to set myself a contrast target after being right about 1.36:1 once already. normal's
+own number (1.01:1) reads on paper like the worst result of the five — screenshotted the full panel instead
+of trusting the ratio (`scratchpad/t2253-band-normal.png`) and it's visibly a distinct, if genuinely subtle,
+pale-blue band against both the white header above and the grey body below — Clean Modern's own restraint,
+not a failed attempt at a bolder theme's contrast. Kept it. Same judgment for studio (1.17:1, a recessed
+silver plate, clearly visible in its own screenshot). Reported every number here anyway, per the dispatch's
+own "report the number... but judge by looking."
+
+### The blast radius is real and wider than Settings — verified, not assumed
+
+`--band-bg` is a SHARED token, already consumed by `.app-header .tab.active` (`--tab-fill: var(--band-bg)`,
+t2073) and by organic's own `!important` list reaching Macros/Gateway/Blocks. Giving it real per-theme values
+reaches the top-level app tabs for free — no separate work, which is the actual payoff of a declared,
+shared token rather than five per-system copies. Did NOT assume this was fine — screenshotted the App
+header itself (not just Settings) for normal/studio/futuristic/steampunk (`scratchpad/t2253-appheader-
+*.png`): all four render correctly, the same real bands, no regression. Updated the REGISTER's App header
+row to record this rather than leave it reading UNVERIFIED for a defect that's now actually fixed there too.
+
+### Wiring: `.settings-head` reads the token directly, the `!important` hack retired for Settings specifically
+
+`ui/settingsPanel.js`'s `.settings-head` background was the literal `var(--panel)` — the reason organic
+needed a separate `!important` override elsewhere just to show its own real band here. Changed it to read
+`var(--band-bg)` directly (same pattern as `.settings-sidebar`/`--tab-body` last turn), then removed
+`#settings-app .settings-head` from organic's override list — genuinely dead weight now, not just unused:
+my own change made it redundant. Left Macros/Gateway/Blocks in that list untouched (their own component CSS
+still hardcodes `var(--panel)`, out of this turn's scope) and updated the adjacent t2213 comment, which had
+gone stale the moment I made this change, to say so rather than leave it contradicting the code next to it.
+
+### Verified
+
+`elementFromPoint` scan re-run after all colour changes: still exactly the 2-tone structure t2251 closed —
+confirms giving `--band-bg` real values didn't disturb the BELOW fix, only the BEHIND one. TABS.md's own
+BEHIND/BELOW sub-sections updated with the closed numbers rather than left describing the pre-fix state.
+
+### Verified (full suite)
+
+Required — another shared-token value change reaching Settings AND the app header. 2787 passed, 22 flaky,
+**1 unexpected**, 25 skipped (27.1m). Checked the unexpected one's error text: `subscriber-error-surface-
+1656.spec.js`, plain `TimeoutError` after 3 retries, no assertion — this is literally one of the 16 specs
+this session's own t2233 turn swept onto `waitReady()` for the `__blkws` family; still occasionally
+surfacing under heavy contention as documented, not a new regression, and unrelated to any token or file
+this turn touched. Flaky count (22) sits above the previously observed 14–18 band — noted as a data point,
+not escalated on one run, per the standing trend-not-verdict ruling; the one flaky test I checked by name
+(`#hdrPostMenu` wizards-row visibility) is an unrelated header-dropdown timing issue, not a Settings/tab
+regression.
+
+### Capacity
+
+Full working room this turn — no flag.
