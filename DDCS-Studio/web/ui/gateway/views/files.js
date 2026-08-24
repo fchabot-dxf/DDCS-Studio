@@ -6,7 +6,9 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from '../../dialog.js';   // in-app 
 
 export default {
   id: "files",
-  label: "Files (CNCDISK)",
+  // t2241 (BACKLOG amendment 6) — was "Files (CNCDISK)"; shortened for the one-row tab-strip goal. CNCDISK
+  // itself is not lost — the section-label inside the tab body already reads "CNCDISK · <path>" (below).
+  label: "Files",
 
   mount(ctx) {
     // t1249 — THE DEPLOY TARGET ROW. The deploy buttons themselves (Export program, the CAM bundle, a SYSDISK file)

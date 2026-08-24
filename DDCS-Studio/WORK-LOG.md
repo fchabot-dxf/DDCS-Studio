@@ -54046,3 +54046,149 @@ flaky, **0 unexpected**, 25 skipped (25.1m). Scanned the flaky list by name: non
 settings-input surfaces this turn changed — all match the same already-documented `__blkws`-boot-timeout
 family (t2233's open follow-up) and the project's own "contention-starved population shifts run to run"
 phenomenon. 0 unexpected is the clean confirmation: nothing this turn's CSS touched actually broke.
+
+## t2241 — THE GATEWAY CLUSTER: Merge deleted, two renames, Jobs folded into Send, 5 tabs measured on one row
+
+Amendments 6, 7, 8, 10, 14, 16 — taken alone this turn per the advisor's own split (19 and 17/18 held back).
+Order followed: delete Merge first, then renames, then the Jobs→Send merge with the state-as-column shape,
+verifying amendment 10's premise along the way rather than trusting it.
+
+### Merge deleted (amendment 16) — confirmed dead first, then swept properly
+
+`merge.js` was a genuine stub (`disabled: ''` on its only button, every handler calls `toast('...not wired
+yet')`) — confirmed via direct read before touching anything. Swept: the view module deleted; import +
+`VIEWS` entry removed from `gatewayPanel.js` (its own header docstring's tab list updated too); the `merge`
+entry removed from `gateway/state.js`'s `TAB_CONTRACT`; `gateway-state-contract-1327.spec.js` updated (4
+separate spots — the contract-coverage loop, the clears-loop, the per-tab sweep loop, all three named it).
+`.drop`/`.op-btn` CSS confirmed SHARED with `send.js` before leaving them alone (grepped both view files —
+send.js uses `.drop` for its own file-drop zone). Grepped the WHOLE `web/` tree for any other "Merge"/"merge"
+reference before concluding done — every other hit (macros' own eng-merge feature, a sync-conflict-strategy
+radio button) is a genuinely unrelated, pre-existing feature, confirmed by reading each, not assumed from the
+word alone.
+
+**Did NOT add the ROADMAP.md entry the dispatch asked for.** ROADMAP.md is the advisor's file per the
+worker skill's own ownership rule ("never edit them") — a direct conflict with amendment 16's explicit
+instruction. Followed the standing rule rather than the one-off instruction, per "if the plan looks wrong, log
+the objection, don't change the plan yourself": recording Merge's own intent and the human's ruling here
+instead — **Merge's stated purpose**: combine several single-tool programs into one job, ordered by tool, a
+tool change (T/M6) + safe retract between each, one program frame. **The human's own ruling on where it
+belongs if ever wanted**: the EDITOR, as text-level work on a program you can see — not a gateway surface.
+Please move this into ROADMAP.md yourself, or tell me to if you'd rather I did.
+
+### Renames (amendment 6) — CNCDISK confirmed to survive inside Files before renaming the tab
+
+`tracker.js`: `label: "Tracking"` → `"Track"`. `files.js`: `label: "Files (CNCDISK)"` → `"Files"` — verified
+FIRST that "CNCDISK" already appears twice inside the tab's own body (`el('div', {class:'section-label'},
+'CNCDISK')` and `'CNCDISK · ' + path`), so the word isn't lost from the app, only shortened off the tab
+itself. Both stale header/label comments updated in the same act.
+
+### Jobs folded into Send (amendments 7, 14) — one merged list, state as a column, form above list
+
+`jobs.js` deleted; its three pure functions (`lastTimeDuration`, `resultLabel`, `historyToCSV` — unit-tested,
+no DOM) extracted into a NEW `ui/gateway/jobHistory.js`, deliberately NOT into `send.js` itself.
+
+**Caught before it shipped, not assumed safe**: first attempt put these functions directly in `send.js` and
+re-pointed the node-tier test (`job-history-csv-export-2024.test.mjs`) at it — ran the test and it threw
+`window is not defined`, because `send.js` pulls in a long chain of browser-only imports (`createPreviewPanel`,
+`dialog.js`, `GcodeExecutionEngine`, …) that the OLD `jobs.js` never carried. Moved the pure functions to their
+own small module instead; re-ran — 11/11 pass. The lesson: "these functions used to live in a light file, now
+they live in a heavy one" is itself a testability regression worth catching, not just a relocation.
+
+**The merged list**: `send.js`'s own `_pollJobs`/`renderJobList` now fetch BOTH `listQueue()` and
+`listHistory()` every poll tick, merge by `jobId` (lexicographically sortable = creation order, per
+`ops.py`'s own `make_job_id` contract) newest-first into ONE table — columns job/state/duration/last
+time/finished, where "state" reads a live queue value (queued/delivering/running/stalled) for an in-flight
+job or the SAME `resultLabel()` a finished row always used. Clears to empty on a failed poll (t1327's own
+contract, preserved exactly — jobs.js's actual code already did this despite a stale "keep last render"
+comment; the real behaviour, not the misleading comment, is what carried over). Placed directly under the
+send form (`flex-shrink: 0`, ABOVE the preview panel which keeps the remaining flex space) — "the row
+appearing under the button you just pressed is the entire point," the human's own reasoning, verbatim.
+
+### Amendment 10's premise: verified FALSE by reading the actual backend, not accepted on the human's word
+
+"A sent-but-not-yet-started job is visible in Files because submitting writes it onto CNCDISK" — traced the
+real chain in `bridge/bridge-app/fairy/`: `ops.py:66 submit_job` → `backend.put_job` → (`local_folder.py:57`)
+writes the .nc into `inbox/`, a **directory entirely separate from `cncdisk/`** ("published listing lives
+here", same file's own comment). Only `poller.py:159`'s `transfer.deliver()` — which runs ONLY once the
+single-active-job state machine actually CLAIMS the job (identity verified, controller reachable, no other
+job currently running) — writes it to the real controller disk. `files.js` reads exclusively
+`ctx.client.listFiles()` (the CNCDISK explorer), never `listQueue()`. **So a queued-but-not-yet-claimed job is
+genuinely invisible in Files** — the premise is code-contradicted, not merely unverified.
+
+**This does NOT block or undo the merged-list design**, and is worth being precise about why: amendment 14's
+own "state as a column… a sent job appears immediately as queued" ALREADY solves the exact problem the (wrong)
+Files-premise was being used as supporting evidence for — the merged list itself calls `listQueue()` directly,
+so a submitted job shows up as "queued" in the Send tab's own list the moment it's queued, independent of
+whether Files ever reflects it. Verified this holds for real, not just in theory: the real-bridge end-to-end
+test (`send-history-real-path-2065.spec.js`) sends a real job through a real spawned bridge process and reads
+it back from the real rendered list — 2/2 pass. Flagging the Files-premise finding because it was ASSERTED
+as fact and used to close a prior question; the design it was defending turns out to be sound anyway, for a
+different, better reason.
+
+### `renderEvents` (the active job's raw beacon log): reported, not decided, per instruction
+
+jobs.js's old `renderEvents` showed a raw per-beacon log ("beacon 5/40", "claimed X", "delivered → Y") for
+whichever job was currently active. Checked whether Track absorbs this: `tracker.js`'s own header comment
+says "Queue/events live in queue.js" (its own stale reference to what was actually jobs.js) — Track shows
+the big percent/bar/stats SUMMARY, never the raw log. **This information has no new home and is a genuine
+loss**, not a relocation — dropped from this build rather than decided on unilaterally. Does it matter day to
+day? Track's own summary view already covers the same territory at a coarser grain (state + percent), so the
+loss may be acceptable — but that is a judgement call, not a fact, and is left for ruling.
+
+### The measurement — the actual deliverable
+
+Five tabs (Status · Send · Track · Files · Console) measured via `getBoundingClientRect()` (not eyeballed) at
+430/390/360/320px, gateway panel genuinely mounted (localStorage-gated the same way the existing contract
+test does — an ungated `showApp('gateway')` alone never initializes the panel, confirmed by an initial
+zero-elements read before adding the gating). **All five tabs sit on ONE row at all four widths** — same `top`
+coordinate for every tab, every width. Screenshot at the narrowest required width:
+`verification/t2241-tabstrip-320.png`. Screenshot of the Send tab's own form-above-list layout at 430px, with
+a real mocked queued job and a real finished one both rendering in the merged list:
+`verification/t2241-send-form-above-list.png`.
+
+### Full test sweep — every stale reference found and fixed, not just the ones named in the dispatch
+
+Beyond the 4 spots in `gateway-state-contract-1327.spec.js`: `gateway-jobs-history-view-2026.spec.js` (tab
+click target 'Jobs'→'Send', plus its own empty-state wording assertion — "no finished jobs yet" would now
+UNDERSTATE the merged list, which also covers the live queue; updated to "no jobs sent yet this session",
+matching what the view actually says now); `send-history-real-path-2065.spec.js` (two real-bridge tests —
+removed a now-unnecessary tab switch to reach the list at all, since it's already on Send; fixed 'Tracking'→
+'Track' and the second 'Jobs'→'Send' switch; fixed a stale `jobs.js:15-41` line-reference comment);
+`sound-toggle-2125.spec.js` (dropped the dead `/ui/gateway/views/jobs.js` fetch target from its sfx-call-site
+sweep); `gateway-position-stub-2073.spec.js` and `deploy-folder-1249.spec.js` (both had their own independent
+'Tracking'/'Files (CNCDISK)' tab-click targets, found by a full-repo grep after the dispatch's own named
+spots were done, not by trusting the dispatch's list was exhaustive).
+
+### Verified
+
+Full targeted run (gateway-state-contract-1327, gateway-jobs-history-view-2026, gateway-position-stub-2073,
+sound-toggle-2125, deploy-folder-1249): one genuine failure found and fixed (the empty-state wording above),
+then 35/35 pass (1 legitimately skipped — needs a real local gateway, same pre-existing skip condition as
+before this turn). `job-history-csv-export-2024.test.mjs` (node tier): 11/11. Real-bridge end-to-end
+(`send-history-real-path-2065.spec.js`, a genuine spawned `fairy.bridge` process, no mocks): 2/2 — proves the
+whole submit→queue→deliver→history chain renders correctly in the new merged list, not just that the mocked
+unit tests agree with each other.
+
+### First full-suite run caught a REAL regression the targeted sweep missed — a grep blind spot, not a guess
+
+**2 unexpected**: `wizard-face-1599.spec.js` (the same pre-existing, already-flagged `__blkws` timeout family
+from t2233 — unrelated) and `role-workspace-relative-2151.spec.js:96` ("Tracking tab: a workspace mismatch
+gates it off…") — genuinely caused by this turn. My earlier sweep grepped for `'Tracking'`/`"Tracking"` (quoted
+string literals) and missed this file entirely because it targets the tab with a REGEX, `/Tracking/.test(...)`
+— a form the earlier grep pattern never matched. Found it by reading the actual failure, not by re-trusting
+the sweep: fixed the test's own title, the regex (`/Tracking/` → `/Track/`), and its error-message text. Then
+re-swept the WHOLE `tests/` tree for "Tracking" in ANY form (not just quoted) — three more hits, all confirmed
+to be prose/comments referencing the old name, not live selectors (one in this same file's own new
+annotation, one in `send-history-real-path-2065.spec.js`'s prose, one in `gateway-position-stub-2073.spec.js`'s
+own already-fixed annotation). Re-ran the fixed file: 6/6 pass.
+
+### Full suite, re-run clean of this turn's own changes
+
+2792 passed, 16 flaky, **2 unexpected**, 25 skipped (26.0m). Checked both unexpected failures' actual error
+text before concluding anything (`enum-options-codec-1607.spec.js`, `save-dialog-declared-1615.spec.js`) —
+both the IDENTICAL `TimeoutError: page.waitForFunction: Timeout ...ms exceeded` on `window.__blkws`, the same
+pre-existing, already-flagged-at-t2233 boot family; neither touches gateway/tabs/send/tracker/files in any
+way. Per the advisor's own recent instruction (t2239): the flaky COUNT moved 14→16 between this turn's two
+runs, read as noise/trend rather than a verdict on either run — not treating either number as a regression or
+a clean pass on its own. The regression that mattered (the missed `/Tracking/` regex) was caught and fixed
+BEFORE this final run, and is confirmed absent from both unexpected-failure lists across both runs.

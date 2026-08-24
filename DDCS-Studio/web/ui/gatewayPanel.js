@@ -6,7 +6,7 @@
  * (desktop app) or the CLOUD Worker (R2-backed) — set ?api=… to point at the cloud; the views don't change.
  * Only mounted when a gateway answers (gatewayStatus.js gates the tab), and only polls while visible.
  *
- * Layout (Studio workflow): Status · Send · Merge · Tracking · Files · Jobs · Console.
+ * Layout (Studio workflow): Status · Send · Track · Files · Console.
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
 import { roleInfoFromDescriptor } from './gatewayStatus.js';   // t2151 — the client-side, workspace-relative role, applied to THIS panel's own polled `desc` (ctx.desc, poll() below) — never gatewayStatus.js's separately-polled cache
@@ -15,13 +15,15 @@ import { syncGatewaySound } from './sound.js';   // t2129 (review) — a freshly
 import { el, clear } from './gateway/util.js';
 import statusView from './gateway/views/status.js';
 import sendView from './gateway/views/send.js';
-import mergeView from './gateway/views/merge.js';
 import trackerView from './gateway/views/tracker.js';
 import filesView from './gateway/views/files.js';
-import jobsView from './gateway/views/jobs.js';
 import consoleView from './gateway/views/admin.js';
 
-const VIEWS = [statusView, sendView, mergeView, trackerView, filesView, jobsView, consoleView];
+// t2241 — Merge (a permanent stub, never wired — BACKLOG's own t2233 amendment 16) deleted outright, not
+// hidden. Jobs folded into Send (amendment 7/14): a merged queue+history list lives inside sendView now, so
+// jobsView is gone too — see send.js's own header for the shape. Five tabs: Status · Send · Track · Files ·
+// Console (was seven).
+const VIEWS = [statusView, sendView, trackerView, filesView, consoleView];
 const POLL_MS = 1500;
 
 let inited = false;

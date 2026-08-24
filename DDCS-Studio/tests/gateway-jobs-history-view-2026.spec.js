@@ -7,12 +7,17 @@ import { test, expect } from '@playwright/test';
  * it — the green-tests-over-a-dead-ui-path shape this session has hit before: the logic is tested, the
  * surface a person actually clicks is not.
  *
+ * t2241 — jobs.js is gone; Jobs folded into Send (a merged queue+history list living under the send form,
+ * BACKLOG amendment 7/14). Same table, same columns (job/state/duration/last time/finished — "state" reads
+ * the SAME resultLabel() a finished row always did), now reached via the Send tab instead of a Jobs tab —
+ * this file's own assertions are unchanged, only the tab clicked to reach them.
+ *
  * Bridges to the gateway suite's OWN established fake/offline techniques rather than inventing a third way to
  * stand a gateway up: `page.route` response mocking (gateway-quiet-offline-1307) + the navigate/click-the-tab
  * pattern (gateway-state-contract-1327). Deliberately does NOT depend on a real bridge process answering on
  * this machine — gateway-state-contract-1327's own "connected" tests `test.skip` when nothing real is
- * reachable; mocking the three endpoints Jobs actually calls (`/api/descriptor`, `/api/queue`, `/api/history`)
- * gets a genuinely CONNECTED, DATA-BEARING state deterministically, every run, on any machine.
+ * reachable; mocking the three endpoints this view actually calls (`/api/descriptor`, `/api/queue`,
+ * `/api/history`) gets a genuinely CONNECTED, DATA-BEARING state deterministically, every run, on any machine.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -39,7 +44,7 @@ const boot = async (page, { historyRows = HISTORY_ROWS } = {}) => {
     await page.evaluate(() => window.showApp && window.showApp('gateway'));
     await page.waitForTimeout(1500);   // the panel's own first poll
     await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Jobs');
+        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Send');
         if (t) t.click();
     });
     await page.waitForTimeout(900);
@@ -94,7 +99,7 @@ test('t2049: a stalled run does not poison "last time" on the REAL rendered view
     expect(r[1][3], 'the stalled row also looks past itself to the real completion, not its own truncated 45s').toBe('10m00s');
 });
 
-test('with NO finished jobs, History says so plainly and offers no Export control to click', async ({ page }) => {
+test('with NO jobs at all (queue or history), the list says so plainly and offers no Export control to click', async ({ page }) => {
     await boot(page, { historyRows: [] });
     const r = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
@@ -104,7 +109,9 @@ test('with NO finished jobs, History says so plainly and offers no Export contro
             rows: root.querySelectorAll('table tr').length,
         };
     });
-    expect(r.text, 'the empty state is stated, not a blank table').toMatch(/no finished jobs yet/i);
+    // t2241 — "no finished jobs yet" (jobs.js's old, history-only wording) would now UNDERSTATE the empty
+    // state: the merged list covers the live queue too, so "no jobs sent yet this session" is the honest one.
+    expect(r.text, 'the empty state is stated, not a blank table').toMatch(/no jobs sent yet/i);
     expect(r.rows, 'no table at all when there is nothing to show').toBe(0);
     expect(r.exportPresent, 'no export button when there is nothing to export').toBe(false);
 });

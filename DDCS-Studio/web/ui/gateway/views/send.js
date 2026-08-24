@@ -1,7 +1,15 @@
 // ui/gateway/views/send.js — send a program to the controller. Ported from the fairy submit view, adapted to
 // Studio: drop a .nc OR pull the current Studio editor program, optionally instrument it with beacons for
 // progress tracking, then submitJob to the gateway queue. A WRITE op — the operator still presses Cycle Start.
-import { el, toast } from '../util.js';
+//
+// t2241 (BACKLOG amendment 7/14) — Jobs folded in: the tab that CREATES a job (submitJob is the seam) now
+// also shows what it created, ONE merged list (queue + finished history, newest first, state as a column)
+// living directly under the send form — "the row appearing under the button you just pressed is the entire
+// point" (the human's own reasoning). The separate live-queue SECTION and the active job's raw EVENTS log
+// jobs.js used to render are gone as distinct views; the events log specifically has NO new home (not
+// reachable from Track — see tracker.js's own header) and is a genuine, reported loss, not a silent one —
+// WORK-LOG t2241 names it for the advisor's own ruling.
+import { el, toast, fmtEta } from '../util.js';
 import { contractFor, isUnreachable } from '../state.js';   // t1327 — the declared connection-state contract
 import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
 import { dlgConfirm, dlgNotice } from '../../dialog.js';
@@ -13,6 +21,8 @@ import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
 import { submitJobToDrive, canSendViaDrive, readGatewayHeartbeat } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
 import { sfx } from '../../sound.js';   // t2125 — job.sent marks the moment a job LEAVES this browser (client-only; arrived/delivered/failed are the gateway's own)
+import { UIUtils } from '../../uiUtils.js';   // t2024 — CSV export reuses the SAME download primitive backup.js/varListPanel.js already use, not a new one
+import { lastTimeDuration, resultLabel, historyToCSV, fmtWhen } from '../jobHistory.js';   // t2241 — pure, kept OUT of this file: importing them from here broke the node-tier test (this file pulls in a browser-only chain)
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -522,13 +532,68 @@ export default {
       el('div', { class: 'wiz-usage' },
         'Beacons ON instruments the job for progress tracking; OFF = deliver-only (probe / util macros). '
         + 'The operator presses Cycle Start at the machine.'));
-    ctx.root.append(block, previewContainer);
+    // t2241 — FORM ABOVE LIST, on purpose (the human's own reasoning: the row appearing under the button you
+    // just pressed is the entire point of the merge). `flex-shrink: 0` so the list takes only its own height
+    // and never squeezes; the preview panel (a secondary, review-before-sending tool) keeps the remaining
+    // space below it, same as before this turn.
+    this.jobList = el('section', { class: 'block', style: 'flex-shrink: 0' });
+    ctx.root.append(block, this.jobList, previewContainer);
     sync();
     this.applyState(ctx.desc !== undefined ? ctx.desc : (ctx.status && ctx.status.descriptor));
+    this._pollJobs(ctx);
   },
 
   // the poll is where the state actually changes; the banner and the button follow it rather than the mount alone
   async onPoll(ctx) {
     if (this.applyState) this.applyState(ctx.desc !== undefined ? ctx.desc : (ctx.status && ctx.status.descriptor));
+    await this._pollJobs(ctx);
+  },
+
+  // t2241 — ONE list, two sources merged by jobId (lexicographically sortable = creation order, ops.py's own
+  // make_job_id contract), newest first, STATE AS A COLUMN rather than a second view: a job appears the
+  // instant it is queued (state: queued/delivering/running/stalled) and stays the SAME row once it finishes
+  // (state becomes the final result) — no jump from one list to another to see what happened to it.
+  // t1327 — clears to empty on a failed poll (jobs.js's own contract, preserved): a stale listing describing
+  // a machine that is not there is exactly the phantom-data shape this whole contract exists to prevent.
+  async _pollJobs(ctx) {
+    let items = [];
+    try { items = await ctx.client.listQueue(); } catch { /* clears — see t1327 comment above */ }
+    let rows = [];
+    try { rows = await ctx.client.listHistory(); } catch { /* clears */ }
+    this._historyRows = rows;   // Export CSV reads the last-polled rows without a re-fetch (t2024)
+    this.renderJobList(items, rows);
+  },
+
+  renderJobList(items, rows) {
+    const c = this.jobList;
+    const label = el('div', { class: 'section-label' }, 'Jobs');
+    const live = (items || []).map((j) => ({ jobId: j.jobId, name: j.name || j.jobId, stateText: j.state || 'queued', pillClass: j.state || 'queued', duration: '—', last: '—', finished: '—' }));
+    const done = (rows || []).map((r, i) => ({
+      jobId: r.jobId, name: r.name || r.jobId, stateText: resultLabel(r), pillClass: r.final_state || '',
+      duration: r.duration_s == null ? '—' : fmtEta(r.duration_s),
+      last: (() => { const l = lastTimeDuration(rows, i); return l == null ? '—' : fmtEta(l); })(),
+      finished: fmtWhen(r.ended_at),
+    }));
+    const merged = [...live, ...done].sort((a, b) => (a.jobId < b.jobId ? 1 : -1));
+    if (!merged.length) { c.replaceChildren(label, el('div', { class: 'muted' }, 'no jobs sent yet this session')); return; }
+    const exportBtn = el('button', { class: 'op-btn', onclick: () => this.exportHistoryCSV() }, 'Export CSV');
+    const tbl = el('table', {}, el('tr', {},
+      el('th', {}, 'job'), el('th', {}, 'state'), el('th', {}, 'duration'), el('th', {}, 'last time'), el('th', {}, 'finished')));
+    for (const m of merged) {
+      tbl.append(el('tr', {},
+        el('td', { class: 'mono' }, m.name),
+        el('td', {}, el('span', { class: 'pill ' + m.pillClass }, m.stateText)),
+        el('td', { class: 'mono' }, m.duration),
+        el('td', { class: 'mono' }, m.last),
+        el('td', { class: 'mono' }, m.finished)));
+    }
+    c.replaceChildren(el('div', { class: 'row' }, label, exportBtn), tbl);
+  },
+
+  exportHistoryCSV() {
+    const rows = this._historyRows || [];
+    if (!rows.length) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    UIUtils.downloadFile(`ddcs-job-history-${stamp}.csv`, historyToCSV(rows));
   },
 };

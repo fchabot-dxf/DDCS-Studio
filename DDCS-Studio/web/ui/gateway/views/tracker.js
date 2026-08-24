@@ -1,5 +1,6 @@
 // tracker.js — the big shop-floor Tracker: ONE job, readable from across the room.
-// Giant percent + bar + stats, scaled with the viewport (clamp). Queue/events live in queue.js.
+// Giant percent + bar + stats, scaled with the viewport (clamp). Queue/history live in send.js (t2241 —
+// were jobs.js, folded in when Jobs merged into Send).
 import { el, fmtEta } from "../util.js";
 import { stateNote } from "../state.js";   // t1327 — the declared connection-state contract
 
@@ -21,7 +22,7 @@ export default {
   // wired to what's open, even with its own local daemon) cannot show anything live regardless of controller
   // family, so it gates on role too, same declared-not-hand-rolled pattern as requiresModbus above.
   requiresGateway: true,
-  label: "Tracking",
+  label: "Track",   // t2241 (BACKLOG amendment 6) — was "Tracking"; shortened for the one-row tab-strip goal
 
   mount(ctx) {
     this.wrap = el("section", { class: "block bigtrack" });

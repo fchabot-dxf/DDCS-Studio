@@ -262,7 +262,7 @@ test('THE GATEWAY FILES SURFACE STATES THE TARGET, and offers the re-pick', asyn
     await page.waitForFunction(() => typeof window.showApp === 'function', null, { timeout: 15000 });
     await page.evaluate(() => window.showApp('gateway'));
     // the Files view is one of the Gateway's tabs; select it, then the target row is there
-    await page.click('text=Files (CNCDISK)').catch(() => {});
+    await page.click('text=Files').catch(() => {});   // t2241 — was 'Files (CNCDISK)'
     await page.waitForSelector('#gw_deploy_target', { timeout: 10000 });
     await expect(page.locator('#gw_deploy_target')).toContainText(/DEPLOY TARGET/);
     await expect(page.locator('#gw_deploy_target'), 'with no target yet it says what one is for').toContainText(/USB stick|not chosen/i);

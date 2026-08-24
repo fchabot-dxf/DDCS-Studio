@@ -376,8 +376,10 @@ test('the WHERE-split is real: job.arrived/delivered/failed have NO browser sfx(
     await boot(page);
     const counts = await page.evaluate(async () => {
         const files = [
+            // t2241 — jobs.js deleted (Jobs folded into Send); send.js (already listed) carries its old sfx-adjacent
+            // code now, and the pure job-history helpers that moved to gateway/jobHistory.js have no sfx() calls.
             '/app.js', '/wizardManager.js', '/ui/gateway/views/send.js', '/blocks/blockly/tokenGuard.js',
-            '/ui/gatewayPanel.js', '/ui/gateway/views/status.js', '/ui/gateway/views/jobs.js', '/ui/gateway/views/tracker.js',
+            '/ui/gatewayPanel.js', '/ui/gateway/views/status.js', '/ui/gateway/views/tracker.js',
         ];
         const texts = await Promise.all(files.map((f) => fetch(f).then((r) => r.text()).catch(() => '')));
         const all = texts.join('\n');

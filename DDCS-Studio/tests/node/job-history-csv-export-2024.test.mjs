@@ -1,5 +1,5 @@
 import { test, expect } from './support/harness.mjs';
-import { historyToCSV, lastTimeDuration, resultLabel } from '../../web/ui/gateway/views/jobs.js';
+import { historyToCSV, lastTimeDuration, resultLabel } from '../../web/ui/gateway/jobHistory.js';   // t2241 — moved here (a separate, browser-free module) when Jobs folded into Send
 
 /**
  * job-history-csv-export-2024 — EXPORT JOB HISTORY (t2024): a plain "Export CSV" button on the Jobs view's

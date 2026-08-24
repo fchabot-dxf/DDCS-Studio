@@ -166,11 +166,9 @@ const stageAndSend = async (page, { beaconsOn }) => {
 
 test('a REAL deliver-only send (Beacons off) reaches the real bridge and renders in the real History tab', async ({ page }) => {
     await stageAndSend(page, { beaconsOn: false });
-    // switch to Jobs and let the REAL /api/history poll happen — no mocked route anywhere
-    await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Jobs');
-        if (t) t.click();
-    });
+    // t2241 — Jobs folded into Send: the merged job list is already ON this tab, no navigation needed. Just
+    // let the REAL /api/history poll happen — no mocked route anywhere, and Send stays the active view so its
+    // own onPoll (which fetches it) keeps running.
     await page.waitForTimeout(2000);
     const r = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
@@ -187,15 +185,16 @@ test('a REAL tracked send that is never fed a beacon genuinely stalls, and the r
     // per t2057's own fix) -- wait past the real, short --stall 3 configured above, then read the real
     // Tracking tab's own state.
     await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Tracking');
+        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Track');
         if (t) t.click();
     });
     await page.waitForTimeout(4500);   // genuinely wait out the real stall window, not simulated
     const tracked = await page.evaluate(() => (document.querySelector('#gateway-app .gw-view .bt-state') || {}).textContent);
     expect(tracked, 'the real tracker shows the real stalled state, not a stuck 0% that never explains itself').toMatch(/STALLED/i);
 
+    // t2241 — Jobs folded into Send: switch back there for the merged job list (was 'Jobs', its own tab)
     await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Jobs');
+        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Send');
         if (t) t.click();
     });
     await page.waitForTimeout(1500);
@@ -204,8 +203,9 @@ test('a REAL tracked send that is never fed a beacon genuinely stalls, and the r
         const rows = [...root.querySelectorAll('table tr')].slice(1);
         return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
     });
-    // t2095 — this used to check row[1] === 'stalled' exactly. jobs.js's resultLabel() (t2049, documented at
-    // jobs.js:15-20/28-41) deliberately never renders the bare word 'stalled' — it appends HOW FAR the run
+    // t2095 — this used to check row[1] === 'stalled' exactly. resultLabel() (t2049, now in
+    // ui/gateway/jobHistory.js — was jobs.js, moved when Jobs folded into Send at t2241) deliberately never
+    // renders the bare word 'stalled' — it appends HOW FAR the run
     // got ('stalled — no signal after delivery' when zero beacons ever arrived, matching this exact scenario,
     // or 'stalled — signal lost at N/total' otherwise), a real UX improvement this test's exact-match assertion
     // was never updated to match. Matches the family of stalled labels instead of the retired bare literal.

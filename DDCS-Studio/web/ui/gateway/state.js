@@ -40,12 +40,15 @@ export const isUnreachable = (desc) => gatewayState(desc).id === 'unreachable';
  */
 export const TAB_CONTRACT = {
     status: { clears: false, keeps: 'the connection line itself — saying it is unreachable IS its job', arms: true },
+    // t2241 — Merge deleted (was a permanent stub, never wired); Jobs folded into Send (BACKLOG amendment
+    // 7/14). Send is genuinely MIXED now: the staged program (`clears: false`, below) is the operator's own
+    // and survives; the merged queue+history LIST it now also shows is fetched data and independently clears
+    // to empty on the same failed-poll path jobs/tracker/files always used (send.js's own onPoll, not this
+    // boolean — the contract has no per-SECTION granularity, so this is documented here rather than modelled).
     send: { clears: false, keeps: 'the staged program text: it is the operator’s own, and preparing one needs no machine', arms: false,
         reason: 'No gateway answering — you can still stage and edit a program; sending needs a machine.' },
-    merge: { clears: true, keeps: '', arms: false, reason: 'No gateway answering — merging reads the controller’s own settings.' },
     tracker: { clears: true, keeps: '', arms: false, reason: '' },
     files: { clears: true, keeps: '', arms: false, reason: 'No gateway answering — the controller’s files cannot be listed.' },
-    jobs: { clears: true, keeps: '', arms: false, reason: 'No gateway answering — the job history lives on the gateway.' },
     admin: { clears: false, keeps: 'the Service/daemon controls — they are how you FIX being unreachable', arms: true },
 };
 

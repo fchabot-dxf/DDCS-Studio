@@ -52,7 +52,8 @@ test('THE CONTRACT IS DECLARED — every subtab says what it does when unreachab
     expect(r.unreachable).toBe('unreachable');
     expect(r.connected).toBe('connected');
     // EVERY tab is named — a new tab has to state its behaviour rather than defaulting to "keep whatever was there"
-    for (const id of ['status', 'send', 'merge', 'tracker', 'files', 'jobs', 'admin']) {
+    // t2241 — merge deleted (a permanent stub, never wired); jobs folded into send (a merged queue+history list)
+    for (const id of ['status', 'send', 'tracker', 'files', 'admin']) {
         expect(r.tabs, `the contract covers the ${id} tab`).toContain(id);
     }
     // the two tabs that legitimately KEEP something say what and why, so "keeps nothing" elsewhere is explicit
@@ -61,14 +62,14 @@ test('THE CONTRACT IS DECLARED — every subtab says what it does when unreachab
     expect(r.contract.send.arms, 'but sending is disarmed').toBe(false);
     expect(r.contract.admin.keeps, 'the Console keeps its controls — they are how you FIX being unreachable').toMatch(/fix/i);
     // …and the data tabs clear
-    for (const id of ['files', 'jobs', 'merge', 'tracker']) {
+    for (const id of ['files', 'tracker']) {
         expect(r.contract[id].clears, `${id} shows no data rows when it cannot ask`).toBe(true);
     }
 });
 
 test('FILES — a fresh profile with no gateway shows ZERO rows, and nothing is armed', async ({ page }) => {
     await openPanel(page, { reachable: false });
-    await goTab(page, 'Files (CNCDISK)');
+    await goTab(page, 'Files');
     const r = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
         return {
@@ -120,7 +121,7 @@ test('SEND — disarmed with the reason ON the control, while staging stays full
 
 test('TRACKING — says UNREACHABLE, not IDLE: different facts, different words', async ({ page }) => {
     await openPanel(page, { reachable: false });
-    await goTab(page, 'Tracking');
+    await goTab(page, 'Track');
     const r = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
         return { text: root.textContent, big: (root.querySelector('.bt-idle') || {}).textContent || '' };
@@ -134,7 +135,7 @@ test('TRACKING — says UNREACHABLE, not IDLE: different facts, different words'
 test('THE SWEEP — every data tab is clear when unreachable, and the state note is the SAME wording everywhere', async ({ page }) => {
     await openPanel(page, { reachable: false });
     const out = {};
-    for (const [label, id] of [['Send', 'send'], ['Merge', 'merge'], ['Tracking', 'tracker'], ['Files (CNCDISK)', 'files'], ['Jobs', 'jobs']]) {
+    for (const [label, id] of [['Send', 'send'], ['Track', 'tracker'], ['Files', 'files']]) {
         await goTab(page, label);
         out[id] = await page.evaluate(() => {
             const root = document.querySelector('#gateway-app .gw-view');
@@ -145,8 +146,8 @@ test('THE SWEEP — every data tab is clear when unreachable, and the state note
             };
         });
     }
-    // NO TAB SHOWS DATA IT COULD NOT FETCH…
-    for (const id of ['merge', 'tracker', 'files', 'jobs']) {
+    // NO TAB SHOWS DATA IT COULD NOT FETCH… (send included — t2241, its merged job list is fetched data too)
+    for (const id of ['send', 'tracker', 'files']) {
         expect(out[id].rows, `${id} shows no data rows when unreachable (got ${out[id].rows})`).toBe(0);
     }
     // …AND EVERY TAB SAYS SO, in one wording rather than six near-synonyms
@@ -175,9 +176,9 @@ test('THE OTHER DIRECTION — with a gateway answering, the tabs show their data
     // program is staged — that is the ordinary empty-form state, not a connection refusal, and the title says so).
     expect(send.bannerShown, 'no unreachable banner when a gateway is answering').toBe(false);
     expect(send.title, 'and no connection reason on the control').toBe('');
-    await goTab(page, 'Tracking');
+    await goTab(page, 'Track');
     const tracking = await page.evaluate(() => (document.querySelector('#gateway-app .gw-view .bt-idle') || {}).textContent || '');
-    // …and Tracking may now legitimately say IDLE, because it ASKED and there was no job
+    // …and Track may now legitimately say IDLE, because it ASKED and there was no job
     expect(tracking, `connected tracking headline: ${tracking}`).not.toMatch(/UNREACHABLE/);
 });
 
@@ -191,7 +192,7 @@ test('THE OTHER DIRECTION — with a gateway answering, the tabs show their data
  */
 test('THE PHANTOM ITSELF — rows from a live gateway must VANISH when it goes away, not linger armed', async ({ page }) => {
     await openPanel(page, { reachable: true });
-    await goTab(page, 'Files (CNCDISK)');
+    await goTab(page, 'Files');
     const live = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
         return { rows: root.querySelectorAll('table tr').length, deletes: root.querySelectorAll('button.danger').length };

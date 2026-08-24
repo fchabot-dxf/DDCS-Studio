@@ -93,7 +93,7 @@ test('admin.js Setup: a mismatch STATES ITSELF but never hides this PC\'s own re
     expect(s.bannerText, 'the mismatch is stated, not silent').toMatch(/different controller than the WORKSPACE/);
 });
 
-test('Tracking tab: a workspace mismatch gates it off, stated, distinctly from the Modbus-capability gate', async ({ page }) => {
+test('Track tab: a workspace mismatch gates it off, stated, distinctly from the Modbus-capability gate', async ({ page }) => {
     await page.route('**/api/descriptor', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(descFor('ddcs-v41', { controller_family: 'v4.1' })) }));
     await boot(page);
     await setWorkspaceController(page, 'ddcs-expert-m350');
@@ -102,9 +102,9 @@ test('Tracking tab: a workspace mismatch gates it off, stated, distinctly from t
     await page.waitForFunction(() => document.querySelectorAll('#gateway-app .settings-main-tab').length > 0);
     await page.evaluate(() => {
         const tabs = [...document.querySelectorAll('#gateway-app .settings-main-tab')];
-        const t = tabs.find((x) => /Tracking/.test(x.textContent));
+        const t = tabs.find((x) => /Track/.test(x.textContent));   // t2241 — was /Tracking/
         t && t.click();
     });
     const why = await page.evaluate(() => (document.querySelector('#gateway-app .gw-view .muted') || {}).textContent || '');
-    expect(why.toLowerCase(), `Tracking's gated reason: ${JSON.stringify(why)}`).toMatch(/not the gateway for the open workspace/);
+    expect(why.toLowerCase(), `Track's gated reason: ${JSON.stringify(why)}`).toMatch(/not the gateway for the open workspace/);
 });

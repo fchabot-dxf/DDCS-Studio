@@ -33,7 +33,7 @@ const boot = async (page, positionBody) => {
     await page.evaluate(() => window.showApp && window.showApp('gateway'));
     await page.waitForTimeout(1500);
     await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Tracking');
+        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Track');   // t2241 — was 'Tracking'
         if (t) t.click();
     });
     await page.waitForTimeout(900);
