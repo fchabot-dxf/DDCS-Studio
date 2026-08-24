@@ -52797,3 +52797,81 @@ predicted from the missing SVG filter).
 
 Full smoke tier green (77) — CSS-only, one rule deleted, nothing else touched. Threw away
 `tests/_futuristicglow.spec.js` after use.
+
+## t2213 — ORGANIC'S ACTIVE SETTINGS TAB WAS INVISIBLE: the ghost-button regression class, a ninth site
+
+Human report: "in organics the setting active tab isnt very visible." The advisor measured before dispatching
+(`DDCS-Studio/scratchpad/t-organic-tabs.md`): `.settings-head` (the band) = `--panel` #1c140c, the active tab =
+`--bg` #14110b, the tab's own outline (`--tab-edge` → `--border`) = transparent. Contrast ~1.04:1 against a
+3:1 floor — the SAME failure class as t2208's ghost buttons (state carried entirely by a border, in a theme
+that just removed borders), a ninth site the button-only sweep couldn't have found since it isn't a button.
+
+### The token-indirection sweep (per the dispatch's own explicit ask)
+
+A literal grep for the defect comes back empty — `.active`/`.settings-main-tab.active` reads `var(--tab-edge)`,
+and `--tab-edge` is declared `var(--border)` 300 lines away, in a different rule. Enumerated every token that
+aliases `--border` (`grep -n -- "--[a-z-]*:\s*var(--border"`) and classified each consumer as SEPARATION (a
+divider line — fine to lose) or STATE (an indicator — must move to a surface):
+
+- `--tab-edge` (:359) → `.app-header .tab.active` / `.settings-main-tab.active` box-shadow ×3 — **STATE, this
+  bug.** Also feeds the curved "feet" radial-gradients (:424/:428) as a gradient stop colour — checked by
+  screenshot, the shape still traces cleanly (the stop just collapses into the surrounding transparent, no
+  visible artifact); classified SEPARATION, no action.
+- `--edge` (:149, organic re-asserts :3792) → welcome-modal card border, already reads `var(--btn-ghost-edge,
+  var(--edge))` at t2208's own `.wcm-nav button` site — covered.
+- `--menu-edge` → TWO consumers. `.hdr-quick-menu` falls through `var(--menu-edge, var(--kbd-edge, ...))` and
+  organic DOES declare its own `--kbd-edge: #6e5840` (:4928, an opaque literal, untouched by t2208) — this
+  popover's border never went transparent at all, unaffected. `.toolbar-dropdown-content` (no such fallback,
+  reads `var(--menu-edge)` bare) DOES resolve through to transparent — checked by screenshot (opened the
+  Probe dropdown in organic): reads clean regardless, because its own `--menu-face` fill plus box-shadow
+  elevation plus each ITEM already carrying t2208's `--btn-ghost-face` fill together carry it. SEPARATION,
+  no action, confirmed by screenshot not just by reasoning about it.
+- `--field-edge` → input/select borders (:1985, :3388 is studio-only literal). Not screenshotted individually
+  this turn — `--field-face` (`var(--panel)`) sits inside modals that already read as distinct filled surfaces
+  (the settings modal card, `--modal-face`), so a field's own missing outline is a lesser version of the same
+  "already-carried-by-the-surface-around-it" case as the menus. Flagging as UNVERIFIED rather than silently
+  calling it fine — the settings modal's own "THEME/Organic" dropdown was clearly visible in the full-panel
+  screenshot below, but that is not the same as confirming EVERY field.
+- `--modal-foot-edge` → footer top divider inside 3 already-distinctly-filled modal cards. SEPARATION.
+- `--line` (#blocks-app scope) → t2208 already covered its state-bearing consumer (`.blk-view-btn`); its
+  other consumer (`.blk-pane-head` border-bottom) is a divider inside an already-filled pane head. SEPARATION.
+
+### The lead: Settings was missing organic's own existing band-bg mechanism
+
+`.settings-content` (the body under the tabs) resolves to `var(--bg)` (`ui/settingsPanel.js:1112`) — the SAME
+token the active tab already fills with. That match is BY DESIGN (the shared rule's own comment: "the active
+tab fills with the colour of the strip directly below... reads as merged with the body") — so the tab's own
+fill was never the wrong rung to move. The STRIP was: `styles.css:404-407` already gives organic's canopy
+`--band-bg` (#25301a) to `.app-header .tab.active`, `#macros-app .settings-head`, `#gateway-app .settings-head`
+and `#blocks-app .blk-topbar` — but never `#settings-app .settings-head`. Checked whether that was deliberate:
+`ui/settingsPanel.js:1100` hardcodes `background: var(--panel)` for its own `.settings-head`, byte-identical in
+shape to Macros' own inline copy (`ui/macrosApp.js:57`) — nothing in either file's code or history suggests
+Settings was meant to differ, and the WORK-LOG's own t2073 entry (line ~43886) shows the original 5-selector
+list already excluded it back at t2071, the mechanism's origin — a longstanding gap, not a t2208 regression.
+Added `#settings-app .settings-head` to the `!important` override list (styles.css:404-407) — one line, the
+SAME mechanism the other three strips already use, no new machinery, no border restored.
+
+### Verification — and an honest shortfall against the stated 3:1 floor
+
+Re-measured post-fix: `.settings-head` now resolves to `--band-bg` #25301a, active tab still `--bg` #14110b.
+**Contrast: 1.36:1** (`(37,48,26)` vs `(20,17,11)`, WCAG relative-luminance formula) — a real improvement
+(1.04→1.36) but it does NOT clear the dispatch's own stated 3:1 floor. Measured `.app-header .tab.active` too,
+per the dispatch's explicit "don't assume it's fine" ask: same pair, same 1.36:1 — the SAME shortfall exists
+there too, previously unreported. A muted forest green and a near-black share enough LUMINANCE (despite the
+obvious hue difference) that WCAG's formula — luminance only, no hue term — doesn't credit the separation.
+
+Screenshotted every required surface anyway, since the number and the look are different questions here:
+`t2213-organic-settings-{430,1280}.png` + tabs-crop, `t2213-organic-appheader-tab.png`,
+`-macros-strip.png`, `-gateway-strip.png`, `-blocks-strip.png`, `-toolbar-dropdown.png`,
+`t2213-normal-settings-tabs-crop.png` (sanity — untouched, other themes are `[data-theme="organic"]`-scoped
+out of this change). In every FULL-context screenshot (not an isolated crop) the active tab reads clearly at a
+glance — bold white/ink text, the tab's own curved "feet," and in Settings specifically an amber underline
+accent on the active sub-tab all carry additional signal beyond the raw fill colour that the WCAG number
+doesn't capture. Whether that combined result counts as "cleared" is a judgement call I'm not making
+unilaterally: closing the numeric gap for real would mean brightening `--band-bg` itself (a color the human
+deliberately chose at t2127, "ORGANIC-TREE-PLAN.md" — not mine to re-tune on a contrast-formula guess without
+it being named as its own decision). Reporting the number and the screenshots together rather than rounding
+up or silently re-tuning the canopy colour to force a pass.
+
+Full smoke tier green (77) — CSS-only, one selector list gained one entry. Threw away
+`tests/_organictabs.spec.js` after use.

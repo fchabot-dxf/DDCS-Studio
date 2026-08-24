@@ -402,9 +402,20 @@ html, body { overflow-x: clip; }
    with. The remaining four selectors are ONE band with the tab (the file's own comment already said so) — they
    move to the SAME coral (#bf6850, the gradient's own top stop) rather than splitting off and staying green. */
 [data-theme="organic"] .app-header .tab.active,
+[data-theme="organic"] #settings-app .settings-head,
 [data-theme="organic"] #macros-app .settings-head,
 [data-theme="organic"] #gateway-app .settings-head,
 [data-theme="organic"] #blocks-app .blk-topbar { background: var(--band-bg) !important; }
+/* t2213 — #settings-app ADDED to this list (was missing since t2071, the patch's own origin — not a t2208
+   regression, just never noticed until --border going transparent removed the LAST thing giving the active
+   settings-tab any separation from its own strip: both were --panel, one darkened by a few points in t2208,
+   leaving ~1:1 contrast with the tab-edge outline gone too). Settings' own .settings-head independently
+   hardcodes background:var(--panel) inline (ui/settingsPanel.js) exactly like Macros' (ui/macrosApp.js) and
+   Gateway's (styles.css:549) own — nothing in its code suggests the omission was deliberate, and the fix here
+   is the SAME mechanism already proven for the other three strips, not a new one. Do NOT restore --tab-edge/
+   --border for this — the active tab's own fill (--bg) already correctly matches .settings-content's
+   background (var(--bg), ui/settingsPanel.js:1112) per the browser-tab "merges with the content below" design
+   this rule's own comment describes; the STRIP is what needed to move, not the tab. */
 /* t2073 — was the literal #bf6850 restated a second time; now derives from organic's own --band-bg (its
    theme block), the exact gap point (c) of this turn's dispatch named as the reason this patch existed at
    all. Same resolved colour. */
