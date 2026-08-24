@@ -8,25 +8,32 @@ its whole tone ladder, so declaring the depth declares the fix.**
 
 ---
 
-## THE RULE — one sentence, applied N times
+## THE RULE — one sentence, and it does not grow with depth
 
-> **Every active tab merges into the surface DIRECTLY BELOW IT, and the strip it sits on must differ from it.**
+> **Every ACTIVE tab, at every level, IS the content surface. Only INACTIVE tabs and the outer strip differ.**
 
-That is not a rule plus special cases. It is the same rule applied once per level. A tab is a *hole punched in
-its strip* showing the surface behind — that is what makes it read as a tab instead of a highlighted button.
+Human, 2026-08-24, after challenging an earlier three-tone draft of this file: *"would they be different in
+the way we said or would adding subtabs wouldnt need colors changed?"* — then, on being shown both: *"ok 2
+tones."*
 
-**Depth determines the tone count: a depth-N system needs N+1 tones.**
+⭐ **TWO TONES, WHATEVER THE DEPTH.** A tab is a *hole punched in its strip* showing the page behind it. The
+selected thing is flush and unstyled; the UNSELECTED ones are what carry a chip. Adding a sub-level therefore
+costs nothing — no new tone, no new token, no new rule.
 
 ```
-DEPTH 1                          DEPTH 2
-  ░░░░┌──────┐░░░░░  C             ░░░░┌──────┐░░░░░  C   strip
-  ┌───┘      └────┐                ┌───┘      └────┐
-  │   content     │  B             │ ▒┌────┐▒▒▒▒▒▒ │  A   L1 tab + interstice band
-  └───────────────┘                ├──┘ L2 └──────┤
-                                   │   content     │  B   L2 tab + content
-   2 tones                         └───────────────┘
-                                    3 tones
+DEPTH 1                              DEPTH 2
+  ░░░░┌──────┐░░░░░░░  C strip         ░░░░┌──────┐░░░░░░░  C strip
+  ┌───┘      └──────┐                  ┌───┘      └──────┐
+  │    content      │  B               │  (sub)(sub)     │  B   ← everything below
+  └─────────────────┘                  │    content      │  B     the strip is ONE
+                                       └─────────────────┘        continuous surface
+   2 tones                              2 tones — unchanged
 ```
+
+⛔ **AN EARLIER DRAFT OF THIS FILE CLAIMED DEPTH N NEEDS N+1 TONES. THAT WAS WRONG** — a middle tone for the
+L1 tab and the interstice band is a *stylistic choice* (the sub-tab row reading as its own plane, like a
+toolbar under a tab bar), not a structural requirement. It was presented as a necessity and it is not one.
+The human caught it. Do not reintroduce it.
 
 **The two ways it breaks, and they are independent:**
 
@@ -43,60 +50,62 @@ DEPTH 1                          DEPTH 2
 
 ## THE DECLARATION — `data-tabs="1"` / `data-tabs="2"`
 
-Human, 2026-08-24, on what this file is actually for: *"the idea is to declare a 2 level tab vs 1 level."*
-Not a prose register — **a property the markup carries, that the stylesheet reads.**
-
-A tab system declares its depth ONCE, on the container that owns the strip:
+Human, 2026-08-24: *"the idea is to declare a 2 level tab vs 1 level."* Not a prose register — **a property
+the markup carries, that the stylesheet reads.**
 
 ```html
-<div class="settings-modal" data-tabs="2">   <!-- Settings: L1 + L2 -->
-<div class="gateway-app"    data-tabs="1">   <!-- Gateway: one strip -->
-<div id="controller-dock"   data-tabs="1">   <!-- the keyboard deck -->
+<div class="settings-modal" data-tabs="2">   <!-- L1 + L2 -->
+<div class="gateway-app"    data-tabs="1">   <!-- one strip -->
 ```
-
-and the tone ladder follows from that number alone:
 
 ```css
-/* the three tones, per theme — declared beside the other --tab-* tokens */
---tab-strip: …;   /* C — behind the tabs. MUST differ from the active tab. */
---tab-mid:   …;   /* A — the L1 tab AND the interstice band. Depth 2 only. */
---tab-body:  …;   /* B — the deepest active tab AND the content it opens. */
+--tab-strip: …;   /* C — behind the OUTERMOST tabs. MUST differ from the active tab. */
+--tab-body:  …;   /* B — every active tab at every level, AND the content. */
 
-[data-tabs] .tab-strip            { background: var(--tab-strip); }
-
-[data-tabs="1"] .tab-l1.active    { background: var(--tab-body); }   /* merges into content */
-
-[data-tabs="2"] .tab-l1.active,
-[data-tabs="2"] .tab-interstice   { background: var(--tab-mid); }    /* L1 merges into the band */
-[data-tabs="2"] .tab-l2.active    { background: var(--tab-body); }   /* L2 merges into content */
+.tab-strip                        { background: var(--tab-strip); }
+.tab-l1.active, .tab-l2.active,
+.tab-interstice                   { background: var(--tab-body); }   /* one surface, all depths */
 ```
 
-⭐ **At depth 1, `--tab-mid` is simply unused.** One declaration covers both shapes — there is no depth-1
-branch and no depth-2 branch to keep in step, which is the entire point. A third level, if one ever appears,
-adds a tone and a line rather than a new special case.
+⭐ **THE TONES DO NOT READ THE DEPTH AT ALL.** That is the test that the rule is right: if the colour ladder
+needed the depth, the depth would be load-bearing styling data and every new level would be a new special case.
+It does not, so it is not.
 
-⭐ **And a new tab system gets the whole ladder by declaring one attribute.** Nobody has to remember the rule,
-which is the failure mode this file exists to end: the rule WAS known, written in a comment on the shared strip
-rule, and four themes still shipped without a band.
+⭐ **What the declaration actually buys is the INACTIVE registers**, which is smaller than the first draft
+claimed and is the honest answer:
 
-### ⚠ What this does NOT do
+```
+depth 1    inactive L1 tabs sit on C
+depth 2    inactive L1 tabs sit on C   ← two different grounds,
+           inactive L2 tabs sit on B   ← so possibly two different treatments
+```
 
-⛔ It does not merge the systems into one component, restyle anything by itself, or replace per-theme
-character. `--tab-strip` in steampunk is brass and in futuristic is cyan-black; the DECLARATION is shared, the
-VALUES are not.
+A system needs to know that about itself. It does not need to know it to pick a fill for its active tab.
 
-⛔ It does not license renaming every existing class at once. See the adoption note below.
+### ⚠ The consequence that WILL ship this broken
+
+Taking the interstice to `--tab-body` puts the L2 sub-tabs on the same ground as the active one. In organic
+today the inactive sub-tabs carry `--panel2` (t2214, a *raised* fill) while the active one is `--bg`, so the
+active reads only because it is darkest. Flatten the ground and **the row inverts: unselected looks selected
+and selected disappears.**
+
+⇒ **The rule already answers it: active is flush, INACTIVE carries the chip.** So the inactive sub-tabs are
+what needs a register — and a *raised* fill on an unselected control was always saying the wrong thing.
+⚠ t2214's `--panel2` rule was correct when the ground was `--panel`. It is not a regression in that work; it is
+the same declaration meeting a changed ground. Change it deliberately and say so.
+
+### ⛔ What this does NOT do
+
+Not a merge of the systems into one component, not a restyle by itself, not a flattening of per-theme
+character — `--tab-strip` is brass in steampunk and cyan-black in futuristic. **The declaration is shared, the
+values are not.** And it does not license renaming every class at once; the attribute can select through
+whatever a system already calls its parts.
 
 ### Adoption — pilot first, per this project's own habit
 
 ⛔ Do NOT convert seven systems in one turn. Settings is being fixed anyway and is the only CONFIRMED depth-2
-system, so it is the pilot: declare `data-tabs="2"`, wire the three tones, prove the `elementFromPoint` scan
-shows exactly three contiguous tones. **Everything else adopts when it is next touched**, and its row here
-moves from UNVERIFIED to a depth only once it has been counted on screen.
-
-⚠ The existing class names (`.settings-main-tab`, `.settings-tab`, `.deck-tab`) do not have to become
-`.tab-l1`/`.tab-l2` on day one — the attribute can select through whatever a system already calls its parts.
-Renaming is a separate, optional tidy; the DECLARATION is the part that carries the value.
+system, so it is the pilot. Everything else adopts when next touched, and its row below earns a depth only once
+someone has counted it **on screen** rather than inferred it from a grep.
 
 ---
 
