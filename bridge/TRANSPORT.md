@@ -141,6 +141,58 @@ refuse. **This must be decided, not discovered.**
 
 ---
 
+## 5b. ⭐ RULED — 2026-08-24
+
+The five questions in §5 are now four answered and one open.
+
+**① A job whose origin road vanishes mid-run** — *advisor's call, human deferred: "whatever, you decide"*
+⇒ **Record the status LOCALLY, mark it UNDELIVERED, forward it when the road reopens.**
+The job is already cutting by then. Refusing is too late to help, and losing the record of what a machine
+actually did is the worst of the three outcomes. ⚠ Undelivered is a STATE the client must be able to see, not
+a silent local write — a status nobody ever reads is the same as no status.
+
+**② Arrival order across two inboxes** — *advisor's call, same deferral*
+⇒ **FIFO by when the GATEWAY observed the job**, never by a timestamp inside it — a remote clock cannot be
+trusted and a phone's clock least of all.
+⭐ **And write down in the code that this is a STAGING LIST, not a scheduler.** Nothing auto-runs: `send.js`
+states it plainly — *"a WRITE op — the operator still presses Cycle Start."* Order barely matters because a
+human picks what runs. Say so, or somebody later builds a priority scheme for a queue that never drains itself.
+
+**③ `local_root` relative** — *human: "dont auto merge im just testing"*
+⇒ **Resolve against a fixed base** (the app-data dir, beside the config), so the job store no longer depends on
+which directory the app was launched from.
+⇒ **⛔ DO NOT auto-merge the three existing `_bridge_data` folders.** Pick the one in use, and REPORT that the
+others exist so the human can look. Silently merging could resurrect jobs they believed gone.
+⭐ **AND THE FOLDER IS USED REGARDLESS OF CLOUD STATE** (human asked directly). Under the fan-out both roads
+are always open, so the local folder is not a fallback for the disconnected case — it is the PRIMARY road for
+the common one:
+
+```
+  same machine   -> local folder    instant, no quota, no account
+  remote device  -> cloud           the only road that reaches
+  both always available; nobody chooses
+```
+
+⭐ Drive quota is therefore only ever spent on jobs that actually need to TRAVEL. This also makes ③ more
+important, not less: the fixed location is the primary store, not a legacy path being tolerated.
+
+**④ Visible but unusable** — *explained and accepted*
+⇒ The client MUST say which transport a gateway is on, because the fan-out CREATES this failure: today a
+gateway you cannot send to is also invisible, which at least matches reality. Once presence is broadcast, a
+phone can see a gateway whose roads do not reach it.
+⇒ **OBSERVED: the heartbeat payload already carries `backend`**, so this costs nothing but wording. Render
+*"running — LOCAL transport, cannot send from this device"* and the remedy, never a Send button that fails.
+
+**⑤ Security — STILL OPEN**, and narrower than §5 implied.
+The Drive folder is scoped to the human's own Google account, so that IS the auth boundary; and **nothing
+auto-runs** — a hostile job cannot start itself, because a person presses Cycle Start at the machine.
+⇒ The residual exposure is **folder SHARING**: if `DDCS Bridge` is ever shared, someone else can place a job
+that looks legitimate to whoever walks up next.
+⇒ Advisor's recommendation, NOT yet ruled: **warn if the folder carries any sharing permission**, rather than
+building an identity scheme. Needs the human's answer before anything is built.
+
+---
+
 ## 6. ⛔ WHAT THIS IS NOT
 
 - **Not a reason to delete the local backend.** One-box (Studio and gateway on the same PC, no account, no
