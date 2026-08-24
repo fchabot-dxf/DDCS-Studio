@@ -54342,3 +54342,100 @@ into tokens), 8/9, and the interstice flattening remain untouched, per the advis
 A same-turn amendment sharpened scope for whenever that work starts (noted, not acted on here): the human
 wants ALL FIVE themes naming their own sub-tab values through the same seam, not organic-fixed-plus-four-
 defaults, and wants amendments 6+7 taken as their own whole turn rather than bundled with 8/9/4.
+
+## t2247 — AMENDMENTS 6+7, THE WHOLE TURN: the L2 sub-tab seam, hoisted and tokenized for all five themes
+
+The sub-tab ring is the SAME leak the dropdown had (t2239), one level over: the CSS lived duplicated in
+`settingsPanel.js:1108-1110` and `macrosApp.js:61-63`, with no token anywhere, which is why per-theme styling
+was genuinely impossible before this turn, not merely unbuilt.
+
+### The seam — same shape L1 already proved once
+
+L1 (`.settings-main-tab`) went through this exact move already (styles.css's own comment: "previously
+duplicated scoped under #settings-app + #macros-app; now global"). L2 never got it, and never got L1's own
+defensive `box-shadow: none; text-shadow: none; filter: none;` reset either — confirmed as the actual
+mechanism (not re-derived, the advisor's own measurement matched): `border-width: 0px`, `border-radius: 16px`,
+`box-shadow` carrying `rgba(255,255,255,.5) 0 1px 0 inset` — the global bare `button` rule leaking through,
+identical to the dropdown.
+
+**Checked the "one token set or two" question before assuming**: read both JS copies side by side.
+Settings and Macros' resting/hover/active COLOURS are byte-identical (`background: transparent`/`var(--bg)`/
+`var(--bg)`, `color: var(--text-dim)`/`var(--text-main)`/`var(--text-main)`) — only the active-indicator's
+ORIENTATION differs (border-bottom for Settings' horizontal strip, border-left for Macros' vertical list),
+which is a LAYOUT fact, not a material one. One token set serves both; the orientation stays a small residual
+declaration per app (matching TABS.md's own RULES-vs-COMPONENT split), not tokenized.
+
+Declared `--subtab-face/-ink/-face-hover/-ink-hover/-face-active/-ink-active/-active-edge`, hoisted the shared
+`.settings-sidebar .settings-tab{,:hover,.active}` rule into `styles.css` (mirroring L1's exact defensive
+pattern), and cut BOTH JS files down to layout-only declarations (display/width/text-align/padding, and the
+active-indicator's own orientation + colour via the new token).
+
+### A real CSS bug caught and fixed mid-build, not shipped
+
+First attempt declared `--subtab-face-hover: var(--bg)` etc as `:root` DEFAULTS (matching how I'd handled
+`--wiz-gear-*`/`--field-face-light` at t2237). Measured after building it: EVERY theme's hover/active state
+showed the IDENTICAL `#e0e0e0`/`#000` pair — the file's own "neutral fallback" `:root` block's OWN literal
+`--bg` value (line 96), not any theme's real colour. **The mechanism**: a custom property declared as
+`var(X)` resolves `X` AT THE DECLARING ELEMENT, then that already-resolved value is what inherits down — it
+is not a live per-descendant re-evaluation the way directly consuming `var(--bg)` in a rule is. Declaring
+`--subtab-face-hover: var(--bg)` at `:root` freezes it to `:root`'s own `--bg` forever; no theme's override of
+`--bg` on `[data-theme=X]` (a DESCENDANT of `:root`) can ever reach back and change an already-resolved
+inherited value. Fixed by moving the "default to var(--bg) unless overridden" behaviour into the CONSUMING
+rule's own fallback (`var(--subtab-face-hover, var(--bg))`) — a fallback genuinely IS re-evaluated live at
+the reading element, which is the actual behaviour "byte-identical per theme" needs. Re-measured after: every
+theme showed its own correct, distinct colours (organic `#14110b`/`#f8f0da`, studio `#c4bfb5`/`#101010`,
+futuristic `#070b14`/`#fff`, steampunk `#2a1810`/`#f5d7a8`, normal `#f4f4f4`/`#000`) — confirmed this does
+NOT retroactively affect t2237's own `--wiz-gear-*`/`--field-face-light` tokens, since those are ONLY ever
+consumed inside `[data-theme="organic"]`-scoped rules (nothing else reads them), so their own frozen-at-:root
+default was never actually exposed as a bug in practice — checked, not assumed.
+
+### Also caught: a THIRD, now-actively-wrong override left over from t2214
+
+Deleted `[data-theme="organic"] #settings-app .settings-sidebar .settings-tab, [data-theme="organic"]
+#macros-app .settings-sidebar .settings-tab { background: var(--panel2); }` — the ORIGINAL t2214 fix, still
+in the file. It was ID-scoped (higher specificity than my new class-only seam), so it out-specified the new
+`.active`/`:hover` rules TOO, collapsing every sub-tab state onto one background — caught by measuring
+computed style per state (resting/hover/active all reading the SAME colour), not assumed correct because the
+CSS read right. Its original INTENT (organic's resting sub-tab needs a real fill) is now expressed properly:
+`[data-theme="organic"] { --subtab-face: var(--panel2); --subtab-ink: var(--text); }` in organic's own theme
+block — RESTING only; hover/active correctly fall through to the shared `var(--bg)` fallback.
+
+### Amendment 7 — ink moves with the fill
+
+Organic's resting ink was the shared default `--text-dim` on `--panel2` — measured as a real contrast
+shortfall (a muted ink on a surface LIFTED toward light, the fill moved and the ink didn't), not just a style
+preference. Set to `--text` (this theme's own normal reading ink, the same alias `--ink` already uses) —
+contrast ~9.6:1 against `--panel2`, comfortable AA+ headroom. Active-state contrast measured for every theme:
+organic 16.6:1, normal 19.1:1, studio 10.4:1, futuristic 19.7:1, steampunk 12.3:1 — all well clear of 4.5:1.
+
+### The four non-organic themes: byte-identical, a stated choice
+
+None of normal/studio/futuristic/steampunk declare their own `--subtab-*` overrides — their sub-tabs resolve
+through the shared fallback (`var(--bg)`/`var(--text-main)`/`var(--text-dim)`), exactly what both JS copies
+already rendered before this turn. Verified this is genuinely a CHOICE, not an omission, by checking each
+theme actually renders correctly and distinctly through the fallback (screenshots + computed style for all
+five, not organic alone) — not simply assumed safe because "nothing changed."
+
+### The other cares, checked
+
+**helpPanel.js / setupChecklist.js**: neither RENDERS `.settings-tab` — both only SELECT an existing one
+(scrolling to it, toggling `.needs-setup`). No styling of their own to hoist or break.
+
+**`.needs-setup` glow**: a `text-shadow` animation (`tabNeedsGlow`), independent of the background/border
+material this turn touched. Verified live on Profile (Controller group, organic) — reads correctly against
+the new fill, the underline (active indicator) and the glow don't clash.
+
+**Both shapes, both verified live**: Settings' inline-centred pills (`verification/t2247-subtab-states-
+{organic,normal,studio,futuristic,steampunk}.png`, resting+hover+active together, not three separate crops —
+confirmed the hovered tab via `element.matches(':hover')` before trusting the screenshot, not assumed from
+mouse position alone) and Macros' full-width vertical list (`verification/t2247-macros-sidebar-organic.png`)
+both render correctly through the same seam, differing only in the active-indicator's own orientation as
+designed.
+
+### Verified
+
+Full suite (required — a shared token seam touching Settings and Macros both): 2797 passed, 12 flaky, **1
+unexpected**, 25 skipped (36.8m). Checked its error text (`wizard-face-1599.spec.js:130`): NOT the `__blkws`
+family this time — it's the SEPARATE, already-documented t1766 "reproject echo race" in the same file's own
+`waitForEmpty` helper, unrelated to Blockly boot timing and unrelated to any CSS this turn touched. Confirmed
+rather than assumed, matching this session's own standing discipline for every full-suite run.

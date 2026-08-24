@@ -1105,9 +1105,14 @@ function buildSettingsOverlay() {
                personality is gone, so there is one place to look for a subtab on any screen). */
             #settings-app .settings-body { flex-direction: column; }
             #settings-app .settings-sidebar { width: 100%; flex: 0 0 auto; display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel); overflow: visible; }
-            #settings-app .settings-sidebar .settings-tab { display: inline-block; width: auto; flex: 0 0 auto; text-align: center; padding: 6px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
-            #settings-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
-            #settings-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-bottom: 3px solid var(--accent); padding-bottom: 3px; }
+            /* t2247 — material (background/color/border/box-shadow/radius) HOISTED to the shared
+               .settings-sidebar .settings-tab rule (styles.css, reads --subtab-* tokens) — this was one of
+               two byte-identical copies (macrosApp.js the other), the reason per-theme sub-tab styling was
+               impossible before. What's left here is genuinely LAYOUT: Settings' strip is a horizontal row of
+               inline-centred pills, and its active indicator runs along the BOTTOM (--subtab-active-edge, the
+               shared token — was a hardcoded var(--accent) restating the same colour a second time). */
+            #settings-app .settings-sidebar .settings-tab { display: inline-block; width: auto; flex: 0 0 auto; text-align: center; padding: 6px 12px; }
+            #settings-app .settings-sidebar .settings-tab.active { border-bottom: 3px solid var(--subtab-active-edge, var(--accent)); padding-bottom: 3px; }
             #settings-app .settings-sidebar .sidebar-group-label { display: none; }   /* the group is already named by the ACTIVE main tab above */
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }

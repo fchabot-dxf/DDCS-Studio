@@ -58,9 +58,14 @@ export function initMacrosApp() {
             /* .settings-main-tab styling is shared/global in styles.css */
             #macros-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
             #macros-app .settings-sidebar { width: 180px; flex: 0 0 180px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
-            #macros-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
-            #macros-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
-            #macros-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
+            /* t2247 — material (background/color/border/box-shadow/radius) HOISTED to the shared
+               .settings-sidebar .settings-tab rule (styles.css, reads --subtab-* tokens) — this was one of
+               two byte-identical copies (settingsPanel.js the other), the reason per-theme sub-tab styling
+               was impossible before. What's left here is genuinely LAYOUT: Macros' sidebar is a full-width
+               vertical list, and its active indicator runs along the LEFT (--subtab-active-edge, the shared
+               token — was a hardcoded var(--accent) restating the same colour a second time). */
+            #macros-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; }
+            #macros-app .settings-sidebar .settings-tab.active { border-left: 3px solid var(--subtab-active-edge, var(--accent)); padding-left: 9px; }
             #macros-app .settings-sidebar .sidebar-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px 4px; opacity: .6; }
             #macros-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
             #macros-app .settings-sidebar .tree-level-1 { padding-left: 20px; }

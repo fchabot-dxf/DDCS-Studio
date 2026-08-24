@@ -235,6 +235,24 @@ svg [id*="Zfirst_travel"] {
        override both together. */
     --field-face-light: var(--panel); --field-ink-light: var(--text);
 
+    /* t2247 (BACKLOG amendment 6/7) — the L2 sub-tab (.settings-sidebar .settings-tab) material, following the
+       SAME seam L1 (.settings-main-tab, styles.css ~3525) already went through once: "previously duplicated
+       scoped under #settings-app + #macros-app; now global." L2 never got that move, and never got L1's own
+       defensive `box-shadow: none; text-shadow: none; filter: none;` either — which is why the global bare
+       `button` rule's leaked border-radius/inset-highlight (the SAME mechanism the dropdown had) reads as a
+       ring here too.
+       ⚠ ONLY --subtab-face gets a REAL default here, and only because it's a literal (`transparent`), not a
+       var() reference. --subtab-ink/-face-hover/-ink-hover/-face-active/-ink-active/-active-edge do NOT get
+       :root defaults, on purpose: a custom property declared as `var(--bg)` HERE would resolve `--bg` at
+       THIS element (:root) — the neutral-fallback #e0e0e0, not organic's #14110b or any other theme's own
+       value — and INHERIT that already-frozen result downward, never re-resolving per descendant. Caught
+       live, not assumed: measured every theme's hover/active state and found the IDENTICAL #e0e0e0/#000
+       pair on all five, the neutral fallback's own colours leaking through regardless of theme. The correct
+       "default to var(--bg) unless a theme overrides it" behaviour instead lives as a FALLBACK on each
+       consuming rule (`var(--subtab-face-hover, var(--bg))`) — a fallback IS re-evaluated live at the
+       element that reads it, which is the behaviour "byte-identical to before, per theme" actually needs. */
+    --subtab-face: transparent;
+
     /* t2087 (P5a) — MODAL z-index SCALE: named tokens replacing scattered literals, scoped to true
        scrim-backed modals only (not popovers/toasts/tooltips/dropdowns — those have their own separate
        z-index concerns, out of this scale's scope, per the dispatch's own "keep it to MODALS" instruction).
@@ -438,14 +456,17 @@ html, body { overflow-x: clip; }
 [data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255, 255, 255, .82); }
 [data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255, 255, 255, .7); }
 
-/* t2214 — amendment 1: the MACROS /DISK/ file shelf (ui/macrosApp.js's `.settings-tab` rows, same class/shape
-   used by #settings-app's own secondary rail) had `background: transparent` at rest and no border ever (not a
-   t2208 regression — it never drew a shape). On organic that reads as plain text with zero row separation;
-   human's ruling verbatim: "these can get a lighter or different color". --panel2 is the ladder's own "raised"
-   rung (t2208 built it for exactly this). :hover/.active already move to var(--bg) — kept as-is, only the
-   RESTING state gets a surface here. */
-[data-theme="organic"] #macros-app .settings-sidebar .settings-tab,
-[data-theme="organic"] #settings-app .settings-sidebar .settings-tab { background: var(--panel2); }
+/* t2214 — amendment 1 (superseded in SHAPE, not intent, by t2247): the MACROS /DISK/ file shelf and Settings'
+   own sub-tabs had `background: transparent` at rest and no border ever (not a t2208 regression — it never
+   drew a shape). Human's ruling verbatim: "these can get a lighter or different color". --panel2 is the
+   ladder's own "raised" rung. This used to be a THIRD, ID-scoped override sitting beside the two duplicated
+   JS copies — exactly the disease t2247's seam exists to end, and it was actively WRONG once that seam
+   landed: the ID selector out-specified the new .active/:hover rules too, so every sub-tab state (not just
+   resting) collapsed onto this one background (caught by measuring computed style per state, not assumed
+   correct because the CSS "looked right"). Moved to organic's own theme block below as a --subtab-face
+   override (RESTING only — hover/active fall through to the consuming rule's own `var(--bg)` fallback,
+   which resolves correctly and distinctly for organic same as every theme, so they need no override of
+   their own — see the :root token comment for why the fallback lives on the CONSUMER, not a :root default). */
 /* t2214 — text fields: --field-face defaults to var(--panel), which on organic sits directly on an equally
    --panel-toned surface in several places (e.g. the M-code name/body fields inside the Macros tree, measured
    byte-identical rgb(28,20,12) on rgb(28,20,12) — human's own words, "dark-on-dark"). --field-edge (->
@@ -3547,6 +3568,29 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     border-bottom: none; padding-bottom: 0;
 }
 
+/* t2247 (BACKLOG amendment 6/7) — Shared L2 sub-tab (.settings-sidebar .settings-tab) — ONE definition for
+   Settings AND Macros, the SAME move L1 above already made ("previously duplicated... now global"). Was
+   duplicated verbatim (colour-for-colour) in settingsPanel.js:1108-1110 and macrosApp.js:61-63, with no token
+   anywhere — the reason per-theme styling was IMPOSSIBLE before this, not merely unbuilt. Reads the
+   --subtab-* tokens declared at :root (their defaults resolve to exactly what both copies already rendered —
+   see the token comment there). The explicit `box-shadow: none; text-shadow: none; filter: none;` is copied
+   directly from L1's own defensive reset (line ~3554) — L2 never had it, which is why the global bare
+   `button` rule's leaked border-radius + inset-highlight read as a ring here (measured: border-width 0px,
+   box-shadow carrying `rgba(255,255,255,.5) 0 1px 0 inset` — the identical mechanism the dropdown had, not a
+   coincidence, the same unreset base rule). LAYOUT (display/width/text-align/padding, and the active
+   indicator's ORIENTATION — border-bottom for Settings' horizontal strip, border-left for Macros' vertical
+   list) stays declared per-app: that's a genuine structural difference, not a duplicated material one, so
+   hoisting it here would be forcing one shape onto two different controls — exactly what TABS.md's own
+   RULES-vs-COMPONENT split warns against. */
+.settings-sidebar .settings-tab {
+    border-radius: var(--radius, 4px); border: none; cursor: pointer; transition: 120ms;
+    box-shadow: none; text-shadow: none; filter: none; transform: none;
+    background: var(--subtab-face); color: var(--subtab-ink, var(--text-dim));
+    font-size: 12.5px; font-weight: 600;
+}
+.settings-sidebar .settings-tab:hover { background: var(--subtab-face-hover, var(--bg)); color: var(--subtab-ink-hover, var(--text-main)); }
+.settings-sidebar .settings-tab.active { background: var(--subtab-face-active, var(--bg)); color: var(--subtab-ink-active, var(--text-main)); }
+
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
 [data-theme="studio"] .numpad .key,
 [data-theme="studio"] .vbtn {
@@ -3986,6 +4030,15 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        palette (the resting stop of --btn-face, #e7dbc0, flattened to one solid tone) paired with organic's
        own already-declared dark ink for a light surface (--accent-ink, same token --btn-ink-hover reuses). */
     --field-face-light: #e8dcc0; --field-ink-light: var(--accent-ink);
+    /* t2247 (BACKLOG amendment 6/7, superseding t2214's own ID-scoped rule — see styles.css:456) — the L2
+       sub-tab RESTING state only; hover/active fall through to the consuming rule's own `var(--bg)`
+       fallback, already correct here. --panel2 is the same "raised" rung t2214 always intended. Ink moves
+       WITH the fill (amendment 3's
+       pairing rule) rather than staying at the shared default's --text-dim: measured, --text-dim on --panel2
+       is a real contrast problem (a muted ink on a LIFTED-toward-light surface — the fill moved and the ink
+       didn't), not just a style preference — --text (this theme's own normal reading ink, --ink's own alias)
+       clears it with real headroom. */
+    --subtab-face: var(--panel2); --subtab-ink: var(--text);
 
     /* contract */
     --scrim: rgba(12,8,5,.72);
