@@ -50,7 +50,19 @@ test('the dot is hidden (visually and from assistive tech) when clean, shown wit
 
 test('the dot occupies a FIXED slot — the chip does not reflow between clean and dirty', async ({ page }) => {
     await ready(page);
-    const cleanBox = await page.locator('#hdrWsDirtyDot').boundingBox();
+    // t2233 — the FIXED-SLOT property (styles.css .hdr-ws-dirty-dot: "the element always occupies its own
+    // box... only its VISUAL fill toggles via opacity/scale") is a LAYOUT guarantee: offsetWidth/offsetHeight
+    // (the pre-transform border box) is what actually stays constant, and it is what makes the neighbour not
+    // reflow. getBoundingClientRect()/boundingBox() report the POST-transform visual rect instead — since the
+    // fill toggle is implemented via `transform: scale()`, that rect genuinely differs (0.4x → 1x scale is
+    // 3.2px → 8px, not a race) and was never a valid way to assert "the box doesn't change size". Originally
+    // asserted via boundingBox and raced the .15s transition (see git history); fixed by reading the correct,
+    // transform-immune property instead of chasing the transition's end state.
+    const dotSize = (p) => p.evaluate(() => {
+        const d = document.getElementById('hdrWsDirtyDot');
+        return { width: d.offsetWidth, height: d.offsetHeight };
+    });
+    const cleanBox = await dotSize(page);
     const cleanNameX = (await page.locator('.hdr-ws-name-txt').boundingBox()).x;
 
     await page.evaluate(async () => {
@@ -60,10 +72,10 @@ test('the dot occupies a FIXED slot — the chip does not reflow between clean a
         m.saveSettings();
         window.ddcsFileSaveState.refresh();
     });
-    const dirtyBox = await page.locator('#hdrWsDirtyDot').boundingBox();
+    const dirtyBox = await dotSize(page);
     const dirtyNameX = (await page.locator('.hdr-ws-name-txt').boundingBox()).x;
 
-    expect(dirtyBox.width, 'the dot\'s own box is the same size clean vs dirty').toBe(cleanBox.width);
+    expect(dirtyBox.width, 'the dot\'s own LAYOUT box is the same size clean vs dirty (the fill toggle must not resize it)').toBe(cleanBox.width);
     expect(dirtyNameX, 'the name text does not shift sideways when the dot shows').toBe(cleanNameX);
 });
 

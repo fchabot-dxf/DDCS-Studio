@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1836→t1838→t1872→t1874 — Option B, SLICE 3 of 3: LIVE VISIBILITY (the reason B exists). While PLAYBACK
@@ -72,7 +73,7 @@ async function mkOp(page, opType, n) {
 
 async function loadAndBoot(page, opTypes, { wrapped = false } = {}) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
+    await waitReady(page, () => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
     await page.evaluate(() => window.showApp('studio'));
     const blocks = [];
     for (let i = 0; i < opTypes.length; i++) blocks.push(await mkOp(page, opTypes[i], i + 1));

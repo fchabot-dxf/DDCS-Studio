@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * ② B4 M2 step 2 — the generic STRUCTURAL-TOGGLE capability (built ONCE, corner-agnostic): the shared `whenOk` evaluator,
@@ -9,7 +10,7 @@ import { test, expect } from '@playwright/test';
  */
 test('guard/prune capability: shared whenOk + pruneGuards (drop/unwrap/nested) + instantiate re-derive-by-identity', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await waitReady(page, () => window.ddcsGetBlockProgram);
 
   const r = await page.evaluate(async () => {
     const { whenOk, pruneGuards } = await import('/blocks/whenGuard.js');

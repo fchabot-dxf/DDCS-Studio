@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * COMPOSABLE-WIZARD-AUTHORING PILOT 1 (t397) — the FORM value-field BLOCK. A `formfield` block in the user_root
@@ -160,7 +161,7 @@ test('DRIVE THE APP: a formfield-authored op RENDERS its fields in the live form
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/formfield_pilot_form.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // Class-B render guard (blockly skill): the formfield block actually DRAWS in the Blocks workspace (not a phantom model)
     await page.evaluate(() => window.showApp('blocks'));
-    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+    await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks().length > 0);
     await page.waitForTimeout(500);
     const render = await page.evaluate(() => {
         const ws = window.__blkws;

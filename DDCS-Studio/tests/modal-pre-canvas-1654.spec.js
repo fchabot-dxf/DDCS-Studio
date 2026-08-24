@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1654 — a DURABLE top-level record field survives the Blockly CANVAS round-trip, not just the text one.
@@ -19,9 +20,9 @@ import { test, expect } from '@playwright/test';
  */
 const boot = async (page) => {
     await page.goto('/', { timeout: 30000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 30000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 30000 });
+    await waitReady(page, () => !!window.__blkws);
 };
 
 test('a relative plunge (G1 G91 Z-5) keeps its G91 through the REAL editor -> stack -> canvas -> stack -> emit gesture', async ({ page }) => {

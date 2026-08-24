@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1876→t1878→t1880 — PROBE-PORT FIELD GATING, closing the headline gap the audit found: `postGating.js`'s own
@@ -46,7 +47,7 @@ const PROBE_OPS = ['user_corner_data', 'user_middle_data', 'user_edge_data', 'us
  *  the incoming one lands (proven flaky in manual testing — a fresh load never was). Slower, but correct. */
 async function portFieldUnder(page, profileId, opType) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef);
+    await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef);
     return page.evaluate(async ({ profileId, opType }) => {
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         setActiveProfile(profileId);
@@ -96,7 +97,7 @@ test('the gate does not grey EVERYTHING regardless of dialect — a different fi
     // stylus-tip compensation) and confirm it's untouched.
     test.setTimeout(30_000);
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef);
+    await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef);
 
     const r = await page.evaluate(async () => {
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');

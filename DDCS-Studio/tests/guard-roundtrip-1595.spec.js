@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1595 — THE CANVAS CAN CARRY A STRUCTURAL FORK.
@@ -19,10 +20,12 @@ import { test, expect } from '@playwright/test';
  * through the canvas, some flip diverges.
  */
 
-// ⚠ EVERY WAIT HERE IS EXPLICIT AND GENEROUS, AND THAT IS A CONSEQUENCE OF THE CHANGE, NOT PADDING. Rendering a
-// guard's arms means Corner now puts 1852 Blockly blocks on the canvas instead of 111 — measured ~2.6s to build and
-// ~5.1s to settle, alone. Under the suite's six workers those numbers stretch, and the config's 5s actionTimeout is
-// the default for an un-optioned wait. This spec opens the two largest wizards in the registry, fourteen times.
+// ⚠ Rendering a guard's arms means Corner now puts 1852 Blockly blocks on the canvas instead of 111 — measured
+// ~2.6s to build and ~5.1s to settle, alone. Under the suite's six workers those numbers stretch. t2233 —
+// every readiness wait below goes through waitReady() (tests/_boot.js), which disables waitForFunction's own
+// timeout so the test's own test.setTimeout() is the sole authority — no more per-file guess that has to stay
+// ahead of the config's 5s actionTimeout default (the previous 60000ms literals here were exactly that guess).
+// This spec opens the two largest wizards in the registry, fourteen times.
 
 // t1718 made the comment above's load-sensitivity gate-readable via a per-spec retry; t1724 retired that in
 // favor of a config-level policy (playwright.config.js's `retries`) — a fixed list of "these specs get
@@ -30,9 +33,9 @@ import { test, expect } from '@playwright/test';
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    await waitReady(page, () => !!window.__blkws);
 };
 
 /** Open a wizard to customize, and wait for the CANVAS TO SETTLE rather than for a fixed number of milliseconds —
@@ -40,10 +43,10 @@ const boot = async (page) => {
 const customize = async (page, opType) => {
     await page.evaluate(() => window.ddcsLoadBlockStack([]));
     await page.evaluate((x) => window.ddcsEditWizardDef(x), opType);
-    await page.waitForFunction(() => {
+    await waitReady(page, () => {
         const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op');
         return !!(op && (op.children || []).length) && window.__blkws.getAllBlocks().length > 0;
-    }, null, { timeout: 60000 });
+    });
     let last = -1;
     for (let i = 0; i < 120; i++) {                       // block count stops changing → the reproject has landed
         const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);

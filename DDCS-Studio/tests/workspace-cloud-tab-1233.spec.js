@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1233 A3 — THE CLOUD TAB. Google Drive is ANOTHER PLACE WORKSPACES LIVE, not another kind of thing.
@@ -66,7 +67,7 @@ async function fakeDrive(page, files = CLOUD) {
 
 async function boot(page, { signedIn = true } = {}) {
     await page.goto('/');
-    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsFileSavedPlace);
+    await waitReady(page, () => window.openWorkspaceManager && window.ddcsFileSavedPlace);
     await page.evaluate(() => { window.__ddcsNoReload = true; });
     await page.evaluate((yes) => {
         if (yes) { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); }

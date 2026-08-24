@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { getBlkFormHost } from './support/blkFormHost.js';
+import { waitReady } from './_boot.js';
 
 /**
  * t1599 — A DEFINE CUSTOM WIZARD BLOCK ON THE CANVAS MEANS THE WIZARD VIEW TAB HAS CONTENT.
@@ -51,13 +52,13 @@ import { getBlkFormHost } from './support/blkFormHost.js';
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
     // t1734 — the Blocks tab must actually be OPEN for face()/settle() to read anything: ddcsEditWizardDef opens it
     // as a side effect (so the CUSTOMIZE test below always worked), but ddcsLoadBlockStack alone does not — the
     // other three tests here only ever call that, and window.__blkws stayed undefined until this was added (a
     // pre-existing gap in boot(), unrelated to the tab restructure — found while verifying the repoint below).
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    await waitReady(page, () => !!window.__blkws);
 };
 const settle = async (page) => {
     let last = -1;

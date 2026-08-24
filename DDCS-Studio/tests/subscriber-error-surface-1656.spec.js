@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1656 — a subscriber THROWING is isolated (one broken view must not take down every other view on a stack
@@ -12,9 +13,9 @@ import { test, expect } from '@playwright/test';
  */
 const boot = async (page) => {
     await page.goto('/', { timeout: 30000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 30000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 30000 });
+    await waitReady(page, () => !!window.__blkws);
 };
 
 test('t1654s durable-field guard surfaces via console.error on the REAL ddcsLoadBlockStack path (not just a direct stackToWorkspace call)', async ({ page }) => {

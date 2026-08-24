@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1611 — SHARED_LABELS: the placement family gets friendly names, declared ONCE.
@@ -39,7 +40,7 @@ const declared = (page) => page.evaluate(async () => {
 test('the resolver chain: explicit label → SHARED_LABELS → raw name', async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsStudio);
     const d = await declared(page);
     expect(d.map, 'the shared map exists and covers the placement family').toBeTruthy();
     for (const p of PARAMS) expect(d.map[p], `SHARED_LABELS declares ${p}`).toBeTruthy();
@@ -52,7 +53,7 @@ test('the twin Generator Modal renders the friendly names — and an explicit la
     test.setTimeout(120_000);
     page.on('dialog', (d) => d.accept());
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsStudio && window.ddcsStudio.wizardManager);
     await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_surfacing_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 30000 });
     const d = await declared(page);
@@ -71,9 +72,9 @@ test('the Blocks Wizard View face resolves through the SAME chain', async ({ pag
     test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    await waitReady(page, () => !!window.__blkws);
     await page.evaluate(() => window.ddcsLoadBlockStack([]));
     await page.evaluate(() => window.ddcsEditWizardDef('user_surfacing_data'));
     let last = -1;

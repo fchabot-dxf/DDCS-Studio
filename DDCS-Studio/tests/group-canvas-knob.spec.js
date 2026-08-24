@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * Group form — canvas-role (2D) knob, part A: LOCK that a NUMBER-ROLE 2D knob (a `point` / `nrect` param exposed as a
@@ -14,7 +15,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('A: a point knob in a grouped run\'s form edits + writes back BOTH axes + survives a reprojection', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram && window.insertWiz);
+  await waitReady(page, () => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram && window.insertWiz);
 
   // a PURE hand-built stack: a move with x exposed as point-x and y as point-y → a 2D-point knob "pos" (px / py).
   await page.evaluate(() => window.ddcsLoadBlockStack([

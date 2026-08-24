@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1948 — COLLAPSE-ON-DELETE, wired at the single choke point t1946 confirmed: `workspaceToStack`
@@ -17,7 +18,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function boot(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram && window.ddcsGetBlockGcode
+    await waitReady(page, () => window.ddcsStudio && window.ddcsGetBlockProgram && window.ddcsGetBlockGcode
         && window.openWiz && window.updateWiz && window.insertWiz);
 }
 
@@ -44,8 +45,8 @@ async function foldOps(page, programs) {
 
 async function openBlocksTab(page) {
     await page.locator('[data-app="blocks"]').click();
-    await page.waitForFunction(() => window.Blockly && Blockly.getMainWorkspace(), null, { timeout: 20000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
+    await waitReady(page, () => window.Blockly && Blockly.getMainWorkspace());
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0);
     await page.waitForTimeout(500);   // let the initial stackToWorkspace render settle before we start deleting
 }
 

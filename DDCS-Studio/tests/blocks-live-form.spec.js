@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { stopLiveSim } from './support/simControls.js';
+import { waitReady } from './_boot.js';
 
 /**
  * Live block→form (custom-op round-trip, step 1). Editing a custom wizard in the Blocks tab renders its FORM as a
@@ -16,7 +17,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('editing a custom op shows its form derived from the blocks; editing a block updates the form', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   // a custom op with one exposed number knob "depth" = -5
   await page.evaluate(async () => {
@@ -61,7 +62,7 @@ test('editing a custom op shows its form derived from the blocks; editing a bloc
 test('form→block writeback: editing the live form writes the value back to the block + G-code (no echo clobber)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
@@ -110,7 +111,7 @@ test('form→block writeback: editing the live form writes the value back to the
 test('editing-context chrome: re-authoring shows the glow class + named chip; saving clears it', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
@@ -125,7 +126,7 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   // a future expiry surfaces as a named failure instead of a phantom red. This pre-warm STAYS — it is defence in
   // depth, not the thing holding the spec up — and the load is asserted below rather than assumed.
   await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
+  await waitReady(page, () => window.ddcsLoadBlockStack && window.__blkws);
   await page.evaluate(() => window.ddcsEditWizardDef('user_chrome'));
   await page.waitForSelector('#blk-formpane:not([hidden])', { timeout: 8000 });
   // t1518 — and the load REALLY happened: the pre-warm's whole purpose, asserted instead of trusted
@@ -135,10 +136,10 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   // DETERMINISTIC: the formpane unhides on the projection while the chrome (glow class + chip) is applied by
   // devMode's own refresh — a sample squeezed between the two read half-applied chrome under load. Wait for the
   // condition the asserts read (same shape as the save-clear wait below); if it never applies, this times out.
-  await page.waitForFunction(() => {
+  await waitReady(page, () => {
     const app = document.getElementById('blocks-app'), chip = document.querySelector('.blk-edit-chip');
     return app && app.classList.contains('editing-wizard') && chip && !chip.hidden && /Chrome Op/.test(chip.textContent || '');
-  }, { timeout: 8000 });
+  });
   const editing = await page.evaluate(() => ({
     hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
     chipShown: !document.querySelector('.blk-edit-chip').hidden,
@@ -151,16 +152,16 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   // save → exits the editing context (glow + chip clear). The workspace must actually HOLD the re-authored op first:
   // the formpane shows on the editing flag alone, while the save reads the LIVE workspace (collectAuthoring) — saving
   // before the blocks land alerts "No operation to save" and the dialog never opens (the load-time face of the same race).
-  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
+  await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
   await page.evaluate(() => window.ddcsSaveAsWizard());
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Chrome Op');
   await page.click('.blk-dev-savedlg .blk-dev-save');
   // DETERMINISTIC: wait for the editing context to actually CLEAR (save → refreshEditingChrome is async; an arbitrary
   // sleep flaked under full-gate load). If it never clears, this times out → the real bug surfaces.
-  await page.waitForFunction(() => {
+  await waitReady(page, () => {
     const app = document.getElementById('blocks-app'), chip = document.querySelector('.blk-edit-chip');
     return app && !app.classList.contains('editing-wizard') && chip && chip.hidden;
-  }, { timeout: 8000 });
+  });
   const after = await page.evaluate(() => ({
     hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
     chipShown: !document.querySelector('.blk-edit-chip').hidden,
@@ -187,14 +188,14 @@ const listOps = (page) => page.evaluate(async () => (await import('/blocks/userO
 test('non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
   // the Blocks app must be UP before re-authoring (editWizardDef's internal wait is capped — see the chrome test)
   await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
+  await waitReady(page, () => window.ddcsLoadBlockStack && window.__blkws);
   await reauthor(page, 'orig', 'Original');
   // …and the workspace must HOLD the re-authored op before saving: the save reads the LIVE workspace
   // (collectAuthoring) — saved too early it alerts "No operation to save" and the dialog never opens
-  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
+  await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
 
   await page.evaluate(() => window.ddcsSaveAsWizard());
   // the dialog offers BOTH actions when editing: an explicit "Update", and the accent "Save as new"
@@ -218,7 +219,7 @@ test('non-destructive save: re-author + "Save as new" creates a copy, leaving th
 test('non-destructive save: "Update" overwrites the re-authored wizard in place (no duplicate)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  await waitReady(page, () => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
   await reauthor(page, 'orig', 'Original');
 
   await page.evaluate(() => window.ddcsSaveAsWizard());
@@ -242,9 +243,9 @@ test('non-destructive save: "Update" overwrites the re-authored wizard in place 
 // and that the 3D tab is unaffected by the Wizard View tab having nothing to show.
 test('no wizard form is conjured when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);
+  await waitReady(page, () => window.showApp && window.ddcsLoadBlockStack);
   await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => window.__blkws);
+  await waitReady(page, () => window.__blkws);
   await page.evaluate(() => window.ddcsLoadBlockStack([{ type: 'move', params: { x: 0, y: 0, z: -5, mode: 'feed' } }]));
   await page.waitForTimeout(500);
   const r = await page.evaluate(() => {

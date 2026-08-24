@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * POCKET-DEPTH FIELD (declare-not-derive). Inside features get a real BOTTOM at a DECLARED depth — the user owns the number,
@@ -9,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test('3D floor: an inside cavity with a declared depth gets a floor at top − depth; a full depth stays through', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await waitReady(page, () => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
         const { GcodeViz3D } = await import('/viz/gcodeViz3d.js');
         const host = document.createElement('div'); host.style.cssText = 'width:320px;height:320px;'; document.body.appendChild(host);
@@ -53,7 +54,7 @@ test('3D floor: an inside cavity with a declared depth gets a floor at top − d
 test.use({ viewport: { width: 1200, height: 900 } });
 test('modal depth field: editing it persists to feature.depth (round-trip) + floors the pocket; screenshot', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsOpenStock && window.ddcsGetSettings);
+    await waitReady(page, () => window.ddcsStudio && window.ddcsOpenStock && window.ddcsGetSettings);
     await page.evaluate(() => {
         const s = window.ddcsGetSettings().stock;
         Object.assign(s, { x: 120, y: 90, z: 20, datum: 'nnp', shape: 'pocket', features: [] });
@@ -76,7 +77,7 @@ test('modal depth field: editing it persists to feature.depth (round-trip) + flo
 
 test('SCRUTINY screenshot: a 3/4-angle render shows the pocket CONFINED (solid stock all around, walls to the floor, no full-width band)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await waitReady(page, () => window.ddcsGetBlockProgram);
     await page.evaluate(async () => {
         const { GcodeViz3D } = await import('/viz/gcodeViz3d.js');
         const host = document.createElement('div'); host.id = 'scrutiny3d'; host.style.cssText = 'position:fixed; left:0; top:0; width:560px; height:440px; background:#05070a; z-index:99999;'; document.body.appendChild(host);
@@ -93,7 +94,7 @@ test('SCRUTINY screenshot: a 3/4-angle render shows the pocket CONFINED (solid s
         try { viz.render(); } catch (_) {}
         window.__scrutinyReady = true;
     });
-    await page.waitForFunction(() => window.__scrutinyReady);
+    await waitReady(page, () => window.__scrutinyReady);
     await page.waitForTimeout(300);
     await page.locator('#scrutiny3d').screenshot({ path: 'scratchpad/pocket_recess_3q.png' });
     expect(true).toBe(true);
@@ -101,7 +102,7 @@ test('SCRUTINY screenshot: a 3/4-angle render shows the pocket CONFINED (solid s
 
 test('2D backdrop reflects a declared floor depth (a sub-through cavity gets the depth tag)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await waitReady(page, () => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
         const { projectWorkpiece, workpieceBackdrop } = await import('/engine/workpiece.js');
         const floored = workpieceBackdrop(projectWorkpiece({ x: 100, y: 80, z: 20, shape: 'pocket',

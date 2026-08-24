@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1623 — THE PALETTE BY ROLE (the t1572 ruling, landed): four groups on the EXISTING `category` axis —
@@ -17,7 +18,7 @@ test.use({ viewport: { width: 1600, height: 1000 } });
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
 };
 
 const toolboxGroups = () => async (pageEval) => pageEval;
@@ -102,7 +103,7 @@ test('THE EMPTY-GROUP SKIP, pinned by INVERSION — remove every member and the 
 test('ONE COLOUR PER ROLE — the inputs family shares a colour; layout keeps the authoring fuchsia; they differ', async ({ page }) => {
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    await waitReady(page, () => !!window.__blkws);
     const r = await page.evaluate(() => {
         const ws = window.__blkws;
         const mk = (t) => { const b = ws.newBlock(t); const c = b.getColour(); b.dispose(); return c; };
@@ -118,9 +119,9 @@ test('ONE COLOUR PER ROLE — the inputs family shares a colour; layout keeps th
 test('THE INNER-ELBOW FIX — the geras dark path is hidden (the black wedge at a mouth’s inside corner)', async ({ page }) => {
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    await waitReady(page, () => !!window.__blkws);
     await page.evaluate(() => window.ddcsEditWizardDef('user_pause_confirm'));
-    await page.waitForFunction(() => window.__blkws.getAllBlocks().length > 3, null, { timeout: 60000 });
+    await waitReady(page, () => window.__blkws.getAllBlocks().length > 3);
     const r = await page.evaluate(() => {
         const els = [...document.querySelectorAll('.blocklyPathDark')];
         return { count: els.length, anyVisible: els.some((e) => getComputedStyle(e).display !== 'none') };

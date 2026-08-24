@@ -53564,6 +53564,112 @@ verification, not folded into a triage report.
 
 Read-only turn — no test files edited, only run and measured.
 
+## t2233 — FIX THE FLAKES: one declared wait helper, 16 files' duplicated timeout numbers deleted, 22→17 measured
+
+### The real root cause, found by reading the actual error text instead of assuming
+
+`playwright.config.js`'s `use: { actionTimeout: 5_000 }` (meant for click/fill-style UI actions) also sets
+`page.setDefaultTimeout()` — which governs `page.waitForFunction` too. Any boot-readiness wait that omitted an
+explicit timeout was NOT inheriting the 60000ms test-level default as I assumed at t2231 — it was silently
+capped at **5 seconds**, tighter than every one of the ad-hoc numbers (60000/30000/10000/8000ms) other files
+guessed. Confirmed directly: re-ran the flaky batch and read the raised error verbatim —
+`TimeoutError: page.waitForFunction: Timeout 5000ms exceeded` on a call with no third argument at all.
+
+### The fix — one declared thing, per the advisor's naming of the disease (clickBtn/t2113, ghost-buttons, this)
+
+Added `tests/_boot.js`, exporting `waitReady(page, predicate, arg)` — a single wrapper around
+`page.waitForFunction(predicate, arg, { timeout: 0 })`. `timeout: 0` disables waitForFunction's OWN timeout
+entirely, so the ONLY governing budget left is the enclosing test's `test.setTimeout()` (or the 60s config
+default) — there is no second number that can drift out of sync with it, because there is no second number.
+
+Swept 16 spec files (`wizard-face-1599`, `shared-labels-1611`, `guard-roundtrip-1595`,
+`subscriber-error-surface-1656`, `palette-by-role-1623`, `modal-pre-canvas-1654`, `blocks-live-form`,
+`formfield-block`, `formfield-opparam-1640`, `collapse-on-delete-1948`, `group-canvas-knob`,
+`probe-port-gate-1880`, `pocket-depth`, `workspace-cloud-tab-1233`, `guard-prune`,
+`option-b-slice3-live-visibility-1874`) — every APP/WORKSPACE-READINESS `waitForFunction` call (checks for
+`__blkws`, `ddcsStudio`, `ddcsGetBlockProgram`, `showApp`, etc.) now goes through `waitReady()`. Deliberately
+scoped OUT: calls confirming a specific, single, already-triggered UI result (a save's exact filename, a
+panel's `.__panel` object materializing, a dialog closing) — kept their existing explicit timeouts, since
+they're a different question ("did this one action's result land") than "has the app finished getting ready,"
+and touching them wasn't evidenced by any failure trace.
+
+### workspace-dirty-dot-2188 — NOT a timing race once actually looked at; the assertion itself was wrong
+
+Per the advisor's instruction to look hard at the assertion before assuming a race: `#hdrWsDirtyDot`'s fill
+toggle is implemented via `transform: scale(.4 → 1)` (styles.css:776/778), and `getBoundingClientRect()` (what
+`.boundingBox()` reads) reports the POST-transform visual rect — genuinely 3.2px at rest vs 8px full-size, not
+noise. First attempt (waiting for `transitionend` before reading) proved this: the read became RELIABLE, but
+reliably showed 8 vs the clean read's 3.2 — the two were never going to be equal once measured honestly. The
+design intent ("the element always occupies its own box... only its VISUAL fill toggles") is a LAYOUT
+guarantee, and `offsetWidth`/`offsetHeight` (unaffected by `transform`) is the correct, race-immune way to
+assert it — rewrote the test to read those instead of `boundingBox()` for the dot's own size, keeping the
+existing (and always-correct) neighbour-X-position check for the actual "does not reflow" property. This is
+the "genuine intermittent bug" category the dispatch warned not to assume away — except the bug was in the
+TEST's assertion, not the app; the app's fill mechanism was correct all along.
+
+### Measured, before vs after (the same batch, isolated file, and full-suite comparisons the dispatch asked for)
+
+**Isolated, single file** (`wizard-face-1599`, `--workers=1 --repeat-each=5`, matching the t2231 baseline
+exactly): 40% (8/20) before → 10% (2/20) on the first re-run. A SECOND isolated re-run (`--repeat-each=8`)
+came back worse — 37.5% (3/8) — one of the three failures being the ALREADY-DOCUMENTED, unrelated t1766
+reproject-echo race living in the same file (not something this turn touched), and two hitting the full
+300000ms `test.setTimeout()` with `window.__blkws` never becoming truthy at all. Investigated rather than
+accepted at face value: this machine is carrying roughly 20 stray node/MCP processes accumulated over multiple
+days (Aug 15–23 creation dates) — several live `chrome-devtools-mcp` instances (each drives a real Chrome), a
+few `@modelcontextprotocol/server-sequential-thinking` servers, two stale `http-server`/`mem-server` processes
+on abandoned ports, and a day-old orphaned Playwright `test-server`. None are in this session's own tracked
+process subtree (`proc_health.py watch` reports it clean), so they predate and are unrelated to this turn —
+but they are real, uncontrolled background load that makes "isolated, --workers=1" not actually isolated on
+this machine. Did NOT kill them (not mine, ambiguous whether another session/tool depends on them, and killing
+unrelated processes without clear ownership is exactly the kind of action that wants asking first) — flagging
+this plainly rather than either pretending the isolated numbers are clean or unilaterally clearing the machine.
+
+**Same 16-file batch, default parallelism** (matching t2231's exact "before" methodology): 9 failed (2.1m)
+before → 8 failed (**15.1m** — a 7x wall-clock increase) after. Most of the 8 are DIFFERENT tests than before:
+14 test-instances from the original set are now clean (both `collapse-on-delete-1948` cases, both
+`guard-roundtrip-1595` cases that had been the worst-documented instance of this exact disease per its own
+header comment, `option-b-slice3-live-visibility-1874`, `palette-by-role-1623`, `wizard-face-1599`'s CUSTOMIZE
+case, `modal-pre-canvas-1654`'s undeclared-field case, `probe-port-gate-1880`) — but `guard-roundtrip-1595`
+gained TWO NEW failures this run, each burning its FULL declared budget (300000ms and 600000ms) before giving
+up. ⚠ **THE HONEST COST, NAMED RATHER THAN HIDDEN:** deleting the artificial inner cap is correct — it stops a
+test from failing on a wrong number instead of the real condition — but when the real condition genuinely
+doesn't resolve under heavy contention, the test now burns its ENTIRE generous outer budget instead of failing
+in seconds. A red run under contention got much slower, even though fewer tests are wrong.
+
+**Full suite, both tiers** (the authoritative apples-to-apples number, same command as t2231's baseline): 2793
+passed, **17 flaky** (down from 22), 0 unexpected, 25 skipped. `workspace-dirty-dot-2188` is completely clean.
+`shared-labels-1611`, `subscriber-error-surface-1656`, and `wizard-face-1599` are STILL flaky — a genuine
+contention/slowness issue survives past the timeout-number fix for these specifically. 13 files that were NOT
+flaky in the t2231 baseline appear flaky in this run instead (`coord-list-block`, `corner-wall-collapse-1664`,
+`formfield-loud-mismatch-1636`, `group-chip`, `group-gesture`, `gui-blocks-reauthor`, `middle-superset`,
+`pane-visual-host-programmatic-1762`, `param-group-rows-1605`, `passes-field-1613`, `plane-guarantee-961`,
+`save-dialog-declared-1615` ×2, `tooltable-gate-1890`) — NONE of these files were touched this turn. This
+matches a phenomenon this project's OWN `playwright.config.js` already documents and named at t1718/t1719/
+t1724 (comment at line ~26-29): under `workers: 6` contention, "the contention-starved population shifts run
+to run," which is why the project tracks the COUNT as its health metric rather than a fixed per-spec list.
+Read as: normal, already-known suite variance, not a regression this turn's change caused (this turn touched
+none of these 13 files) — but naming it rather than silently absorbing it into the "fixed" claim.
+
+### What this turn did NOT do, and why
+
+Did not attempt to further chase `shared-labels-1611`/`subscriber-error-surface-1656`/`wizard-face-1599`'s
+remaining flakiness, or diagnose why `__blkws` sometimes never appears within 5-10 real minutes under
+contention. That is a genuine, undiagnosed root cause (resource starvation from this machine's own stray-process
+load, real per-worker CPU contention at `workers: 6`, or an actual app-level slow-path/deadlock in Blocks-tab
+boot) and guessing at a fix without knowing which would be hand-rolling a patch for an undeclared cause —
+exactly what this session's own declare-before-hand-roll discipline argues against. Recommending it as its own
+dedicated investigation, informed by this turn's evidence (specifically: try the same isolated measurement on
+a machine without the ~20 stray processes, before assuming an app-level bug).
+
+### Non-vacuity
+
+The mechanism fix is proven non-vacuous by the measured count drop (22→17, matching the exact same full-suite
+command as the t2231 baseline) and by the specific before/after test-identity comparison (14 named test
+instances that failed under the old code now pass under the new code, same batch, same command). The
+`workspace-dirty-dot-2188` fix is proven non-vacuous the same way t2206's was: reverted to `.boundingBox()`
+mentally (the git history/diff shown above) shows exactly why the old assertion could never have reliably
+passed once the race was removed — the fix isn't a guess, the failure was reproduced and explained.
+
 ## t2229 — PART ONE: STILL REAL IF, RUN FOR REAL — #10, F1, F3, F4
 
 ### F1 — appears STALE; the STILL REAL IF check itself had a bug

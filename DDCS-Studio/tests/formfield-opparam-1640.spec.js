@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitReady } from './_boot.js';
 
 /**
  * t1640 — THE FORMFIELD GAINS AN OP PARAM MODE. t1636 measured this is not a fork: `deriveBindings`'s matcher
@@ -57,7 +58,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('REAL APP: an Op Param field authored over surfaceraster saves, survives reload, renders its baked default, and editing it drives the built stack\'s own atom param', async ({ page }) => {
     page.on('dialog', (d) => d.accept());
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
+    await waitReady(page, () => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
     await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
     // author: a bare surfaceraster leaf (no assign blocks at all — the exact shape that derived ZERO bindings pre-fix)
@@ -73,7 +74,7 @@ test('REAL APP: an Op Param field authored over surfaceraster saves, survives re
         window.ddcsLoadBlockStack(stack);
     }, RASTER_PARAMS);
     await page.evaluate(() => window.showApp('blocks'));
-    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+    await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks().length > 0);
     await page.waitForTimeout(500);
 
     // save via the real button + real dialog — must NOT refuse (the pre-fix shape of this exact stack refused / derived nothing)
@@ -92,7 +93,7 @@ test('REAL APP: an Op Param field authored over surfaceraster saves, survives re
     expect(savedOpType, 'the save dialog opened and the wizard persisted — no false refusal').toBeTruthy();
 
     await page.reload();
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWiz);
+    await waitReady(page, () => document.documentElement.dataset.ddcsReady === '1' && window.openWiz);
     const registered = await page.evaluate(async (opType) => {
         const U = await import('/blocks/userOps.js');
         const op = U.listUserOps().find((o) => o.opType === opType);
@@ -143,7 +144,7 @@ test('the t1636 loud refusal still fires in Op Param mode: a dangling atomType, 
     const dialogs = [];
     page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
+    await waitReady(page, () => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
     await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
     // Op Param naming an atom type that ISN'T in the stack at all — 0 hits.
@@ -157,7 +158,7 @@ test('the t1636 loud refusal still fires in Op Param mode: a dangling atomType, 
         window.ddcsLoadBlockStack(stack);
     }, RASTER_PARAMS);
     await page.evaluate(() => window.showApp('blocks'));
-    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+    await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks().length > 0);
     await page.waitForTimeout(500);
     await page.waitForSelector('.blk-dev-savebtn', { state: 'visible' });
     await page.evaluate(() => window.ddcsSaveAsWizard());
@@ -181,7 +182,7 @@ test('the t1636 loud refusal still fires in Op Param mode: a dangling atomType, 
         window.ddcsLoadBlockStack(stack);
     }, RASTER_PARAMS);
     await page.evaluate(() => window.showApp('blocks'));
-    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+    await waitReady(page, () => window.__blkws && window.__blkws.getAllBlocks().length > 0);
     await page.waitForTimeout(500);
     await page.waitForSelector('.blk-dev-savebtn', { state: 'visible' });
     await page.evaluate(() => window.ddcsSaveAsWizard());
