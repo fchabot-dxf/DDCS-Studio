@@ -52602,3 +52602,77 @@ computed/spread shape, an accidental timestamp, anything not perfectly stable), 
 dirty the workspace with no real content behind it — the EXACT bug class t2196 just fixed, reached through a
 different door (a plain boot, no controller switch required) that nothing currently guards against. Named here
 as the reportable finding; NOT fixed in this turn, per the dispatch's own instruction ("report first").
+
+## t2206 — THE FLAKE, ROOT-CAUSED AND FIXED; the latent risk RECORDED as a comment (both per the advisor's steer)
+
+t2204's interim report (paused on direct human instruction to consult the advisor before digging further alone)
+came back with clear direction: fix the swallowed exception first regardless of the flake, capture the exact
+404'd URLs before chasing any other lead, and record (don't guard) the `seedDefaultPortedUserOps` risk as a
+comment. All three done this turn.
+
+### Part 1a — the swallowed exception (`ui/gatewayStatus.js`)
+
+`showApp()`'s own `if (isBlocks) { try { … } catch (err) { console.error(...) } }` never rethrows — a genuine
+`showBlocks()` failure has always surfaced as a clean, successfully-resolved promise to every caller, and to a
+test polling `window.__blkws` for readiness, as an opaque 60s timeout with the real exception thrown away one
+line above. Fixed to rethrow after logging. Checked every real caller first (`grep`, 12 call sites) — every
+one already either doesn't await the call at all (fire-and-forget; a throw just becomes a normal unhandled-
+rejection log instead of a silently swallowed one) or already wraps it in its own `try/catch`. Safe to rethrow.
+
+### Part 1b — capturing the real 404s (the advisor's own strongest lead, and it was wrong — cleanly)
+
+Instrumented a faithful 3-test replica (`page.on('dialog', accept)` + `test.setTimeout(180_000)`, matching the
+real file's own preamble exactly, since that combination — not the boot sequence alone — was what reproduced
+the flake at t2204) with `page.on('response')`/`page.on('console')`/`page.on('pageerror')`. The 404s are
+**`/api/config`/`/api/descriptor`** — the gateway-status endpoints `gatewayStatus.js` polls periodically, which
+the TEST HARNESS's mem-server never implements (by design — it serves `web/` files, not a real gateway
+backend). They fire on EVERY boot, pass or fail alike, and are NOT any file added this session. This directly
+kills the advisor's own "stale file-listing" lead, cleanly, exactly as they asked it to be tested. (Separately,
+mid-investigation: found and killed a genuinely orphaned `mem-server.cjs` process — PID from an earlier
+interrupted diagnostic run — still holding port 3211. A real, if unrelated, piece of session hygiene, not the
+flake's cause: `playwright.config.js` refuses to silently reuse a stale server, so it blocked a *new* run
+rather than serving stale content into one that already passed.)
+
+More importantly: WITH the rethrow from 1a now live, a live flaky run STILL showed only the plain
+`waitForFunction` timeout — no thrown exception, no new console error beyond the routine 404 polling. This
+rules out "swallowed exception" as the flake's own mechanism (the fix is still correct and worth keeping — it
+just isn't what was hiding THIS bug) and confirms the boot genuinely runs long sometimes, not that it fails.
+
+### Part 1c — the actual bug: a timeout budget mismatch, found once the false leads were cleared
+
+`bootBlocks()`'s own `waitForFunction(() => !!window.__blkws, …)` was hardcoded to `{ timeout: 60000 }` while
+EVERY test in the file sets its own `test.setTimeout(120_000–180_000)` — the test author clearly anticipated
+Blocks boot could run long, but the INNER wait undercut that budget by half to two-thirds. A run that
+genuinely takes 61–70 seconds under load (measured live: one flaky run failed at 61821ms, right past the old
+cap) was failing on an arbitrary INNER ceiling with 60-120 seconds of the test's own declared budget still
+sitting unused. Fixed: raised to 100000ms — under the FILE's shortest `test.setTimeout` (120_000, the third
+test) with headroom left for the rest of that test's own body afterward.
+
+### Verified against the project's own real usage, not just `--retries=0`
+
+Before this turn's fixes: the file failed 2-of-3 or worse, reproducibly, even WITH `--retries=0` bypassed
+manually (matching t2202/t2204's own findings). After: an isolated `--retries=0` run improved to 2/3 passing
+outright (one still hit the new 100000ms ceiling — the load-sensitivity is real, not imagined, just smaller
+now). Run again under the PROJECT'S OWN actual gate configuration (`playwright.config.js`'s declared
+`retries: 2`, deliberately NOT bypassed this time — that global policy exists exactly for genuine one-off
+contention stalls, per that file's own comment) — the one remaining slow case was correctly absorbed and
+reported as "1 flaky" (passed on retry), with the other two tests green outright. This is the health metric
+the project's own config already asks for (`scripts/test-all.cjs` reads the flaky count, not a per-spec name
+list) — not a new quarantine invented for this turn, the EXISTING one, now confirmed to actually work here.
+
+### Part 2 — the latent-risk comment (`app.js`'s `seedDefaultPortedUserOps`)
+
+Per the advisor's own explicit instruction ("record it in the code, do not build a guard for it — a comment
+is the cheap, durable thing; a guard is machinery for a bug that does not exist yet"): added a comment at the
+function itself naming the finding from t2204's own investigation (byte-identical rewrite in the common case,
+the one real-divergence case already closed by t2196/t2198, the standing risk if any future seed builder is
+ever non-deterministic) — no functional change, no guard, no new machinery.
+
+### Verification
+
+Lint clean on every touched file (`gatewayStatus.js`, `app.js`, the one test file — comment-only there beyond
+the timeout number). Full smoke tier (77) green. A 15-file sample of Blocks-tab tests run as a broader
+collateral check on the rethrow — one incidental failure (`blocks-live-form.spec.js`, `window.showApp is not a
+function`) reproduced as a CLEAN PASS in isolation immediately after, confirming it was the SAME session-wide,
+load-driven flakiness this whole investigation has been chasing, not something the rethrow introduced (a
+`TypeError: is not a function` is not a shape a `throw err` inside an existing catch block could ever produce).

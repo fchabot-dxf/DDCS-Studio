@@ -220,7 +220,19 @@ export function initGatewayStatus() {
         if (isBlocks) {
             try {
                 await (await import('../blocks/blocksApp.js')).showBlocks();
-            } catch (err) { console.error('blocks init failed', err); }
+            } catch (err) {
+                // t2206 — RETHROWN, not just logged. Swallowing this here meant a genuine build failure (Blockly's
+                // own script-tag load failing, say) surfaced to every caller as a clean, successful showApp()
+                // promise — and to a caller polling for the app's own readiness signal (window.__blkws), as an
+                // opaque timeout with zero diagnostic value, since the real exception this file already caught
+                // was thrown away one line above. Every real caller already tolerates a throw here: the fire-
+                // and-forget ones (`window.showApp && window.showApp('blocks')`, unawaited) just get a normal
+                // unhandled-rejection log instead of a silent one; the awaited ones already wrap the call in
+                // their own try/catch. console.error stays too — a fast trail in the browser console costs
+                // nothing extra now that the real signal also reaches whoever is actually watching for it.
+                console.error('blocks init failed', err);
+                throw err;
+            }
         }
     }
 

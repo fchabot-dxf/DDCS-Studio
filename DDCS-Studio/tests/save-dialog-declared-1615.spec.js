@@ -15,7 +15,13 @@ const bootBlocks = async (page) => {
     await page.goto('/', { timeout: 60000 });
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+    // t2206 — was 60000, mismatched against every test in this file's own `test.setTimeout` (120_000-180_000):
+    // the inner wait could time out and fail the test with 2+ minutes of its own declared budget still unused.
+    // Measured, not guessed (a rotating 2-of-3 flake reproduced live, isolated to exactly this wait, with
+    // gatewayStatus.js's own showApp() no longer swallowing a real build exception — none was thrown; the boot
+    // genuinely just runs long under load sometimes). 100000 fits under the SHORTEST test.setTimeout in this
+    // file (120_000, the third test) with headroom left for the rest of that test's own body.
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 100000 });
 };
 const settle = async (page) => {
     let last = -1;

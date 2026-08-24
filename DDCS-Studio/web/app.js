@@ -221,6 +221,19 @@ class DDCSStudio {
     // Built-ins remain untouched; these are user-layer entries and can be hidden/deleted/overridden like any other custom op.
     // IMPORTANT: existing saved seeded defs are upgraded in place so new UI metadata (dropdown options, panel/sim blocks,
     // domain grouping) appears for users who already had earlier versions in localStorage.
+    // t2204/t2206 (investigated, latent risk RECORDED not guarded — a declaration, not an engine) — this runs on
+    // EVERY boot, unconditionally, and updateUserOp() always writes regardless of whether the fresh build differs
+    // from what's already stored. Harmless TODAY only because every SEED_BUILDERS entry happens to be
+    // deterministic given the active controller (defV is declared, so updateUserOp's own bump guard never fires;
+    // savedAt is preserved from the stored def) — confirmed empirically (t2196) that a plain reboot with no
+    // controller change reproduces byte-identical output, so the dirty flag (data/backup.js, reading raw
+    // localStorage) never trips. The ONE case where a seed's output genuinely differs — a controller-dependent
+    // builder like user_atc_length_data's tool-register mapping — is a real semantic change, already handled by
+    // the post-open re-baseline (ui/fileSaveState.js's settleThenMark). ⚠ THE RISK THIS LEAVES STANDING: if any
+    // seed builder — present or future — ever produces non-deterministic output between calls (a computed/spread
+    // key order that isn't stable, an accidental timestamp, anything not perfectly reproducible), every boot
+    // would silently dirty the workspace with no real content behind it — the exact bug class t2196 fixed,
+    // reached through a plain boot instead of a controller switch, with nothing here to catch it.
     seedDefaultPortedUserOps() {
         const have = new Set(listUserOps().map((d) => d.opType));
         const seeds = SEED_BUILDERS.map((fn) => fn());   // t1107 — SEED_BUILDERS is the ONE source (module-level), shared with the per-wizard Restore-to-factory reseed
