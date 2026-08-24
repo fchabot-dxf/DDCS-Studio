@@ -12,7 +12,6 @@ import { DockManager } from './ui/dockManager.js';
 import { WizardManager } from './wizardManager.js';
 import { el } from './ui/uiUtils.js';
 import { setupGlobalFunctions } from './ui/globalFunctions.js';
-import { sfx } from './ui/sound.js';  // themed earcon suite (t2125)
 import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, getUserDef } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops; t1107 — per-wizard Restore-to-factory reseed
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
@@ -182,19 +181,14 @@ class DDCSStudio {
 
         // Visual Viewport -> detect virtual keyboard on mobile (adds/removes `keyboard-active` on <body>)
         if (window.visualViewport) {
-            // track previous keyboard state so we only play sound when it opens
-            this._keyboardActive = false;
-
+            // t2229 (BACKLOG F3a) — the edge-tracking this._keyboardActive used to gate here (only PLAY on the
+            // open transition) existed solely to time sfx('keyboard.opened'), now deleted (human ruling: a
+            // sound is only justified when the state it reports isn't already visible — the keyboard opening
+            // IS visible). The classList toggle below needs no edge state at all, just the current value.
             const _checkKeyboard = () => {
                 try {
                     const vv = window.visualViewport;
                     const newActive = vv && vv.height < window.innerHeight * 0.8;
-
-                    if (newActive && !this._keyboardActive) {
-                        // keyboard just opened
-                        sfx('keyboard.opened');
-                    }
-                    this._keyboardActive = newActive;
 
                     if (newActive) {
                         document.body.classList.add('keyboard-active');

@@ -224,8 +224,6 @@ export class WizardManager {
         // non-blocking prompt instead of opening. "Open anyway" re-enters with bypassPrereq, so the gate is a
         // thin pass-through when the hardware is present (or the user already chose to proceed).
         if (needsPrereqPrompt(type, variant, bypassPrereq)) return;
-        // play a feedback sound whenever a wizard is opened
-        sfx('wizard.opened');
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
         closeTemplatesPopover();
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
@@ -441,18 +439,17 @@ export class WizardManager {
     // and no-ops — same known, unfixed silent-blank-modal shape as 'corner' — see ARCHITECTURE.md TRAPS #5.)
 
     /**
-     * Hide the wizard overlay.  If `reverse` is truthy the click sound will
-     * play backwards; callers that are performing an insert should pass
-     * `false` so only the forward animation is heard. If `isCancel` is true, 
-     * the form's edits are discarded by restoring the snapshot taken on open.
+     * Hide the wizard overlay. If `isCancel` is true, the form's edits are discarded by restoring the
+     * snapshot taken on open.
+     * t2229 (BACKLOG F3a) — `reverse` is now VESTIGIAL: its only effect was gating sfx('wizard.closed'),
+     * deleted this turn (human ruling: no sound for a state already visible). Left in the signature rather
+     * than swept — every caller already passes it explicitly and none relies on it for anything else, so
+     * removing it is a real but separate cleanup, not this turn's scope (F3a is the ACTION table only).
      */
     close(reverse = true, isCancel = true) {
         // t810 — let the active view tear down (symmetric with onShow): userOpView drops any pending throttled recompute
         // so a trailing update can't ghost-fire ~200ms after the modal closes.
         { const view = this.activeView(); if (view && typeof view.onHide === 'function') view.onHide(this); }
-        if (reverse) {
-            sfx('wizard.closed');
-        }
         if (isCancel && this._formSnapshot) {
             this._restoreForm(this._formSnapshot);
         }
@@ -575,7 +572,8 @@ export class WizardManager {
             console.warn('WizardManager: No visible wizard or empty code.');
         }
 
-        // do not fire reverse sound when closing as part of insertion, and do not revert the form snapshot
+        // isCancel:false — do not revert the form snapshot, this is a successful insert. (reverse:false here
+        // is now inert, t2229 — see close()'s own docstring.)
         this.close(false, false);
     }
 

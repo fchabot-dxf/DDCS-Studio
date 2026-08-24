@@ -23,6 +23,11 @@ import { test, expect } from '@playwright/test';
  *     actually competes with `.editor-container .viz3d-handle`'s own specificity for these specific properties).
  *     The REMAINING !important flags (position, width, min-*, padding, border-radius, box-shadow, touch-action)
  *     are untouched — a different, still-live concern this tail did not re-verify.
+ *
+ * t2229 (BACKLOG amendment 1) — the declared SLOT this turn built stayed unfilled for four themes until then:
+ * they all read the shared :root blue default. That turn gave each of the four its own theme material (reusing
+ * each theme's own --btn-face/-edge/-ink, t2075) — the first test below now asserts THAT, not the old shared
+ * blue it used to pin byte-identical.
  */
 
 const THEMES = ['studio', 'normal', 'steampunk', 'futuristic', 'organic'];
@@ -49,17 +54,37 @@ const handleStyle = (page) => page.evaluate(() => {
     };
 });
 
-test('the four NON-studio themes render the exact original hardcoded blue, via tokens now (byte-identical)', async ({ page }) => {
+// t2229 (BACKLOG amendment 1) — SUPERSEDED: the four non-studio themes no longer share one hardcoded blue.
+// --viz3d-handle-face/-face-hover/-edge/-ink were a declared slot only studio ever filled in; this turn filled
+// the other four too, each reusing that theme's OWN --btn-face/-edge/-ink material (t2075) rather than the
+// shared :root default. Values below are the real computed styles, captured live per theme, not hand-derived
+// from the source gradients — same discipline the rest of this file already uses.
+const EXPECT = {
+    normal:     { bg: 'rgb(244, 244, 244)', bgImage: 'none', ink: 'rgb(51, 51, 51)', edgeTop: 'rgb(221, 221, 221)' },
+    steampunk:  { bg: 'rgba(0, 0, 0, 0)', bgImage: 'linear-gradient(rgb(107, 83, 41), rgb(74, 56, 25))', ink: 'rgb(212, 165, 116)', edgeTop: 'rgb(139, 105, 20)' },
+    futuristic: { bg: 'rgba(0, 0, 0, 0)', bgImage: 'linear-gradient(rgba(28, 42, 66, 0.92), rgba(10, 16, 28, 0.95))', ink: 'rgb(183, 243, 255)', edgeTop: 'rgba(45, 226, 255, 0.45)' },
+    // organic's own --btn-edge is transparent (t2208 — the theme went borderless); the FACE gradient alone
+    // carries the handle's shape, exactly the t2213/t2214 lesson the amendment named directly for this control.
+    organic:    { bg: 'rgba(0, 0, 0, 0)', bgImage: 'linear-gradient(rgb(231, 219, 192), rgb(204, 189, 153))', ink: 'rgb(42, 33, 23)', edgeTop: 'rgba(0, 0, 0, 0)' },
+};
+
+test('the four NON-studio themes each render their OWN theme material now, not a shared blue (t2229)', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 });
     await ready(page);
     for (const theme of THEMES.filter((t) => t !== 'studio')) {
         await setTheme(page, theme);
         const s = await handleStyle(page);
-        expect(s.bg, `${theme}: same blue background as before this turn`).toBe('rgba(28, 86, 140, 0.95)');
-        expect(s.ink, `${theme}: same ink colour as before this turn`).toBe('rgb(234, 244, 255)');
-        expect(s.edgeTop, `${theme}: same edge colour as before this turn`).toBe('rgba(130, 195, 255, 0.65)');
-        expect(s.edgeWidth, `${theme}: still has a real 1px border (the compound-shorthand bug this turn found and fixed didn't regress the DEFAULT case)`).toBe('1px');
+        const exp = EXPECT[theme];
+        expect(s.bg, `${theme}: fill's background-color`).toBe(exp.bg);
+        expect(s.bgImage, `${theme}: fill's background-image (the gradient, when it has one)`).toBe(exp.bgImage);
+        expect(s.ink, `${theme}: its own ink, not the old shared light-on-blue`).toBe(exp.ink);
+        expect(s.edgeTop, `${theme}: its own edge colour`).toBe(exp.edgeTop);
+        expect(s.edgeWidth, `${theme}: still a real 1px border (organic's own edge is transparent, not absent — width stays)`).toBe('1px');
         expect(s.edgeStyle, `${theme}: still solid`).toBe('solid');
+        // no theme still renders the pre-t2227 shared blue — confirms this is a genuine per-theme change,
+        // not an accidental byte-identical carry-over for any of the four.
+        expect(s.bg === 'rgba(28, 86, 140, 0.95)' || s.edgeTop === 'rgba(130, 195, 255, 0.65)',
+            `${theme}: must not still be the old shared blue`).toBe(false);
     }
 });
 

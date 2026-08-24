@@ -53465,3 +53465,96 @@ the "tracked" variant (the one red, now green). Re-ran twice: 2/2 clean, determi
 (77) after this additional change too.
 
 **All six originally red tests from t2223's triage are now fixed.**
+
+## t2229 — PART ONE: STILL REAL IF, RUN FOR REAL — #10, F1, F3, F4
+
+### F1 — appears STALE; the STILL REAL IF check itself had a bug
+
+The check as literally written (`grep -i "gate|client|server"` without `-E`) treats `|` as a literal
+character, not alternation — zero matches, but that's a broken pattern, not a real signal. Re-ran with `-E`:
+role-gating code is extensive, all routed through `roleInfoFromDescriptor()` (`ui/gatewayStatus.js:68`,
+t2151 — postdates this entry). Traced the SPECIFIC blocker the entry names end-to-end:
+`status.js:64` now reads `try { d = await ctx.client.descriptor(); } catch { d = null; }` — an unreachable
+daemon degrades to `d = null` rather than throwing past a bail; `roleInfoFromDescriptor(null)` → `baseRole:
+'client'` (its own default) → `roleIdentity(null)` → a fully-formed client identity, no throw. A pure client
+with zero reachable daemon gets a real "This PC is a client" render now — exactly the case the entry says was
+impossible. Appended a BACKLOG update reporting this rather than editing `ROLES-PLAN.md` myself (reads as
+advisor-owned planning, same convention as ROADMAP.md).
+
+### F3 — STILL REAL (confirmed by inspection, matching the check's own existence-only framing) — TAKEN, see Part Two
+
+### F4 — STILL REAL, confirmed unbuilt (0 hits, correctly read as "still real" per the inverted ADD-item framing)
+— but the entry's own text already carries a direct human ruling deferring it ("not doing it now"), moved to
+ROADMAP.md. Not eligible for Part Two on that basis, not size.
+
+### #10 — not independently re-verified beyond a read (the dispatch explicitly said not to start it regardless
+of survival — a design question needing its own dispatch with the granularity question settled first).
+
+## t2229 — PART TWO: F3a TAKEN — the smallest (and only eligible) survivor
+
+Excluding #10 (explicitly off-limits this turn) and F4 (explicitly human-deferred), F3 was the only genuinely
+eligible AND smallest item. Two halves, per the entry's own split: F3a (backlog, mine to build) and F3b (a
+design proposal, the advisor's to write) — see the hand-back note for F3b's proposal.
+
+### The deletion — and a real "sweep the chain" catch along the way
+
+`ui/sound.js`'s `ACTION` table: deleted `ui.click`/`ui.toggle`/`wizard.opened`/`wizard.closed`/
+`keyboard.opened` (the human's generalised rule: no sound for a state already visible on screen — every one
+of these five fires for something the eye already sees the instant it happens).
+
+**First swept only `ui/` and concluded (wrongly) that nothing called any of these** — `app.js` and
+`wizardManager.js` live at the web root, outside that search, and BOTH had real, live `sfx()` calls
+(`keyboard.opened` in `app.js`, `wizard.opened`/`wizard.closed` in `wizardManager.js`). Caught by re-running
+the grep across the WHOLE `web/` tree before trusting the first result — exactly the kind of mistake this
+session's own "sweep the chain, not just the visible symptom" doctrine exists to catch, self-caught this
+time rather than needing another turn to find it.
+
+Removed all three real call sites, plus what became dead WEIGHT around them once the sound was gone, not
+just the calls themselves:
+- `app.js`: the whole `this._keyboardActive` edge-tracking state (declaration + check + update) existed
+  SOLELY to gate the now-deleted sound — the `keyboard-active` classList toggle needs no edge state at all,
+  just the current value. Removed the dead state, kept the classList toggle. Removed the now-unused `sfx`
+  import too.
+- `wizardManager.js`: `close()`'s own `reverse` parameter is now VESTIGIAL (its only effect was gating
+  `sfx('wizard.closed')`) — flagged in the docstring rather than swept, since removing it ripples into 3+
+  callers that all pass it explicitly, a real but separate cleanup beyond F3a's own stated scope (the ACTION
+  table only). A stale comment at the one caller that relied on the old wording ("do not fire reverse sound…")
+  updated to describe only what's still true (`isCancel:false`).
+- `sound-toggle-2125.spec.js` used `ui.click`/`ui.toggle` as generic stand-in actions to test the sound
+  SYSTEM's own mechanics (debounce, master toggle, off-list, preview) — not the specific chirps. Swapped to
+  two surviving voice actions (`block.snap`/`wizard.inserted`) at all 6 call sites so the tests keep testing
+  what they were built to test. One test's own TITLE ("real sfx() call sites") went stale too, since
+  `open()`/`close()` no longer call `sfx()` at all — corrected rather than left to misdirect the next reader.
+
+### The addition — block.snap, verified live before wiring anything
+
+The human's own named exception ("ambiguous enough to be kept audible"). No existing listener for a
+Blockly connect event anywhere in the codebase — genuinely new wiring, not a one-line table entry as the
+backlog's own phrasing ("same one-line-per-action shape") slightly undersold. Rather than trust Blockly's
+vendored `.d.ts` (which doesn't cover event shapes at all — checked, it's just the top-level module
+re-exports) or guess at the reason string, drove a REAL disconnect+reconnect on a live workspace and logged
+the actual event: `e.type === 'move'`, `e.reason` an array containing `'connect'` on a genuine snap,
+`['disconnect','bump']` on the corresponding disconnect — confirmed empirically, not assumed. Added `sfx`
+import + one guarded call inside `blocksApp.js`'s own existing workspace change listener (`if (e.type ===
+'move' && e.reason && e.reason.includes('connect')) sfx('block.snap');`) — reuses the listener that already
+exists, not a second one. `block.snap` given its own semitone lift (+2, distinct from the deleted
+`wizard.opened`'s +5) — a snap is a small confirmation, not a scene change.
+
+### Verification
+
+Confirmed `block.snap` is a recognized action (no `sfx: unknown action` console warning) on a real
+disconnect+reconnect gesture. Full `sound-toggle-2125.spec.js` re-run: 13/13 pass. Full sweep of the whole
+repo for any remaining reference to the 5 deleted names outside explanatory comments: clean. Full smoke tier
+green (77).
+
+**Full suite: 2787 passed, 1 failed, 22 flaky, 25 skipped (25.9 min) — the one failure is a genuine finding
+from t2227, not this turn's own work.** `viz3d-handle-theme-2155.spec.js`'s own test explicitly pinned "the
+four NON-studio themes render the exact original hardcoded blue" — a test written FOR the pre-t2227 state,
+correctly failing now that t2227 gave each of the four its own theme material instead of the shared blue.
+t2227 never ran the FULL suite (only smoke + the directly-relevant files), so this sat undetected across two
+commits until this turn's own full run caught it. **Fixed**: captured the real computed values per theme live
+(background, gradient, ink, edge — not hand-derived from the source CSS) and rewrote the test's first case to
+assert the NEW per-theme material, plus a standing guard that none of the four still renders the old shared
+blue by accident. Re-ran the file: 3/3 pass. This is exactly the "full suite before calling any turn done"
+discipline this whole run has been building — noting it here as a gap in t2227's own verification, not
+papering over it.

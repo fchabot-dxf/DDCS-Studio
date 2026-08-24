@@ -94,7 +94,7 @@ test('t2134 MOBILE SILENCE FIX: sfx() on a SUSPENDED AudioContext defers schedul
     await boot(page);
     await page.evaluate(async () => {
         const { sfx } = await import('/ui/sound.js');
-        sfx('ui.click');
+        sfx('block.snap');   // t2229 — was 'ui.click' (deleted, BACKLOG F3a); any declared voice action proves the same defect
         await new Promise((r) => setTimeout(r, 200));   // let the fake resume()'s 60ms settle + the .then() fire
     });
     const { events, resumeCalled } = await page.evaluate(() => window.__suspSpy);
@@ -194,9 +194,9 @@ test('a per-sound row silences ONLY that action, stored as an exceptions-only of
 
     const stillOnOthers = await page.evaluate(async () => {
         const { isActionOn } = await import('/ui/sound.js');
-        return { sent: isActionOn('job.sent'), click: isActionOn('ui.click') };
+        return { sent: isActionOn('job.sent'), snap: isActionOn('block.snap') };   // t2229 — was 'ui.click' (deleted, BACKLOG F3a)
     });
-    expect(stillOnOthers, 'silencing one action must not silence any other').toEqual({ sent: false, click: true });
+    expect(stillOnOthers, 'silencing one action must not silence any other').toEqual({ sent: false, snap: true });
 
     // re-enable → the exception is removed, not just flagged false
     await page.evaluate(() => {
@@ -219,19 +219,20 @@ test('sfx() actually silences synthesis when the master is OFF, and actually pro
     await page.evaluate(async () => {
         const { sfx } = await import('/ui/sound.js');
         window.ddcsGetSettings().sound.enabled = false;
-        sfx('ui.click');
+        sfx('block.snap');   // t2229 — was 'ui.click' (deleted, BACKLOG F3a)
     });
     const off = await spyCounts(page);
     expect(off.synthCount, 'master OFF must create ZERO audio nodes').toBe(0);
 
     // a DIFFERENT action name than the OFF check above — sfx()'s own 60ms debounce is keyed per action
     // name and module state (the lastFired Map) persists across these two evaluate() round trips, so
-    // reusing 'ui.click' here risks a false negative if the two calls land inside that window.
+    // reusing 'block.snap' here risks a false negative if the two calls land inside that window.
+    // t2229 — was 'ui.toggle' (deleted, BACKLOG F3a).
     await page.evaluate(async () => {
         const { sfx } = await import('/ui/sound.js');
         const s = window.ddcsGetSettings();
         s.sound.enabled = true; s.sound.off = [];
-        sfx('ui.toggle');
+        sfx('wizard.inserted');
     });
     const on = await spyCounts(page);
     expect(on.synthCount, 'master ON, nothing silenced, must actually synthesize').toBeGreaterThan(0);
@@ -245,14 +246,14 @@ test('sfx() silences ONLY the per-action off-listed sound, not its siblings', as
     await page.evaluate(async () => {
         const { sfx } = await import('/ui/sound.js');
         const s = window.ddcsGetSettings();
-        s.sound.enabled = true; s.sound.off = ['ui.click'];
-        sfx('ui.click');   // silenced
+        s.sound.enabled = true; s.sound.off = ['block.snap'];   // t2229 — was 'ui.click' (deleted, BACKLOG F3a)
+        sfx('block.snap');   // silenced
     });
     expect((await spyCounts(page)).synthCount, "the specifically-silenced action must create nothing").toBe(0);
 
     await page.evaluate(async () => {
         const { sfx } = await import('/ui/sound.js');
-        sfx('ui.toggle');   // a DIFFERENT action, never silenced
+        sfx('wizard.inserted');   // a DIFFERENT action, never silenced — t2229, was 'ui.toggle' (deleted, BACKLOG F3a)
     });
     expect((await spyCounts(page)).synthCount, 'a sibling action must be unaffected').toBeGreaterThan(0);
 });
@@ -270,8 +271,8 @@ test('the preview button plays a silenced sound regardless of its own toggle or 
         const { previewSfx } = await import('/ui/sound.js');
         const s = window.ddcsGetSettings();
         s.sound.enabled = false;             // master OFF
-        s.sound.off = ['ui.click'];          // AND this specific action silenced
-        try { previewSfx('ui.click'); return null; } catch (e) { return String(e); }
+        s.sound.off = ['block.snap'];        // AND this specific action silenced — t2229, was 'ui.click' (deleted, BACKLOG F3a)
+        try { previewSfx('block.snap'); return null; } catch (e) { return String(e); }
     });
     expect(threw, 'previewSfx must never throw').toBeNull();
     const counts = await spyCounts(page);
@@ -319,7 +320,12 @@ test('the gateway Setup toggle is gone — enable_chime is not part of the confi
     expect(stillReferenced, 'no shipped module still references the retired enable_chime toggle').toEqual([]);
 });
 
-test('opening and closing a wizard (real sfx() call sites) never throws, sound ON or OFF', async ({ page }) => {
+// t2229 (BACKLOG F3a) — wizard.opened/wizard.closed (the sfx() calls this test's own title used to name) are
+// deleted: opening/closing a wizard is visible on screen, so per the human's ruling it no longer gets a sound
+// at all. Kept as a plain no-error smoke check (still meaningful — the sound-settings toggle machinery this
+// test flips is exercised regardless of whether the open/close path itself calls sfx()), title corrected so it
+// doesn't claim to cover call sites that no longer exist.
+test('opening and closing a wizard never throws a sound-related error, sound ON or OFF', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });

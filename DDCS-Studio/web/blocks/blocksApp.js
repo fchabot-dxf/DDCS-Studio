@@ -18,6 +18,7 @@ import { setStack, getStack, getProjection, onChange, getGen, flattenOps } from 
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
+import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
@@ -919,6 +920,11 @@ async function buildWorkspace() {
 
   // ---- workspace events: structural change → re-emit + record edits ----
   ws.addChangeListener((e) => {
+    // t2229 (BACKLOG F3a) — block.snap: the human's own named exception ("ambiguous enough to be kept
+    // audible") to the visible-state-sound removal. Verified live (not assumed from Blockly's own vendored
+    // .d.ts, which doesn't cover event shapes): a genuine drag-to-connect fires e.type === 'move' with
+    // e.reason including 'connect' — a disconnect/bump carries ['disconnect','bump'], never 'connect' alone.
+    if (e.type === 'move' && e.reason && e.reason.includes('connect')) sfx('block.snap');
     if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject */ } }
     if (e.element === 'field' && _ops) {
       try {

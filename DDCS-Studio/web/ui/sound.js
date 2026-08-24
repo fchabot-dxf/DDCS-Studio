@@ -201,11 +201,19 @@ function playSwoosh(a, t) {
 // a variant costs one line and no new synthesis), or a learned `sample` (job events only, never themed).
 export const ACTION = {
     // UI: themed synthesis. You are looking at the screen.
-    'ui.click': { voice: 'click' },
-    'ui.toggle': { voice: 'click' },
-    'wizard.opened': { voice: 'click', semitones: 5 },     // lifted — something began
-    'wizard.closed': { voice: 'click', semitones: -5 },    // the old "reverse", now declared
-    'keyboard.opened': { voice: 'click', semitones: 5 },
+    // t2229 (BACKLOG F3a, human ruling 2026-08-22) — DELETED: ui.click/ui.toggle/wizard.opened/wizard.closed/
+    // keyboard.opened. The generalised rule: a sound is only justified when the state it reports is NOT
+    // already visible on screen — every one of these five fires for something the eye already sees the
+    // instant it happens (a click landing, a panel opening/closing). ui.click/ui.toggle already had zero live
+    // callers (grepped the whole web/ tree). wizard.opened/wizard.closed (wizardManager.js) and
+    // keyboard.opened (app.js) DID have real callers — those calls are removed in the same turn, not left
+    // dangling to silently no-op + console.warn forever.
+    // block.snap is the human's own named EXCEPTION ("ambiguous enough to be kept audible" — a dragged block
+    // connecting into a stack has no other on-screen confirmation as immediate as the snap itself). Wired at
+    // its one real source, blocks/blocksApp.js's own workspace change listener (Blockly's MOVE event with
+    // reason including 'connect' — verified live, not assumed from the vendored .d.ts, which doesn't cover
+    // event shapes at all).
+    'block.snap': { voice: 'click', semitones: 2 },        // a light lift, distinct from wizard.opened's +5 (already gone) — a snap is a small confirmation, not a scene change
     'wizard.inserted': { voice: 'commit' },                // ⭐ lighter than `done` — see EVENT.commit above
     'file.saved': { voice: 'commit' },
     // t2125 (section 5b) — the Blocks-canvas equivalent of Blockly's OWN playErrorBeep(), now muted (see

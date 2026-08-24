@@ -39,6 +39,26 @@ on that PC ask the same local daemon. **The role belongs to the machine, not to 
 from a machine that is not a client.** Until the role is derived CLIENT-SIDE, no amount of tab work will gate,
 and the Status tab cannot know which variant to draw. That derivation is the whole of S1.
 
+#### ✅ UPDATE (t2229) — THE NAMED BLOCKER LOOKS RESOLVED; VERIFY AGAINST ROLES-PLAN.md BEFORE ACTING ON EITHER
+
+The STILL REAL IF check as literally written (`grep -rn "role" ui/gateway/ ui/gatewayPanel.js | grep -i
+"gate|client|server"`) came back empty — but that's a broken pattern (`grep -i` without `-E` treats `|` as a
+literal character, not alternation), not a real signal. Re-run with `-E`: role-gating code is extensive
+throughout `ui/gateway/views/{admin,status}.js` and `ui/gatewayPanel.js`, all routed through ONE function,
+`roleInfoFromDescriptor()` (`ui/gatewayStatus.js:68`, t2151 — postdates this entry).
+
+**The specific blocker this entry names appears to be fixed.** `status.js:64` now reads
+`try { d = await ctx.client.descriptor(); } catch { d = null; }` — an unreachable daemon no longer throws
+past a bail-out; it degrades to `d = null`. Traced end-to-end: `roleInfoFromDescriptor(null)` → `baseRole =
+'client'` (its own default) → `roleIdentity(null)` → a fully-formed `{ kind: 'client', headline: 'This PC is
+a client', ... }`, no throw, no early return. A pure client with zero reachable daemon now gets a real,
+rendered "client" identity — exactly the case this entry says was impossible.
+
+**Not independently verified against `ROLES-PLAN.md`, and not edited** — that file reads as advisor-owned
+planning (same convention as ROADMAP.md), so this is reported rather than reconciled. If t2151 already closed
+S1 there, this backlog entry and that plan's own state have drifted apart from each other; worth a look
+together rather than one at a time.
+
 ### F2. A rename button for workspaces
 > ## ✅ RULED — THERE IS NO "NAME". DISPLAY THE FILE NAME.
 > *(human, 2026-08-22: "we dont need a name just display the file name")*
@@ -92,6 +112,13 @@ evaporates: interrupting music for a *job-failed alert* is correct; for a chirp 
 not doing it now.")* Five firmware-native features incl. **Array machining** and **Sequence machining**
 (a `template.txt` origin list with per-cell rotation). Full evidence + the three reasons it matters now live
 in [`ROADMAP.md`](ROADMAP.md) under "V4.1 ADVANCED MACHINING". Photos: `images/4.1 advance machining1 (1)/`.
+
+#### ✅ UPDATE (t2229) — STILL REAL (unbuilt, confirmed) AND STILL EXPLICITLY DEFERRED — not eligible to pick up
+
+`grep -rn "Advanced machining" --include=*.js .` → 0 hits: genuinely unbuilt, matching the check's own
+inverted framing (an ADD item with no hits means still real). But this entry's own text already carries a
+direct human ruling closing it out of current scope ("not doing it now") — the check confirms it hasn't been
+built, not that it's due. Not picked as this turn's smallest item for that reason, not size.
 
 ### F5. The DDCS wordmark in ORGANIC — ✅ DECIDED AND TRACED, ready to build
 *(human, 2026-08-22, chosen from live specimens. Preview of the final symbol:
