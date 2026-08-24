@@ -1485,13 +1485,20 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
    NEVER meant to touch border-radius/box-shadow (studio's own override two blocks down customizes exactly
    those two, deliberately, for its "mini key tray" look — see its own comment). That means the generic bare
    `button` rule's border-radius: var(--btn-radius) + box-shadow: var(--btn-shadow) leak straight through
-   UNLESS a theme explicitly claims them. Studio claims them on purpose; organic needs the opposite: its whole
-   identity is borderless, so a per-item rounded pill with a bright inset highlight (organic's own --btn-shadow)
-   reads as exactly the border it deliberately removed everywhere else. getComputedStyle confirmed the
-   mechanism directly (border-radius: 14px = --btn-radius; box-shadow = the literal --btn-shadow value) before
-   writing this — not the border-top hairline, which is a separate, intentional 1px item separator. */
+   UNLESS a theme explicitly claims them.
+   t2243 (human, verifying: "for organic the wizard chip button are now rect, not nice, i prefer them to be
+   like other organic button, quite rounded") — CORRECTED: only ONE of the two leaked properties was ever the
+   culprit. The ring the human originally reported was the BOX-SHADOW — organic's --btn-shadow carries
+   `inset 0 1px 0 rgba(255,255,255,.5)`, a bright top highlight that reads as an outline regardless of shape.
+   The border-radius: 14px leaking through from the SAME global rule was organic's own character arriving by
+   accident, and it was correct — every other organic button is quite rounded, and this dropdown item is a
+   real button. t2239's own comment reasoned about the two together ("a per-item rounded pill with a bright
+   inset highlight reads as exactly the border") when only the highlight half of that sentence is true; radius
+   deserved the same independent test as the border-top hairline got (correctly left alone as an intentional
+   separator) and didn't get it. RESTORED by simply not overriding it any more — --btn-radius leaks through
+   here exactly as it does on every other organic button, one home for the curvature instead of a second,
+   competing 0px override. */
 [data-theme="organic"] .toolbar-dropdown-content button {
-    border-radius: 0 !important;
     box-shadow: none !important;
     /* the light/dark pair (t2237) applied here too — dropdown items are the same "small control" category as
        the sub-tabs/settings-inputs it was declared for. Reusing --field-face-light/-ink directly rather than
@@ -3940,12 +3947,18 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --modal-close-shadow: 0 1px 3px rgba(0,0,0,.2); --modal-close-text-shadow: none;
     /* t2237 (BACKLOG amendment 4/5) — the wizard-header gear, following its own close-key neighbour's
        precedent: flat solid face (no gradient), an outer shadow only (no inset highlight), no text-shadow.
-       --wiz-gear-face is --accent (organic's OWN sap amber — a bold, on-brand plate, not a muted ghost blend,
-       matching how --btn-primary-face already uses --accent for a primary action); --wiz-gear-ink pairs with
-       it as --accent-ink (the SAME dark-ink token --btn-ink-hover already reuses) — the light-fill/dark-ink
-       pair, amendment 3, applied together as the one ruling requires. --wiz-gear-edge goes transparent,
-       matching this theme's own border-removal convention everywhere else. */
-    --wiz-gear-face: var(--accent); --wiz-gear-edge: transparent; --wiz-gear-ink: var(--accent-ink);
+       --wiz-gear-edge goes transparent, matching this theme's own border-removal convention everywhere else.
+       t2243 (human, verifying: "in organic the gear can still be grey... the button fill") — CORRECTED the
+       face's HUE, not the flattening: --accent was wrong because the gear is not a primary action. --accent
+       is this theme's way of saying "press this, it's the main thing" (--btn-primary-face's own job); putting
+       it on a utility settings gear tucked in a wizard header gives a minor, occasional affordance the same
+       visual weight as the header's real primary action. Grey is the correct register for secondary/utility,
+       and the :root default gradient (#cfd4da…#8d97a2) was ALREADY grey — organic only ever needed to
+       FLATTEN it, not recolour it. #aab2bb below is the gradient's own 45% stop, reused rather than a new hex.
+       --wiz-gear-ink stays --accent-ink (a light grey plate still needs dark ink — the pairing ruling,
+       amendment 3, doesn't stop applying just because the hue changed; reverting to the :root default #fff
+       here would be white-on-light, the exact failure that ruling exists to prevent). */
+    --wiz-gear-face: #aab2bb; --wiz-gear-edge: transparent; --wiz-gear-ink: var(--accent-ink);
     --wiz-gear-shadow: 0 1px 3px rgba(0,0,0,.2); --wiz-gear-text-shadow: none;
     /* t2237 — the field-light pair's REAL values, declared once here (a true root-level theme property, so
        any descendant can reuse it — buttons included, unlike input/select/textarea-scoped custom properties).

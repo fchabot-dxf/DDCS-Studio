@@ -54192,3 +54192,84 @@ way. Per the advisor's own recent instruction (t2239): the flaky COUNT moved 14�
 runs, read as noise/trend rather than a verdict on either run — not treating either number as a regression or
 a clean pass on its own. The regression that mattered (the missed `/Tracking/` regex) was caught and fixed
 BEFORE this final run, and is confirmed absent from both unexpected-failure lists across both runs.
+
+## t2243 — ORGANIC/TABS THREAD, PART ONE: amendment 10 (dropdown radius) + amendment 5 (gear grey) + the renderEvents question answered
+
+Eleven amendments queued (t2239 #5-7, t2241 #8-11). Advisor gave an explicit dependency order and invited
+splitting freely ("I would rather review four focused commits than one that touches everything"). This turn
+takes the two SMALLEST, most-independent items first (amendment 10, then 5) plus the renderEvents source
+question the advisor asked me to answer before ruling on it — none of the larger CSS-seam/contract work
+(amendments 6-9, the interstice flattening) or the separate ATC issue (11) touched this turn.
+
+### Amendment 10 — the dropdown radius was never the culprit; restored, both spacing options rendered for a human choice
+
+t2239's own fix reset BOTH `border-radius` and `box-shadow` when only the box-shadow (organic's own
+`--btn-shadow` inset white top-highlight) was ever what read as an outline. Removed the `border-radius: 0
+!important` override, keeping `box-shadow: none !important` — `--btn-radius` (14px) now leaks through exactly
+as it does on every other organic button, one home for the curvature instead of a second, competing override.
+
+Per the explicit instruction to render both options rather than pick: screenshotted the CURRENT shipped state
+(flush/stacked items, rounded corners restored — `verification/t2243-dropdown-A-flush.png`) against a
+NOT-shipped prototype (`page.addStyleTag`, never touched the real stylesheet — spaced pills with a gap,
+border-top separator removed — `verification/t2243-dropdown-B-spaced.png`). Looked at both, not just measured:
+**A shows real notches** at each flush join (each button's own 4-corner radius meets its neighbour, leaving
+small dark wedges where the container shows through) — visible on close inspection, matching the advisor's
+own prediction almost exactly. **B reads cleaner** — no notches, and closer to "like other organic button"
+since each row is now an individually-shaped pill rather than a continuous list. Did NOT ship B — it's a
+comparison prototype only, the choice is the human's per the explicit instruction. Confirmed the light-cream
+fill + dark ink from t2237 still reads correctly in both variants (visible in both screenshots).
+
+### Amendment 5 — organic's gear goes back to a flat grey; confirmed no other theme made the same mistake
+
+`--wiz-gear-face` was `var(--accent)` (organic's sap amber) — wrong because the gear is a utility/secondary
+action, not a primary one, and `--accent` is this theme's specific way of marking "the main thing to press"
+(the same job `--btn-primary-face` already does). Changed to `#aab2bb` — the :root default gradient's OWN 45%
+stop (`linear-gradient(...#cfd4da 0%, #aab2bb 45%, #8d97a2 50%...)`), reused rather than inventing a new hex:
+the default was already grey, organic only ever needed to flatten the gradient into one solid tone, not
+recolour it. `--wiz-gear-ink` stays `--accent-ink` (dark) — the pair moves together; reverting to the :root
+default `#fff` would be white-on-a-light-plate, the exact failure the fill/ink ruling exists to prevent.
+Verified via computed style: face `rgb(170,178,187)`, ink `rgb(42,24,16)`, no gradient, outer shadow only.
+
+**Checked for the same mistake elsewhere, per the explicit ask**: grepped every `--wiz-gear-face` declaration
+in the file — exactly two exist, the shared `:root`-equivalent default (grey gradient, untouched) and
+organic's own override (now fixed). No other theme ever had its own `--wiz-gear-face` override, so there is
+nothing else to flag or fix — confirmed by grep, not assumed from memory of what I wrote at t2237.
+
+### renderEvents' source — answered with evidence, not decided
+
+Traced every `events.append`/`events + […]` call in `bridge/bridge-app/fairy/poller.py`: `"claimed {job_id}"`
+(claim start), `"refused: …"` (identity/machine-id mismatch), `"writing to controller"` (delivering),
+`"delivered (…) -> {dest}"` (deliver-only/no-modbus terminal), `"delivered -> {dest}"` (tracked job handoff),
+`"stalled {where}"`, `"done"` — **every one of these is a GATEWAY-SIDE TRANSPORT/LIFECYCLE event**, emitted by
+the poller's own claim/deliver/stall/done state machine, available on ANY controller regardless of Modbus.
+Only ONE entry shape is genuinely Modbus-sourced: `f"beacon {n}/{a['total']}"` (poller.py:225), appended
+exactly when `self.beacons.latest()` — the real hardware register read — returns a new value.
+
+**So the events log is NOT purely Modbus-borne, and Track (which gates on `requiresModbus: true`) would be
+the WRONG home for most of it** — exactly the trap the advisor named: gating gateway-side lifecycle data
+(claimed/delivered/stalled/done — the SAME transitions the merged Send list's own "state" column already
+shows, just at finer grain) behind a Modbus requirement it doesn't need would hide working information from
+every V4.1/V3 user. The beacon-progress entries specifically ARE Modbus-only and would legitimately be absent
+on a non-Expert controller — consistent with what Track already is. Reported per instruction, not built: the
+natural home, if ruled for, is an expandable per-row detail in the merged Send list (already renders for every
+controller) rather than Track — but that's the advisor's call, not built this turn.
+
+### Verified
+
+Full suite (required — the standing rule for a shared-token/CSS change, even though both edits are scoped
+entirely under `[data-theme="organic"]`): 2789 passed, 18 flaky, **2 unexpected**, 26 skipped (29.2m). Checked
+both unexpected failures' actual error text before concluding anything (`palette-by-role-1623.spec.js`,
+`subscriber-error-surface-1656.spec.js`) — both the IDENTICAL `Test timeout of 60000ms exceeded` at
+`_boot.js:26`'s `waitReady`, the same pre-existing `__blkws` boot family from t2233; neither test touches the
+dropdown or the gear. This is the THIRD consecutive full-suite run this session (two at t2241, one here) with
+zero CSS-caused unexpected failures — the flaky count itself moved 14→16→18 across those three runs, read as
+noise per the advisor's own "report as a trend" instruction, not as a regression or a clean pass on its own.
+
+### What this turn did NOT do
+
+Amendments 6/7 (the sub-tab CSS seam — hoisting duplicated inline styles out of `settingsPanel.js`/
+`macrosApp.js` into declared tokens), 8/9 (the tab contract classes + outline continuity, Settings-only
+pilot), and the interstice-flattening step from amendment 4 are all untouched — genuinely larger, structural
+work the advisor explicitly said to sequence AFTER this turn's two small fixes, and explicitly invited
+splitting across turns rather than bundling. Amendment 11 (ATC 3D preview resize) is a separate, unrelated
+investigation — not started.
