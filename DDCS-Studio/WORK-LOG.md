@@ -54998,3 +54998,79 @@ AFTER STEP 2 BEFORE PROCEEDING."
 Heavy turn — a full plan reversal mid-task, a systemic-scope investigation, a self-caught regression with a
 precise root cause, and three full-suite runs (one lost to a PC crash). Full working room throughout; no
 flag, but noting the weight since it's the highest-density turn of this thread so far.
+
+## t2259 — STEP 3: THE "REGISTER" PREMISE WAS ALREADY FALSE, AND THE LOOK-AT-EACH-ONE STEP FOUND A REAL RENDER DEFECT. ZERO code changes this turn — pure investigation, STOPPED as instructed.
+
+**No files touched.** This turn is entirely findings, because the second finding below is a genuine render
+defect and the dispatch's own instruction was explicit: "IF ANY WIZARD RENDERS WRONG, STOP AND REPORT rather
+than patching it."
+
+### Finding 1 — "register the six" was already done, three weeks before this thread started
+
+Before touching anything, checked whether `registerUserOp` genuinely never runs live (the premise behind
+"registering ATC will be the first time this render path ever runs"). It does — `app.js`'s `SEED_BUILDERS`
+array (line 99-105) has included all 6 `atc*DataDef` builders since commit `ef1a1cdf8`, **2026-07-23**, weeks
+before this session. `init()` calls `this.seedDefaultPortedUserOps()` unconditionally on every boot (line
+163), which calls `createUserOp`/`updateUserOp` for every seed, and `createUserOp` calls `registerUserOp`
+internally (userOps.js:1081). Verified live on a genuinely fresh boot (`scratchpad/t2259-live-boot-check.mjs`,
+no manual `registerUserOp` calls of my own) — all 6 twins' builders are already wired, all 6 already appear
+in the live registry.
+
+**Deeper still — the redirect from the real toolbar button is ALSO already wired.** `wizardLibrary.js`
+already declares `opensAs: 'user_atc_*_data'` for all 6 entries. `commandDeck.js`'s `wizItemOnclick(e)`
+already checks `e.opensAs` and generates `openWiz(e.opensAs)` when present (line 96) — confirmed by reading
+the ACTUAL onclick attribute on all 6 real buttons (`scratchpad/t2259-onclick-check.mjs`):
+`onclick="openWiz && openWiz('user_atc_length_data')"`, and identically for the other 5. **A real user
+clicking "Tool Length" in the wizard bar has been opening the twin, not the hand-written wizard, since the
+`opensAs` field was declared.**
+
+My own first attempt at this check got a FALSE NEGATIVE and I caught it before reporting: I called
+`openWiz('atc_length')` directly (the OLD built-in type) rather than clicking the real button, which bypasses
+`wizItemOnclick`'s own redirect check entirely and opens the hand-written `#wiz_atc_length` body — that isn't
+what a real click does. Redid it against the actual onclick attribute before concluding anything.
+
+### Finding 2 — a real render defect, confirmed across 5 of 6 ATC ops by screenshot
+
+Opened all 6 twins via their own opType (matching the real button exactly:
+`scratchpad/t2259-ground-truth.mjs`). Structurally clean: `visualBoxCount: 1` for every op (the "two stacked
+boxes" BACKLOG 20 concern literally cannot occur here — the live "in-place" route renders through a SINGLE
+shared static shell, `#wiz_user`, that never reads `uiChildren`'s `panel`/`sim` declarations at all; my
+BACKLOG 20 fix from t2257 has no effect on this render path, confirmed). `hasSizer: true` for all 6 — the
+resize handle exists.
+
+**But the visible content is wrong.** All 6 default to the `layout2d` pane (`preview3d` stays `display:none`
+— the shared shell's own hardcoded default, unrelated to what each op's own `sim` params request). ATC ops
+have essentially no 2D toolpath — they write registers, run a macro sequence, sometimes probe — so the
+layout2d canvas has nothing real to draw and shows an internal placeholder, "no drawable moves", positioned
+at the SAME top-left spot as the DOM `.viz-status` label ("Tool Length (data) · 47 lines", "Spindle Warmup
+(data) · 19 lines", etc.) — the two overlap and render as garbled, doubled text. Confirmed by screenshot on
+5 of 6 (`t2259-ground-truth-user_atc_{length,change,table,warmup,test}_data.png` — Check not individually
+re-checked by eye but structurally identical); confirmed it is TWO SEPARATE overlapping things, not one
+garbled string, by reading the DOM directly (`scratchpad/t2259-zoom-check.mjs`) — one real, correctly-
+positioned `.viz-status` div, plus a canvas-drawn placeholder underneath it. Compared against `drill`
+(`scratchpad/t2259-drill-compare.png`): its own layout2d pane shows a real pattern with no placeholder
+collision — drill has actual 2D content, so this never surfaces there. The bug is specific to ops whose sim
+declares 3D-relevant content (`machine`/`magazine`/`toolMachine`) but nothing 2D — the shared shell has no
+way to know that and defaults to 2D regardless.
+
+Tried clicking the visual toolbar's own "3D" button to switch panes and confirm the 3D content renders clean
+underneath — the click did not toggle `preview3d`'s display (`scratchpad/t2259-toggle-3d.mjs`); did not chase
+further given the instruction to stop and report rather than debug/patch.
+
+### What this means, not decided by me
+
+The RENDER path is not clean for ATC today, contradicting the assumption that only the EMIT half needed
+proving. Did not attempt a fix (wrong pane default is a shared-shell behavior, not a per-op declaration bug,
+and per BACKLOG 20's own boundary this is exactly the kind of shared-mechanism change that needs the
+advisor's own call, not a unilateral one this turn). Did not touch `index.html` — per the dispatch's own
+explicit ordering, that step is LAST and conditional on a clean render, which this is not.
+
+### Verified
+
+No code changed — nothing to run against the suite. All claims in this entry are backed by a script in
+`scratchpad/` and either console output or a screenshot, not by inference.
+
+### Capacity
+
+Full working room. An investigation-only turn — the two findings here (a wrong premise, and a rendering
+defect the premise was hiding) are worth more than any single edit would have been.
