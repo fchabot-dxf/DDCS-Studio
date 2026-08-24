@@ -53184,3 +53184,100 @@ occurrence and the first NOT involving the waiter itself, which is the actual le
 general ("one backgrounding mechanism, ever"), filing it under the waiter's name kept it from generalizing.
 
 Threw away `tests/_backlog14verify.spec.js` and `tests/_backlog14themes.spec.js` after use.
+
+## t2223 — THE SIX RED TESTS: TRIAGED, NOT FIXED (report before fixing, per the dispatch)
+
+Dispatched to answer three questions per test — test-wrong-vs-product-wrong, age, deterministic-vs-flaky —
+with evidence, and explicitly NOT to fix or delete anything substantial before reporting. Parallelized the
+five independent investigations (the two `screenshot-baselines-1792` tests share one mechanism) across five
+agents so each got full depth rather than a shallow pass across all six. **All six: TEST is wrong, PRODUCT is
+correct, all deterministic (not flaky).** No fixes applied this turn — every finding below is reported for a
+ruling, not acted on.
+
+### 1. `pane-sizer-1353.spec.js` — "a PERSISTED oversize heals on open"
+
+**Test stale.** Asserts the healed pane height gets WRITTEN BACK to `localStorage` (`Number(g.stored) < 900`)
+— that assertion is the only one that fails; the runtime clamp itself (no overflow, handle reachable) still
+passes. `ui/paneAccordion.js:289-298` carries an explicit `⛔ t2113` comment: the write-back was deliberately
+REMOVED — a phone's clamp was leaking into every device's stored preference. Test added 2026-07-29
+(`7b067659`, the same commit that added the write-back); write-back deleted 2026-08-20 (`5d3c9e79`, "the
+preview panes shrank on every open within a session") — that commit's own verification list names 12 other
+specs, not this one. Deterministic: 3/3 identical failures, same line, same value.
+
+### 2. `screenshot-baselines-1792.spec.js` — both tests (MODAL, BLOCKS WIZARD-VIEW PANE)
+
+**Baseline stale, not a regression** — verified by looking at the actual pixels, not assumed, per the
+dispatch's own explicit caution. `toHaveScreenshot()` at `maxDiffPixelRatio: 0` (zero tolerance). Diffed the
+flagged pixels directly: 1-3 RGB-level deltas at section-header dividers, glyph edges, and the modal border —
+font-antialiasing/hairline drift, no layout shift, no missing/misplaced/recolored elements. Confirmed fully
+deterministic first (byte-diffed two independently-generated `actual` screenshots against each other: 0 pixels
+differ) before concluding the MISMATCH itself is stable too — same 879px/4096px diff count every run, 3
+isolated runs. Baseline PNGs last committed 2026-08-19 01:25 (`4427409d`, t2075) — since then 245 commits
+landed, including `0d30457b` (t2200, Aug 23 19:53, "adopt `.modal-card` at 8 of 9 remaining hand-painted modal
+shells") and `4fa35c43` (t2202, Aug 23 20:29, the 19-shorthand font-fix — exactly matches the glyph-edge
+diffs). Playwright/Chromium version unchanged throughout, ruling out a rendering-engine drift explanation.
+
+### 3. `send-gate-wiring-1585.spec.js` — "the real Send button raises the real gate dialog"
+
+**Test wrong — a same-day self-inflicted regression, not staleness.** Fails at line 48:
+`clickBtn('Use current Studio program')` returns `false` — never reaches the gate-dialog code
+(`ui/gateway/views/send.js:227-252`, confirmed untouched and structurally intact). The real button's text is
+`"⬆ Use current Studio program"` (leading arrow glyph, present since the button's own creation at
+`60a6d999`, June 15 — confirmed via `git log -p -S`). `clickBtn`'s matcher was `.includes(t)` until
+`ffc4626e` (2026-08-20, t2113) changed it to `.trim().startsWith(t)` — fixing a DIFFERENT call site
+(`clickBtn('Send')` was matching the wrong button among several) while breaking THIS call site in the same
+shared helper, in the same commit. Deterministic: 3/3 identical, same line, same message.
+
+### 4. `validation-divzero-not-syntax-1603.spec.js` — "the real Send dialog does NOT falsely refuse…"
+
+**Test stale — the exact same-shaped fix already shipped for its sibling, just never ported here.** Fails at
+line 114, same shape as #3: `clickBtn('Send (tracked)')` returns `false` because the real button reads
+`"Send (deliver-only)"` — beacons are gated off by default for V4.1/M350 (no Modbus), so the button's text is
+conditional (`ui/gateway/views/send.js:90,379`). The div-zero validation logic this file is actually ABOUT
+(`engine/core/expression.js`, zero commits since the test's own authoring) is untouched and its own first test
+passes clean in isolation — the failure is entirely in reaching the assertion, not the assertion itself.
+`ffc4626e` (2026-08-20, the SAME commit as #3's root cause) simultaneously patched `send-gate-wiring-1585`'s
+own `clickBtn('Send (tracked)')` to a prefix match with an explicit comment naming the beacons/Modbus cause —
+but never touched this file's identical hardcoded string. Deterministic: 6/6 identical across both the
+suite's own retries and 3 fresh isolated runs.
+
+### 5. `send-history-real-path-2065.spec.js` — "a REAL tracked send that is never fed a beacon…"
+
+**Test stale**, same failure SHAPE as #3/#4 (`clickBtn('Send (tracked)')` → `false`) but a DIFFERENT root
+cause: not a matcher regression, a missing test-environment precondition. `ui/gateway/views/send.js:415`'s
+`applyState` force-disables Beacons whenever `desc.controller_family !== 'expert-m350'`; that family comes
+from `bridge-app/fairy/ops.py:330`'s `detect_controller()`, which fingerprints a REAL firmware `.out` file on
+the SYSDISK share. This test spawns the bridge against an empty synthetic `tmpRoot` — no SYSDISK, no firmware
+file — so detection always resolves to `"unknown"`, never `"expert-m350"`, regardless of what the Studio
+WORKSPACE itself is configured as (the DOM snapshot even shows the file menu correctly reading "DDCS Expert
+M350" — a client-side setting this server-side gate never consults). The Modbus capability gate landed
+2026-08-20 (`ffc4626e`/`7984bf7f`), a `t2095` sweep touched the test file the day before (Aug 19) without
+anticipating it. Deterministic: 3/3 identical.
+
+### The shared thread across all six
+
+Every failure traces to legitimate, INTENTIONAL product work — three separate commits (`5d3c9e79` pane
+persistence, the `t2075`→`t2202` CSS arc, `ffc4626e`/`7984bf7f` the Modbus capability gate) each shipped
+without walking every test their change's surface touched. None is a mystery regression; every one has a
+named commit and a plain mechanism. Three of the six (#3/#4/#5) share the SAME originating commit
+(`ffc4626e`, 2026-08-20, t2113) but for three DIFFERENT specific reasons — a shared matcher regression, an
+unported sibling fix, and an unmet test-environment precondition — worth keeping distinct rather than treating
+as "one bug, three symptoms."
+
+### The 19 flaky — no new evidence of a single shared cause this turn
+
+Out of scope per the dispatch ("not this turn's job"), not investigated directly. All six tests THIS turn
+covered turned out fully deterministic (0 flaky among them), so they contribute nothing to the 19. The
+closest known systemic pattern remains t2206's own finding (a Playwright boot-timeout budget mismatch under
+full-suite parallel load, root-caused and fixed for one specific file) — worth checking whether it recurs
+across the 19 if that becomes its own turn, but that's a guess carried over from earlier work, not new
+evidence gathered this turn.
+
+### Verification
+
+Read-only turn — no application code or test files edited. Every finding above came from running each test in
+isolation (multiple times, confirming determinism), reading `test-results/*/error-context.md` snapshots and
+Playwright's own diff images directly rather than inferring from the summary line, and `git log`/`git log -p
+-S` on both the spec files and the product code they cover. No fixes proposed for deletion — every one of the
+six needs a TEST-SIDE correction (an assertion or helper update), not removal; BACKLOG.md is not touched this
+turn pending the advisor's ruling on how each should be fixed.
