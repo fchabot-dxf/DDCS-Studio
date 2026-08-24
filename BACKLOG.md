@@ -310,6 +310,28 @@ confirm the save path serializes the live object before assuming the chain; do n
 ⚠ The real fix is probably not "add four keys": a whitelist that silently drops anything unlisted will do
 this again on the NEXT setting somebody adds. Decide whether unknown keys should be PRESERVED rather than dropped.
 
+#### ✅ UPDATE (t2219) — ALREADY FIXED, at t2143 (the same turn that fixed item 8) — this entry is stale
+
+Dispatched to investigate the mechanism before proposing anything. Read `ui/settingsPanel.js`'s `loadSettings()`
+first and found a t2143 comment already describing this exact bug and its fix: a sweep found FOUR keys the
+whitelist silently dropped (`systemHooks` — this item's own hand-authored T.nc/error.nc — `macrosSynced`,
+`units`, `toolChange`); `units` got its own typed line, and the other three are now covered by a general
+PASS-THROUGH added to the end of `loadSettings()` (`for (const k of Object.keys(p)) { if (!(k in merged) &&
+!RETIRED_SETTINGS_KEYS.has(k)) merged[k] = p[k]; }`) — exactly the "PRESERVE unknown keys rather than drop
+them" fix this entry itself asked for, not a four-key patch.
+
+**Reproduced live, not just read**: typed a unique marker into T.nc, a different marker into error.nc (both
+via the real unlock flow), confirmed both landed in `localStorage`'s `systemHooks.T`/`.error` before reload,
+reloaded the page, and confirmed both the raw storage AND the rendered textarea still carried the exact
+markers. Zero data loss, both files. Deleted the throwaway repro script after use — no code changed this
+turn, since there was nothing left to fix.
+
+**Why this reads as fixed and not "not yet regressed" fixed**: the mechanism is a general pass-through, not a
+per-key patch — the retirement list (`RETIRED_SETTINGS_KEYS`) is the only remaining exclusion, and it is an
+explicit opt-in list for keys that must NOT resurrect (e.g. t2139's retired `indentStyle`), not an implicit
+whitelist a future key could fall through by accident. The bug class this entry described (a whitelist that
+drops the next unlisted setting) cannot recur the same way.
+
 ### 7. The header shows the VERSION where it should show the WORKSPACE
 > ⭐ **DO THIS TOGETHER WITH ITEM 1** *(human, 2026-08-22)* — same popover, same file. The menu gets its
 > final shape once: theme chips OUT (to Settings), version IN (footer), workspace name OUT (to the header).
@@ -497,8 +519,18 @@ real or got conflated with its `advstart.rc` twin. ⭐ Given the finding above, 
 firmware directory as build material — so if any other declared entry ever resolves to a `.rc`, it is the
 same defect.
 
+#### ✅ UPDATE (t2219) — THE REMOVAL ALREADY SHIPPED, at t2143 — this entry is mostly stale
 
-### 9. TWO LOOSE ENDS FROM THE MENU SPLIT (t2149 shipped the split itself)
+Dispatched to verify the premise before changing anything, the way the tab-strip premise got checked at
+t2217. `data/controllerFiles.js:50` already reads (t2143's own comment, quoting this entry's own evidence
+verbatim): `M6.rc REMOVED` — the line is gone, replaced by the comment explaining why. `tests/controller-
+file-tree.spec.js:38`'s expected array already omits `'M6.rc'` too, and the `not.toContain('camN.nc')` guard
+two lines below is intact and unweakened. Nothing to build.
+
+**The one loose end that's genuinely still open**: the `slib-m.nc` subtitle question above was explicitly
+raised as a judgement call, not decided — and it still reads "M-macro library" in the V4.1 tree
+(`data/controllerFiles.js:62`), unchanged. Not reworded here either, for the same reason the original entry
+gave: it's the human's call, not a layout fix to make unasked.
 *(the split is DONE and its entry is retired — it also carried a self-contradiction of the advisor's own making:
 an early sketch sorted `Wizards…` as APP scope, left in place after the reasoning moved it to FILE. The worker
 built to the reasoned section and FLAGGED the stale one rather than silently picking. Doc debt, now deleted.)*

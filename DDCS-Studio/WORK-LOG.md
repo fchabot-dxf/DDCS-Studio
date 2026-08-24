@@ -53046,3 +53046,63 @@ the settings-tab mechanism at all. `save-dialog-declared-1615.spec.js` reappears
 SAME residual case t2206 already root-caused and closed as "absorbed by retries:2," not a new issue.
 
 Threw away `tests/_tabrow.spec.js` after use.
+
+## t2219 — BACKLOG #6 + #8: BOTH ALREADY FIXED, AT t2143 — no code changed this turn
+
+The queue's first two items: #6, hand-authored T.nc/error.nc discarded on reload (framed as the worst item on
+the list — outright data loss); #8, `M6.rc` offered as an editable G-code file when it's compiled SEGGER
+emWin C source. Dispatched with an explicit "find out why / verify the premise before proposing anything" —
+both turned out to already be resolved.
+
+### #6 — read the code before reproducing anything, and it was already explained
+
+`ui/settingsPanel.js`'s `loadSettings()` carries a t2143 comment naming this EXACT symptom: a sweep found four
+top-level keys the settings whitelist silently dropped on every reload — `systemHooks` (this item's own
+hand-authored T.nc/error.nc text), `macrosSynced`, `units`, `toolChange`. `units` got its own typed line;
+the other three are covered by a general pass-through added to the end of the function:
+`for (const k of Object.keys(p)) { if (!(k in merged) && !RETIRED_SETTINGS_KEYS.has(k)) merged[k] = p[k]; }`
+— unknown keys now SURVIVE by default, with `RETIRED_SETTINGS_KEYS` as the one explicit opt-in exclusion list
+(t2139's retired `indentStyle`, so it doesn't resurrect from an old save) — exactly the fix this backlog entry
+itself asked for ("decide whether unknown keys should be PRESERVED rather than dropped"), not a four-key patch
+that would repeat the bug on the next new setting.
+
+**Reproduced live before trusting the comment** (`tests/_backlog6repro.spec.js`, thrown away after use): typed
+a unique marker into T.nc via the real unlock flow, a different marker into error.nc, confirmed both landed in
+`localStorage`'s `systemHooks.T`/`.error` BEFORE reload, reloaded the page, confirmed both the raw storage and
+the rendered textarea still carried the exact markers after. Zero loss, both files, both the persistence layer
+and the visible UI checked independently.
+
+**Then proved the repro wasn't vacuous** — disabled the pass-through (`if (false && !(k in merged) && ...)`)
+and re-ran. First attempt looked wrong (the marker still "survived") until the mistake became obvious: that
+check was reading raw `localStorage` again, which the SAVE path (never touched by the disable) always writes
+regardless — not evidence about restoration at all. Fixed to check `getSettings().systemHooks` — the live,
+restored in-memory object — instead: with the pass-through disabled, raw storage still held the marker
+(`{"T_unlocked":true,"T":"MARKER-…"}`, the save path working as always) while `getSettings().systemHooks` came
+back `undefined` (nothing restored it) — the EXACT shape of the original bug, data saved but never read back.
+Re-enabled the pass-through, confirmed `git diff` on the file is empty (byte-identical to HEAD). This is the
+real evidence the mechanism is what's responsible, not just correlation with a comment.
+
+### #8 — the removal, and the test update, both already shipped
+
+`data/controllerFiles.js:50`'s `M6.rc` line is already gone, replaced by a t2143 comment quoting this backlog
+entry's own evidence (the SEGGER GUI_Builder header, the tree-consistency argument) as the reason. `tests/
+controller-file-tree.spec.js:38`'s expected-array assertion already omits `'M6.rc'`, and the `not.toContain
+('camN.nc')` guard two lines below (the one this entry explicitly warned not to weaken) is intact.
+
+One genuinely open loose end survives: the backlog itself raised whether `slib-m.nc`'s subtitle ("M-macro
+library") should mention that the tool-change SEQUENCE lives there too, since a user following the old
+"Tool-change dialog" entry now has nothing pointing them at it — explicitly flagged as a judgement call, not
+a decision. Still unreworded (`data/controllerFiles.js:62`). Left alone, same reasoning the original entry
+gave: the human's call, not a layout fix to make unasked.
+
+### BACKLOG.md
+
+Appended `✅ UPDATE (t2219)` sections to both items rather than rewriting the original text, per this file's
+own established convention (t2200/t2202 did the same) — the original findings/reasoning stay intact as the
+record of what was asked and why, the update documents what's actually true now.
+
+### Verification
+
+No application code changed by the end of this turn — `settingsPanel.js` was edited only transiently, to prove
+the repro's non-vacuity, then restored (confirmed via `git diff`, empty). `WORK-LOG.md` and `BACKLOG.md` are
+the only files this turn actually changes.
