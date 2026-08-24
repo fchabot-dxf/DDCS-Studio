@@ -53379,3 +53379,49 @@ other name in the "2 failed" list, `wizard-face-1599.spec.js:129`, is new and un
 touched (grepped for zero matches to `clickBtn`/`gatewaySend`/`pane-sizer`/`screenshot-baselines`); re-ran in
 isolation and it passes clean — the same session-wide transient-contention pattern documented repeatedly this
 run, not a regression.
+
+## t2227 — THE 3D-PREVIEW HANDLE: FOUR THEMES FILLED IN, ZERO NEW MACHINERY
+
+Amendment 1 from t2225: `--viz3d-handle-face/-face-hover/-edge/-ink` were declared at `:root` (styles.css:199-
+202, t2155 tail) as a DECLARED SLOT — "same house pattern as t2075's button material... every skin is
+byte-identical until it opts in." Only studio (:3319-3325) ever opted in. Pure data into an existing slot,
+per the dispatch — no new tokens, no new rules, no `!important`.
+
+### Established first, per the explicit instruction: :root is a genuine neutral fallback, not steampunk's own skin
+
+Checked whether the pattern used elsewhere in this file (`:root, [data-theme="steampunk"] { ... }` sharing one
+block, e.g. the tab tokens at :357) also applied here. It doesn't: the studio override is scoped to
+`[data-theme="studio"]` alone. The file's OWN comment at :195-198 settles it directly: *"normal/steampunk/
+futuristic/organic stay on the default blue, unopted, exactly as before this turn."* **The gap is FOUR
+themes, not three** — steampunk was silently on the shared blue too, which the amendment's own per-theme
+care-list didn't anticipate (it only named organic/futuristic/normal). Gave steampunk its own value for the
+same reason the other three needed one: it was never actually its own skin here.
+
+### Filled all four by REUSING each theme's own already-declared button material — no new colours
+
+Every theme already has `--btn-face`/`-face-hover`/`-edge`/`-ink` (t2075's own button-material group). A
+pull-tab handle is conceptually a themed button control, so each theme's override is just:
+`--viz3d-handle-face: var(--btn-face); --viz3d-handle-face-hover: var(--btn-face-hover); --viz3d-handle-edge:
+var(--btn-edge); --viz3d-handle-ink: var(--btn-ink);` — four lines, zero literals, per theme.
+
+- **steampunk**: brass gradient face (`#6b5329`→`#4a3819`), brass edge (`#8b6914`) — its own established metal
+  material, same family as `--kbd-handle`.
+- **futuristic**: neon-glass navy face, glowing cyan edge (`rgba(45,226,255,.45)`) — ITS OWN accent, not the
+  generic blue that was "close enough to look almost-right while being wrong" (the amendment's own framing).
+- **normal**: flat `var(--bg)` face, plain `var(--border)` edge — deliberately plainer than the others, per
+  the amendment ("whatever you give it should be plainer... rather than a fourth invented palette"), not a
+  new look invented for one control.
+- **organic**: bone-coloured gradient face, `--btn-edge` already transparent (t2208) — the FACE alone carries
+  the handle's shape, exactly the t2213/t2214 lesson the amendment named directly: a border-only control loses
+  its shape the instant `--border` goes transparent, and a small isolated control is exactly where that's
+  easy to miss.
+
+### Verification
+
+Screenshotted the handle itself (not just referenced) at both 1280px and 390px, both closed AND open states,
+across all five themes — `verification/t2227-<theme>-{1280,390}-{closed,open}.png`. Every theme reads as a
+distinct, coherent material (steampunk brass, futuristic neon cyan, normal flat, organic bone, studio
+unchanged silver) with no seam gap or overlap where the handle meets the editor edge in either state, at
+either width — the seam the human reported and fixed earlier this run stays intact. Full smoke tier green
+(77) — CSS-only, four theme blocks each gained four token lines. Threw away
+`tests/_backlog14bhandle.spec.js` after use.

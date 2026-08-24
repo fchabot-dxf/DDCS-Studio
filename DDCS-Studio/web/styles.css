@@ -3028,6 +3028,11 @@ button.primary:hover {
     --btn-radius: 6px;
     --btn-face-hover: #1f4e8c; --btn-edge-hover: #1f4e8c; --btn-ink-hover: #fff;
     --btn-face-active: var(--btn-face-hover);
+    /* t2227 (BACKLOG amendment 1) — the 3D-preview pull-tab was unopted here too, silently on the shared
+       :root blue. Reuses normal's own plain flat button material rather than inventing a fourth palette for
+       one control — the "clean flat" skin's handle should be plainer than the others, not fancier. */
+    --viz3d-handle-face: var(--btn-face); --viz3d-handle-face-hover: var(--btn-face-hover);
+    --viz3d-handle-edge: var(--btn-edge); --viz3d-handle-ink: var(--btn-ink);
     --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
     --btn-success-face: var(--success); --btn-success-ink: #fff;
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
@@ -3527,6 +3532,13 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-radius: 4px;
     --btn-face-hover: linear-gradient(180deg, #8b6914, #6b5329);
     --btn-edge-hover: var(--accent); --btn-ink-hover: var(--text);
+    /* t2227 (BACKLOG amendment 1) — THE 3D-PREVIEW PULL-TAB was declared (t2155 tail) but never filled in for
+       any theme but studio — steampunk was silently on the shared :root blue, not its own skin (checked: the
+       override at t2155 is [data-theme="studio"] alone, not a shared :root block — the file's own comment at
+       :198 lists steampunk among the four unopted themes). Reuses this theme's own button material outright,
+       same house pattern t2155 tail already used for studio's own re-skin — no new colours invented. */
+    --viz3d-handle-face: var(--btn-face); --viz3d-handle-face-hover: var(--btn-face-hover);
+    --viz3d-handle-edge: var(--btn-edge); --viz3d-handle-ink: var(--btn-ink);
     --btn-shadow-hover: 0 0 10px rgba(139, 105, 20, .5);
     --btn-face-active: var(--btn-face-hover);
     --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
@@ -3618,6 +3630,11 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-shadow-hover: 0 0 14px rgba(45,226,255,.42), inset 0 0 8px rgba(45,226,255,.12);
     --btn-transform-active: translateY(1px);
     --btn-face-active: var(--btn-face-hover);
+    /* t2227 (BACKLOG amendment 1) — the 3D-preview pull-tab was unopted here too, silently on the shared
+       :root blue — close enough to this theme's own cyan to look almost-right while being the wrong colour.
+       Reuses futuristic's own neon-glass button material (declared just above) rather than restating it. */
+    --viz3d-handle-face: var(--btn-face); --viz3d-handle-face-hover: var(--btn-face-hover);
+    --viz3d-handle-edge: var(--btn-edge); --viz3d-handle-ink: var(--btn-ink);
     /* t2085 (P4e) — MICRO-TYPOGRAPHY: relocated from a standalone ".toolbar-btn .btn-tx, .op-btn .op-label"
        selector rule ("HUD chip labels", below) into the button-material token group it belongs with. */
     --btn-label-transform: uppercase; --btn-label-tracking: .08em;
@@ -3834,6 +3851,13 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --btn-text-shadow: none;
     --btn-face-hover: linear-gradient(180deg, #f2dba0, #d9a03c); --btn-edge-hover: transparent;   /* t2127 — was coral; t2208 — edge was var(--accent), now transparent too: the face gradient's own colour shift already carries hover, an edge ring would be the one border this theme re-grew */
     --btn-ink-hover: var(--accent-ink);
+    /* t2227 (BACKLOG amendment 1) — the 3D-preview pull-tab was unopted here too, silently on the shared
+       :root blue. Reuses organic's own button material — --btn-edge is ALREADY transparent (t2208), so the
+       FACE (a real bone-coloured gradient) carries the handle's shape on its own, exactly the lesson from
+       t2213/t2214: a border-only control loses its shape the moment --border goes transparent, and this is a
+       small isolated control where that failure mode is easy to miss. */
+    --viz3d-handle-face: var(--btn-face); --viz3d-handle-face-hover: var(--btn-face-hover);
+    --viz3d-handle-edge: var(--btn-edge); --viz3d-handle-ink: var(--btn-ink);
     /* t2208 (amendment) — GHOST buttons (Rename/Duplicate/Export, the update-bar links, rate-toast actions…)
        had NOTHING but var(--border) giving them a shape; now that --border is transparent here, they need an
        actual fill to still read as clickable at a glance. --panel2 is already this theme's "raised surface"
