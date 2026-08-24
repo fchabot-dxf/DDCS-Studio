@@ -97,14 +97,12 @@ function runQuickAction(act) {
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an operation in the Blocks tab first, then save it as a wizard.'); break;
         // t2078 — Load / Export are BACK (see the fileRows comment for the human's reasoning: they act
         // on the program as a whole, not on the text under the caret). ONE implementation — these call the same
-        // window globals ui/globalFunctions.js EDITOR_FILE_ACTIONS called, never a second copy of the logic.
+        // window globals the editor's own corner FILE menu used to call, before t2221 (BACKLOG 14) deleted that
+        // menu outright as dead code (its trigger button was retired back at t2078/t2099).
         // ⛔ CLEAR is deliberately NOT routed here (t1255): the 🗑 in the editor toolbar is the one clear.
         // t2173 (tail, human: "insert is redundant beside load remove it completely") — Insert is GONE, not
         // hidden: the row, this case, and its own handler (window.insertGcodeFile, commandDeck.js) are all
-        // deleted. The pre-existing, already-unreachable corner-menu leftover (globalFunctions.js
-        // EDITOR_FILE_ACTIONS' own 'insert' entry — dead since t2078 retired the button that opened it) still
-        // references the now-gone global via `?.()`, so it stays a safe no-op; left untouched as pre-existing
-        // dead code, not this turn's to clean up.
+        // deleted.
         case 'getDesktop': {
             // opened through the SAME door the update banner uses: in the exe the gateway opens the real
             // system browser server-side, which fires exactly once — window.open double-fired inside the

@@ -27,7 +27,9 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 async function boot(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsEditorFileMenu && window.openWorkspaceManager);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
+    // t2221 (BACKLOG 14) — window.ddcsEditorFileMenu dropped from this wait: the function itself was deleted
+    // (the menu it built had no caller left since t2078/t2099), so waiting on it would hang forever.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.openWorkspaceManager);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     // record which handler each menu item reaches (the SAME globals the quick menu's rows called)
     await page.evaluate(() => {
         window.__fired = [];

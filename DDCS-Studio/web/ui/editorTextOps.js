@@ -9,9 +9,10 @@
  * t2147 — TWO DOORS IN, ONE IMPLEMENTATION: Ctrl+/ and the right-click context menu both drive this file's ONE
  * `commentEditor()` — never a second copy of the toggle logic per door. (The dedicated toolbar BUTTON was a
  * third door once; t2099/da280131 retired it deliberately, "Ctrl+/ and the right-click menu keep it" — a
- * documented decision, not a regression, so the count here is TWO, current, not the three it once was. Its own
- * `#editor-comment` lookup below still runs — the element it looks for is gone from index.html, so it is
- * inert, not wired to anything; named here rather than silently left to look load-bearing.)
+ * documented decision, not a regression, so the count here is TWO, current, not the three it once was.
+ * t2221 (BACKLOG 14) — the vestigial `#editor-comment` lookup this comment used to flag is now deleted outright,
+ * along with its two dead styles.css positioning overrides — swept, not just noted, once it was someone's turn
+ * to touch this file.)
  *
  * ── IT WRITES REAL BYTES, AND THAT IS THE RULING ─────────────────────────────────────────────────────────────────
  * No display-only padding anywhere (ruled OUT by the user; deliberately not built). The editor is a byte-truth
@@ -115,10 +116,10 @@ function applyBlock(ed, op) {
 
 /**
  * Wire the comment toggle's entry points. Idempotent — safe to call again after a re-render, which the editor
- * does often. t2147 — the `#editor-comment` lookup below is VESTIGIAL: that button left index.html at
- * t2099/da280131 ("Ctrl+/ and the right-click menu keep it"), so `b` is always null now and its wiring never
- * runs. Left in place (harmless, not load-bearing) rather than deleted here — a small doc fix, not a code
- * removal; flagged for whoever next touches this file.
+ * does often. t2221 (BACKLOG 14) — the `#editor-comment` button lookup that used to sit here is deleted: that
+ * button left index.html at t2099/da280131 ("Ctrl+/ and the right-click menu keep it"), so the lookup was
+ * always null and its wiring never ran. Comment/uncomment's two live doors (Ctrl+/, the context menu) are
+ * unaffected — see the file header.
  */
 export function installEditorTextOps() {
     const ed = editorEl();
@@ -130,19 +131,6 @@ export function installEditorTextOps() {
         e.preventDefault();
         commentEditor(ed);
     });
-    const b = document.getElementById('editor-comment');
-    if (b && b.dataset.textOpsWired !== '1') {
-        b.dataset.textOpsWired = '1';
-        /**
-         * ⚠ THE BUTTON MUST NOT TAKE FOCUS, and that is a real behaviour fix rather than a test convenience. Pressing
-         * a toolbar button blurs the textarea; the blur drops the SELECTION the button is about to act on, and in this
-         * app it also lets the editor re-sync from the program model underneath the gesture. Found while driving the
-         * button the way a user does — the keyboard path never blurs, so it passed and hid this completely.
-         * `preventDefault` on mousedown is the standard cure: the click still fires, the caret never moves.
-         */
-        b.addEventListener('mousedown', (e) => e.preventDefault());
-        b.addEventListener('click', () => commentEditor(ed));
-    }
 }
 
 /** The one entry the right-click menu shows — declared here so the menu cannot describe a different action. */

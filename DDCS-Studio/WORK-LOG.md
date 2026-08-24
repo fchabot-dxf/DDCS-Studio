@@ -53106,3 +53106,81 @@ record of what was asked and why, the update documents what's actually true now.
 No application code changed by the end of this turn — `settingsPanel.js` was edited only transiently, to prove
 the repro's non-vacuity, then restored (confirmed via `git diff`, empty). `WORK-LOG.md` and `BACKLOG.md` are
 the only files this turn actually changes.
+
+## t2221 — BACKLOG #14: THREE DEAD-CODE CLUSTERS FROM THE t2078 TOOLBAR REFACTOR, SWEPT
+
+Advisor's own overnight audit found EIGHT of eighteen backlog entries stale — this turn's own #6/#8 among
+them — and added a `STILL REAL IF` line to every remaining item (one runnable command deciding it) rather than
+prose that has to be read and understood first. #14 came back genuinely real, three clusters, all leftovers
+from t2078's editor-toolbar refactor (six absolutely-positioned buttons became one flex row).
+
+### (a) `#editor-comment` — the id, not the feature
+
+`editorTextOps.js:133` still did `document.getElementById('editor-comment')`, and the file's own t2147 comment
+already named it vestigial: the dedicated toolbar button was retired at t2099/da280131 ("Ctrl+/ and the
+right-click menu keep it"), so the lookup was always null. Confirmed live: `#editor-comment` doesn't exist in
+the DOM at all (matches `editor-toolbar-2078.spec.js`'s own existing "gone" list, which already checked for
+it). Deleted the dead `const b = ...` block (12 lines) and its now-satisfied doc comment; comment/uncomment's
+two REAL doors (Ctrl+/, the right-click menu) are untouched — `context-menu-pass-1452.spec.js`'s full suite
+(comment/uncomment, both doors, undo, nesting) still passes clean.
+
+### (b) The `bottom:` overrides for `#align-rotate-btn` / `#editor-cam-btn`
+
+Two `@media` blocks (portrait: styles.css ~1140-1149; landscape+keyboard: ~5139-5147) pushed these two buttons
+up with `bottom: … !important` when the 3D drawer or floating keyboard opened — leftovers from before t2078,
+when each button was individually `position:absolute`. The advisor's own steer named the exact test: a
+neighbouring control (the time-estimate chip) went through this same "absolute → flex-row tenant" move at
+t2155 and its own bottom-override became inert. **Verified by rendering, not reading**, per the explicit
+instruction: `getComputedStyle` on both buttons at both media conditions (390×800 portrait, 900×500
+landscape≥700) returned `position: static` in every case — a `bottom` declaration has zero layout effect on a
+static element, so both override blocks were computing values nobody ever saw. Deleted the whole three-rule
+portrait block (nothing else lived in it) and the three dead lines from the landscape block (which keeps its
+OTHER live rules — the keyboard-dock positioning, editor scroll padding, 3D drawer/handle — untouched).
+
+### (c) The editor's retired corner FILE menu — found during this turn's own sweep, not named in the dispatch text yet
+
+`ui/globalFunctions.js`'s `EDITOR_FILE_ACTIONS` + `window.ddcsEditorFileMenu` (the Load/Insert/Export corner
+menu from t1227) had its OWN comment already saying "this whole menu is dead code... no caller left since
+t2078 retired the corner button that used to open it" — and TWO existing specs
+(`editor-toolbar-2078.spec.js`, `editor-file-menu-1227.spec.js`) already assert `#editor-file-btn`/
+`#editor-file-menu` are absent from the DOM. Confirmed live: both DOM ids absent, `window.ddcsEditorFileMenu`
+was still a defined function (never called) before this turn, `undefined` after. Deleted both. Swept the one
+place that referenced it as a LIVE dependency: `editor-file-menu-1227.spec.js`'s own `boot()` waited on
+`window.ddcsEditorFileMenu` existing as part of its readiness gate — removed from the wait (would otherwise
+hang forever), the other two readiness signals (`ddcsReady`, `window.ddcsStudio`, `openWorkspaceManager`)
+already cover real boot completion. Updated two more comments in `headerPost.js` that named
+`EDITOR_FILE_ACTIONS` by name (one of them a t2173-era note explicitly declining to clean this up as "not this
+turn's job" — this was that turn).
+
+### Verification
+
+Ran the full suite (not smoke — this touches shared `styles.css`, per the dispatch's own instruction): the 19
+directly-relevant tests (`editor-toolbar-2078`, `editor-file-menu-1227`, `editor-chrome`,
+`context-menu-pass-1452`) all pass. Screenshotted `#align-rotate-btn`/`#editor-cam-btn`'s own render area
+across all five themes at 1280px and 390px (`verification/t2221-<theme>-{wide,430}-toolbar.png`) — clean, no
+overlap, no missing icons, matching the "nothing rendered differently" prediction the computed-style evidence
+already made.
+
+**Full suite: 2782 passed, 7 failed, 21 flaky, 25 skipped (26.0 min).** The same 6 pre-existing failures from
+t2217's own baseline reappear byte-for-file-identical (`pane-sizer-1353`, `screenshot-baselines-1792` ×2,
+`send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`) — already queued
+for their own dedicated turn per the advisor's own ruling, not re-investigated here. ONE new addition
+(`modal-pre-canvas-1654.spec.js:27`, a G91 relative-plunge canvas round-trip test) — grepped for any reference
+to anything this turn touched (zero matches) and re-ran in isolation: passes cleanly on its own, confirming
+the same session-wide contention-flake pattern documented repeatedly this session, not a regression from the
+dead-code removal. None of the 7 files reference `editor-comment`/`align-rotate-btn`/`editor-cam-btn`/
+`editorTextOps`/`EDITOR_FILE_ACTIONS`/`ddcsEditorFileMenu`.
+
+**A process-hygiene detour mid-turn**: the first full-suite invocation was launched wrong (`npm test 2>&1 |
+tail -5 &` as the Bash command string, WITH the tool's own `run_in_background:true` also set) — the classic
+double-backgrounding shape this session has hit before with `handoff.py wait`, just on a different command.
+The outer `&` backgrounded the whole pipeline at the shell level; the tool saw an instant "exited 0" and
+reported false completion while the real `npm test` (test-all.cjs → e2e → 6 Playwright workers + a
+mem-server) kept running fully detached, invisible to `proc_health.py watch`. Found via `Get-CimInstance
+Win32_Process` matching `node.exe` `CreationDate`s to the launch time; killed the 11-PID tree precisely (not a
+blanket `taskkill node.exe`, since unrelated MCP/tool node processes share the machine) and re-ran correctly
+(bare command, single backgrounding mechanism). Updated `never-nest-the-waiter` memory — this is its sixth
+occurrence and the first NOT involving the waiter itself, which is the actual lesson: the rule was always
+general ("one backgrounding mechanism, ever"), filing it under the waiter's name kept it from generalizing.
+
+Threw away `tests/_backlog14verify.spec.js` and `tests/_backlog14themes.spec.js` after use.

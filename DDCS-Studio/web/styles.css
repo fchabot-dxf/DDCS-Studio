@@ -1137,16 +1137,12 @@ html, body { overflow-x: clip; }
 .vis-modal-pop .vis-head { color: var(--text, #e6edf3); }
 .vis-modal-pop .vis-tog input { cursor: pointer; }
 .vis-modal-pop .vis-alpha { width: 96px; cursor: pointer; accent-color: var(--accent, #0ea5e9); }
-/* Mobile portrait: the 3D preview is a bottom sheet (height --viz3d-size). Push the Transform button UP so it
-   rides just above the open drawer (and follows its resize) instead of hiding under it. (The keyboard case is
-   already handled — keyboard-active pins the editor to a top strip, carrying the button with it.) */
-@media (orientation: portrait) {
-    .editor-container:has(.viz3d-drawer.open) #align-rotate-btn { bottom: calc(var(--viz3d-size, 50%) + 12px) !important; }
-    .editor-container:has(.viz3d-drawer.open) #editor-cam-btn { bottom: calc(var(--viz3d-size, 50%) + 44px) !important; }   /* stack ✚ CAM slot 32px above ⟳ Transform here too */
-    /* t1450 — the comment toggle is one more slot in the same declared stack (32px above ✚ Make), so it rides
-       the open drawer exactly as its neighbours do instead of carrying a magic offset of its own. */
-    .editor-container:has(.viz3d-drawer.open) #editor-comment { bottom: calc(var(--viz3d-size, 50%) + 76px) !important; }
-}
+/* t2221 (BACKLOG 14) — DELETED: a portrait `@media` block of three `bottom: … !important` overrides for
+   #align-rotate-btn / #editor-cam-btn / #editor-comment, left behind by t2078's flex-row refactor of the
+   editor toolbar. All three buttons are plain flex-row children now (position: static, verified live via
+   getComputedStyle — bottom computes a value but position:static ignores it for layout) or, for
+   #editor-comment, don't exist in the DOM at all (that button was retired outright at t2099/da280131). The
+   whole block was inert — none of its three rules had any rendered effect. */
 
 /* Studio editor autocomplete — phone-autocorrect-style float at the caret. */
 .ac-bar {
@@ -5140,15 +5136,11 @@ svg [id$="_wcs"] { display: none; }
        !important: the base .viz3d-drawer{bottom:0} rule is later in the file and would win otherwise. */
     .viz3d-drawer { bottom: var(--kbd-clear, 42px) !important; height: auto !important; }
     .editor-container .viz3d-handle { top: calc((100% - var(--kbd-clear, 0px)) / 2) !important; }
-    /* the ⟳ Align editor-overlay control is pinned bottom:8px (inline) → lift it just above the keys */
-    #align-rotate-btn { bottom: calc(var(--kbd-clear, 42px) + 8px) !important; }
-    /* ✚ CAM slot stacks ABOVE ⟳ Transform on the SAME --kbd-clear signal (btn 24px + 8px gap = 32px more) → the pair
-       never overlaps and neither is ever occluded by the keyboard, whether it is collapsed (42px) or expanded (dock-h+42). */
-    #editor-cam-btn { bottom: calc(var(--kbd-clear, 42px) + 40px) !important; }
-    /* t1450 — …and the comment toggle takes the next slot up (another 32px) on the SAME --kbd-clear signal.
-       Joining the declared stack rather than picking a bottom: the inline values are overridden here, which is
-       exactly how a hand-picked offset came to overlap ✚ Make at wide viewports (measured, then fixed here). */
-    #editor-comment { bottom: calc(var(--kbd-clear, 42px) + 72px) !important; }
+    /* t2221 (BACKLOG 14) — DELETED: three more `bottom: … !important` overrides for #align-rotate-btn /
+       #editor-cam-btn / #editor-comment, the same dead cluster as the portrait block above (see its own
+       comment) — verified live via getComputedStyle at this exact media condition (900×500, landscape,
+       ≥700px): position: static for both real buttons, bottom computing but doing nothing; #editor-comment
+       still absent from the DOM. */
 }
 
 /* Variables tab — search row + Filters button */

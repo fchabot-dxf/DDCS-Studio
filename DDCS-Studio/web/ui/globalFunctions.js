@@ -429,44 +429,13 @@ export function setupGlobalFunctions(app) {
             setTimeout(() => { const off = (ev) => { if (!menu.contains(ev.target) && ev.target !== btn) { menu.remove(); document.removeEventListener('mousedown', off); } }; document.addEventListener('mousedown', off); }, 0);
         };
 
-        // t1227 — the editor's FILE menu (user curation). Load / Insert / Export / Clear used to be rows in the header
-        // quick menu; they act on the PROGRAM IN THE PANE, so they moved to the pane. Same handlers, one declared row
-        // list, popping BELOW its button (it lives in the editor's top-right, unlike '＋ Make ▾' at the bottom).
-        const EDITOR_FILE_ACTIONS = [
-            { id: 'load', label: '📂 Load…', title: 'Load a program file (replaces the editor)', run: () => window.loadGcodeFile?.() },
-            // t2178 (tail) — this row's label was already fairly literal; the real gap is that its OWN handler
-            // (window.insertGcodeFile) was DELETED entirely at t2173 ("insert is redundant beside load, remove
-            // it completely") — this whole menu is dead code (see the file's own comment above: no caller left
-            // since t2078 retired the corner button that used to open it), so this row now names an action that
-            // no longer exists anywhere in the live app. `run` stays a safe no-op (optional chaining), unchanged.
-            { id: 'insert', label: '➕ Insert…', title: 'Insert a program file at the cursor', run: () => window.insertGcodeFile?.() },
-            // t2178 — was "Deploy the program as a file" (stale since amendment 8: Export no longer deploys to a
-            // granted folder, it opens the OS's own native save dialog). Matches the quick-menu's own wording.
-            { id: 'export', label: '⭳ Save G-code as…', title: 'Save the program as a .nc file — the native save dialog opens so you pick the destination yourself', run: () => window.downloadFile?.() },
-            // t1255 (user) — CLEAR IS NOT HERE. The header's 🗑 trash IS the clear, at every width now; this row was a
-            // phone-only stand-in from t1227, back when the trash hid below 600px. Two doors to a destructive action is
-            // one door too many — and the one that hid was the one people learned.
-        ];
-        window.ddcsEditorFileMenu = (btn) => {
-            const ID = 'editor-file-menu';
-            const openM = document.getElementById(ID); if (openM) { openM.remove(); return; }   // toggle
-            const menu = document.createElement('div');
-            menu.id = ID; menu.setAttribute('role', 'menu');
-            const itemCss = 'display:block; width:100%; text-align:left; padding:7px 14px; background:transparent; border:none; color:var(--text-main,#e8ecf1); cursor:pointer; font-size:12px; border-radius:5px; white-space:nowrap;';
-            menu.innerHTML = EDITOR_FILE_ACTIONS.map((a) =>
-                (a.sep ? '<div style="height:1px; margin:4px 6px; background:var(--border,#444);"></div>' : '')
-                + `<button type="button" role="menuitem" data-efm="${a.id}" title="${a.title}" style="${itemCss}">${a.label}</button>`).join('');
-            document.body.appendChild(menu);
-            const r = btn.getBoundingClientRect();
-            menu.style.cssText = `position:fixed; right:${Math.round(window.innerWidth - r.right)}px; top:${Math.round(r.bottom + 6)}px; z-index:1200; background:var(--panel,#2a2f3a); border:1px solid var(--border,#444); border-radius:8px; padding:4px; min-width:150px; box-shadow:0 8px 28px rgba(0,0,0,.5);`;
-            menu.querySelectorAll('[data-efm]').forEach((b) => { b.addEventListener('mouseenter', () => { b.style.background = 'rgba(255,255,255,.10)'; }); b.addEventListener('mouseleave', () => { b.style.background = 'transparent'; }); });
-            menu.addEventListener('click', (e) => {
-                const it = e.target.closest('[data-efm]'); if (!it) return;
-                menu.remove();
-                (EDITOR_FILE_ACTIONS.find((a) => a.id === it.dataset.efm) || {}).run?.();
-            });
-            setTimeout(() => { const off = (ev) => { if (!menu.contains(ev.target) && !btn.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', off); } }; document.addEventListener('mousedown', off); }, 0);
-        };
+        // t2221 (BACKLOG 14) — DELETED: EDITOR_FILE_ACTIONS + window.ddcsEditorFileMenu, the editor's own corner
+        // FILE menu (t1227). Its trigger (#editor-file-btn) was retired at t2078/t2099 ("the load insert export
+        // button can go in the quick menu") — Load/Export moved to the header quick menu, Clear moved to the
+        // editor toolbar's own trash button, Insert was deleted outright at t2173. Nothing has called this menu
+        // since; two existing specs (editor-toolbar-2078.spec.js, editor-file-menu-1227.spec.js) already assert
+        // #editor-file-btn/#editor-file-menu are absent from the DOM. Swept, not just the CSS this time — see
+        // editor-file-menu-1227.spec.js's own boot() for the matching test-side removal.
 
         // Insert in message function for wizards
         window.insertInMsg = (t) => {
