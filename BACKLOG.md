@@ -1680,3 +1680,28 @@ only when retiring.
 ⚠ Note the F4 shape: for an entry that asks to ADD something, "no hits" means STILL REAL. A staleness check
 has to know which direction it is pointing. Write the check so its PASSING output is the stale one, and say
 which that is - otherwise the check is as ambiguous as the prose it replaced.
+
+---
+
+### 19. THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
+
+*(found at t2245 while measuring whether spaced pills made the menu too tall — the height question was the
+prompt, this is what the measuring turned up. Pre-existing, NOT introduced by that change.)*
+
+**STILL REAL IF:** `grep -n "max-height\|overflow" DDCS-Studio/web/styles.css | grep toolbar-dropdown`
+→ **no output means STILL REAL** (this is an ADD item: nothing found = nothing protects it).
+
+`.toolbar-dropdown-content` has **no `max-height`, no `overflow` rule, and no JS clamping** — confirmed by
+grep at t2245. The menu is exactly as tall as its contents, wherever that lands.
+
+**Why it has not bitten yet, and why it will:** the probing dropdown is 8 items and fits a 430px phone with
+room. Nothing enforces that. A user adding wizards to a dropdown through the Wizard-bar editor — which this
+app explicitly supports, *"add or delete a dropdown, show/hide or re-icon any wizard"* — can make one longer
+than the viewport, and the items past the bottom edge become unreachable with no scroll to recover them.
+
+⚠ **Do not "fix" this by capping the item count.** The layout is what fails, not the user's choice of how many
+wizards they want in a group.
+
+⚠ **A max-height must be viewport-derived, not a constant.** A fixed pixel cap is wrong on both a phone and a
+1440p monitor, and this codebase has already been bitten once by a hard 400px preview height that nothing
+downstream consumed (see BACKLOG #10's t1468 note).
