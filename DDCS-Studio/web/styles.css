@@ -3617,7 +3617,15 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     border-bottom: 1px solid rgba(45,226,255,.32);
     box-shadow: 0 1px 14px rgba(45,226,255,.12);
 }
-[data-theme="futuristic"] .app-header .brand .logo { filter: drop-shadow(0 0 6px rgba(45,226,255,.55)); }
+/* t2211 — DELETED: `.app-header .brand .logo { filter: drop-shadow(0 0 6px rgba(45,226,255,.55)); }`. The
+   #neon SVG filter (index.html's mark-futuristic <defs>) renders into a rectangular filter region (x/y -30%,
+   w/h 160%) whose pixels carry faint alpha across the WHOLE region, not just the glyph shapes. A CSS
+   drop-shadow takes its silhouette from the element's rendered alpha, so it saw that region, not the
+   letterforms, and cast a flat cyan rectangle with a hard edge at the region boundary — the "sharp blue rect"
+   reported directly. Confirmed by control: same mark, filter:none on .logo, rectangle gone, yellow neon still
+   reads correctly on its own (screenshots: verification/t2211-futuristic-{before,after}-zoom.png). Not a
+   clipping bug (overflow:visible was the wrong first guess) and not a not-enough-blur bug either — more blur
+   would have spread the same faint-alpha region wider, making the rectangle bigger, not softer. */
 /* t2085 (P4e) — DELETED two rules that used to sit here, both verified dead: `.app-header .tab.active::after
    { box-shadow: 0 0 9px var(--tab-accent, var(--accent)); }` and the redundant `.app-header .tab.active,
    .settings-tabs .settings-main-tab.active { box-shadow: inset ... rgba(45,226,255,.7) ×3, 0 -2px 10px

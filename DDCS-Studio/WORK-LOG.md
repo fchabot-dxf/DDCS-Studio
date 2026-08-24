@@ -52755,3 +52755,45 @@ icon-only or already `border: none`, never relied on `--border` for shape, out o
 
 Threw away `tests/_organicghost.spec.js` after use, same convention as every other screenshot-verification
 turn this session.
+
+## t2211 — FUTURISTIC'S NEON WORDMARK: the "sharp blue rect" was a CSS drop-shadow reading an SVG filter's own bounding box, not the letters
+
+The dispatch arrived already root-caused by the advisor (rendered by control shot: same mark, `filter: none`
+on `.logo` vs not — rectangle present/absent, nothing else changed) and CORRECTED twice mid-diagnosis (their
+own amendments 1→2→3): NOT clipping, NOT under-blur — the CSS `drop-shadow(0 0 6px rgba(45,226,255,.55))` at
+`styles.css:3620` (`[data-theme="futuristic"] .app-header .brand .logo`) was the culprit, confirmed by colour
+alone (the wordmark is `#FFF100` yellow, the tagline `#8892b0` grey — the ONLY blue anywhere in the mark or its
+`#neon` SVG filter is that one CSS rule).
+
+### Confirming the mechanism before touching anything
+
+Read `index.html`'s `mark-futuristic` `<symbol>` (:57-66): its own `#neon` filter is `feGaussianBlur
+stdDeviation="1.6"` merged under `SourceGraphic`, filter region `x="-30%" y="-30%" width="160%" height="160%"`
+on the 150×36 viewBox — a real rectangular region, but one that blurs the YELLOW source, so it cannot itself
+paint blue. A CSS `drop-shadow()` takes its silhouette from the element's own rendered alpha channel — and
+that filter region carries faint alpha across its WHOLE box (the blur's own falloff, not just where the
+glyphs sit), so the drop-shadow saw a rectangle-shaped alpha footprint, not letterforms, and cast a flat cyan
+wash with a hard edge at the region's own boundary. Checked `mark-organic` (:73) for the same risk (the
+advisor's own "check the other four" ask): its `<g fill="#d9a03c">` carries no `<defs>`/`filter` at all — no
+SVG filter, so organic's own `drop-shadow(0 1px 3px rgba(0,0,0,.5))` at `styles.css:3869` has nothing but the
+mark's real path shapes to read alpha from. The "same clip" risk the advisor flagged does not actually apply
+to organic; reporting this rather than touching it, per the dispatch's own "report, do not fix beyond
+futuristic without saying so." Steampunk/normal/studio's own marks not checked individually — none carry a
+`drop-shadow` on `.logo` at all (grepped), so the mechanism has no second half to trigger regardless of their
+mark's own filter status.
+
+### The fix
+
+Deleted `[data-theme="futuristic"] .app-header .brand .logo { filter: drop-shadow(...); }` outright — that
+declaration was the rule's only property, so the whole rule goes, not just the value. Verified twice: (1) a
+JS control matching the advisor's own method (`el.style.filter = 'none'` on the live page, changing nothing
+else) — rectangle gone, yellow neon still reads correctly on its own; (2) the REAL fix, the actual CSS with no
+JS override — same clean result. Screenshots: `verification/t2211-futuristic-before-zoom.png` (the rectangle,
+reproduced), `t2211-futuristic-after-zoom.png` (JS-control fix), `t2211-futuristic-fixed-zoom.png` (the real
+CSS fix, same result), `t2211-organic-logo-check.png` (organic's own mark, clean, no rectangle risk as
+predicted from the missing SVG filter).
+
+### Verification
+
+Full smoke tier green (77) — CSS-only, one rule deleted, nothing else touched. Threw away
+`tests/_futuristicglow.spec.js` after use.
