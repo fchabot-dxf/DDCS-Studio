@@ -547,3 +547,27 @@ Collapsed here on 2026-06-25 to end the planning-doc sprawl: `NEXT-TASKS.md`, `W
 `ARCHITECTURE-MULTIUSER`, `MONOREPO_PLAN`, `COMBINED-APP-PLAN`, `BENCH-CHECKLIST`, `VERIFY-AT-MACHINE`,
 `TOWER-LIGHT-EVAL`, `REMINDERS`, `SETTINGS-TABS-NOTES`, `addstudiotransfer`, `addstudioverify`,
 `probe-preview-frame-issues`). Their actionable content lives above; the files remain for reference.
+
+
+### Stitching several .nc programs into one job — the retired Merge tab's intent
+
+**2026-08-24.** The gateway carried a **Merge** tab from an early design: *combine several single-tool programs
+into ONE job, ordered by tool, with a tool change (T / M6) and a safe retract inserted between each, under a
+single program frame.* It was **never wired** — its own module header said "STUB … placeholder UI + intent
+only", and its Merge button was constructed permanently `disabled`. It was deleted at t2241.
+
+**Why it went, and why the intent is kept here rather than in the UI:**
+
+- Its description is a description of a **multi-op program**, which Studio now builds directly. The tab was
+  offering, as a gateway feature, the thing the wizard stack already does.
+- A disabled button captioned "coming soon" is an unasked affordance, and it was occupying a slot in a strip
+  being fought onto one phone row. Removing it took the gateway from seven tabs to five.
+
+**⭐ Where it belongs if it is ever wanted — the human's own ruling** *("we can do that later in editor")*:
+**in the EDITOR**, as text-level work on a program you can see. Not as a gateway surface. That distinction is
+the useful part of this entry: merging G-code is editing, and the gateway's job is moving jobs to a machine,
+not composing them.
+
+**⚠ The one case multi-op does NOT cover:** stitching `.nc` files that Studio did not author — programs posted
+elsewhere, or files already sitting on the controller. Multi-op composes ops *within* Studio. That gap is real
+but thin: two-sided and externally-posted work goes through Fusion for this shop, and nobody has asked for it.
