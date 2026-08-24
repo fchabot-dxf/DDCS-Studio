@@ -83,64 +83,69 @@ is the kind of special case this file exists to avoid.
 
 ---
 
-## THE DECLARATION — `data-tabs="1"` / `data-tabs="2"`
+## THE DECLARATION — a CONTRACT, not a component
 
-Human, 2026-08-24: *"the idea is to declare a 2 level tab vs 1 level."* Not a prose register — **a property
-the markup carries, that the stylesheet reads.**
+Human, 2026-08-24: *"the idea is to declare a 2 level tab vs 1 level"*, then *"are these tabs reusing a declared
+tab, should they?"* — the second question is the sharper one, and it has **two different answers that must not
+be conflated**:
+
+| | share it? | why |
+|---|---|---|
+| **The RULES** — tone ladder, outline continuity, overlap offset, inactive registers | **YES** | they are true of every tab regardless of how it is built |
+| **The COMPONENT** — markup, layout, behaviour | **NO** | a dock key, a header tab with curved feet and an inline settings pill are different controls; one component serving all three serves none of them well |
+
+⇒ **Share a CONTRACT.** A strip applies the contract classes *alongside* whatever it already calls its parts.
+Additive, never a rename:
 
 ```html
-<div class="settings-modal" data-tabs="2">   <!-- L1 + L2 -->
-<div class="gateway-app"    data-tabs="1">   <!-- one strip -->
+<div  class="settings-modal"    data-tabs="2">      <!-- depth, declared once -->
+  <div    class="settings-head       tab-strip">
+    <button class="settings-main-tab tab-l1 active">
+  <div    class="settings-sidebar    tab-interstice">
+    <button class="settings-tab      tab-l2 active">
+  <div    class="settings-content    tab-panel">
 ```
 
 ```css
 --tab-strip: …;   /* C — behind the OUTERMOST tabs. MUST differ from the active tab. */
---tab-body:  …;   /* B — every active tab at every level, AND the content. */
+--tab-body:  …;   /* B — every active tab at every level, AND the panel. */
 
-.tab-strip                        { background: var(--tab-strip); }
+.tab-strip                                   { background: var(--tab-strip); }
 .tab-l1.active, .tab-l2.active,
-.tab-interstice                   { background: var(--tab-body); }   /* one surface, all depths */
+.tab-interstice, .tab-panel                  { background: var(--tab-body); }
+.tab-panel                                   { border: var(--tab-edge-w) solid var(--tab-edge); }
+.tab-l1.active, .tab-l2.active               { margin-bottom: calc(-1 * var(--tab-edge-w)); }
 ```
 
-⭐ **THE TONES DO NOT READ THE DEPTH AT ALL.** That is the test that the rule is right: if the colour ladder
-needed the depth, the depth would be load-bearing styling data and every new level would be a new special case.
-It does not, so it is not.
+⭐ **ONE CSS block then styles every tab in the app.** `.ie-tabs` becomes themeable by *adding a class*, not by
+rewriting the icon editor. A new strip gets the tone rule, the continuous outline and the overlap the moment it
+declares itself — nobody has to remember any of it.
 
-⭐ **What the declaration actually buys is the INACTIVE registers**, which is smaller than the first draft
-claimed and is the honest answer:
+⭐ **And the tones still do not read the depth.** `data-tabs` buys only the INACTIVE registers, because at depth
+2 the two levels sit on different grounds (L1 inactive on the strip, L2 inactive on the body) and may want
+different treatments. That is the honest, narrow thing the depth is for.
 
-```
-depth 1    inactive L1 tabs sit on C
-depth 2    inactive L1 tabs sit on C   ← two different grounds,
-           inactive L2 tabs sit on B   ← so possibly two different treatments
-```
+### ⚠ Why the earlier "select through whatever it already calls its parts" hedge was wrong
 
-A system needs to know that about itself. It does not need to know it to pick a fill for its active tab.
+An earlier draft said the attribute could select through each system's existing class names. That leaves FIVE
+selector lists to keep in step — the exact divergence this file exists to end, rebuilt inside the fix for it.
+**The contract classes ARE the seam.** Without them the declaration reaches nothing.
 
-### ⚠ The consequence that WILL ship this broken
+### ⛔ What this still does NOT do
 
-Taking the interstice to `--tab-body` puts the L2 sub-tabs on the same ground as the active one. In organic
-today the inactive sub-tabs carry `--panel2` (t2214, a *raised* fill) while the active one is `--bg`, so the
-active reads only because it is darkest. Flatten the ground and **the row inverts: unselected looks selected
-and selected disappears.**
+Not a merge into one component. Not a rename of existing classes — they stay, and keep owning layout, spacing
+and behaviour. Not a flattening of per-theme character: `--tab-strip` is brass in steampunk and cyan-black in
+futuristic. **The contract is shared; the values are not.**
 
-⇒ **The rule already answers it: active is flush, INACTIVE carries the chip.** So the inactive sub-tabs are
-what needs a register — and a *raised* fill on an unselected control was always saying the wrong thing.
-⚠ t2214's `--panel2` rule was correct when the ground was `--panel`. It is not a regression in that work; it is
-the same declaration meeting a changed ground. Change it deliberately and say so.
-
-### ⛔ What this does NOT do
-
-Not a merge of the systems into one component, not a restyle by itself, not a flattening of per-theme
-character — `--tab-strip` is brass in steampunk and cyan-black in futuristic. **The declaration is shared, the
-values are not.** And it does not license renaming every class at once; the attribute can select through
-whatever a system already calls its parts.
-
-### Adoption — pilot first, per this project's own habit
+### Adoption — pilot, then on contact
 
 ⛔ Do NOT convert seven systems in one turn. Settings is being fixed anyway and is the only CONFIRMED depth-2
-system, so it is the pilot. Everything else adopts when next touched, and its row below earns a depth only once
-someone has counted it **on screen** rather than inferred it from a grep.
+system, so it is the pilot: add the classes, wire the two tones, prove the `elementFromPoint` scan shows exactly
+two contiguous tones and the outline runs unbroken except under the active tab.
+
+Everything else adopts **when it is next touched**, and its row below earns a real depth only once someone has
+counted it **on screen** rather than inferred it from a grep. The honest cost is one class at roughly six render
+sites — small, but each needs its depth established first.
 
 ---
 
