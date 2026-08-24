@@ -248,17 +248,22 @@ svg [id*="Zfirst_travel"] {
        defensive `box-shadow: none; text-shadow: none; filter: none;` either — which is why the global bare
        `button` rule's leaked border-radius/inset-highlight (the SAME mechanism the dropdown had) reads as a
        ring here too.
-       ⚠ ONLY --subtab-face gets a REAL default here, and only because it's a literal (`transparent`), not a
-       var() reference. --subtab-ink/-face-hover/-ink-hover/-face-active/-ink-active/-active-edge do NOT get
-       :root defaults, on purpose: a custom property declared as `var(--bg)` HERE would resolve `--bg` at
-       THIS element (:root) — the neutral-fallback #e0e0e0, not organic's #14110b or any other theme's own
-       value — and INHERIT that already-frozen result downward, never re-resolving per descendant. Caught
-       live, not assumed: measured every theme's hover/active state and found the IDENTICAL #e0e0e0/#000
-       pair on all five, the neutral fallback's own colours leaking through regardless of theme. The correct
-       "default to var(--bg) unless a theme overrides it" behaviour instead lives as a FALLBACK on each
-       consuming rule (`var(--subtab-face-hover, var(--bg))`) — a fallback IS re-evaluated live at the
-       element that reads it, which is the behaviour "byte-identical to before, per theme" actually needs. */
-    --subtab-face: transparent;
+       ⚠ NONE of --subtab-face/-ink/-face-hover/-ink-hover/-face-active/-ink-active/-active-edge get :root
+       defaults, on purpose: a custom property declared as `var(--bg)` or `var(--panel)` HERE would resolve
+       at THIS element (:root) — the neutral-fallback colour, not organic's own value or any other theme's —
+       and INHERIT that already-frozen result downward, never re-resolving per descendant. Caught live, not
+       assumed: measured every theme's hover/active state and found the IDENTICAL #e0e0e0/#000 pair on all
+       five, the neutral fallback's own colours leaking through regardless of theme. The correct "default to
+       X unless a theme overrides it" behaviour instead lives as a FALLBACK on each consuming rule
+       (`var(--subtab-face-hover, var(--bg))`) — a fallback IS re-evaluated live at the element that reads
+       it, which is the behaviour "correct per theme, with no explicit override" actually needs.
+       t2251 (amendment 4) — --subtab-face ITSELF used to get a `transparent` :root default here (safe as a
+       literal, no freezing risk) because the resting sub-tab used to sit on the INTERSTICE's own --panel
+       fill and didn't need its own colour to read as distinct. Now that .settings-sidebar flattens to
+       --tab-body (this turn), transparent would make every resting sub-tab invisible against the new
+       flattened ground — it needs a REAL chip colour of its own, so the transparent default is gone and the
+       fallback moved to the consuming rule below (`var(--subtab-face, var(--panel))`), matching the pattern
+       already proven for the other five tokens in this family. */
 
     /* t2087 (P5a) — MODAL z-index SCALE: named tokens replacing scattered literals, scoped to true
        scrim-backed modals only (not popovers/toasts/tooltips/dropdowns — those have their own separate
@@ -407,13 +412,16 @@ html, body { overflow-x: clip; }
    tab-l2.active is the ONLY new behavior here — each system's own fill + edge-ring rule (background /
    box-shadow) already resolves to --tab-body / --tab-edge at higher specificity than these bare classes,
    so nothing regresses; margin-bottom is uncontested by any existing rule, so it applies regardless.
-   SETTINGS ONLY this turn (the pilot). tab-strip / tab-interstice / tab-panel are markup-only readiness —
-   deliberately NOT wired to background/border here: amendment 4 (flattening the interstice's own fill into
-   the shape) is a SEPARATE turn, and Settings' own strip/content borders already carry their own per-theme
+   SETTINGS ONLY this turn (the pilot). Settings' own strip/content borders carry their own per-theme
    treatment (see the t2213 comment below on .settings-head/--band-bg — a matching-background merge, not a
-   drawn edge; this contract does not invent a second mechanism for the same seam). */
+   drawn edge), so .tab-panel gets no border here either — this contract does not invent a second mechanism
+   for the same seam.
+   t2251 (amendment 4) — .tab-interstice now DOES flatten to --tab-body (below), landed on Settings'
+   #settings-app .settings-sidebar directly (specificity: the ID-scoped inline rule wins regardless of what
+   this bare class says, so both are set to the same value rather than fought over — same pattern as
+   .tab-strip/.tab-panel above). */
 .tab-strip { background: var(--tab-strip); }
-.tab-panel { background: var(--tab-body); }
+.tab-interstice, .tab-panel { background: var(--tab-body); }
 .tab-l1.active, .tab-l2.active { margin-bottom: calc(-1 * var(--tab-edge-w)); }
 
 .app-header .tab,
@@ -3612,11 +3620,17 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 .settings-sidebar .settings-tab {
     border-radius: var(--radius, 4px); border: none; cursor: pointer; transition: 120ms;
     box-shadow: none; text-shadow: none; filter: none; transform: none;
-    background: var(--subtab-face); color: var(--subtab-ink, var(--text-dim));
+    background: var(--subtab-face, var(--panel)); color: var(--subtab-ink, var(--text-dim));
     font-size: 12.5px; font-weight: 600;
 }
 .settings-sidebar .settings-tab:hover { background: var(--subtab-face-hover, var(--bg)); color: var(--subtab-ink-hover, var(--text-main)); }
 .settings-sidebar .settings-tab.active { background: var(--subtab-face-active, var(--bg)); color: var(--subtab-ink-active, var(--text-main)); }
+/* t2251 (amendment 4) — RESTING now falls back to --panel (the OLD interstice colour), not transparent: once
+   .settings-sidebar itself flattens to --tab-body (=--bg, same turn), a transparent resting tab would read
+   as invisible against the new ground and be indistinguishable from active. THE RULE (TABS.md) already says
+   which side needs the register — active is flush with the surface below it, inactive carries the chip — so
+   the chip moves to resting, not active. Organic's own --subtab-face: var(--panel2) (below) is unaffected;
+   this fallback only reaches the four themes that never declared their own override. */
 
 /* --- Virtual numpad (comm wizard) → electric-blue keys --- */
 [data-theme="studio"] .numpad .key,

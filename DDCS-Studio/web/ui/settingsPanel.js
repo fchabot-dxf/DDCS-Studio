@@ -1109,7 +1109,17 @@ function buildSettingsOverlay() {
                directly under the main tabs, at EVERY width (this is what the phone layout already did — the split
                personality is gone, so there is one place to look for a subtab on any screen). */
             #settings-app .settings-body { flex-direction: column; }
-            #settings-app .settings-sidebar { width: 100%; flex: 0 0 auto; display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel); overflow: visible; }
+            #settings-app .settings-sidebar { width: 100%; flex: 0 0 auto; display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px 12px; background: var(--tab-body); overflow: visible; }
+            /* t2251 (BACKLOG amendment 4, TABS.md) — THE INTERSTICE FLATTENS. Was background: var(--panel)
+               with its own border-bottom: 1px solid var(--border), a visibly separate plane between the L1
+               active tab and the content below (the BELOW defect TABS.md names — an elementFromPoint scan
+               showed 3+ tone-stops, not 2). Now var(--tab-body) (=--bg, the SAME tone as every active tab and
+               .settings-content): the L1 active tab, the interstice and the panel are ONE continuous surface,
+               per THE RULE ("every ACTIVE tab, at every level, IS the content surface"). The border-bottom is
+               deleted too, not just left — with sidebar and content now the SAME colour, a border between them
+               would draw a seam INSIDE what is supposed to read as one surface. The resting (non-active) L2
+               sub-tabs get their own chip fill instead (styles.css, --subtab-face's new var(--panel) fallback)
+               so selection still reads once the ground under them stops doing that job. */
             /* t2247 — material (background/color/border/box-shadow/radius) HOISTED to the shared
                .settings-sidebar .settings-tab rule (styles.css, reads --subtab-* tokens) — this was one of
                two byte-identical copies (macrosApp.js the other), the reason per-theme sub-tab styling was

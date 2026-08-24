@@ -54566,3 +54566,72 @@ advisor's own standing ruling, not as a verdict from this one run.
 ### Capacity
 
 Full working room this turn — no flag.
+
+## t2251 — AMENDMENT 4: THE INTERSTICE FLATTENS, SETTINGS NOW SCANS EXACTLY 2 TONES
+
+Took exactly the one named task ("amendment 4, the interstice, ON ITS OWN"). Did not start the queued
+work after it (ATC preview report, queue-mirrors-disk, analytics events, Send event log) — the dispatch's
+own phrasing reads as ordering guidance for whichever turn picks the queue up next, not as this turn's own
+scope; flagging that reading explicitly in the pass-back rather than silently deciding either way.
+
+### The flatten itself
+
+`ui/settingsPanel.js`: `#settings-app .settings-sidebar` — `background: var(--panel)` → `background:
+var(--tab-body)`, and its `border-bottom: 1px solid var(--border)` deleted outright (not just left alone):
+once the interstice and `.settings-content` share the same fill, a border between them would draw a seam
+INSIDE what's now supposed to read as one surface — leaving it would have undone the whole point of the
+flatten. Also added `.tab-interstice, .tab-panel { background: var(--tab-body); }` to the shared contract
+block in styles.css (was `.tab-panel` alone) — inert for Settings today (Settings' own ID-scoped rule wins
+on specificity regardless, same value either way) but now genuinely wired for a future adopter, matching
+last turn's `.tab-strip`/`.tab-panel` precedent.
+
+### The consequence the advisor named as load-bearing, not a caution — and the fix
+
+Before this turn, resting L2 sub-tabs were `background: var(--subtab-face)` defaulting to a literal
+`transparent` at `:root`, showing through to whatever sat behind them — the interstice's own `--panel`. That
+gave resting tabs a de facto chip (via the interstice's colour) without declaring one. Flattening the
+interstice to `--tab-body` would have made that transparent background show through to `--bg` instead —
+identical to the flattened ground AND to the active tab's own `--bg` fill, erasing the resting/active
+distinction entirely for every theme except organic (which already had its own explicit `--subtab-face:
+var(--panel2)` override).
+
+Per THE RULE's own direction ("active is flush, inactive carries the chip") the register belongs on
+RESTING, not active. Removed the `--subtab-face: transparent` `:root` literal entirely and moved the
+"default to `--panel` unless a theme overrides it" behaviour onto the CONSUMING rule's own fallback:
+`background: var(--subtab-face, var(--panel));` — the same fix shape as
+[[css-var-default-freezes-at-declaring-element]] (a fallback on the reader re-resolves live per theme; a
+default at the declaring point does not), applied here to introduce a NEW live default rather than to
+un-break a frozen one. Verified this reaches Macros/Gateway as a genuine no-op (they never touched this
+turn — confirmed via empty `git diff` on both files): their own `.settings-sidebar` is still literally
+`var(--panel)`, so their resting sub-tabs now resolve `--panel` via the new fallback instead of `transparent`
+showing through to the same `--panel` behind them — same rendered colour either way, reasoned through
+analytically since the harness didn't have a working `window.showMacrosApp`-equivalent handle for a live
+render check (tried `window.showMacrosPanel()`, sidebar didn't mount in the probe — not chased further since
+the source-diff argument is sufficient and neither file changed).
+
+### Verified
+
+Wrote `scratchpad/t2251-subtab-states.mjs`: hovers the 3rd sub-tab so resting (2nd)/hovered (3rd)/active
+(1st) all render together in ONE screenshot per theme, per the advisor's explicit "not three crops" ask.
+All 5 themes: resting reads as a real, visible chip; hover and active both read flush with the ground.
+Computed style confirms the RELATIONSHIP is identical across normal/studio/futuristic/steampunk (resting =
+`--panel`, hover/active = `--bg` = interstice) — organic keeps its own distinct `--panel2` chip (untouched,
+still an explicit override) but the same flush/chip relationship holds.
+
+Re-ran `scratchpad/t2249-contract-probe.mjs`'s `elementFromPoint` scan (all 5 themes): the strip (`--panel`,
+tone C) is followed by ONE continuous run of `--bg` (tone B) from the L1 active tab straight through the
+interstice and into `.settings-content` — no interposed third colour. **Exactly 2 contiguous tones**, the
+literal check amendment 9 originally asked for and t2249 honestly reported as not-yet-met. Full-panel
+screenshots (`scratchpad/t2249-contract-{organic,normal}.png`, regenerated) confirm it reads correctly by
+eye too, not just numerically — the sub-tab row and the content below it are visually one surface in both a
+dark and a light theme.
+
+### Verified (full suite)
+
+Required — same shared-token family as last turn, now also touching the interstice's own background and
+removing a `:root` literal default. 2793 passed, 17 flaky, **0 unexpected**, 25 skipped (35.6m). Flaky count
+sits inside the previously observed 14–18 trend band.
+
+### Capacity
+
+Full working room this turn — no flag.
