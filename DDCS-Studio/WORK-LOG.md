@@ -56006,3 +56006,73 @@ rename and the emit-pipeline's own `absorbed`/`feedFolds`/return-statement line 
 `web/wizards/stacks/atcTestWizard.js` (comment-only, the rename), `tests/atc-cap-gate.spec.js` (comment-only,
 the rename), `tests/node/architecture-map-1698.test.mjs` (the stale citation), `ARCHITECTURE.md` (four
 citations corrected, each with its shift annotated). `index.html` untouched.
+
+## t2279 — TURN B: THE BLOCKLY EVENT SURVEY. REPORT ONLY, NOTHING BUILT. Verdict per item, as asked — and one
+of them is a real, independent correctness/safety finding, not just an undo-semantics gap: BACKLOG #24.
+
+### The verdicts
+
+| item | verdict | evidence |
+|---|---|---|
+| `change/collapsed` | **COVERED** | already a durable record field (pre-dates this survey); confirmed live: collapsing a block fires a real `saveStates` snapshot (`insert`→`block edit`) and the record carries `collapsed:true` |
+| `change/inline` ("Inline Inputs") | **NOT COVERED — correctly so** | no field captures it anywhere in `stackBridge.js`; toggling it is pure layout, the derived stack is byte-identical either way, so it's inert by construction, not by omission |
+| `change/comment` (a block's own attached comment bubble) | **NOT COVERED — a real content-loss risk** | "Add Comment" is reachable on any block's context menu (confirmed); `setCommentText`/`getCommentText` work and the text survives on the LIVE block; but `workspaceToStack()`'s record has no `comment` field at all — the text is silently discarded the moment the block round-trips through `toRecord`/`recToJson` (any reproject, any save/reload, any undo past the point it was added) |
+| six `comment_*` events (`WorkspaceComment` — free-floating sticky notes) | **NOT REACHABLE** | right-clicking EMPTY canvas shows no "Add Comment" (only Undo/Redo/Clean up/Collapse/Expand/Delete); `Blockly.WorkspaceComment` is `undefined` on this build's namespace — the feature this event family belongs to isn't wired up at all, distinct from the block-comment feature above |
+| three `var_*` events (native Blockly variables) | **NOT REACHABLE** | the app's own "Variables" toolbox category is a custom `kind:'reporter'` block (`wizards/ops/variable.js`, a text field naming a #-register) — grepped the whole `blocks/`+`wizards/` tree for `createVariable`/`VariableModel`/`Blockly.Variables`: zero hits outside this survey's own scratch scripts. Blockly's native variable system is never invoked, so these events can never fire |
+| loose blocks (create/delete/move of a block never connected to the program) | **COVERED by the stack — and that is the finding.** See below. |
+
+### Loose blocks — the one asked to look hardest at, and the answer inverts the dispatch's own hypothesis
+
+The dispatch's own framing: *"probably invisible to [the stack] entirely."* **The opposite is true, and it's
+worse.** `workspaceToStack()` (`stackBridge.js:203`) reads `ws.getTopBlocks(true)` — every block with no
+previous connection, full stop, no filter for whether it's actually reachable from the program's own
+start/end chain — and hands the result straight to `emitMapped`. Verified this three ways, each ruling out
+the previous one's possible artifact:
+
+1. Direct `workspaceToStack(ws)` call after `newBlock()`+`render()`: the loose block's record appeared
+   immediately (`scratchpad/t2279-loose-blocks-check.mjs`).
+2. Suspecting that was just my own API call bypassing the app's real event path, fired a REAL
+   `Blockly.Events.BlockCreate` (what a genuine toolbox drag ultimately produces) and waited past any
+   throttle window: `ddcsGetBlockProgram()` — the live app's own accessor — picked it up, AND `saveStates`
+   recorded it as an ordinary undoable "block edit", indistinguishable from a real edit
+   (`scratchpad/t2279-loose-blocks-check3.mjs`).
+3. **The one that matters**: does it actually reach emitted TEXT, or does the record just sit inert in the
+   stack array? Created a loose, unconnected `move` atom (a real leaf, not an empty op container) the same
+   way — the live projected G-code gained a new line, `G1  F2000`, appended with zero visual distinction from
+   the real program (`scratchpad/t2279-loose-leaf-emit-check.mjs`). A loose empty `drill_op` CONTAINER, by
+   contrast, contributed nothing — but only because a freshly-dragged container has no children yet (`op` is
+   transparent at emit, per t2277's own reading of `emit()`); a partially-built or forked container could
+   still carry real content. Only the leaf-atom case is confirmed definitively this turn.
+
+**Filed as BACKLOG #24, flagged PRIORITY** — independent of the whole undo-redesign arc this survey feeds,
+this is a live correctness/safety gap: an ordinary mis-drag (missing a connection point by a few pixels, or
+exploring the palette and forgetting to clean up) silently changes what the machine will actually run, with
+no warning and no visual marker distinguishing "in the program" from "near the program." Explicitly did NOT
+propose using this turn's own disabled-block suppression as the fix — that would silently reclassify an
+accident as an authored choice, which teaches a user nothing; a visible warning or an emit-time refusal reads
+as the more honest direction, but that is a decision for whoever picks up #24, not this survey.
+
+### How this feeds Turn C
+
+Per the dispatch's own framing, this survey's accuracy decides the undo-redesign's scope:
+- `collapsed` needs no new work — already durable, already snapshotted.
+- `inline` needs no work — correctly inert.
+- Block comments (`change/comment`) are a REAL gap, but a DIFFERENT one — a persistence gap, not primarily an
+  undo-granularity gap (today's snapshot-based history doesn't even know the field exists at all, gesture or
+  not). Worth its own decision on whether Turn C's model widening should ALSO carry comment text, since it's
+  touching the same `toRecord`/`recToJson`/marker machinery anyway.
+- `WorkspaceComment` events and `var_*` events need nothing — genuinely unreachable, not a gap to design around.
+- Loose blocks are ALREADY fully in the undo-relevant stack (confirmed COVERED for the gesture-recording
+  question Turn C cares about) — but the SEPARATE, more urgent question of whether they should be allowed to
+  emit at all is BACKLOG #24's, not Turn C's.
+
+### Backlog tail
+
+Re-surveyed BACKLOG.md briefly rather than a full re-pass (already exhaustively covered t2277's own turn) —
+nothing new turned up tail-sized; skipping again, as the dispatch itself allowed. #24 above is a real, filed
+finding from this turn's own investigation, not a tail pick.
+
+### Files changed
+
+`BACKLOG.md` (new entry #24). No `web/` source touched — report-only turn, as dispatched. Every verification
+script lives in gitignored `scratchpad/t2279-*.mjs`.
