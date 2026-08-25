@@ -55772,3 +55772,66 @@ third thing to pad it.
 `web/blocks/blocksApp.js` (overlay config only — `zoom.controls`/`trashcan` → `false`, `wheel` untouched).
 `web/styles.css`: net zero (the `.blk-topbar-row` addition was reverted with the buttons). `index.html`
 untouched.
+
+## t2275 — TURN A of the split amendment stack: THE DISABLED-BLOCK EMIT QUESTION. REPORT ONLY, NOTHING BUILT.
+
+**VERDICT: confirmed, real, live-reachable. Disabling a block via Blockly's own standard "Disable Block"
+context-menu action (present, unmodified, reachable on any block including a top-level op — confirmed in
+t2273's own context-menu dump) has ZERO effect on the emitted G-code. The block is greyed on the canvas and
+still cuts.**
+
+### How this was established (code + a live empirical check, not one alone)
+
+**Static**: `workspaceToStack()` → `chain()` → `toRecord()` (`blocks/blockly/stackBridge.js`) is the ENTIRE
+workspace-to-program-stack conversion. Full-file grep for `disabled|isEnabled|setEnabled|DisabledReason`:
+zero hits. `chain()` walks every next-block unconditionally
+(`for (let b = block; b; b = b.getNextBlock()) out.push(toRecord(b))`) — no filter, no branch, nothing reads
+a block's enabled state anywhere in this file. `blocks/blockEmitter.js`'s `emitMapped()` — the function that
+turns that stack into G-code text — processes every record in its input array unconditionally too; the ONLY
+gating it performs at all is `applyCapGating()`, and that reads a DECLARED `t.cap` property per emitted
+token against the active post's `caps` table — a completely separate, capability-driven mechanism with no
+connection to Blockly's UI-level disabled flag.
+
+**Empirical** (`scratchpad/t2275-disabled-emit-check.mjs`, `-check2/3.mjs`): loaded a real 2-op program,
+called the REAL Blockly 13 API a user's "Disable Block" click triggers (`block.setDisabledReason(true,
+reason)` — confirmed this is the live API; more on that below), confirmed `isEnabled()` correctly flipped to
+`false`, then called `workspaceToStack(ws)` again: **still 2 records, byte-identical content** — the
+"disabled" block's record is included exactly as if nothing had changed. (Getting a full G-code byte-diff
+through this specific sandboxed setup fought me — `getProjection()`/`#editor` both read empty in a minimal
+script outside the app's normal init sequence, and burning more time chasing that plumbing wasn't worth it
+once the structural stack-length proof was already unambiguous: the same records reach the same
+unconditional emit loop either way, so the text they produce cannot differ.)
+
+### An adjacent, separate finding — found investigating this exact code path, reported alongside
+
+**This app's OWN post-gating visual affordance is dead code.** `blocksApp.js:80`, inside `applyOpGating()`:
+`try { b.setEnabled(!reason); } catch (_) { /* older Blockly */ }` — meant to grey out an atom the active
+controller/post doesn't support. Checked the real block prototype in the vendored Blockly 13
+(`scratchpad/t2275-check-api.mjs`): **`setEnabled` does not exist on a block instance in this version** —
+Blockly renamed it to `setDisabledReason(disabled, reason)` at v11. So this call **throws every single time
+it runs**, silently swallowed by the try/catch whose own comment already anticipated an API mismatch
+("older Blockly") without landing on the actual fix. Confirmed directly: `b.setEnabled(false)` →
+`TypeError: b.setEnabled is not a function`; `b.setWarningText(...)`, the paired call two lines up, still
+works fine.
+
+⭐ **This is COSMETIC, not a correctness bug — worth distinguishing sharply from the main finding.** The
+REAL enforcement of post-capability gating (e.g., ATC drawbar M-codes not running on V4.1) happens correctly
+and independently in `blockEmitter.js`'s `applyCapGating()`, via the declared `t.cap`/`caps` mechanism
+described above — it has never depended on Blockly's block-enabled state. So a gated atom's G-code line IS
+still correctly commented out (`( gated: ... )`) in the actual emitted program; it simply never visually
+greys out on the canvas the way the code's own intent describes, though its warning tooltip still fires. Two
+independent, correctly-agreeing computations from the same declared source (`def.gate()`), not a correctness
+gap — just a broken half of a UI affordance, sitting one line away from the real bug and easy to conflate
+with it if not separated out explicitly, which is why it's called out on its own here.
+
+### Scope check against the ask
+
+This was investigation only, as instructed — nothing in `web/` was touched or committed this turn; every
+change lives in gitignored `scratchpad/t2275-*.mjs` probe scripts. Turn A is answered; Turn B (the full
+Blockly event-type survey, which this finding feeds into and the disabled-state item above already partially
+answers) is next in the advisor's own ordering, not taken this turn to keep the one-job-per-turn discipline
+the split was explicitly restoring.
+
+### Files changed
+
+None (report-only turn, as dispatched).
