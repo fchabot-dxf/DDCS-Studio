@@ -1514,6 +1514,16 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     top: -6px;                 /* fallback mirrors the JS: tray opens over the trigger */
     left: -6px;
     min-width: calc(100% + 12px);
+    /* BACKLOG 19 (t2245 finding, t2269 fix) — was NO max-height/overflow at all: the tray was exactly as
+       tall as its contents, wherever that landed. A wizard-bar dropdown group can grow past a viewport's
+       height (the Wizard-bar editor lets a user add/re-icon/reorder wizards into any group, unbounded) with
+       no scroll to recover the items past the bottom edge. Deliberately NOT a fixed pixel cap — this
+       codebase was already bitten once by a hard 400px preview height nothing downstream consumed (BACKLOG
+       #10) — 100vh-derived instead, so it scales on a phone and a 4K monitor alike. Deliberately NOT capping
+       the item count either — the layout is what was failing, not how many wizards someone chose to keep in
+       a group. */
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
     /* opaque tray in every theme — rounded items no longer leak the editor through the gaps */
     background: var(--menu-face);
     border: 1px solid var(--menu-edge);
