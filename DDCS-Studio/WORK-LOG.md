@@ -56285,3 +56285,85 @@ Not reached — the investigation above filled the turn's reasonable budget on i
 ### Files changed
 
 None. Every verification script lives in gitignored `scratchpad/t2283-*.mjs`.
+
+## t2285 — THE GATE: does undo still work when the Blockly workspace was never mounted? CONFIRMED DIRTY.
+Stopped per the dispatch's own explicit instruction ("if it comes back dirty, stop and I will rule"). Both
+smaller questions answered in the same report, as asked.
+
+### The gate — real, confirmed, not theoretical
+
+**The Blockly workspace is lazily created, only on the FIRST Blocks-tab visit.** `blocksApp.js`'s own
+`initBlocks()`/`buildWorkspace()`: nothing runs until `showBlocks()` is called (the tab router's own
+callback), and that only fires when a user actually clicks the Blocks tab. Confirmed live
+(`scratchpad/t2285-editor-only-undo-check.mjs`): loaded a program, made a real change, all WITHOUT ever
+calling `showApp('blocks')` — `window.__blkWs` genuinely does not exist (`wsExists: false`).
+
+**And today's undo works fine in exactly that state** — same script: `canUndoBefore: true`,
+`window.ddcsUndo()` correctly reverted the program (`progBefore: 2 → progAfter: 1`), with zero Blockly
+workspace involved at any point. This is the CURRENT, correct behavior for what the dispatch calls "the more
+common user" — anyone who never opens Blocks still gets working undo on their editor-level edits, because
+today's snapshot is the semantic record, which needs nothing from Blockly at all.
+
+**The proposed Blockly-native-serialization snapshot would break this outright.** `Blockly.serialization.
+workspaces.save(ws)` requires a live `ws` — with none mounted, there is nothing to snapshot and nothing to
+restore. Building the redesign as a straight format swap would silently strip undo from every Studio-only
+session — exactly the "ships green because every test opens Blocks" failure named in the dispatch, and a
+regression for what is very plausibly the MORE common workflow (a operator editing G-code directly, never
+touching the block canvas at all).
+
+### The natural resolution — proposed, not built
+
+A DUAL FORMAT, decided per-snapshot at the moment it's taken, not a global mode switch:
+- **`ws` doesn't exist yet** (no Blocks visit so far in this session) → snapshot the semantic record, exactly
+  as today. No viewport to preserve because there is no canvas to have a viewport in — the problem gesture-
+  recording exists to fix (jarring view jumps) literally cannot occur here, so falling back isn't a
+  compromise, it's simply correct for that state.
+- **`ws` exists** (Blocks has been opened at least once, even if the user has since switched tabs — worth
+  confirming `ws` PERSISTS across a tab switch rather than being torn down, not yet verified this turn) →
+  snapshot Blockly's native serialization + scroll/scale, per the confirmed architecture.
+- A history can legitimately contain BOTH kinds across one session (editor-only edits before the first Blocks
+  visit, Blockly-native gestures after) — `apply()` needs to branch per-entry on which kind it is, not assume
+  one for the whole session.
+
+This keeps the format decision entirely INSIDE `saveStates.js`'s own `snapshot()`/`apply()` — every caller
+(below) keeps working exactly as it does today, unaware anything changed.
+
+### (a) Snapshot size — measured, not estimated
+
+`scratchpad/t2285-snapshot-size-check.mjs`, a realistic 5-op program (160 total descendant blocks — t2277
+measured 32 descendants for a single drill's own WHILE/GOTO peck body, this is 5 of those):
+- Semantic record: **4,509 bytes**.
+- Blockly-native serialization + scroll/scale: **16,422 bytes** — **3.64× larger**.
+- At `saveStates.js`'s own `MAX = 100` history cap: **~440 KB semantic vs ~1.6 MB Blockly-native**, worst case.
+
+**Assessment**: 1.6 MB for the entire history buffer is small by ordinary browser standards (well under a
+typical page's own JS payload) — not itself a blocking concern. The REAL cost gesture-based recording adds
+isn't snapshot size, it's snapshot RATE: attempts now count, so the 100-entry cap fills faster in wall-clock
+terms during an active editing session, meaning effective undo DEPTH (how far back a real session can reach)
+shrinks under heavy canvas fiddling. The cap already bounds memory regardless; this is a UX depth question,
+not a memory one — worth naming, not necessarily worth solving before building.
+
+### (b) Other `saveStates.js` consumers — audited, confirmed safe by construction
+
+Every call site found (`grep -rn` across `web/`): `confirmDestructiveLoad` (`devMode.js` ×2, `programFile.js`,
+`commandDeck.js`, `wizardManager.js`), `wouldLoseWork` (`workspaceManager.js`, `commandDeck.js`), a direct
+`snapshot()` call (`commandDeck.js`). Read each: `wouldLoseWork()` reads `getProg()` — the semantic
+`ddcsGetBlockProgram()` layer, which is COMPLETELY UNTOUCHED by this redesign (only what `saveStates.js`
+captures/restores changes, never the semantic layer itself, per the confirmed architecture's own point 2).
+`confirmDestructiveLoad` reads the same `getProg()` and calls `snapshot(label)` as an opaque "make a recovery
+point" call — it does not know or care what shape that recovery point takes internally. **Every one of these
+6+ call sites operates ABOVE the snapshot format, never touching it directly** — so as long as the dual-format
+fallback above lives entirely inside `snapshot()`/`apply()`'s own bodies, none of these callers need to
+change, and none of the destructive-load guards they implement are at risk of silently stopping guarding.
+
+### What's still unverified, named rather than assumed
+
+Whether `ws` persists across a tab switch away from Blocks (vs. being torn down) — needed to know whether a
+user who visits Blocks once, then works in the editor for the rest of the session, keeps getting
+Blockly-native (viewport-preserving) snapshots or falls back to semantic ones after leaving the tab. Not
+checked this turn — the gate itself was the priority, and it's now answered either way by the dual-format
+design (whichever it resolves to, snapshot() just checks `ws` at capture time).
+
+### Files changed
+
+None. Verification scripts in gitignored `scratchpad/t2285-*.mjs`.
