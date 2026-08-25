@@ -1192,3 +1192,118 @@ else. ⛔ It is **not** in `camsetting`: `camsetting[430]` reads `0.0`, and appl
 to a `setting`-space address is the mistake that hides it. **`eng` is the name table for `setting`, 1:1**, so
 any `setting` slot can now be *named* rather than guessed — which is the declared address map that memory
 asked for, already shipped by the vendor.
+
+### 12. ⚠ AMENDMENT TO §9 — how much of that is THIS MACHINE'S SETUP, not the firmware
+*(Prompted by the owner, who was right to ask: "is that WCS mechanic might be a result of how I work? how I
+wrote my probe macro". Answer: partly yes. §9 said the offset is applied "unconditionally" — that is stronger
+than one reading of one machine in one configuration supports.)*
+
+⭐ **There are TWO INDEPENDENT tool-offset systems on this controller, and `eng` names both:**
+
+| block | `eng` name | gated by | value here |
+|---|---|---|---|
+| `#400..#415` | **"H01..H16 tool length offset"** | `G43`/`G49` + `H` word — the standard mechanism | **all 0.000** |
+| `#930..#949` | **"T01..T20 Z offset"** | the tool table itself | **T01 = −68.336**, rest 0 |
+
+⇒ The panel showing `G49`/`H00` is **entirely consistent** — the H table it refers to is empty. The `−68.336`
+lives in the *other* system. ⇒ **§9's framing stands (they are different mechanisms), but the word
+"unconditionally" is withdrawn**: what is measured is that the tool-table Z offset applies **independently of
+`G43`/`G49`**, on a machine configured as below. It is NOT established that no parameter can turn it off.
+
+**⇒ THE CONFIGURATION THAT PRODUCED THIS READING — all of it is the owner's own setup:**
+```
+#128  "Is the Floating tool set valid?"  = 1   (ON)
+#130  "Is the fixed tool set valid?"     = 1   (ON)
+#999  "coordinate offset method" [0..2]  = 0
+#803  "The virtual Tool function on?"    = 0   (OFF — #973+ virtual tool Z offsets all 0)
+#805  "Automatic tool setting after tool change?" = 0
+```
+⚠ **`#999 "coordinate offset method"` is a THREE-WAY MODE (0/1/2) and it almost certainly governs how these
+offsets combine.** It reads `0` here and **the other two values have never been observed**. ⛔ Do not describe
+the stacking behaviour as universal DDCS behaviour until `#999` = 1 and 2 have been seen.
+
+⭐ **And the VALUE is unambiguously the owner's workflow.** `#1430`/`setting[930]` is written by their own
+tool-setter recipe (`CALIBRATE.nc` / `TOOLSET.nc` store `#1430 = [touch] − #2500`), with `#128`/`#130` both
+enabled. **A machine whose owner never probes has `#930` = 0 and would never see any of this.**
+
+⇒ **WHAT THIS CHANGES FOR THE APP — it makes the hazard MORE relevant, not less.** The stacking is not exotic
+firmware trivia; it is what happens to **anyone who uses the tool setter**, which is the normal workflow here.
+But the fix must read the offset **from the machine**, never assume a mode: `#999`, `#128`, `#130` and the
+active tool number are all in the same file and all readable.
+
+`[CONFIRMED: the two blocks exist and hold these values]` ·
+`[HYPOTHESIS: that #999 governs the combination — one value observed out of three]`
+
+### 13. ⭐⭐⭐ DOES IT APPLY UNIVERSALLY? — tested, and the manufacturer's own macro is the rule
+*(The owner asked the two right questions: "verify if this finding applies universally", and "or the one
+prescribed by manufacturer with native macro". Both answered below, by measurement.)*
+
+#### a. On the Expert the layout is STABLE — same indices in four independent dumps
+Every parameter resolved **by `eng` NAME** across the live machine, the factory `default_setting` beside it,
+the 2025-12-11 OEM firmware bundle, and the 2026-06-10 capture:
+
+| `eng` name | live | factory default | OEM firmware | 2026-06 capture |
+|---|---|---|---|---|
+| Current coordinate | `#78` = 1 | `#78` = 1 | `#78` = 1 | `#78` = 1 |
+| **T01 Z offset** | `#930` = **−68.336** | `#930` = **0** | `#930` = **0** | `#930` = **0** |
+| H01 tool length offset | `#400` = 0 | `#400` = 0 | `#400` = 0 | `#400` = 0 |
+| coordinate offset method | `#999` = 0 | `#999` = 0 | `#999` = 0 | `#999` = 0 |
+| Is the Floating tool set valid? | `#128` = **1** | `#128` = **1** | `#128` = **1** | `#128` = **1** |
+| Is the fixed tool set valid? | `#130` = **1** | `#130` = **1** | `#130` = **1** | `#130` = **1** |
+
+⭐⭐ **THIS OVERTURNS §12's hedge.** `#128`/`#130`/`#999` sit at their **FACTORY** values — the tool-set
+mechanism is enabled out of the box, not by anything the owner did. **The only thing that is the owner's is
+the VALUE in `#930`, written by their own probe macro.** ⇒ The stacking is **universal Expert behaviour**;
+what varies between machines is merely whether anyone has probed yet. ⛔ §12's "this may be the owner's setup"
+is withdrawn as to the MECHANISM; it stands only as to the value.
+
+#### b. ⭐⭐ THE MANUFACTURER'S OWN FORMULA — `slib-g.nc`, subprogram `O500`
+The vendor's own system macro library writes the WCS like this:
+
+```gcode
+O500
+IF #578<1 GOTO1          (guard: coordinate number must be >= 1)
+IF #578<7 GOTO2
+#[800+#578*5]=#1         (X)
+#[801+#578*5]=#2         (Y)
+#[802+#578*5]=#3         (Z)
+#[803+#578*5]=#4         (A)
+```
+
+⇒ **The manufacturer-prescribed address is `#[800 + (active coord) * 5 + axis]`**, with `#578` holding the
+active coordinate number. For G54 (`#578`=1) that is `#805` — **algebraically identical** to the app's
+`#805 + [WCS−1]*5` and to the owner's `COPY_WCS.nc`. `800 + n*5 ≡ 805 + (n−1)*5`.
+
+⭐ **And it explains row 0 once and for all**: `setting[300]`/`#800` is the **n = 0 slot**, which the vendor's
+OWN guard (`IF #578<1`) excludes — there is no coordinate system 0. That is exactly why the pendant does not
+display it, and why my §5 off-by-one was wrong. `[CONFIRMED — vendor source]`
+
+⛔ **Use the vendor's form, not ours.** `#[800 + n*5]` needs no `−1` correction and matches the firmware's own
+guard, so an off-by-one cannot be reintroduced by someone "simplifying" the expression.
+
+#### c. ⛔ ACROSS CONTROLLERS IT DOES **NOT** TRANSFER — the V4.1 has neither block
+The V4.1's own `eng` has **314** entries against the Expert's 585, and resolving the same names finds:
+
+| name | Expert | V4.1 |
+|---|---|---|
+| H01 tool length | `#400` | **`#264`** — different index, same concept |
+| T01 Z offset | `#930` | ⛔ **ABSENT** |
+| coordinate offset method | `#999` | ⛔ **ABSENT** |
+| Current coordinate | `#78` | ⛔ **ABSENT** |
+
+⇒ **The dual-offset system (H table *and* a separate tool-table Z) is Expert-only.** The V4.1 carries the
+`H01..H15` length table and nothing equivalent to `T01 Z offset` ⇒ **the §9/§12 stacking hazard does not exist
+on a V4.1**, and a fix written against Expert indices would read garbage there.
+
+#### d. ⇒ THE UNIVERSAL RULE, then — it is a METHOD, not an address
+Nothing numeric survives the crossing. What survives is:
+
+1. ⭐ **Resolve every parameter by its `eng` NAME on THAT controller — never by a hardcoded index.**
+   "H01 tool length" is `#400` on an Expert and `#264` on a V4.1. The number is per-firmware; the name is not.
+   `eng` ships in the dump beside `setting`, so the map is always available at read time.
+2. ⭐ **Prefer the vendor's own macro form** where one exists (`#[800 + n*5]`), because it encodes the
+   firmware's own guards and indexing convention rather than a re-derivation of them.
+3. ⚠ **Treat a name that is ABSENT as a capability the controller does not have** — not as a value of 0, and
+   not as a reason to fall back to the other controller's index.
+4. ⛔ **Never transfer a numeric finding between controllers.** The `controllers/README.md` rule already says
+   this; §13c is the measurement that shows what it costs when ignored.
