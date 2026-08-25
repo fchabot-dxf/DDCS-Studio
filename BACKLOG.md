@@ -1611,7 +1611,7 @@ wrong question. The right one, *"is there a baseline at all?"*, was answerable i
 manager, which distinguishes **"Never saved to a file"** from **"Unsaved changes"** in its own state line. Six
 measurements chased a mechanism when the first step should have been checking whether the premise held.
 
-⇒ **See BACKLOG 24 for what IS worth improving here** — the dot itself cannot express that difference.
+⇒ **See BACKLOG 25 for what IS worth improving here** — the dot itself cannot express that difference.
 
 ---
 
@@ -1937,7 +1937,7 @@ could still emit real content; this turn only confirmed the leaf-atom case defin
 
 ---
 
-### 24. THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
+### 25. THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
 
 *(surfaced 2026-08-25 by BACKLOG 17, which was NOT a bug — the dot was correct throughout. This is what the
 episode actually exposed.)*
