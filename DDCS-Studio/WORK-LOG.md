@@ -55541,3 +55541,110 @@ Full suite: 2794 passed, 15 flaky (inside the observed band), **0 unexpected**.
 Full working room. Path Anchor's own genuine complexity (not a dodge — verified by reading its actual
 implementation before scoping it out) is why this turn is one node type deep, not two; said so plainly
 rather than padding the turn with a rushed second build.
+
+## t2271 — "REPRODUCE, DON'T IMPROVE" correction absorbed. Path Anchor DECLARED (both halves, guard demo
+watched exactly as asked), piloted on Surfacing, and a real latent scoping defect found and diagnosed —
+not fixed this turn, reported and backlogged.
+
+### The correction, and why nothing needed redoing
+
+A mid-task amendment restated the standing G-code-emit-parity discipline for UI declarations: a difference
+between a declared twin and its hand-written shell is a BUG in the declaration, never a chance to tidy or
+harmonize — inconsistencies across the 15 shells get reproduced faithfully and raised separately, once every
+shell is declarable, never resolved silently mid-declaration. Checked this turn's own prior work against it
+before building anything new: the `usage_text` node's `.wiz-usage`/`.settings-hint` split (t2269) already
+does this correctly — it reproduces a real, confirmed CSS difference (styles.css:4944/5808) as a declared
+`style` param, not a "human ruling" flag. Only the comment language needed a small correction (removed
+wording that mis-framed a genuine reproduction as needing a ruling); no behavior changed.
+
+### Path Anchor: built as the dual-vocabulary pattern now predicts
+
+`web/wizards/ops/pathAnchor.js` (NEW) — the Blockly half: `{ type: 'path_anchor', ... emit: () => [] }`,
+metadata only, matching `code_preview`/`usage_text`'s shape. `web/ui/formWidgets.js`'s `traverse()` gained
+the render half: finds the `byParam.stockAttach`/`byParam.pathDatum` rows already produced by the twin's own
+flat bindings, stamps the `<prefix>stockAttach`/`<prefix>pathDatum` ids `pathAnchorField.js` expects, hides
+the raw rows, builds the `.pa-mount` div, and dynamically imports `mountPathAnchor(prefix)` — reproducing the
+shell's own wiring convention rather than rewriting it.
+
+**Watched the guard catch the half-declaration on purpose, as asked**: built the `formWidgets.js` branch and
+committed nothing, ran `uichildren-vocabulary-pairing.test.mjs` — failed, naming `path_anchor` precisely, as
+the only renderer-known type absent from `wizards/ops/index.js`'s `BLOCKS`. Registered `pathAnchorBlock`,
+re-ran — passed. This is the guard doing exactly the job it was built for at t2265, on a real case, not a
+staged one.
+
+### Pilot: Surfacing (`web/blocks/dataOps/surfacingData.js`)
+
+None of the 6 ATC ops use Path Anchor (no stock-attach geometry on a tool-change op), so the pilot needed a
+mill-op twin instead — picked Surfacing, one of the 6 registered ops (drill/pocket/contour/slot/surfacing/
+text) that share this picker. Added `{ type: 'path_anchor', params: { prefix: 'sf_' } }` to its `uiChildren`,
+between `sim` and `param_group`. Verified no crash on either live route: Customize
+(`ddcsEditWizardDef('user_surfacing_data')`) and in-place (`openWiz('user_surfacing_data')`, still on the
+flat/legacy path, unaffected — consistent with every prior finding that the tree path is dormant).
+
+### The finding: `pathAnchorField.js`'s own lookups are unscoped — real, but currently inert
+
+A standalone fair-harness render of the declaration alone (`scratchpad/t2271-declaration-surfacing.mjs`)
+showed the `.pa-mount` div and both stamped ids landing correctly, but **`svgCount: 0`** — the picker's own
+corner-grid SVGs never appeared. Traced it precisely: `mountPathAnchor(prefix)` finds its mount with
+`document.querySelector('.pa-mount[data-prefix="..."]')` — unscoped, first-match, whole-document — and
+`buildPicker`'s own `fld()` does the same with `document.getElementById(prefix+field)`. The OLD static
+Surfacing shell (still present in `index.html`, `display:none` but never removed — this turn's own
+constraint was "don't touch index.html") declares its own `.pa-mount[data-prefix="sf_"]` and matching ids,
+and it sits earlier in document order, so the global lookup finds IT, not the new declaration's host.
+Confirmed with a debug script returning both `.pa-mount[data-prefix="sf_"]` instances side by side —
+`{svgs:2, insideMyHost:false}` (the old shell) and `{svgs:0, insideMyHost:true}` (mine).
+
+⭐ **Then checked whether this is reachable in the REAL live app before treating it as a stop-the-turn
+"impossible to reproduce" finding** — it isn't, and here's the check: `renderUiTree()`, the only code path
+that can ever invoke the new `path_anchor` branch, is gated by `hasTreeLayout()` (`userOpView.js:106`),
+which requires a real `split_horizontal`/`split_vertical` node — zero of the 32 registered twins declare
+one (a pre-existing, already-documented fact, not new here). Confirmed live: opened the real Customize route
+for `user_surfacing_data` and queried `.pa-mount[data-prefix="sf_"]` — found only the OLD shell's own mount,
+unbuilt, 0 SVGs; `renderUiTree` was never invoked at all. So the collision is real but currently dormant, on
+exactly the same footing as the rest of the uiChildren tree-render path. Not a live regression, not a
+blocker — but a genuine latent defect that WILL bite the moment any twin gets a real tree layout and uses
+`path_anchor` against a prefix a still-present shell also claims.
+
+**Recorded as BACKLOG #21** rather than fixed this turn: the fix (scope both lookups to a root, default
+`document` to preserve the 6 existing static-shell call sites byte-for-byte, switch `fld()` from an `id`
+match to a `data-param` query scoped within that root) touches shared widget code with 6 existing call
+sites needing verification — a third file beyond the "declare + teach the renderer" pattern, and its own
+piece of work, not a tail-sized append to this turn.
+
+### An unrelated regression, found and fixed: `cam-substack-save-fork.spec.js`
+
+The full suite (background run, started before this section was written) came back 1 unexpected:
+`tests\cam-substack-save-fork.spec.js:110` — `flatTypes.slice(0, 4)` hardcoded `['user_root', 'panel',
+'sim', 'param_group']` as Surfacing's exact uiChildren prefix. Adding `path_anchor` between `sim` and
+`param_group` shifted the real order by one, so the fixture no longer matched. Not a flake, not
+pre-existing — reproduced in isolation (`npx playwright test tests/cam-substack-save-fork.spec.js -g
+"surfacing LIVE"`, failed with the exact expected/received diff naming `path_anchor` as the extra element).
+The test's own comment already frames this list as tracking the real declared order, not pinning fixed
+slots, so updated the fixture (`slice(0, 5)`, `path_anchor` inserted) and the `for` loop asserting each
+uiChild precedes `opunit`. Re-ran the whole spec file standalone after the fix: 5/5 pass. Re-ran the full
+suite: **2791 passed, 17 flaky (within the observed band), 0 unexpected.**
+
+### Two new amendments landed at the final poll — deferred, not incorporated
+
+Both are unrelated to this arc (Blocks-tab canvas chrome, not wizards-as-data): undo/redo buttons in the
+Blocks toolbar (with a real "which of the two undo stacks responds" question to answer first), and removing
+Blockly's floating zoom/trashcan overlays (with a real touch-delete-affordance question to verify first).
+Both are legitimate, scoped, and each carries its own genuine investigation the advisor explicitly asked for
+before calling it done — exactly the shape of work this turn's own Path Anchor section just finished arguing
+should NOT be rushed into an already-large turn. Neither contradicts or half-applies against anything built
+this turn, so nothing here needed reconciling — they're queued as the next turn(s)' own work, not silently
+dropped.
+
+### Files changed (arc)
+
+`web/ui/formWidgets.js` (comment correction on the `usage_text` branch; new `path_anchor` traverse() branch),
+`web/wizards/ops/pathAnchor.js` (NEW), `web/wizards/ops/index.js` (registers it),
+`web/blocks/dataOps/surfacingData.js` (pilot: one new uiChildren entry), `BACKLOG.md` (new entry #21),
+`tests/cam-substack-save-fork.spec.js` (fixture update for the real, non-regressive order shift).
+`index.html` untouched.
+
+### Capacity
+
+Full working room, and this turn ran long — Path Anchor's own investigation plus the unrelated regression
+chase plus the two deferred amendments add up. Flagging it plainly rather than compressing the next dispatch
+into what's left: the next turn is a clean start, not a continuation squeezed for time.

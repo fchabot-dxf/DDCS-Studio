@@ -237,6 +237,13 @@ export function buildSurfacingTwinStack() {
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the face-area rect + pos/size handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            // t2271 (wizards-as-data E2 measurement, PILOT) — the dual stock-attach/path-datum corner picker.
+            // surfacing's own static shell (index.html:754) mounts it at prefix "sf_" — copied verbatim, not
+            // re-derived. See formWidgets.js's own 'path_anchor' branch for how it reproduces the widget's
+            // getElementById convention without touching ui/pathAnchorField.js itself, and for why the
+            // stockAttach/pathDatum dropdown rows (surfacingData.js's own declared bindings, below) are
+            // hidden rather than left visible — the shell shows the picker only, no text fallback.
+            { type: 'path_anchor', params: { prefix: 'sf_' } },
             {
                 type: 'param_group',
                 params: { group: 'Surfacing' },

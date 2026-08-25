@@ -1414,18 +1414,50 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // (t2267): the same purpose exists under TWO unreconciled CSS classes with genuinely different
                 // rendered results, not just different names — .wiz-usage (font-size 10px, a left accent-
                 // border callout with a subtle background tint) on 8 shells, .settings-hint (font-size 11px,
-                // no border, no background — plain small text) on ATC's own 6. This is a real inconsistency,
-                // not one this act resolves unilaterally: `style` is a declared param (defaulting to the
-                // majority 'callout' shape), not a silent pick of one over the other — flagged for a human
-                // ruling in the pass-back, not decided here. `text` is trusted, author-declared markup (the
-                // existing shells already embed <b> for emphasis — e.g. "Settings → ATC"), assigned via
-                // innerHTML like every other declared-content node in this file, not escaped like a short
-                // label/tag string.
+                // no border, no background — plain small text) on ATC's own 6. t2271 correction — this is not
+                // a design ruling to escalate: the RULE is the same as byte-parity on emit, the declaration
+                // REPRODUCES what the shell does, exactly; `style` exists because the fifteen genuinely
+                // differ, not as an open question. Harmonising the fifteen is a separate, deliberate,
+                // later change — not something this branch decides or defers a ruling on. `text` is trusted,
+                // author-declared markup (the existing shells already embed <b> for emphasis — e.g.
+                // "Settings → ATC"), assigned via innerHTML like every other declared-content node in this
+                // file, not escaped like a short label/tag string.
                 const ut = document.createElement('div');
                 const style = node.params && node.params.style;
                 ut.className = style === 'plain' ? 'settings-hint' : 'wiz-usage';
                 ut.innerHTML = (node.params && node.params.text) || '';
                 container.appendChild(ut);
+            } else if (node.type === 'path_anchor') {
+                // t2271 (wizards-as-data E2 measurement, PILOT on Surfacing — the mill-op family that
+                // actually uses it; none of the 6 ATC ops have stock-attach geometry) — REPRODUCES
+                // ui/pathAnchorField.js's mountPathAnchor(prefix) faithfully, not a rewrite of it. That
+                // widget's own internal lookup is document.getElementById(prefix + field) — the OLD static
+                // shell's own per-field id convention (<input id="d_pathDatum" type="hidden">), not the
+                // data-param attribute every other declared field in this tree uses. Rather than teach
+                // pathAnchorField.js a second lookup path, this branch finds the ALREADY-RENDERED
+                // stockAttach/pathDatum rows (byParam — built the identical way every formfield row is) and
+                // stamps the id the widget expects directly onto their own <input>, so the widget's own code
+                // is untouched and keeps working exactly as it always has.
+                // ⚠ REPRODUCE, DON'T IMPROVE (t2271's own correction, echoing the emit-side byte-parity
+                // rule): stockAttach/pathDatum are ALSO independently declared as visible enum/dropdown
+                // bindings (surfacingData.js:87-88) — a real, useful keyboard-only fallback the shell never
+                // had, but not what the shell SHOWS. The shell hides these two fields entirely behind the
+                // picker (type="hidden", no dropdown). Faithfully reproducing that means hiding the row here,
+                // not keeping an accidental improvement the binding declaration happens to already offer.
+                const prefix = (node.params && node.params.prefix) || '';
+                for (const key of ['stockAttach', 'pathDatum']) {
+                    const entry = byParam[key];
+                    if (!entry || !entry.row) continue;
+                    const inp = entry.row.matches && entry.row.matches('[data-param]') ? entry.row : entry.row.querySelector('[data-param]');
+                    if (inp) inp.id = prefix + key;
+                    entry.row.style.display = 'none';   // the shell's own type="hidden" has no visible row at all
+                    if (!container.contains(entry.row)) container.appendChild(entry.row);
+                }
+                const mount = document.createElement('div');
+                mount.className = 'pa-mount';
+                mount.dataset.prefix = prefix;
+                container.appendChild(mount);
+                import('./pathAnchorField.js').then((m) => m.mountPathAnchor(prefix)).catch(() => {});
             } else if (node.type === 'param_group') {
                 // t1605 — a param_group IS its rows. TRANSPARENT on purpose, exactly like the flat form path
                 // (formBindings treats it as row-order metadata, never chrome): each param_field child picks its

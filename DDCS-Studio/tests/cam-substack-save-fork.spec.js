@@ -147,9 +147,10 @@ test.describe(() => {
         // param_group that came back from the canvas EMPTY: the copy inherited no bindings, so nothing refilled it and
         // `opunit` happened to land at index 4. Now the fork inherits its source's declarations, materializeParamGroup
         // repopulates the group's param_field rows, and the opunit sits after them — the same claim, one row later.
-        expect(r.flatTypes.slice(0, 4), 'the uiChildren keep their positions').toEqual(['user_root', 'panel', 'sim', 'param_group']);
+        // t2271 — surfacing's uiChildren gained a `path_anchor` node (declared picker), shifting `opunit` one row further.
+        expect(r.flatTypes.slice(0, 5), 'the uiChildren keep their positions').toEqual(['user_root', 'panel', 'sim', 'path_anchor', 'param_group']);
         expect(r.flatTypes.indexOf('opunit'), 'the opunit is present').toBeGreaterThan(-1);
-        for (const ui of ['panel', 'sim', 'param_group']) {
+        for (const ui of ['panel', 'sim', 'path_anchor', 'param_group']) {
             expect(r.flatTypes.indexOf(ui), `${ui} (a uiChild) precedes the opunit-wrapped exec run`).toBeLessThan(r.flatTypes.indexOf('opunit'));
         }
         expect(r.unresolvedBindings, 'EVERY saved binding still resolves to a socket that exists (no corruption)').toBe(0);

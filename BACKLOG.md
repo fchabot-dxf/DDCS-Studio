@@ -1751,3 +1751,44 @@ branch genuinely cannot fire, before E2 registers anything beyond ATC.
 
 **STILL REAL IF (systemic half):** `grep -l "panel" DDCS-Studio/web/blocks/dataOps/*Data.js | wc -l`
 → **any count above 6 means the systemic half is STILL REAL.**
+
+### 21. `ui/pathAnchorField.js` looks up its own mount point GLOBALLY — latent, currently dormant, found t2271
+
+**OBSERVED:** `mountPathAnchor(prefix)` (`ui/pathAnchorField.js:57`) finds its host with
+`document.querySelector('.pa-mount[data-prefix="${prefix}"]')` — the WHOLE document, not scoped to any
+rendering root. `buildPicker`'s own `fld()` (`:31`) does the same with `document.getElementById(prefix +
+field)`. Both are first-match, document-order lookups. There are already **6 existing call sites** (the
+static per-op shells: `surfacingView.js`, `textView.js`, `slotView.js`, `pocketView.js`, `contourView.js`,
+`drillView.js`), each relying on being the ONLY `.pa-mount[data-prefix="X"]` in the document at call time —
+true historically, because nothing else ever rendered a second one.
+
+**t2271 added a 7th call site**: `formWidgets.js`'s new `path_anchor` `uiChildren` node type (the declared
+twin's own picker), reached via `renderUiTree()`. When a twin's declaration and its OLD static shell share the
+same prefix (e.g. `sf_` for surfacing) and BOTH are present in the DOM at once — true today, since the old
+shells are hidden via `display:none`, never removed — `mountPathAnchor`'s global lookup finds the OLD shell's
+`.pa-mount` first and mounts the picker SVGs there instead of into the new declaration's own host. Confirmed via
+a direct debug script: `document.querySelectorAll('.pa-mount[data-prefix="sf_"]')` returns the old
+`#wiz_surfacing` shell's mount (0 SVGs after mounting into it) with the new host's own mount never even
+existing in that particular check — see below.
+
+⭐ **WHY THIS IS NOT A STOP-THE-TURN FINDING, and is not urgent:** `renderUiTree()` — the ONLY code path that
+would ever invoke the new `path_anchor` branch — is gated by `hasTreeLayout()` (`userOpView.js:106`), which
+requires a real `split_horizontal`/`split_vertical` node. **Zero of the 32 registered twins declare one**, so
+the tree-render path is dormant app-wide (a pre-existing, already-documented fact, not new to this entry) —
+confirmed live: opening the real Customize route for `user_surfacing_data` and checking
+`.pa-mount[data-prefix="sf_"]` finds only the OLD shell's own mount, unbuilt, 0 SVGs; `renderUiTree` was never
+called at all. The collision is real but currently inert, on the same footing as the rest of the tree path.
+
+⚠ **IT WILL BITE the moment ANY twin gets a real tree layout AND uses `path_anchor` with a prefix that collides
+with a still-present static shell.** Fix before then, not urgently now.
+
+**Fix, once picked up:** give `mountPathAnchor`/`buildPicker` an optional scope root (default `document`,
+preserving the 6 existing call sites byte-for-byte) and have `formWidgets.js`'s `path_anchor` branch pass its
+own `container` as that root. `fld()`'s `getElementById` lookup needs the same treatment — likely
+`root.querySelector('[data-param="${field}"]')` scoped within the container rather than an `id` match, since
+two elements can legally end up sharing an `id` in this scenario (the real root cause, `id` matching is not
+safely scoped-able the way `querySelector` from a root is). ⚠ Touches a shared widget with 6 existing call
+sites — verify none regress before shipping.
+
+**STILL REAL IF:** `grep -n "document.querySelector\|document.getElementById" DDCS-Studio/web/ui/pathAnchorField.js`
+→ any hit means unscoped lookups are still there.
