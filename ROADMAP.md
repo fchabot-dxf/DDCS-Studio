@@ -677,3 +677,28 @@ declaration would have to reproduce whichever behaviour is *correct*, and nobody
 ⇒ **This is the same uncoordinated per-shell drift that let the ATC resize bug sit unnoticed** (six ATC bodies
 missing the `.viz-split` wrapper every other built-in had). The shells drift because each is written by hand.
 That is the arc's own argument, restated as measurement rather than principle.
+
+
+### CONVENTION — when a function's ROLE widens, its NAME widens with it
+
+**Human, twice, 2026-08-25.** On extending the cap-gating function to also suppress user-disabled lines:
+*"i agree with reusing capgating but should it be renamed to keep track."* Then, on reusing a grouping
+predicate to decide emission: *"sometimes reusing a function is exactly what we need, but we need to rename it
+slightly just to keep track."*
+
+⭐ **Reuse is usually right — a second implementation is this project's most-repeated defect.** But a name that
+described the original job becomes a LIE the moment the job grows, and the next reader trusts the name over the
+body. `applyCapGating` handling user-disabled lines was no longer capability gating; a predicate called
+`_isLooseTop` deciding what reaches the machine is no longer a grouping heuristic.
+
+⇒ **Reuse the function. Rename it to the wider role. In the same change.** Renaming later never happens,
+because by then the name reads as established rather than stale.
+
+⚠ **And check for a second copy BEFORE reusing.** Both times this came up, the function existed twice:
+`applyCapGating` had one home but a sibling mechanism, and `_isLooseTop` is defined identically in
+`programModel.js:237` and `opSession.js:609`. Widening one copy while the other keeps the old behaviour is
+strictly worse than either — it is a divergence dressed as a reuse.
+
+⚠ **The tell that a rename is owed:** if you have to explain the name away in a comment — *"despite the name,
+this also…"* — the name has already failed. This codebase has several of those and each one cost a turn to
+believe.
