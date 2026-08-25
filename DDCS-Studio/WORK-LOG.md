@@ -55074,3 +55074,89 @@ No code changed — nothing to run against the suite. All claims in this entry a
 
 Full working room. An investigation-only turn — the two findings here (a wrong premise, and a rendering
 defect the premise was hiding) are worth more than any single edit would have been.
+
+## t2261 — THE EXPERIMENT: RENDER ATC CHECK FROM ITS DECLARATION ALONE, DIFF AGAINST THE SHELL. ZERO code changes — a measurement, exactly as asked.
+
+**Pilot chosen: ATC Check.** Compared it against the alternatives before picking: Warmup is the smallest (4
+bindings, 1 section, no gate) but too sparse to exercise sections/gating at all; Table is smallest by live
+field count (3) but that's mostly toggles, not scalar bindings; Change is the richest (9 fields, 5 methods)
+but its size would make a byte-level diff noisy. Check sits at the sweet spot the advisor already spotted —
+8 bindings, 2 declared sections (TOOL & CUT / GEOMETRY), a uniform gate, full help text on every field — rich
+enough that a gap would actually show up, small enough to diff by hand with confidence.
+
+### The method, and a self-caught methodology bug along the way
+
+Replicated `userOpView.js`'s own "isTree" render branch (lines 341-384) — `formBindings` → `renderOpForm`
+(into a temp host, to extract `byParam`) → `renderUiTree(host, userRoot.uiChildren, def.bindings, byParam)`
+— verbatim, standalone, targeting a fresh host with NO static shell involved at all
+(`scratchpad/t2261-declaration-render.mjs`).
+
+First run: the form rendered as an unstyled jumble (labels and inputs strung together on one line) and the
+preview canvas was solid black. Before reporting either as "what the declaration lacks," checked whether my
+OWN harness was unfair — it was: my host had none of the `.wiz-2pane`/`.wiz-controls` ancestor classes
+`renderUiTree`'s own layout logic (formWidgets.js:368-372, `host.closest('.wiz-2pane')`) depends on. Rebuilt
+the host wrapped in the same shell classes a real modal provides. The form styling came back correctly once
+that was fixed — a test-harness gap, not a declaration gap, and worth naming as its own lesson: the
+DECLARATION doesn't carry its OWN presentation context: it EXPECTS to be dropped into an ancestor that
+already provides it, which is fine for every real caller but means a bare standalone render will always look
+broken regardless of what the declaration says, until the harness matches.
+
+Two apparent gaps remained even with the fair harness: `blockHeight`/`port` (the two source-chip-bound
+fields) showed their `psrc-wrap` icon but no label text, and the 3D canvas stayed black. Did NOT report these
+as declaration gaps on a single, standalone reading — cross-checked against the REAL, FULL live pipeline
+(`ddcsEditWizardDef('user_atc_check_data')` + `showApp('blocks')`, the genuine Customize route, not a
+replica) via `scratchpad/t2261-customize-full.mjs` + a screenshot. **Both "gaps" were false positives from my
+own imprecise DOM queries** — the screenshot shows "Setter Block Height" rendering correctly with its label,
+and the 3D probe-sim view rendering correctly and fully populated. My `.closest('.form-row')` selector was
+finding the wrong ancestor for the source-chip-wrapped rows (the label lives outside that ancestor, not
+inside it), and my canvas-content check ran before the WebGL scene had time to paint. Corrected before
+writing anything down, per this session's own standing discipline — a claim that turned out to be my own
+test bug, not something to have reported as a real difference.
+
+### The one CONFIRMED, real gap: the CODE PREVIEW panel
+
+Every hand-written ATC shell's own static markup carries a hardcoded `<div class="preview-block"><span
+class="label">CODE PREVIEW…</span><pre id="wiz_atc_*_code"></pre></div>`, entirely separate from anything in
+`uiChildren`. Confirmed absent from BOTH the fair standalone render AND the real Customize-route screenshot
+— neither shows a live G-code preview panel anywhere. `uiChildren`'s own vocabulary (`sim` / `panel` /
+`param_group` / `formfield`) has no node type that means "also show a live code preview here" — this is a
+genuine declaration gap, not a renderer bug: there's nothing to declare that would produce it, not a
+declared thing the renderer is failing to honor.
+
+### A second, smaller finding: declared but currently inert
+
+`section: 'TOOL & CUT'` / `'GEOMETRY'` is present on every binding and rendered as NEITHER a visible header
+in the shell NOR in the declaration-alone render — confirmed absent in both, so this is not a decl-vs-shell
+difference at all, just metadata the current renderer doesn't consume for grouping yet. Noted because it's
+exactly the kind of thing that looks like a gap on a casual read and isn't one — worth distinguishing from
+the code-preview finding, which genuinely is.
+
+### Both directions, as asked
+
+**What the shell has that the declaration doesn't (yet) express:** the code-preview panel — confirmed,
+above. **What the declaration produces that the shell doesn't:** nothing found. Since the field-level render
+(labels, help text via `title` attributes, gating via `data-gate`) runs through the exact same shared
+`renderOpForm` function on both paths, there was no possible daylight there by construction — any true
+difference could only live in the surrounding structure, and the only structural piece the shell adds that
+the declaration doesn't is the code preview. No case where the declared route was BETTER; nothing smoothed
+over in that direction either — genuinely didn't find one.
+
+### The honest summary
+
+For ATC Check specifically: the FIELD-LEVEL description in `atcCheckData.js` is complete — every binding's
+label, help, gate, and value round-trips correctly through the shared renderer with zero loss, confirmed by
+direct comparison, not assumed. The one thing standing between "renders from declaration alone" and "matches
+the shell exactly" is a single missing node type: something that says "put a live code preview here." That
+is a small, well-scoped, single addition to the vocabulary — not a rewrite, and not something specific to
+Check; every one of the 32 twins would need the identical piece.
+
+### Verified
+
+No code changed — every claim in this entry traces to a script in `scratchpad/t2261-*` and either a
+screenshot or direct console output, cross-checked against the real live app where a first reading looked
+suspicious rather than reported as-is.
+
+### Capacity
+
+Full working room. Another investigation-only turn, deliberately — "ship nothing" was the instruction and
+the value here is the measurement, not an edit.
