@@ -37,7 +37,13 @@ const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];
 // t2277 — `disabled` joins `collapsed`: a native Blockly block property (its own disabled-reasons set), not a
 // `.data` field, so it lives directly in this set rather than DURABLE_DATA_FIELDS. See toRecord()'s own comment
 // for why it is read from ONE SPECIFIC disabled-reason (MANUALLY_DISABLED), never blanket isEnabled().
-const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', 'disabled', '_group', ...DURABLE_DATA_FIELDS]);
+// t2289 — `comment` joins them the same way: Blockly's own comment-bubble text (getCommentText()/setCommentText()),
+// a native block property (Blockly serializes it under `icons.comment`, not `.data`), not a DURABLE_DATA_FIELDS
+// member. BACKLOG #26 — this was previously reachable on the canvas (Blockly's "Add Comment" context-menu entry,
+// never removed) but had NO field here at all, so it was silently dropped on any reprojection. See recToJson()'s
+// own comment for the serialization shape (verified live, scratchpad/t2289-comment-shape-check.mjs), and
+// blockEmitter.js's applyAttachedComments for how it becomes real program content, not just canvas decoration.
+const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', 'disabled', 'comment', '_group', ...DURABLE_DATA_FIELDS]);
 
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
@@ -138,6 +144,7 @@ function toRecord(b) {
             simChildren: firstSim ? chain(firstSim) : [],
             collapsed: b.isCollapsed() || undefined,
             disabled: isManuallyDisabled(b) || undefined,   // t2277 — undefined (not false) so it's absent, not a JSON `false` clutter
+            comment: (b.getCommentText && b.getCommentText()) || undefined,   // t2289 — same absent-not-empty convention
         };
     }
     const def = BLOCKS[b.type];
@@ -183,6 +190,7 @@ function toRecord(b) {
     }
     if (b.isCollapsed && b.isCollapsed()) r.collapsed = true;
     if (isManuallyDisabled(b)) r.disabled = true;   // t2277 — any block at any depth; see collectDisabledIds (blockEmitter.js) for the cascade
+    if (b.getCommentText && b.getCommentText()) r.comment = b.getCommentText();   // t2289 — any block at any depth; see collectComments (blockEmitter.js)
     return r;
 }
 
@@ -317,6 +325,7 @@ function recToJson(rec) {
         if (Object.keys(inputs).length) node.inputs = inputs;
         if (rec.collapsed) node.collapsed = true;
         if (rec.disabled) node.disabledReasons = [manuallyDisabledReason()];   // t2277 — Blockly's own serialization key, confirmed empirically (scratchpad/t2277-serialization-shape.mjs)
+        if (rec.comment) node.icons = { comment: { text: rec.comment, pinned: false, height: 80, width: 160 } };   // t2289 — Blockly's own serialization key + shape, confirmed empirically (scratchpad/t2289-comment-shape-check.mjs) — pinned/height/width are Blockly's own defaults for a freshly-set comment, not carried state
         return node;
     }
     // Preserve the model id (op blocks already do, above) so the loaded workspace block keeps the SAME id the emit
@@ -387,6 +396,7 @@ function recToJson(rec) {
     if (Object.keys(inputs).length) node.inputs = inputs;
     if (rec.collapsed) node.collapsed = true;
     if (rec.disabled) node.disabledReasons = [manuallyDisabledReason()];   // t2277 — any block, not just op containers (nesting, see WORK-LOG)
+    if (rec.comment) node.icons = { comment: { text: rec.comment, pinned: false, height: 80, width: 160 } };   // t2289 — any block, not just op containers
     return node;
 }
 

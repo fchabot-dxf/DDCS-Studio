@@ -218,21 +218,29 @@ function revCanon(opType) {                          // marker (canon) key -> in
  *  user def; built-ins pass 0 → unstamped). It's the def-change→rebuild signal, NOT the format `MARKER_VERSION`.
  *  `disabled` (opt, t2277) = the op's own MANUALLY_DISABLED state (not the app's own transient post-gating —
  *  see stackBridge.js's toRecord for why those two are read from DIFFERENT Blockly disabled-reasons and must
- *  never be conflated). A THIRD reserved top-level key, same shape as `defV`: PROGRAM CONTENT, not a param. */
-export function markerLine(opType, params, defV, disabled) {
+ *  never be conflated). A THIRD reserved top-level key, same shape as `defV`.
+ *  `comment` (opt, t2289) = the op's OWN attached note (Blockly's comment-bubble text, read via getCommentText() —
+ *  see stackBridge.js's toRecord/recToJson). A FOURTH reserved top-level key, same shape as `disabled`: PROGRAM
+ *  CONTENT (it emits — see blockEmitter.js's applyAttachedComments), not a param. Scoped to the OP's OWN comment
+ *  only, same as `disabled` was — a comment on a block NESTED inside a parametric built-in op is not marker-durable
+ *  (that op's body regenerates from `params` alone on reimport, so a nested atom's own fields never had a
+ *  persistence channel here; see t2277's own identical scoping for `disabled`, and this turn's WORK-LOG entry). */
+export function markerLine(opType, params, defV, disabled, comment) {
     const rec = { op: opType };
     for (const k in (params || {})) rec[canonOf(opType, k)] = params[k];
     if (defV && defV > 0) rec.defV = defV;
     if (disabled) rec.disabled = true;
+    if (comment) rec.comment = comment;
     return `( ${SENTINEL}:${MARKER_VERSION} ${escParens(JSON.stringify(rec))} )`;
 }
 
 /** True if a line is a DDCS op marker (cheap sentinel test). */
 export const isMarker = (line) => /^\(\s*@DDCS:\d+\s/.test(String(line).trim());
 
-/** Parse a line → { opType, params, v, defV, disabled } (params back in internal keys) or null if not a marker.
- *  `defV` = the stamped per-def version (0 when absent — a legacy pre-versioning file). `v` = the format version.
- *  `disabled` = t2277's reserved marker key (false when absent — every pre-t2277 file, byte-for-byte). */
+/** Parse a line → { opType, params, v, defV, disabled, comment } (params back in internal keys) or null if not a
+ *  marker. `defV` = the stamped per-def version (0 when absent — a legacy pre-versioning file). `v` = the format
+ *  version. `disabled` = t2277's reserved marker key (false when absent — every pre-t2277 file, byte-for-byte).
+ *  `comment` = t2289's reserved marker key ('' when absent — every pre-t2289 file, byte-for-byte). */
 export function parseMarker(line) {
     const m = String(line).match(/^\(\s*@DDCS:(\d+)\s+(.*?)\s*\)\s*$/);
     if (!m) return null;
@@ -240,8 +248,8 @@ export function parseMarker(line) {
     try { rec = JSON.parse(m[2]); } catch (_) { return null; }
     if (!rec || typeof rec.op !== 'string') return null;
     const opType = rec.op, rev = revCanon(opType), params = {};
-    for (const k in rec) { if (k === 'op' || k === 'defV' || k === 'disabled') continue; params[rev[k] || k] = rec[k]; }   // defV/disabled are reserved marker keys, not params
-    return { opType, params, v: Number(m[1]), defV: Number(rec.defV) || 0, disabled: !!rec.disabled };
+    for (const k in rec) { if (k === 'op' || k === 'defV' || k === 'disabled' || k === 'comment') continue; params[rev[k] || k] = rec[k]; }   // defV/disabled/comment are reserved marker keys, not params
+    return { opType, params, v: Number(m[1]), defV: Number(rec.defV) || 0, disabled: !!rec.disabled, comment: rec.comment || '' };
 }
 
 /** Validate an op record against the schema → warning strings ([] = clean, or op not catalogued). */

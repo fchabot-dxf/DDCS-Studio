@@ -21,6 +21,7 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
+import { commentBlock } from '../wizards/ops/comment.js';   // t2289 — the ONE emitter an attached note reuses unchanged (see applyAttachedComments)
 import { UNRESOLVED } from '../wizards/ops/expr.js';   // t1577 — the failure sentinel a Set binding carries when its own value did not resolve
 import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ONE cut-entry source for the entry fold (shared with the marker)
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
@@ -519,6 +520,7 @@ export function emitMapped(blocks, settings = {}) {
     applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
     applySerialLibrary(T, dialect);       // t764 — expand {SN} markers → the bump (top) + the per-digit dispatch + the glyph library (once per distinct height, after the program end). NO {SN} marker → byte-identical.
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
+    applyAttachedComments(T, blocks);     // t2289 — a block's own note (Blockly comment bubble) becomes a real line, beside the block it explains — BEFORE suppression, so a disabled block's own note folds with it
     applyLineSuppression(T, dialect, collectDisabledIds(blocks));   // comment out lines the active post can't run, or the human disabled — DISTINGUISHABLY: '( gated: … )' vs '( disabled: … )'
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
     // t2070/t2139 — the two DDCS-syntax guards (inline-IF..THEN skip, then the unconditional flush-left strip —
@@ -815,6 +817,49 @@ function collectDisabledIds(blocks, out = new Set()) {
         if (b.uiChildren) collectDisabledIds(b.uiChildren, out);
     }
     return out;
+}
+
+/** t2289 — collect { blockId → comment text } for every block (at any depth) whose OWN record carries a
+ *  `comment` (Blockly's comment-bubble text — see stackBridge.js's toRecord/recToJson). Threaded into
+ *  applyAttachedComments below, the same walk shape as collectDisabledIds. */
+function collectComments(blocks, out = new Map()) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.comment) out.set(b.id, b.comment);
+        if (b.children) collectComments(b.children, out);
+        if (b.uiChildren) collectComments(b.uiChildren, out);
+    }
+    return out;
+}
+
+/** BACKLOG #26 / t2289 — a block's own attached note IS program content (the human ruling this turn built to),
+ *  so it must EMIT, not just persist. Reuses wizards/ops/comment.js's EXISTING emit unchanged (one emitter, two
+ *  entry points: the standalone Comment atom a wizard drops in explicitly, and this — a note attached to
+ *  whatever block it explains). One comment line per noted block, spliced immediately BEFORE the first tagged
+ *  line whose ancestry (`t.src`, tag()'s own ancestry chain) contains that block's id — "before" reads as "the
+ *  following documents what's next," and the SAME ancestry-containment test collectDisabledIds/applyLineSuppression
+ *  already use means the note tracks its subject through everything downstream: wherever that block's own first
+ *  line ends up, the note stays immediately beside it — never drifting from what it explains, which was the
+ *  human's own argument for attaching notes to a block over the separate free-floating Comment atom.
+ *  Runs BEFORE applyLineSuppression, but that pass's own FIRST guard (`code.startsWith('(')` → skip, "already a
+ *  comment") means a note's line is NEVER rewritten to `( disabled: … )` even when its subject is — confirmed
+ *  live, not assumed (scratchpad/t2289-comment-disabled-interplay.mjs): the note is untouched, only the
+ *  subject's OWN line gets the `disabled:` wording. Left this way deliberately, on reflection: a note was never
+ *  executable G-code in the first place (it's already inert), so the "won't run" framing that wording exists to
+ *  convey has nothing to add to it — it says exactly what the author wrote, disabled or not. */
+function applyAttachedComments(T, blocks) {
+    const comments = collectComments(blocks);
+    if (!comments.size) return;
+    const insertions = [];
+    for (const [id, text] of comments) {
+        const idx = T.findIndex((t) => t.src && t.src.includes(id));
+        if (idx >= 0) insertions.push({ idx, id, text, src: T[idx].src });   // t2289 — inherit the found line's OWN ancestry, so a note on a nested block still cascades under an ANCESTOR's later disable, exactly like the line it's attached to
+    }
+    insertions.sort((a, b) => b.idx - a.idx);   // descending — earlier splices must not shift later ones' indices
+    for (const { idx, text, src } of insertions) {
+        const [line] = commentBlock.emit({ text });
+        T.splice(idx, 0, tag(line, src));
+    }
 }
 
 /** Per-line suppression: comment out a line the active post CANNOT run (capability gating), or that the human

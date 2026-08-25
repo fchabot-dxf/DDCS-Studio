@@ -56505,3 +56505,167 @@ turn's files; none of them touch `saveStates.js`/`blocksApp.js` or the undo mech
   scale-before-scroll ordering included), `_placeDeadline` tracking, the gesture-boundary listener (debounce
   on `e.group`, ungrouped-event sentinel fold-in).
 - Verification scripts in gitignored `scratchpad/t2287-*.mjs` (kept, not committed).
+
+## t2289 — TURN D: COMMENTS IN THE OP MODEL. BUILT, per the three explicit rulings + BACKLOG #26 folded in.
+A block's own attached note (Blockly's native comment bubble — "Add Comment" on any block, never removed from
+this app) is now real, model-carried, EMITTING program content — not canvas-only decoration silently dropped
+on every reprojection. Round-trips through the canvas model AND (op-level, same scope t2277 set for
+`disabled`) through `.nc` export/reimport, byte-identically. The standalone Comment atom leaves the toolbox
+palette, now that the attached-note path covers what it existed for.
+
+### 1. The field: `comment` joins `disabled`/`collapsed` as a native top-level record field (`stackBridge.js`)
+
+Added to `KNOWN_LEAF_RECORD_FIELDS` (a Blockly block property — `icons.comment`, not a `.data` field — so it
+lives directly in this set, not `DURABLE_DATA_FIELDS`, exactly the `disabled` precedent). `toRecord()` reads
+`b.getCommentText()` in BOTH branches (the op-container branch and the generic-atom branch), so a note is
+captured at ANY depth, not just top-level ops. `recToJson()` writes it back via
+`node.icons = { comment: { text, pinned: false, height: 80, width: 160 } }` — **verified empirically before
+writing it**, per the backlog's own explicit instruction not to assume from the API name
+(`scratchpad/t2289-comment-shape-check.mjs`, `-leaf.mjs`: `Blockly.serialization.blocks.save()` on a block
+with `setCommentText('hello world note')` called returns exactly that shape, on both an op container and a
+leaf atom; a full `serialization.workspaces.save/load` round trip on a live workspace preserves the text).
+`pinned`/`height`/`width` are Blockly's own defaults for a freshly-set comment (confirmed in the same script,
+not carried as separate persisted state) — the model field is the TEXT, matching the human's own framing
+("a comment that emits is program content") rather than the bubble's own pixel geometry.
+
+### 2. The emit: reuses `wizards/ops/comment.js`'s existing emitter, unchanged (`blockEmitter.js`)
+
+Per the ruling: `commentBlock.emit({text})` is called AS-IS — its paren-stripping line was not touched. New
+`collectComments(blocks)` (mirrors `collectDisabledIds`'s exact walk shape) + `applyAttachedComments(T,
+blocks)` (mirrors `applyLineSuppression`'s ancestry-matching idiom): for each noted block, find the FIRST
+tagged line whose ancestry (`t.src`, `tag()`'s own ancestry chain — ROOT to leaf) contains that block's id,
+and splice a comment line immediately BEFORE it, inheriting that line's own `src` (so a note on a nested block
+still cascades under a LATER ancestor disable, exactly like the line it explains).
+
+**Placement — decided and verified, not left implicit (the dispatch's own explicit ask):** BEFORE the block's
+own first emitted line. Reasoning: reads as "the following documents what's next" (matches how the codebase's
+OWN generated annotations already read — e.g. the loop's `( COUNT i=... )` precedes its unrolled body), and a
+multi-line-emitting block (a loop body, a peck cycle) gets ONE note ahead of the whole thing rather than one
+trailing an arbitrary last line. Verified live: a leaf atom's own note lands directly above its own line
+(`t2289-comment-emit-check.mjs`); an OP-CONTAINER's own note lands above its FIRST CHILD's first line
+(`t2289-op-level-comment2.mjs`, after an empty-`children:[]` false start reproduced t2277's own documented
+"transparent op emits nothing" gap — corrected to a real builder-generated body, matching that precedent's own
+lesson). "Cannot drift from what it explains" (the human's own argument for attached notes over the separate
+free-floating Comment atom) holds by construction: the note's position is computed from wherever its subject's
+OWN line lands, every emit, never a stored offset.
+
+**A commented + disabled block's note is NOT rewritten to `( disabled: … )`** — found live
+(`t2289-comment-disabled-interplay.mjs`), not by design-first-then-test: `applyLineSuppression`'s own FIRST
+guard skips any line already starting with `(`, which every comment line does, so the note passes through
+untouched while its SUBJECT's own line still gets the `disabled:` wording. Kept as-is on reflection rather
+than special-cased around: a note was never executable G-code, so the "won't run" framing has nothing to add
+to it — it says exactly what the author wrote, disabled or not. (Documented the ACTUAL behavior in the code
+comment, correcting an initial comment that had asserted the opposite — see Errors below.)
+
+### 3. Round-trip: marker-durable at the OP level, scoped exactly like `disabled` was (`opSchema.js` + `programModel.js`)
+
+`markerLine`/`parseMarker` gained `comment` as a FOURTH reserved top-level marker key, same shape as
+`disabled`. `serializeWithMarkers` passes `op.comment` through; `importMarkedNc` restores it onto the rebuilt
+op the same way `disabled` is. **Full round trip, verified against real builder-generated ops**
+(`t2289-comment-full-roundtrip.mjs`, mirroring t2277's own `t2277-full-roundtrip2.mjs` exactly): an op-level
+comment survives export → the marker's JSON payload carries `"comment":"…"` legibly → reimport (including
+nesting inside the pre-existing, unrelated `multi_step` auto-wrap, confirmed via
+`t2289-comment-roundtrip-nested-check.mjs`) → **re-emitting the reimported stack produced text
+BYTE-IDENTICAL to the pre-export emit.**
+
+**Scoped OUT, deliberately, matching `disabled`'s own precedent exactly:** a comment on a block NESTED inside
+a parametric built-in op's regenerated body has no marker persistence channel — `opFromMarker`/`makeOp`
+rebuilds that body fresh from `params` alone on every reimport, and a nested atom's `comment` isn't a param.
+Not tested as a separate case because the code path proves it structurally: `serializeWithMarkers` reads only
+`op.comment` (one string, the op's own), never walks `op.children` — there was never a channel for it to lose.
+In-session (Blocks canvas open, no export/reimport), a nested note round-trips correctly via the ordinary
+canvas/model bridge (§1) — this is a live-session-only capability for nested notes specifically, not a build
+gap, reported rather than silently accepted, exactly per BACKLOG #26's own "answer the cheaper one first"
+framing (the cheaper one — the canvas round-trip — is fully built; the marker question for NESTED comments is
+answered: not worth its own turn, since it's the same shape as an already-accepted, already-documented limit).
+
+### 4. The palette — hidden, sequenced after (`wizards/ops/comment.js`)
+
+`hidden: true` added to `commentBlock`'s def — the SAME declared mechanism `safetraverse` already uses (t903),
+already respected by `buildToolbox` and the palette search filter (confirmed via grep before use, not
+assumed). The TYPE stays fully registered: load-compat, AND because `newBlock('comment')` is genuinely
+load-bearing across dozens of `wizards/stacks/*.js` / `wizards/lathe/*.js` generators plus several
+`dataOps/*.js` files that pattern-match a comment's own TEXT as a structural marker inside a regenerated body
+(`atcTestData.js`, `commData.js`, `cornerData.js`, `rotaryClockData.js`, `rotaryCenterData.js`,
+`partingData.js`, `ioStepData.js`, `alignmentData.js`) — none of that reads the toolbox, so none of it is
+touched. Verified live (`t2289-palette-hide-check.mjs`, `-toolbox-direct-check.mjs`): `buildToolbox([])`'s own
+fresh output no longer contains a `"type":"comment"` entry; `BLOCKS['comment']` still exists; a legacy record
+carrying a `comment`-type block still loads and emits (`( legacy comment block )`). Sequenced LAST, only after
+§1–3 were confirmed working — the dispatch's own explicit ordering, so there was never a window with no way to
+add a comment at all.
+
+### Verified live, real UI gesture (not just the API) — the real right-click path
+
+`t2289-real-contextmenu-check.mjs`: right-clicked a real block, found "Add Comment" in the REAL Blockly
+context menu (confirmed still present, never removed — BACKLOG #26's own premise), clicked it through the
+actual menu DOM, confirmed a comment icon attaches (`hasCommentIcon: true`) via the same `getIcon('comment')`
+API `toRecord()`'s own mechanism relies on. Typing text into the opened bubble is Blockly's own native
+textarea-editing internals (not app code), already proven to route through the same `setCommentText` this
+turn's capture reads.
+
+### Architecture map — 3 citations fixed in the same act, per the worker's own standing instruction
+
+My edits to `stackBridge.js` shifted `KNOWN_LEAF_RECORD_FIELDS`'s own line and both `recToJson` throw-guard
+lines below it, rotting `ARCHITECTURE.md`'s prose line-number citations and (for `KNOWN_LEAF_RECORD_FIELDS`
+specifically) `tests/node/architecture-map-1698.test.mjs`'s own literal `find` string (caught by the node
+tier: `REG KNOWN_LEAF_RECORD_FIELDS … NOT FOUND anywhere`). Fixed both — the test's `find` string updated to
+the new literal line (now including `'comment'`), and `ARCHITECTURE.md`'s three prose citations (the
+registries-table row, INV1's mouth-guard, INV2's undeclared-field guard) updated to their verified current
+lines (46 / 393 / 340 respectively), each confirmed via a direct grep before writing, not computed from
+assumed line-shift arithmetic alone. `DURABLE_DATA_FIELDS`'s own citation (`:24`, actually `:25` — a
+pre-existing, unrelated one-line drift this turn didn't cause) left untouched — not this turn's mess to clean.
+
+### Errors and fixes
+
+Two false starts, both self-caught before being reported as findings: (1) an op-level-comment test using a
+bare `children: []` record produced empty emit output — reproduced t2277's own already-documented "an op
+container is transparent at emit time, only its children emit" gap; corrected by using a builder-generated
+body. (2) The `applyAttachedComments` doc comment originally asserted a disabled block's note WOULD fold to
+`( disabled: … )` "via the identical ancestry mechanism" — stated before testing it, and wrong:
+`applyLineSuppression`'s pre-existing "already a comment, skip" guard means it never does. Caught by actually
+running the interplay test rather than trusting the intended design; corrected the comment to describe the
+verified, and on reflection more correct, actual behavior (§2 above) instead of forcing the code to match the
+wrong assumption.
+
+### Regression sweep — found a real, larger-than-precedent tradeoff the suite itself was designed to catch
+
+Both core emit/bridge files (`blockEmitter.js`, `stackBridge.js`) plus `opSchema.js`/`programModel.js` are the
+SAME shared-file set t2277 flagged for a full run. Node tier: 228/228 (including the architecture-map fix).
+
+**Full suite run #1 caught one real (`unexpected`) failure**, and it is worth flagging explicitly rather than
+folding quietly into the file list: `palette-sufficient-1591.spec.js` — "every block type used by a registered
+wizard is reachable in the palette" — has its OWN declared mechanism (`loadBearingHidden`) for exactly the
+situation `hidden: true` on `comment` creates, pinned as an EXACT expected array specifically so a NEW entry
+can never pass silently. `comment` turned out to be load-bearing for **24 wizard templates** (`newBlock
+('comment')` used throughout their generated bodies) — an order of magnitude larger than the existing 3-entry
+precedent (`clearlift`/`safehop`/`safetraverse`, 1-2 wizards each). This is the dispatch's own ruling (3)
+carried out exactly as instructed — the palette removal itself was not a judgment call this turn made — but
+the SIZE of the resulting gap is worth the reader's attention, which is precisely why the test pins it instead
+of silently passing. Updated the expected array + the test's own comment block with the full reasoning (see
+`tests/palette-sufficient-1591.spec.js`'s own updated comment): the gap is narrower than the raw "24" suggests
+— forking any of these wizards (copying its template programmatically) is completely unaffected, since that
+never went through the palette; only building one from a blank canvas, one dragged block at a time, loses the
+exact standalone-comment-line replay, and gains a strictly better replacement for the same documentation goal
+(the new attached-note mechanism this turn built). Re-ran the single spec green after the fix, then the full
+suite again in full as the actual merge-gate evidence.
+
+**Full suite run #2 — after the fix: genuinely green.** node tier 228/228. e2e tier: **2796 passed, 13 flaky,
+0 unexpected, 26 skipped** (~27.4 min). The flaky set is a different 13 than run #1's 16 (no meaningful
+overlap) — pre-existing test-infra noise, none touching this turn's files (`stackBridge.js`, `blockEmitter.js`,
+`opSchema.js`, `programModel.js`, `wizards/ops/comment.js`).
+
+### Files changed
+
+- `DDCS-Studio/web/blocks/blockly/stackBridge.js` — `comment` joins `KNOWN_LEAF_RECORD_FIELDS`; captured in
+  `toRecord()` (op + generic branches); written back in `recToJson()` (op + generic branches) via
+  `icons.comment`.
+- `DDCS-Studio/web/blocks/blockEmitter.js` — `collectComments`/`applyAttachedComments`, wired into
+  `emitMapped()` before `applyLineSuppression`; imports `commentBlock` from `wizards/ops/comment.js`.
+- `DDCS-Studio/web/blocks/opSchema.js` — `markerLine`/`parseMarker` gain the `comment` reserved marker key.
+- `DDCS-Studio/web/blocks/programModel.js` — `serializeWithMarkers`/`importMarkedNc` pass `comment` through,
+  mirroring `disabled`.
+- `DDCS-Studio/web/wizards/ops/comment.js` — `hidden: true` (leaves the toolbox palette; type stays registered).
+- `DDCS-Studio/tests/node/architecture-map-1698.test.mjs` — `find` string updated for the new
+  `KNOWN_LEAF_RECORD_FIELDS` literal.
+- `ARCHITECTURE.md` — 3 line-number citations corrected (registries table, INV1, INV2).
+- Verification scripts in gitignored `scratchpad/t2289-*.mjs` (kept, not committed).
