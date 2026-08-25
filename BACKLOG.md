@@ -1594,7 +1594,7 @@ traced but not fixed".
 
 ---
 
-### 18. THE KEYBOARD DOCK IS OPEN AT BOOT ON THE HUMAN'S PHONE - mobile only, and also not reproducible
+### 18. [RESOLVED 2026-08-25 — STOPPED HAPPENING, CAUSE NEVER ESTABLISHED] THE KEYBOARD DOCK IS OPEN AT BOOT ON THE HUMAN'S PHONE - mobile only, and also not reproducible
 
 *(human, 2026-08-23: "also still always opening on the keyboad opened", then "the dock thing is on mobile only
 from what ive seen", then the lead: "possibly has to do with the new button row we added earlier".)*
@@ -1625,6 +1625,28 @@ dock handle this session. Worth checking, in this order:
 
 **Do not close this on a passing test.** It must be confirmed on the human's actual phone against the deployed
 site, or confirmed as a stale-cache artefact and closed for that reason with the evidence.
+
+
+#### RESOLVED 2026-08-25 — and the distinction matters
+
+Human, checking their own phone: *"dock is fine now."*
+
+⚠ **It stopped happening. It was never reproduced, and the cause was never found.** Those are different
+things, and this entry is retired as the first rather than the second.
+
+**What was ruled out along the way, all measured:** a stale deployed build (`pages.dev` served the same version
+as `main` when checked), a caching probe server (re-measured on a clean one, same result), and boot-time
+expansion (a mobile context at 412px booted the dock at **43px, handle only, `is-expanded` absent** — three
+separate times across the session).
+
+⇒ So the app's own boot path is clean and has been throughout. Whatever produced it lived on the human's
+device — most likely a cached bundle or accumulated state that has since been replaced.
+
+⛔ **If it returns, do NOT re-run the reproduction attempts above** — they have been done three times and are
+all negative. Go straight to the difference: their device's stored state and their real controller config,
+neither of which any local probe reproduces. And note the prior history on this entry: an earlier turn also
+failed to reproduce it and closed it by adding a regression test, which passed while the human still saw the
+bug. **A green test on this one proves nothing.**
 
 ---
 
@@ -1847,3 +1869,47 @@ of truth for the same op and would drift from the params that are supposed to de
 ⇒ If it is worth solving, the disabled state of a child has to be part of the op's own PARAMS — expressible by
 the generator, not stored beside it. That is a design question about what a parametric op's params include, not
 a bug fix. **Worth a ruling before anyone builds it.**
+
+### 24. ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
+
+*(found t2279, investigating the Blockly event survey's own "loose blocks" question — the dispatch's own
+hypothesis was that a disconnected block is probably INVISIBLE to the program stack. The opposite is true,
+and it is worse: it is fully visible, fully undoable, and fully EMITTED, with no visual distinction from a
+block that is actually part of the program.)*
+
+**STILL REAL IF:** drag any leaf atom (e.g. a plain Move block) from the Blocks-tab toolbox onto empty canvas
+— NOT connecting it to anything — and check the projected G-code. **A new line for that atom appearing =
+STILL REAL.**
+
+**PRIORITY — this is a correctness/safety finding, independent of the whole undo-redesign arc it was found
+inside.** `workspaceToStack()` (`blocks/blockly/stackBridge.js:203`) reads `ws.getTopBlocks(true)` — EVERY
+block with no previous connection, whether or not it is part of the "real" program chain — and hands the
+result straight to `emitMapped`. There is no connectivity filter anywhere between the workspace and the
+emitted text. Confirmed empirically, not inferred (`scratchpad/t2279-loose-leaf-emit-check.mjs`): created a
+`move` atom via the exact API path a real toolbox drag ends in (a genuine `Blockly.Events.BlockCreate` fired,
+not a bypassed API call), left it fully unconnected, and the live projected G-code gained a new line —
+`G1  F2000` — with the app's own `saveStates` history recording it as an ordinary "block edit", identical to
+any real edit. Nothing on screen distinguishes "this block is part of your program" from "this block is
+sitting nearby and will also run."
+
+⚠ **Why this is worse than the dispatch expected:** an invisible-to-the-stack loose block would just be an
+annoyance (you'd lose track of it, but it couldn't hurt anything). A block that IS in the stack and DOES emit
+means exploring the palette, or a slightly-missed connection drop — an easy, ordinary mis-drag in any
+block-based editor — silently changes what the machine will actually do, with no warning, no visual marker,
+and (unverified this turn, worth checking before this is fixed) no guaranteed position in program order
+(`getTopBlocks`'s own ordering, not necessarily creation order or canvas position).
+
+⚠ **Interacts directly with t2277's own disabled-block work, and NOT as a fix — as a possible partial
+mitigation someone could reach for and should think through first:** a loose block could in principle be
+auto-treated as "disabled" (commented out) rather than live-emitted, using the exact suppression mechanism
+just built. ⛔ But that changes WHAT A LOOSE BLOCK MEANS from "an accident nobody asked for" to "a legitimate
+authored state" — worth a ruling, not a reflexive reach for the nearest available lever. The more honest fix
+is probably a VISIBLE affordance (a warning badge on any block Blockly's own `getTopBlocks` returns that isn't
+reachable from `progstart`, or refusing to emit an unconnected block at all with a loud on-screen notice) —
+not silently reclassifying it as disabled, which would suppress it correctly but teach nothing.
+
+⚠ **Scope not yet established:** does the SAME thing happen for a loose OP CONTAINER (e.g. a bare `drill_op`
+dragged and left unconfigured)? Tested and found: NO immediate emitted lines, but only because a freshly
+dragged op container has empty `children` until a wizard actually builds it (`opRanges`/`emit()`'s 'op'
+branch is transparent — it emits only its children). A PARTIALLY built or forked op container sitting loose
+could still emit real content; this turn only confirmed the leaf-atom case definitively.
