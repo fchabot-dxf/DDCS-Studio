@@ -1092,11 +1092,16 @@ not be]`
 The owner read the pendant with **G54 active** and the machine idle:
 
 ```
-        work (G54)        machine
+           Mach            Abs (G54 work)
 X          5.000          -45.130
 Y         -5.000          660.704
 Z         -5.000           99.844
 A         -5.000          660.944
+
+(label correction: the 5/-5/-5 column is the MACHINE DRO -- it matches #122-124
+ "Mach position after go home" and the #880 machine-X reading of 5.000 recorded
+ at line 446. The offset is the DIFFERENCE between the columns either way, so
+ every number and conclusion below is unaffected.)
 ```
 
 **⇒ §5's reading (a) is REFUTED. The app is correct: G54 IS `setting[305]` = `coordinate` row 1.**
