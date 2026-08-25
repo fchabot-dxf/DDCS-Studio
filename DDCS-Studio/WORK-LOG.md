@@ -55343,3 +55343,86 @@ touched can affect anything the browser-tier suite exercises.
 
 Full working room. A cleaner turn than the last three — one focused investigation with a clear, evidence-
 backed answer, one small mechanical build, both scoped exactly to what was asked.
+
+## t2267 — THE COST ESTIMATE: what all 15 hardcoded shells carry that no uiChildren node can (yet) express. SURVEY ONLY, nothing built.
+
+Read all 15 shells in full (`drill`, `user` [the generic one], `pocket`, `contour`, `slot`, `surfacing`,
+`text`, `atc_length`, `atc_check`, `atc_warmup`, `atc_table`, `atc_change`, `atc_test`, `comm`, `wcs`), not
+just their preview-blocks. **The list is short, and shorter than it first looked** — checking one mechanism
+(`guard`) before assuming it was missing cut what looked like the biggest item down to zero.
+
+### (a) Already expressible today, by an existing node nobody has used for this
+
+- **`form_action_btn`** (`wizards/ops/formControls.js`) — ATC's own "⚙ ATC Settings…" button (all 6 ATC
+  shells: `onclick="window.openAtcSetup()"`) matches an ALREADY-DECLARED select option exactly:
+  `action: 'atcSetup'`, sitting right next to `toolLibrary`/`homingSetup`. Confirmed by reading the block's
+  own `defaults`/`selects`, not assumed from the name.
+- **Every conditional sub-panel keyed by a sibling field's value** — drill/slot's pattern-type switch
+  (grid/circle/rect/line show different field sets), pocket/contour's shape-type switch (rect/circle/polygon
+  dimensions), comm's type→mode→val/msg/color/dwell cascade. I initially assumed this needed a NEW mechanism
+  (the existing `gate` only GREYS fields for a capability absence, doesn't HIDE them for a sibling value) —
+  checked before reporting it as a gap, and found `blocks/whenGuard.js`'s `guard` block instead:
+  `whenOk({param, is/in/not}, params)` evaluates against the op's OWN resolved params (not just capability
+  flags), and `pruneGuards` explicitly recurses into `uiChildren`, not just `children` — the mechanism is
+  already general enough, already proven (Corner's own structural toggles use it), and was simply never
+  reached for a form-layout purpose. This is the single largest correction in this survey: what looked like
+  the biggest true gap turned out to already exist.
+- **The `#sf_zModeLabel`/`#sf_zMode` empty-skeleton pattern** (surfacing's own zMode dropdown, populated at
+  runtime from the twin's own declared `SURFACING_STRUCT` spec) — already declaration-driven in spirit; a
+  `formfield`/`param_field` node with a dropdown widget already covers this shape.
+
+### (b) Needs a new node type
+
+- **Static top-of-form instructional text.** 13 of 15 shells carry a paragraph above the fields explaining
+  the whole op ("Drills/bores a hole pattern... drag the handles...") — no existing node declares free-form
+  descriptive text at all. Needs one (`usage_text` or similar, a single `text` param).
+  **Consistency finding**: this exists under TWO different, unreconciled names — `.wiz-usage` (drill/pocket/
+  contour/slot/surfacing/text/comm) and `.settings-hint` (all 6 ATC shells) — same semantic purpose, two
+  independently-authored implementations. A new node should settle which (or carry a style param for both),
+  not just add a third name.
+- **The Path Anchor picker** (`pa-mount`, `ui/pathAnchorField.js`) — the datum/stock-attach-corner mount used
+  by all 6 "placement" mill ops (drill/pocket/contour/slot/surfacing/text). No `wizards/ops/*.js` file
+  declares it; `specializedPickers.js`'s own family (region/tool-library/thread-preset/declared-IO/slider/
+  stepper) doesn't include it. A real, recurring gap — 6 of 15 shells need it.
+
+### (c) Genuinely not declarable today, and why
+
+- **The comm-screen preview** (`comm-screen-pixwrap`/`comm-screen`, a pixel-accurate simulated DDCS
+  controller-display mockup). Not a 3D/2D toolpath view at all — `sim`/`panel` both assume that shape. No
+  existing node comes close; this would need its own new concept, not a variant of an existing one.
+- **Computed/dynamic text content** — three separate instances, all sharing the same real gap: every
+  existing text-bearing field (a node's `label`, a binding's `help`, `code_preview`'s own `tag`) takes a
+  STATIC string param. None support "compute this text from the op's own live state." Comm's own usage
+  paragraph changes per selected `type` (populated by JS, not hardcoded); WCS's own `#wcsStatus` compliant-
+  tag is empty in the markup and filled in at runtime; comm's `#c_val_hint`/`#c_status_dwell_hint` spans are
+  ALSO runtime-set, separate from a field's own static `title`. All three are the same underlying need — a
+  declared value that's a FUNCTION of resolved params, not a literal — and none of today's text-bearing
+  params can express that.
+
+### Are the 15 shells consistent with each other? No — and it's the same drift class as the ATC resize bug
+
+The 6 mill ops (drill/pocket/contour/slot/surfacing/text) are highly consistent with EACH OTHER — same
+section order (VISUALIZATION → usage → shape/pattern → TOOL → DEPTH & FEED → CODE PREVIEW), same `pa-mount`,
+same `.wiz-usage` class. But `comm` and `wcs` abandon the shared `.wiz-2pane`/`.wiz-visual`/`.wiz-controls`
+structure entirely — a flat single column, no split — which the other 13 all share. ATC's 6 use a DIFFERENT
+hint-text class (`.settings-hint`, not `.wiz-usage`) for the identical semantic purpose. The compliant-tag
+has FOUR distinct forms across the 15 (three static strings plus WCS's own dynamic one). None of this is
+individually a bug — each shell's own author made a locally-reasonable choice — but it's exactly the
+UNCOORDINATED, per-shell-authored divergence that let ATC's own `.viz-split` omission go unnoticed for as
+long as it did: 15 independently hand-maintained shells drift from each other in small ways nobody is
+checking, because nothing declares what they're all supposed to hold in common.
+
+### The honest size of the list
+
+Two genuinely missing node types (`usage_text`, a Path Anchor picker), one thing that turns out to already
+exist and just needs using (`form_action_btn`), one mechanism that turns out to already cover a whole
+category of "gap" that looked much bigger before checking (`guard`/`whenOk`, already proven, already reaches
+`uiChildren`), and two real, harder-to-solve items that don't have an easy declared answer yet (the
+comm-screen mockup; computed/dynamic text). That's the arc's whole remaining cost across all 32 twins, not
+per-twin — most twins won't need the Path Anchor picker or the comm-screen mockup at all (only 6 and 1 of
+the 15 respectively need them). Nothing built this turn, per the explicit instruction.
+
+### Capacity
+
+Full working room. A pure-reading turn — the value was in checking `whenGuard.js` before reporting a gap
+that turned out not to be one, not in the volume of file read.
