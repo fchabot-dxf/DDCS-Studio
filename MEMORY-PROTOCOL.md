@@ -99,3 +99,40 @@ be skipped, a **periodic cross-seat sweep is the backstop** — dump both stores
 ⭐ **The danger is ABSENCE more than DISAGREEMENT.** That sweep found no contradictions at all — what it found
 was one seat not knowing what the other had paid to learn. Nothing detects that: no test, no exception, no
 grep. It is the only defect class in this project with no automatic tell.
+
+---
+
+## 6. ⭐ THE DOMAIN CHECK — how a seat knows to say "ask the other one"
+
+**Owner, 2026-08-25: *"so if it doesnt have it it says so and i probe you."*** The owner is the only thing that
+talks to both seats, so they are the router. **But a seat cannot route what it does not notice.**
+
+⚠ **Absence has no signal.** A seat does not know what it does not know. It does not feel a gap — it just
+guesses, confidently, and the guess reads exactly like knowledge. Tonight RENDERRANCHY spent four dispatched
+amendments designing comment-safety machinery and **never once felt short of a fact**, while the governing
+constraint sat in Fairy's store the whole time.
+
+⇒ **So the trigger cannot be "notice you are missing something." It must be "notice WHOSE DOMAIN this is":**
+
+```
+about to assert something about THE MACHINE — a controller's syntax, what it
+accepts, how the hardware behaves?
+  → FAIRY'S DOMAIN. Say so and STOP, unless it is written in
+    controllers/<name>/FINDINGS.md. Do not reason it out.
+
+about to assert something about THE APP — architecture, the block model, the
+emit pipeline, how a wizard is built?
+  → RENDERRANCHY'S DOMAIN. Same rule in reverse.
+```
+
+**That is checkable in the moment. "Detect what you are missing" is not.**
+
+⭐ **It works when applied.** RENDERRANCHY passed it once tonight — *"I am not the source for the safe
+comment-character list; derive it from the dumps"* — and that single refusal is what surfaced Fairy's answer.
+It then FAILED the same test on the sanitiser design, where the governing constraint was equally a hardware
+fact and nobody flagged it. **Same seat, same evening, same question, opposite outcomes** — the difference was
+only whether the domain got named out loud.
+
+⚠ **And say it to the OWNER, not into a document.** They are the router; a note in a file reaches nobody until
+someone opens it. *"This is a machine question and I would be guessing — worth asking Fairy"* is the whole
+protocol, spoken.
