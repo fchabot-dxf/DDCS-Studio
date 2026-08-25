@@ -1683,7 +1683,7 @@ which that is - otherwise the check is as ambiguous as the prose it replaced.
 
 ---
 
-### 19. THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
+### 19. [SHIPPED t2269 — viewport-derived cap, no item-count limit] THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
 
 *(found at t2245 while measuring whether spaced pills made the menu too tall — the height question was the
 prompt, this is what the measuring turned up. Pre-existing, NOT introduced by that change.)*

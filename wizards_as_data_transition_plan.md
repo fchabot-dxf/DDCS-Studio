@@ -105,6 +105,69 @@
 > invention at all. See BACKLOG "GATE CONSOLIDATION" — the eight-mechanism inventory is why these should be
 > shaped as DATA rather than as more special cases.
 
+> ### ⭐ MEASURED STATE — 2026-08-25. The done-condition is now a NUMBER, not a judgement.
+>
+> The owner's done-condition above — *full reproducibility of a built-in by blocks, form and preview
+> included* — was tested rather than argued. What follows is measurement; every line was verified.
+>
+> **PROVEN**
+> - **Emit is byte-identical.** 42 input combinations across the six ATC twins, **0 diffs** (t2257).
+> - **The form already renders from the declared bindings.** The flat path (label, help, section, type,
+>   default, gate) was verified complete, with a pre-existing note recording zero exceptions across
+>   Corner, WCS, ATC-Length and Surfacing.
+> - **Declaration vs hand-written shell, diffed directly** (t2261): everything matched except **one**
+>   structural item — the code-preview panel. Not a list. One.
+>
+> **THE VOCABULARY IS DUAL — the arc's real hazard**
+> Every `traverse()` node type also needs a matching Blockly file under `wizards/ops/`. Declare one half
+> and Blockly throws, which **aborts the whole render** and breaks unrelated fields by sequencing (t2263).
+> A half-declared node is not a missing feature, it is a crash that takes bystanders with it.
+> ⇒ Guarded since t2265 by `tests/node/uichildren-vocabulary-pairing.test.mjs`, proven non-vacuous.
+>
+> **THE REMAINING COST — for ALL 32 twins, not per twin** (surveyed t2267, all 15 shells read in full)
+> - ✅ `code_preview` — declared t2263
+> - ✅ `usage_text` — declared t2269. ⚠ Found that ATC Check's explanatory text was **already gone from
+>   the live app**; declaring it restores lost content rather than closing a measurement gap.
+> - ⏳ **Path Anchor picker** — 6 of 15 (mill ops). Binds by element id, not the `data-param` convention
+>   every other field uses: a design decision, not a template fill-in.
+> - ❌ **The comm-screen mockup** — no existing node's shape is close.
+> - ❌ **Computed / dynamic text** — every text param today is a static string. A change to the
+>   declaration FORMAT, not a node, and it needs its own design.
+> - ⭐ **Two apparent gaps evaporated on inspection**: `form_action_btn` already covers ATC's settings
+>   button, and `whenGuard.js` already handles sibling-value conditional sub-panels — it evaluates
+>   against resolved params and already recurses into `uiChildren`. The largest item on the survey went
+>   to zero because someone checked before declaring it a gap.
+>
+> ### ⛔ THE GOVERNING DISCIPLINE: REPRODUCE, DO NOT HARMONISE
+>
+> Human, 2026-08-25, correcting the advisor: *"why cant we apply the prescribed instruction of
+> reproducibility"* — and they were right, because the advisor had applied it to the emit and abandoned it
+> for the UI.
+>
+> **The declaration reproduces what the shell does, EXACTLY. A difference is a bug in the declaration,
+> never an opportunity to tidy.**
+>
+> ⭐ The reason is not taste. **Mixing the two makes parity unprovable** — you can never tell whether a
+> difference is the declaration failing or somebody harmonising, and a parity test cannot assert equality
+> against a target allowed to move while you chase it.
+>
+> ⚠ **The 15 shells are NOT consistent with each other** and that is a finding to RECORD, not resolve:
+> comm and wcs abandon the shared `.wiz-2pane` structure, ATC's hint class differs from the other nine,
+> the compliance tag has four forms, and `.wiz-usage` vs `.settings-hint` genuinely render differently
+> (bordered callout vs plain text). **Reproduce every one of them.** Harmonising is a separate, deliberate
+> change made AFTER parity is proven, where a difference is visible and intentional instead of buried in a
+> migration.
+>
+> ⚠ If a shell's behaviour is genuinely IMPOSSIBLE to reproduce, that is a real finding and it stops the
+> turn. An inconsistency that is merely ugly is not impossible.
+>
+> ### THE DONE-CONDITION, MADE MECHANICAL
+> A reproducibility ratchet is being built: render each wizard from its declaration and from its shell,
+> diff the SEMANTICS (params, and per param label/help/section/type/default/gate, plus which structural
+> elements exist) — never pixels. It asserts the known gap list **exactly**, so a new gap fails AND closing
+> one fails until the list is updated. ⇒ **The arc is done when that list is empty.**
+
+
 ## Background & The "One Source of Truth" Problem
 
 Historically, DDCS Studio's built-in wizards (e.g., Corner Probe, Pocket) were defined in two separate halves:

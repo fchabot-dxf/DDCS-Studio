@@ -634,6 +634,15 @@ and the `.wiz-box` chrome around it. That list — not the render path — is wh
 retiring 15 hand-written shells.
 
 
+
+### ⇒ THE ARC'S OWN DOC IS THE SOURCE OF TRUTH
+
+The measured state of wizards-as-data — parity evidence, the dual-vocabulary hazard, the remaining cost, and
+the **reproduce-do-not-harmonise** discipline — lives in
+[`wizards_as_data_transition_plan.md`](wizards_as_data_transition_plan.md), beside the owner's own
+done-condition. The entries above are the findings as they were made; that file is where the current state is
+kept. ⚠ Update it there, not here, or the two drift — which is the exact defect this project keeps meeting.
+
 ### THE ARC'S COST, MEASURED — t2267 (survey of all 15 hardcoded shells)
 
 **The question:** what does a hand-written wizard shell still provide that the declaration cannot? This is the
