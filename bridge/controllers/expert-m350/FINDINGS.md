@@ -1135,3 +1135,60 @@ ever was** — it is real, it is measured, and it is Z-only, which is why X/Y al
 ⚠ **Not yet checked:** whether the app's pull actually ignores row 8 (that is an app question, for the
 RENDERRANCHY seat), and whether row 8 is nonzero on the V4.1 / DM500 at all. The reading here is one snapshot
 of one machine in one state.
+
+### 9. ⭐⭐ IDENTIFIED — the "extra row" is the ACTIVE TOOL'S Z OFFSET, written by the probe `[CONFIRMED 2026-08-25]`
+The owner's instinct — *"it must have to do with the floating probe"* — is correct, and `eng` names it outright:
+
+```
+#930  setting[930] = -68.3360   "T01 Z offset"      <- the tool table, written by the probe
+      setting[342] = -68.3364   <- the ACTIVE tool's offset, applied live
+```
+
+`68.336` appears in **exactly two** places in the whole 8000-byte file, and those are the two. Cur Tool is
+**T1**. The tool block is `#890+n` = T(n+1) X offset, `#910+n` = Y, `#930+n` = Z; every other tool reads 0.
+
+⇒ **`setting[340..344]` is not a mystery row and is not G92** — it is the **live copy of the current tool's
+offset**, stacked on the WCS. §8's "unidentified extra row" is hereby identified. (The two values differ in
+the 4th decimal — `-68.3364` vs `-68.3360` — so the live copy is a working value, not a byte-for-byte mirror.)
+
+⚠⚠ **AND IT IS APPLIED WHILE THE PANEL SHOWS `G49` / `H00`.** Tool-length compensation reads as CANCELLED and
+the offset is in force anyway. ⇒ On this controller the probe-set tool Z offset is **not** the G43/G49
+mechanism — it is applied unconditionally as part of the work-coordinate computation. ⛔ Do not reason about
+it from `G43`/`G49`/`H` modal state; that state says nothing about whether it is active.
+
+### 10. ⭐⭐ THE WHOLE WCS TABLE, VERIFIED AGAINST THE PANEL — all six, exactly
+The pendant's coordinate page was read directly and matches `coordinate` rows 1..6 / `setting[305..334]` on
+**every axis of every system**:
+
+```
+          G54        G55        G56        G57        G58        G59     [Offset]
+X      50.130     50.670     75.584     42.650    317.332     42.650      0.000
+Y    -665.704    -34.642   -632.758   -661.186   -611.350   -661.186      0.000
+Z     -36.508    -35.163    -96.424    -87.336     -6.329      0.000      0.000
+A    -665.944    -34.642      0.000   -661.186   -611.350   -661.186      0.000
+B       0.000      0.000    360.002      0.000      0.000      0.000      0.000
+```
+
+⇒ `setting[300 + n*5]`: **row 0 is NOT displayed on the panel at all**; rows 1..6 are **G54..G59**; row 7 is the
+panel's trailing **"Offset"** column (all zeros); row 8 is the active tool's live Z offset (§9).
+⭐ `_WCS_BASE = 305` is **correct and now panel-verified on all six systems.** ⛔ Do not change it.
+
+### 11. ⭐⭐⭐ THE ADDRESS SYSTEMS UNIFY — one rule, three independent anchors `[CONFIRMED]`
+The `var-read-address-systems` memory wanted the two address spaces reconciled into one declared map. The
+machine says they already are, and the rule is a single subtraction:
+
+```
+macro #N   →   setting f64 index (N − 500)   →   eng entry #(N − 500)
+```
+
+| macro | setting index | what `eng` calls it | measured value |
+|---|---|---|---|
+| `#578` | `setting[78]` | "Current coordinate" (`min=1 max=7`) | `1` — G54 active ✓ |
+| `#805` | `setting[305]` | *(no entry — the WCS table is not a UI param)* | `50.130` = panel G54 X ✓ |
+| `#1430` | `setting[930]` | "T01 Z offset" | `-68.336` ✓ |
+
+⇒ **The memory's `#1430` = Tool 1 Z-length was RIGHT** — it resolves through the same `−500` as everything
+else. ⛔ It is **not** in `camsetting`: `camsetting[430]` reads `0.0`, and applying the camsetting `−1000` rule
+to a `setting`-space address is the mistake that hides it. **`eng` is the name table for `setting`, 1:1**, so
+any `setting` slot can now be *named* rather than guessed — which is the declared address map that memory
+asked for, already shipped by the vendor.
