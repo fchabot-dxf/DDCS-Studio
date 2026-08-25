@@ -981,3 +981,18 @@ register, and `RECORD[]`-to-file are three implementations of one idea: *somethi
 job is*. Declaring that seam is inert data and costs nothing; building a polling engine for a register whose
 shape, transport, and units are all still unknown would be building on four guesses. ⛔ Do not build the
 reader until questions 1-4 are answered.
+
+
+## Comment characters — what the vendor's own macros actually contain `[CONFIRMED 2026-08-25]`
+Full audit, cross-dialect and with its method: [`../COMMENT-CHARACTERS.md`](../COMMENT-CHARACTERS.md).
+The Expert-specific results, in one paragraph so this file is not a second copy that can drift:
+
+* **2,201 vendor comments** across SYSDISK system macros, the OEM firmware install payload and the OEM
+  CAM packs. **Zero of them nest `(`.** Every nested comment in this repo is in a file we wrote.
+* Attested and safe as replacement characters: **`-` `.` `:` `=` `!` `,`** (and `/` mid-line only,
+  never at line start). Attested but MISLEADING: `[` `]` (expressions) and `#` (variable sigil).
+* ⭐ **`%` is context-dependent.** `#1505=<n>(message)` is the operator-message mechanism and `%` is a
+  live printf specifier inside it (`X=%.3f` prints a number); in an ordinary comment it is a literal
+  percent sign. 36 of 335 vendor uses are message-attached. Do not offer it as a blind replacement.
+* ⭐ **Comment bodies are not ASCII-restricted** — the vendor ships 6,664 high bytes of GBK Chinese
+  inside SYSDISK comments alone. ⚠ GBK, not UTF-8: a UTF-8 round-trip corrupts vendor macros.

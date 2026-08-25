@@ -25,7 +25,10 @@ epoch are per-machine, so there is no turn marker connecting them and no notific
 
 ## 1. ⭐ WHAT RENDERRANCHY IS ACTUALLY WAITING FOR
 
-**This one is BLOCKING** — a queued RENDERRANCHY turn cannot be built without it:
+⭐⭐ **ANSWERED 2026-08-25 — see [`controllers/COMMENT-CHARACTERS.md`](controllers/COMMENT-CHARACTERS.md).** Derived from the vendor corpora with provenance kept separate, method stated so the vetting is checkable, and the per-dialect question answered honestly (Expert `[CONFIRMED]`; V4.1 and DM500 too thin, `[HYPOTHESIS]`; grbl not answerable from dumps).
+⭐ **The headline is that the governing constraint is NESTING, not the character set** — zero nested comments in 2,248 vendor comments across three DDCS controllers and 4,656 LinuxCNC comments; every nesting instance in this repo is in a file we wrote. That half already shipped at `917f8856`, so the replacement setting is a smaller feature than it was scoped as.
+
+~~**This one is BLOCKING**~~ — the original ask, kept for the record:
 
 > **The safe comment-character list, derived from the real dumps.** RENDERRANCHY is adding a setting that replaces an
 > illegal character in a G-code comment, with a user-chosen replacement. The candidate list must come from
