@@ -750,6 +750,39 @@ True, and fighting a reflex loses. So do not:
 ⚠ And because judgement at write time will sometimes fail, a periodic sweep stays as the BACKSTOP rather than
 the mechanism.
 
+
+#### ⭐ CORRECTION — the memory is the INDEX, not a duplicate to be eliminated
+
+The version above said "promote project facts to the repo" and left out why memories still have to exist.
+**Owner, 2026-08-25: *"claude just has to have project memory no?"*** — correct, and it is the half that makes
+the rest work.
+
+```
+REPO     one home · travels · versioned · reviewable
+         ⚠ but PASSIVE. it is only read if something points at it.
+
+MEMORY   ⭐ ACTIVE. surfaces automatically, unprompted, at the moment it is relevant.
+         ⚠ but per-machine, and drifts.
+```
+
+**A fact in the repo that nobody thinks to open is worse than a memory that appears when it is needed.** Repo
+docs have no delivery mechanism; recall IS the delivery mechanism. So:
+
+> **MEMORY = the INDEX** (short, a pointer, a *great* description).
+> **REPO = the CONTENT** (the full fact, one home).
+
+The memory is not a duplicate to be deleted — it is the **retrieval layer**. And a pointer memory still cannot
+drift, because it holds no content to diverge.
+
+⚠⚠ **Which makes the DESCRIPTION the load-bearing part**, because that is what recall matches on. **A
+perfectly true memory with a bad description behaves exactly like no memory at all.** Proven twice in one
+session: `CNC-FAIRY` was correctly recorded as the gateway machine with the word "fairy" absent from its
+description, so it was never recalled and a handoff request was misread outright.
+
+⭐ **And it explains the cross-seat result**: Fairy's SEVEN memories outperformed the Studio side's 165 on
+the facts that mattered. Few, dense, and each one well described. **A small index with a high hit rate beats a
+large one with poor addressing.**
+
 #### Where hardware facts already have a better home than a memory
 
 `bridge/CLAUDE.md` already names it: **`controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` /
