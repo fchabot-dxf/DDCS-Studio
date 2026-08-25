@@ -56180,3 +56180,108 @@ genuinely separate feature from this turn's `disabled`/`stray` work, not folded 
 `web/blocks/blockly/stackBridge.js` (`workspaceToStack` excludes strays), `web/blocks/blocksApp.js`
 (`applyStrayMarking`, wired into both `applyOpGating` and `reproject`). `BACKLOG.md` (#26). `index.html`
 untouched.
+
+## t2283 — TURN C: THE UNDO REDESIGN. STOPPED AND REPORTED, per the dispatch's own explicit permission —
+investigated deeply, established the core mechanism works, and found the six requirements are TIGHTLY
+COUPLED in a way that makes a partial build actively worse than the status quo. Nothing shipped this turn;
+everything below is evidence and a concrete plan for whoever builds it next (possibly still me, next turn).
+
+### What's ESTABLISHED — the core mechanism is sound, verified empirically, not assumed
+
+**Blockly's own event grouping IS the right "one gesture" signal** (`scratchpad/t2283-event-grouping-check.mjs`):
+a real mouse-driven drag (mousedown → move → mouseup) fires MANY distinct events — `drag`, `selected`, `move`
+(reasons `disconnect`/`drag`/`snap`), `change` — and every one of them (except the very first `selected`,
+fired before Blockly's own gesture tracking opens a group) carries the SAME `event.group` id, generated and
+managed entirely by Blockly itself. This is exactly the "mirror Blockly's own semantics" principle an earlier
+amendment already established — the boundary already exists, nothing to invent.
+
+**The rejected/bumped-drag case (item 6) resolves correctly, verified, not assumed**
+(`scratchpad/t2283-unplug-group-check2.mjs`): connected two blocks then called `unplug()` — the app's OWN
+refusal mechanism, `blocks/blockly/tokenGuard.js`'s `child.unplug()`, called synchronously from inside a
+`BLOCK_MOVE` change-listener callback — within one open `Events.setGroup(...)` scope. The resulting event
+(`reason: ["disconnect","bump"]`) carried the SAME group id as the connecting move. Since Blockly's own event
+dispatch calls listeners synchronously, and a real drag's group stays open for the WHOLE gesture (confirmed
+above — it doesn't close between intermediate events, only at the end), `tokenGuard.js`'s refusal — which
+fires from inside that same synchronous dispatch — naturally lands in the SAME group as the drag that
+triggered it. One undo press reverses both, by construction, not by luck.
+
+**Form fields (item 3) and viewing actions (item 4) are ALREADY excluded, by construction, needing
+verification not new code** — a form field is a plain HTML input; it fires zero Blockly events. 3D/2D preview
+orbit/pan is a completely separate UI component from the Blockly canvas; it also fires zero Blockly events.
+Any gesture-recording mechanism keyed on Blockly's own `event.group`/`isUiEvent` therefore never sees either
+one — the exclusion is structural, not a filter I'd need to write and could get wrong. The dispatch's own
+"VERIFY that still holds" is satisfied by this reasoning plus the existing `!e.isUiEvent` filter already in
+`blocksApp.js`'s change listener (unchanged by anything investigated this turn) — worth a final live check
+once the mechanism is actually wired, but not a design risk.
+
+⚠ **One real nuance found**: `viewport_change` and `selected` events DO share a drag's own group (seen in the
+raw event logs above) — so "did the group change" alone is not quite sufficient; a NEW gesture-recording pass
+must also require at least one genuinely authoring-relevant event (create/delete/move/change on a
+program-relevant block) within that group before it counts as a recordable gesture, or a pure pan-and-select
+with no edit would wrongly count as one. Noted for whoever builds this — not itself a blocker.
+
+### What's NEWLY DISCOVERED — the requirements are coupled, and viewport preservation is the load-bearing one
+
+**Confirmed the current implementation genuinely loses viewport state on undo** — not assumed, not already
+handled (`scratchpad/t2283-viewport-loss-check.mjs`): panned the canvas to `(300, 250)`, made a real edit,
+called the existing `saveStates.undo()`, and the workspace landed back at `(30, 30)` — some auto-fit default,
+not the user's own pan. This is real, live, and matches exactly what the dispatch called "non-optional now
+that gestures multiply the press count": under gesture-not-delta, several undo presses may be needed to walk
+back past noise (failed drags, attempts) to reach a real edit, and today EACH press would re-jump the view.
+
+**Why this forces a genuine format change, not an addition**: `saveStates.js`'s current snapshot is the
+app's OWN semantic `{type,params,children}` record — deliberately position-free, since G-code emit never
+cares where a block sits on screen. `Blockly.serialization.workspaces.save(ws)` (confirmed present and
+working, `scratchpad/t2283-workspace-serialization-check.mjs`) DOES capture position (`x`/`y` per block,
+confirmed in a real save), but notably NOT scroll/zoom (`savedKeys` was just `["blocks"]` — viewport isn't
+included by that call at all and would need to ride alongside it as a custom addition, reading
+`ws.scrollX`/`scrollY`/`scale` directly). So a gesture-based, viewport-preserving history needs to snapshot
+Blockly's OWN native serialization (plus scroll/scale, captured separately) — not the app's semantic record —
+because the semantic record structurally cannot carry position at all.
+
+**This is why the six requirements can't be split cleanly.** Gesture-not-delta (1) without viewport
+preservation (5) would ship something WORSE than today: MORE undo presses (attempts now count), each one
+jumping the view — the exact "four presses of jumping is intolerable where one was merely untidy" failure the
+dispatch itself named. One timeline (2) is only meaningful once there IS one unified snapshot format for
+buttons and keyboard to share — today there are structurally two (Blockly's own native undo stack, which
+knows positions; saveStates' own semantic stack, which doesn't). Building 1+2+6 without 5 isn't a smaller
+safe slice of the same feature — it's the reverted t2273 buttons' own failure mode again, just relocated.
+
+### The proposed architecture, concrete enough to build from
+
+1. `saveStates.js`'s `snapshot()` moves from "the app's semantic stack, on qualifying `onProgramChange`
+   origins" to "`Blockly.serialization.workspaces.save(ws)` + `{scrollX, scrollY, scale}`, on a NEW gesture
+   boundary" — detected by watching `ws.addChangeListener` for `event.group` changing AWAY from the
+   currently-open gesture's group, where that CLOSING group contained at least one non-UI, program-relevant
+   event (the nuance above).
+2. `apply()` (undo/redo's restore) moves from `ddcsLoadBlockStack(clone(state.stack))` to
+   `Blockly.serialization.workspaces.load(state.blocks, ws)` + `ws.scroll(state.scrollX, state.scrollY)` +
+   restoring scale — THEN letting the EXISTING `reproject()` path re-derive `programModel.js`'s own semantic
+   `stack`/`proj` via `workspaceToStack(ws)`, exactly as any live edit already does today. The semantic layer
+   (editor text, wizard forms, emit) doesn't change AT ALL — only what gets captured/restored around it.
+3. Buttons (if/when rebuilt — not this turn, per the dispatch's own note that this isn't automatically part of
+   Turn C) and the keyboard shortcut both call the SAME `undo()`/`redo()` — no separate Blockly-native-stack
+   path for either, closing the two-timeline gap t2273's reverted buttons would have shipped.
+4. Group drags (item 6's other half — did NOT get to this specifically, flagging it): Blockly's own event
+   grouping already pops a whole event group as one unit on ITS OWN native undo (per the amendment that
+   originally raised this) — the NEW mechanism inherits that for free since it keys off the SAME group
+   concept; worth one live confirmation with a real multi-block drag before calling it done, not designed
+   from scratch.
+
+### Why this is reported, not built, this turn
+
+Six requirements, tightly coupled (shown above, not asserted), a genuine snapshot-format change touching the
+restore path every view depends on, plus the dispatch's own explicit, doubled-down instruction to stop and
+report if the turn grows past its one job — this is comparable in scope to t2277's own disabled-block turn
+(itself a full turn with extensive verification), not a same-turn addition to something already built. The
+mechanism is now proven sound (gesture grouping, bump grouping, form/view exclusion, the serialization API's
+exact shape) — what's left is a real, non-trivial implementation + regression pass against the existing undo
+test suite, better started fresh than squeezed into what's left of this turn.
+
+### Backlog tail
+
+Not reached — the investigation above filled the turn's reasonable budget on its own.
+
+### Files changed
+
+None. Every verification script lives in gitignored `scratchpad/t2283-*.mjs`.
