@@ -1050,7 +1050,7 @@ and rows 0..6 are exactly seven. `setting[78]` currently reads **1**.
 
 ⇒ **Measured relation: WCS n (1..7) lives at `setting[300 + (n−1)*5]`, so WCS 1 → `setting[300]`.**
 
-### 5. ⚠⚠ THIS DISAGREES WITH THE APP AND WITH THE HAND-WRITTEN MACROS, BY EXACTLY ONE SYSTEM
+### 5. ~~THIS DISAGREES WITH THE APP...~~ ⛔ **REFUTED AT THE PANEL — see §8 below.** The app was right.
 Both the profile mapper (`_WCS_BASE = 305`) and the owner's own `COPY_WCS.nc`
 (*"Calculate source base address: 805 + [WCS-1]*5"*) put **G54 at `setting[305]`** — which is **row 1**, the
 SECOND row of the measured table. The measurement puts WCS 1 at row 0 / `setting[300]`.
@@ -1087,3 +1087,51 @@ not be]`
 * `mdiblock` (720 B) = **MDI history** — past hand-typed lines (`#571=1`, `G90 G0 B360`, `#3000=#880`).
 * `processing` (4800 B) = a **recent-programs list**: 96-byte records of name + four i32 counters.
 * `processing1` (4 B) = `5c 5f 52 5b`, not a plausible counter. Undecoded.
+
+### 8. ⭐⭐ RESOLVED AT THE PANEL — §5 was WRONG, and a SECOND offset row exists `[CONFIRMED 2026-08-25]`
+The owner read the pendant with **G54 active** and the machine idle:
+
+```
+        work (G54)        machine
+X          5.000          -45.130
+Y         -5.000          660.704
+Z         -5.000           99.844
+A         -5.000          660.944
+```
+
+**⇒ §5's reading (a) is REFUTED. The app is correct: G54 IS `setting[305]` = `coordinate` row 1.**
+`coordinate` row 0 / `setting[300]` is a leading row that is **not** G54, so `_WCS_BASE = 305` and the owner's
+`805 + [WCS-1]*5` both stand. ⛔ **Do not "fix" the WCS base** — the off-by-one was my inference and the
+machine says no. Every row was tested against the panel; row 1 is the only one that fits, on 4 of 5 axes.
+
+⭐⭐ **BUT THE FIFTH AXIS EXPOSED SOMETHING REAL: the effective offset is TWO rows added together.**
+Row 1 alone predicts Z = `31.508`; the panel says `99.844` — out by exactly **68.336**, which is
+`setting[342]`, the Z slot of **row 8** (`setting[340..344]`). Adding them reproduces the panel **exactly on
+all five axes**:
+
+```
+row 1  (G54)     50.130  -665.704   -36.508  -665.944   0.000
+row 8  (extra)    0.000     0.000   -68.336     0.000   0.000
+combined         50.130  -665.704  -104.844  -665.944   0.000
+work - combined -45.130   660.704    99.844   660.944   0.000   == the panel, to 3 decimals
+```
+
+⇒ **MEASURED: `effective offset = WCS row (setting[300+n*5]) + row 8 (setting[340..344])`.** Row 8 is applied
+on top of whichever WCS is active. `[CONFIRMED — all five axes, one reading]`
+
+⚠ **WHAT ROW 8 *IS* remains unidentified.** G92 is the obvious candidate (a global offset stacked on the WCS)
+but it is NOT proven — `eng` has no entry for `#340..#344`, and the panel showed `G49`/`H00` (tool-length
+compensation OFF), so it is not a tool offset being applied through G43. ⛔ Do not name it G92 in code until
+a second reading with a deliberately changed G92 confirms it.
+
+⛔⛔ **THE CONSEQUENCE, AND IT IS LOAD-BEARING: any consumer that reads only the WCS row gets Z wrong.**
+Right now that error is **68.336 mm**, silently — the number looks perfectly plausible. On a controller where
+**G54 Z0 = the spoilboard is SACRED**, a Z offset that is wrong by 68 mm and looks fine is exactly the class
+of defect that ends in a tool through the table.
+
+⇒ **This is a far better candidate for the owner's "it pulled the wrong coord" (t2067) than the off-by-one
+ever was** — it is real, it is measured, and it is Z-only, which is why X/Y always looked right.
+
+⚠ **Not yet checked:** whether the app's pull actually ignores row 8 (that is an app question, for the
+RENDERRANCHY seat), and whether row 8 is nonzero on the V4.1 / DM500 at all. The reading here is one snapshot
+of one machine in one state.
