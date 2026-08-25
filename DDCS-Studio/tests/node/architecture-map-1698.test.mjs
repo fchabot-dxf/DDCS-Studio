@@ -433,7 +433,7 @@ const REGISTRY_CLAIMS = [
     { id: 'REG WIZARD_VIEWS coded-view registry', file: 'web/wizards/views/index.js', find: 'export const WIZARD_VIEWS = [' },
     { id: 'REG def.mouth reader (which kinds hold children)', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthOf = (def) => def.mouth;' },
     { id: 'REG DURABLE_DATA_FIELDS (Blockly round-trip survivors)', file: 'web/blocks/blockly/stackBridge.js', find: "const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];" },
-    { id: 'REG KNOWN_LEAF_RECORD_FIELDS', file: 'web/blocks/blockly/stackBridge.js', find: "const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', '_group', ...DURABLE_DATA_FIELDS]);" },
+    { id: 'REG KNOWN_LEAF_RECORD_FIELDS', file: 'web/blocks/blockly/stackBridge.js', find: "const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', 'disabled', '_group', ...DURABLE_DATA_FIELDS]);" },
     { id: 'REG hookKeysOf export (what counts as a hook)', file: 'web/blocks/userOps.js', find: 'export const hookKeysOf = (def) => Object.keys(def || {}).filter(isHookKey);' },
     { id: 'REG GUARD_FIELDS (guard predicate shape)', file: 'web/wizards/ops/guard.js', find: "export const GUARD_FIELDS = ['whenparam', 'whenis', 'whentype'];" },
     { id: 'REG MULTI_WIDGETS reader in panelTypes (re-anchored, was wrong target)', file: 'web/wizards/ops/panelTypes.js', find: 'if (unit.length > 1 && MULTI_WIDGETS.has(unit[0] && unit[0].widget)) for (const b of unit) _unwritable.add(b.param);' },

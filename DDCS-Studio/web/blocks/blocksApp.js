@@ -77,7 +77,13 @@ function applyOpGating(ws) {
         if (def && typeof def.gate === 'function') {
             let reason = null; try { reason = def.gate(dl); } catch (_) { /* */ }
             try { b.setWarningText(reason ? `Not on ${post.name} — ${reason}.` : null); } catch (_) { /* */ }
-            try { b.setEnabled(!reason); } catch (_) { /* older Blockly */ }
+            // t2277 — FIXED: setEnabled() doesn't exist past Blockly v11 (renamed setDisabledReason; this call has
+            // been throwing and silently swallowed by the catch ever since, so gated atoms never actually greyed).
+            // OWN reason string ('post-gating'), deliberately NOT Blockly's MANUALLY_DISABLED — this is a transient,
+            // recomputed-every-pass gate, never the human's own choice, and stackBridge.js's toRecord()/isManuallyDisabled
+            // reads that ONE specific reason for the model's own `disabled` field precisely so the two never conflate:
+            // a post-gated atom must never round-trip as if the human had turned it off themselves.
+            try { b.setDisabledReason(!!reason, 'post-gating'); } catch (_) { /* older Blockly */ }
         }
     }
 }

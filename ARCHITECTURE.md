@@ -170,7 +170,9 @@ In the live app: `listEntries().filter(e => e.kind === 'builtin').map(e => [e.id
 ### Post-passes, in declared order (`blockEmitter.js:516-533`)
 
 `applySetupFlips` :516 → `applyToolChanges` :517 → `applyEntryWaypoint` :518 → `applyProgramTransform` :519 →
-`applySerialLibrary` :520 → `applyModalFeed` :521 → `applyCapGating` :522 → `balanceOwords` :523 →
+`applySerialLibrary` :520 → `applyModalFeed` :521 → `applyLineSuppression` :522 (t2277 — renamed from
+`applyCapGating`: it now does capability gating AND human-disable suppression, distinguishable in the output
+as `( gated: … )` vs `( disabled: … )`; the call site's own line number is unchanged) → `balanceOwords` :523 →
 `applyDdcsSyntaxGuards` :530 (t2070/t2139, inline-IF..THEN skip then the unconditional flush-left strip — every
 line loses its leading whitespace, always, no settings check). Runs **last** because every pass above it matches
 line *text* — the reasoning is written at `blockEmitter.js:524-529`.
@@ -193,8 +195,9 @@ Also found while widening this to real CAM-generator text for the first time: th
 matched SYMBOLIC comparison operators (`>`, `==`, …); DDCS accepts word forms too (`GT`, `EQ`, …) and the
 hand-written CAM generator source uses them extensively — `CLAMP_RE`/`CLAMP_INV` now cover both forms.
 
-`emitMapped` returns `{ text, lines, map, absorbed, feedFolds }` (`blockEmitter.js:536`). `absorbed` (:531) and
-`feedFolds` (:535) are **passes declaring what they did**, so their invariants can be measured rather than trusted.
+`emitMapped` returns `{ text, lines, map, absorbed, feedFolds }` (`blockEmitter.js:539`, t2277 shifted from 536
+by +3 — `applyLineSuppression`'s expanded doc comment above it). `absorbed` (:534) and `feedFolds` (:538) are
+**passes declaring what they did**, so their invariants can be measured rather than trusted.
 
 ### The three facts a newcomer gets wrong here
 
@@ -213,8 +216,11 @@ hand-written CAM generator source uses them extensively — `CLAMP_RE`/`CLAMP_IN
 
 `getDialect(profileId)` — `wizards/dialects/index.js`. Two consumption modes: **per-line**, threaded as the 4th
 argument to every leaf kernel (`blockEmitter.js:456`); and **capabilities**, `getCaps(id)` read at
-`applyCapGating` (`:520`) and `balanceOwords` (`:521`). Gating is **per line, never per op** — the op stays in the
-stack and unrunnable lines become `( gated: … )` comments.
+`applyLineSuppression` (`:522`, t2277 renamed from `applyCapGating`) and `balanceOwords` (`:523`). Suppression
+is **per line, never per op** — the op stays in the stack and unrunnable lines become `( gated: … )` comments;
+a line the human disabled becomes `( disabled: … )` instead — same mechanism, distinguishable reason, and only
+`disabled` persists across a save/reload (it rides the op's own marker; `gated` is recomputed fresh from the
+active post on every emit, so it is never stale and never needs to be).
 
 ### Where the emit is actually invoked
 
@@ -403,7 +409,7 @@ pane they would have backed) — see WORK-LOG t1734.
 | the data twins | `SEED_BUILDERS`, `web/app.js:100-107` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:98-99`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
 | the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:34-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
 | which block kinds hold children | **`def.mouth`** on each def — see INVARIANT #1 (the one-line reader's file:line lives there, machine-checked) | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
-| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:36`) | — |
+| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:39`, t2277 shifted from 36 by +3 — `disabled` joined the set) | — |
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:917` (t1996 shifted this from 893 — see INV6); exported as `hookKeysOf` `:924` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
 | per-atom scratch vars | `def.scratch` on each atom; aggregated by `data/universalScratch.js` | — |
@@ -420,14 +426,14 @@ pane they would have backed) — see WORK-LOG t1734.
 ## INVARIANTS — the rule, its guard, and what breaking it looks like
 
 **1 · A record that carries children declares a `mouth`.**
-Guard: `blocks/blockly/stackBridge.js:350` (t1950 — shifted from 326 by +24; the workspaceToStack terminator/wrapper-gate correction's own doc comment) throws by name. Reader: `blocks/blockly/bridge.js:78`.
+Guard: `blocks/blockly/stackBridge.js:373` (t2277 — shifted from 350 by +23, the `isManuallyDisabled` helper added above it; t1950 before that — shifted from 326 by +24, the workspaceToStack terminator/wrapper-gate correction's own doc comment) throws by name. Reader: `blocks/blockly/bridge.js:78`.
 Break it → the children are **silently discarded** on a Blockly round-trip. This replaced four hand-maintained
 kind lists after the *fifth* silent loss (t1069/t1093/t1595/t1627/t1636). A **fifth, still-live** kind list at
 `blocks/blockEmitter.js:40` was surveyed, measured non-lossy, and deliberately left — unifying it is re-litigating
 a decided call.
 
 **2 · A leaf record's top-level fields are declared or the write throws.**
-Guard: `stackBridge.js:297` (t1950 — shifted from 273 by +24, same cause). Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
+Guard: `stackBridge.js:320` (t2277 — shifted from 297 by +23, same cause as INV1 above; t1950 before that — shifted from 273 by +24, same cause). Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
 relative plunge silently becomes absolute. Note the resolution shape: `_group` is **tolerated, not persisted** —
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 

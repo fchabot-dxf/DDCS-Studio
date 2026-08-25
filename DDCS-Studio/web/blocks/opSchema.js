@@ -215,19 +215,24 @@ function revCanon(opType) {                          // marker (canon) key -> in
 
 /** Build the marker comment line for an op record. `params` = the op's single-source-of-truth params. `defV` (opt)
  *  = the op's declared per-def version stamp (N1) — additive payload key, stamped last, only when > 0 (a versioned
- *  user def; built-ins pass 0 → unstamped). It's the def-change→rebuild signal, NOT the format `MARKER_VERSION`. */
-export function markerLine(opType, params, defV) {
+ *  user def; built-ins pass 0 → unstamped). It's the def-change→rebuild signal, NOT the format `MARKER_VERSION`.
+ *  `disabled` (opt, t2277) = the op's own MANUALLY_DISABLED state (not the app's own transient post-gating —
+ *  see stackBridge.js's toRecord for why those two are read from DIFFERENT Blockly disabled-reasons and must
+ *  never be conflated). A THIRD reserved top-level key, same shape as `defV`: PROGRAM CONTENT, not a param. */
+export function markerLine(opType, params, defV, disabled) {
     const rec = { op: opType };
     for (const k in (params || {})) rec[canonOf(opType, k)] = params[k];
     if (defV && defV > 0) rec.defV = defV;
+    if (disabled) rec.disabled = true;
     return `( ${SENTINEL}:${MARKER_VERSION} ${escParens(JSON.stringify(rec))} )`;
 }
 
 /** True if a line is a DDCS op marker (cheap sentinel test). */
 export const isMarker = (line) => /^\(\s*@DDCS:\d+\s/.test(String(line).trim());
 
-/** Parse a line → { opType, params, v, defV } (params back in internal keys) or null if not a marker.
- *  `defV` = the stamped per-def version (0 when absent — a legacy pre-versioning file). `v` = the format version. */
+/** Parse a line → { opType, params, v, defV, disabled } (params back in internal keys) or null if not a marker.
+ *  `defV` = the stamped per-def version (0 when absent — a legacy pre-versioning file). `v` = the format version.
+ *  `disabled` = t2277's reserved marker key (false when absent — every pre-t2277 file, byte-for-byte). */
 export function parseMarker(line) {
     const m = String(line).match(/^\(\s*@DDCS:(\d+)\s+(.*?)\s*\)\s*$/);
     if (!m) return null;
@@ -235,8 +240,8 @@ export function parseMarker(line) {
     try { rec = JSON.parse(m[2]); } catch (_) { return null; }
     if (!rec || typeof rec.op !== 'string') return null;
     const opType = rec.op, rev = revCanon(opType), params = {};
-    for (const k in rec) { if (k === 'op' || k === 'defV') continue; params[rev[k] || k] = rec[k]; }   // defV is a reserved marker key, not a param
-    return { opType, params, v: Number(m[1]), defV: Number(rec.defV) || 0 };
+    for (const k in rec) { if (k === 'op' || k === 'defV' || k === 'disabled') continue; params[rev[k] || k] = rec[k]; }   // defV/disabled are reserved marker keys, not params
+    return { opType, params, v: Number(m[1]), defV: Number(rec.defV) || 0, disabled: !!rec.disabled };
 }
 
 /** Validate an op record against the schema → warning strings ([] = clean, or op not catalogued). */

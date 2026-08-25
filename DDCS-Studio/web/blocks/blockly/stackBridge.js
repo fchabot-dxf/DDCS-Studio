@@ -33,7 +33,10 @@ const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];
 // here (no throw) but deliberately excluded from DURABLE_DATA_FIELDS, so it is NOT written to `.data` — that
 // reproduces its exact pre-t1654 behaviour (silently ignored by the old, unchecked recToJson) rather than
 // stashing a stale copy that could disagree with a later fresh recomputation.
-const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', '_group', ...DURABLE_DATA_FIELDS]);
+// t2277 — `disabled` joins `collapsed`: a native Blockly block property (its own disabled-reasons set), not a
+// `.data` field, so it lives directly in this set rather than DURABLE_DATA_FIELDS. See toRecord()'s own comment
+// for why it is read from ONE SPECIFIC disabled-reason (MANUALLY_DISABLED), never blanket isEnabled().
+const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', 'disabled', '_group', ...DURABLE_DATA_FIELDS]);
 
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
@@ -41,6 +44,23 @@ const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'u
 const isAbsent = (v) => v === undefined || v === null || v === '';
 /** …and does this atom DECLARE that this field may be absent? (wizards/ops/*.js `absentable`) */
 const absentable = (def, f) => !!(def && Array.isArray(def.absentable) && def.absentable.includes(f));
+
+/** t2277 — is this block MANUALLY disabled (the human's own choice, via the canvas "Disable Block" action or a
+ *  loaded record's own `disabled:true`), as opposed to disabled for some OTHER reason? Blockly 11+ tracks
+ *  disabled-reasons as a SET (`getDisabledReasons()`), not a single boolean, specifically so independent reasons
+ *  can coexist without clobbering each other — e.g. blocksApp.js's own applyOpGating greys an atom the active
+ *  post can't run under its OWN reason string ('post-gating'), never 'MANUALLY_DISABLED'. Reading blanket
+ *  `!b.isEnabled()` here would conflate the two: a block gated by the CURRENT post (transient, recomputed every
+ *  gating pass, never meant to persist) would wrongly round-trip as the human's own deliberate choice the moment
+ *  someone happened to be on a post that gates it. Checking the SPECIFIC reason keeps them independent, exactly
+ *  as Blockly's own API was designed to allow. */
+// t2277 — read the reason string FROM Blockly's own namespace (Blockly.constants.MANUALLY_DISABLED) rather than
+// a hand-copied literal, so a future Blockly upgrade that renames it can't silently desync the two sides.
+const manuallyDisabledReason = () => { try { return getBlockly().constants.MANUALLY_DISABLED; } catch (_) { return 'MANUALLY_DISABLED'; } };
+function isManuallyDisabled(b) {
+    try { return !!(b.hasDisabledReason && b.hasDisabledReason(manuallyDisabledReason())); }
+    catch (_) { return !b.isEnabled(); }   // older Blockly — no per-reason API, blanket state is all there is
+}
 
 function toRecord(b) {
     if (b.type === 'op' || b.type.endsWith('_op')) {         // op CONTAINER — opType/requires/params ride in `data`
@@ -116,6 +136,7 @@ function toRecord(b) {
             requires: meta.requires || [], params: params, children: firstGcode ? chain(firstGcode) : [],
             simChildren: firstSim ? chain(firstSim) : [],
             collapsed: b.isCollapsed() || undefined,
+            disabled: isManuallyDisabled(b) || undefined,   // t2277 — undefined (not false) so it's absent, not a JSON `false` clutter
         };
     }
     const def = BLOCKS[b.type];
@@ -160,6 +181,7 @@ function toRecord(b) {
         if (when) r.params.when = when;
     }
     if (b.isCollapsed && b.isCollapsed()) r.collapsed = true;
+    if (isManuallyDisabled(b)) r.disabled = true;   // t2277 — any block at any depth; see collectDisabledIds (blockEmitter.js) for the cascade
     return r;
 }
 
@@ -283,6 +305,7 @@ function recToJson(rec) {
         if (rec.simChildren && rec.simChildren.length) inputs.SIM = { block: chainToJson(rec.simChildren) };
         if (Object.keys(inputs).length) node.inputs = inputs;
         if (rec.collapsed) node.collapsed = true;
+        if (rec.disabled) node.disabledReasons = [manuallyDisabledReason()];   // t2277 — Blockly's own serialization key, confirmed empirically (scratchpad/t2277-serialization-shape.mjs)
         return node;
     }
     // Preserve the model id (op blocks already do, above) so the loaded workspace block keeps the SAME id the emit
@@ -352,6 +375,7 @@ function recToJson(rec) {
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;
     if (rec.collapsed) node.collapsed = true;
+    if (rec.disabled) node.disabledReasons = [manuallyDisabledReason()];   // t2277 — any block, not just op containers (nesting, see WORK-LOG)
     return node;
 }
 

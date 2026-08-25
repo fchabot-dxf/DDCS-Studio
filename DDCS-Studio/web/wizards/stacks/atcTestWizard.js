@@ -62,7 +62,7 @@ function drawbarStack(params) {
     A('#100', 1, 'Cycle counter'); A('#101', cycles, 'Cycles');
     SPOFF(); COOLOFF();
     // t640 — the drawbar/sensor M-codes are ATC pneumatics: DECLARE cap:'atc' so they fold to a comment on a non-ATC post
-    // (V4.1/DM500) instead of leaking Expert-only pneumatic codes. applyCapGating gates them per-line (built-in AND fold path).
+    // (V4.1/DM500) instead of leaking Expert-only pneumatic codes. applyLineSuppression gates them per-line (built-in AND fold path).
     MC(mc.stopped, 'Wait: spindle-stopped sensor', 'atc');
     LB(10); C('CYCLE START');
     MSG('Cycle #100: RELEASE');

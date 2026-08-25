@@ -55835,3 +55835,174 @@ the split was explicitly restoring.
 ### Files changed
 
 None (report-only turn, as dispatched).
+
+## t2277 — TURN A-PRIME: MAKE DISABLE REAL. BUILT. A disabled block now emits COMMENTED OUT (never omitted),
+the state lives in the OP MODEL (not Blockly-only), round-trips through the marker system byte-identically
+(verified end to end, not assumed), and the dead post-gating `setEnabled()` call is fixed without colliding
+with the new model field.
+
+### The design, in one paragraph
+
+Blockly 11+ tracks disabled state as a SET of independent reason strings (`getDisabledReasons()`), not a
+single boolean — exactly the mechanism needed to keep TWO unrelated disabled concerns from colliding: the
+app's OWN transient post-gating (an atom the active controller can't run — recomputed every gating pass,
+never meant to persist) and the HUMAN's own deliberate choice (the standard "Disable Block" canvas action,
+which Blockly tags with its own `MANUALLY_DISABLED` reason — confirmed empirically, not assumed:
+`scratchpad/t2277-manual-disable-reason.mjs` triggered the REAL context-menu action and read back
+`getDisabledReasons() === ['MANUALLY_DISABLED']`). Reading blanket `!b.isEnabled()` would have conflated the
+two the moment a manually-enabled block also happened to be post-gated. The model reads/writes ONE specific
+reason; post-gating (fixed below) now uses its OWN, different reason string, so the two stay independent by
+construction, not by convention.
+
+### 1. Disabled state lives in the op model (`web/blocks/blockly/stackBridge.js`)
+
+`disabled` joins `collapsed` as a native top-level record field (added to `KNOWN_LEAF_RECORD_FIELDS`, NOT
+`DURABLE_DATA_FIELDS` — it's a Blockly block property, not a `.data` field). `toRecord()` reads it via a new
+`isManuallyDisabled(b)` helper (checks `b.hasDisabledReason(Blockly.constants.MANUALLY_DISABLED)` — the
+constant read from Blockly's own namespace via `getBlockly()`, never hand-copied, so a future rename can't
+silently desync the two sides) in BOTH branches — the op-container branch and the generic-atom branch — so
+`disabled` is available at ANY depth, not just top-level ops (this is what makes the nesting case in §4 work
+at emit time). `recToJson()` writes it back the same way in both branches, confirmed against Blockly's own
+serialization JSON shape (`scratchpad/t2277-serialization-shape.mjs`: `Blockly.serialization.blocks.save()`
+on a manually-disabled block returns `disabledReasons: ["MANUALLY_DISABLED"]` — that key, that shape, verified
+before writing to it, not assumed from the instance-method names).
+
+### 2. Emit: reused `applyCapGating`'s mechanism, not a second pass (`web/blocks/blockEmitter.js`)
+
+New `collectDisabledIds(blocks)` walks the record tree (any `.children`/`.uiChildren`) once, collecting the
+id of every block whose OWN record carries `disabled: true`. `applyCapGating` (renamed in spirit, not in
+name, to also gate on this) gets a new FIRST check inside its existing per-line loop: `t.src` — the ancestry
+chain `tag()` already stamps on every emitted line, program root to leaf, the SAME field the emit map/code
+panel already relies on — is tested against the disabled-id set. A hit wraps the line as `( disabled: ... )`,
+mirroring cap-gating's own `( gated: ... )` wording but distinct, since one is a post limitation and the
+other is a human choice. This is genuinely the SAME implementation, not a parallel one: same function, same
+loop, same "skip a line that's already a comment" guard (which — for free, not by special-casing — protects
+a disabled op's own MARKER line: markers start with `(` and that guard already exists for cap-gating, so a
+disabled op's marker survives untouched and un-recursed-into).
+
+**Cascading is free, not built.** A child block's emitted line carries an ancestry array that includes every
+containing block's id, so if a PARENT is disabled, every descendant line's `t.src` already contains the
+parent's id — no second walk, no explicit propagation code. Verified this matches Blockly's OWN visual
+semantics before relying on it: built a real nested loop+child pair
+(`scratchpad/t2277-cascade-check.mjs`), disabled the parent, and confirmed the child's OWN `isEnabled()`
+stays true (it isn't itself disabled) while `getInheritedDisabled()` flips to true — Blockly already treats
+"a disabled ancestor" as its own first-class concept, distinct from "disabled itself," and the ancestry-based
+emit check reproduces exactly that distinction through a completely independent mechanism that happens to
+agree.
+
+### 3. Fixed the dead `setEnabled()` call (`web/blocks/blocksApp.js:80`, `applyOpGating`)
+
+Confirmed via the real block prototype (`scratchpad/t2275-check-api.mjs`, carried over from Turn A's own
+finding) that `setEnabled` does not exist on a Blockly 13 block instance — it throws, and the existing
+try/catch has been silently swallowing that every single time this ran, so gated atoms have never actually
+greyed (their warning tooltip still fired — that call is separate and was never broken). Replaced with
+`b.setDisabledReason(!!reason, 'post-gating')` — an OWN reason string, deliberately not `MANUALLY_DISABLED`,
+so a post-gated atom is never misread by `isManuallyDisabled()` as the human's own choice and wrongly
+persisted into the model. Fixing the visual half and building the model-field half in the SAME turn, without
+this separation, would have silently corrupted the model the moment a gated atom's post-gating state got read
+as if it were a deliberate disable — checked for this specifically, not discovered after the fact.
+
+### 4. Round-trip fidelity — verified end to end, the dispatch's own "the one I would get wrong"
+
+`opSchema.js`'s `markerLine`/`parseMarker` gained a THIRD reserved top-level marker key (`disabled`, same
+shape as the existing `defV`) — genuine program content now rides in the `( @DDCS:1 {…} )` payload, not
+inferred from whether the surrounding lines happen to be comments. `programModel.js`'s `serializeWithMarkers`
+passes `op.disabled` through; `importMarkedNc` restores it onto the rebuilt op BEFORE the existing
+line-count-based boundary detection runs (load-bearing: because disabling COMMENTS lines rather than omitting
+them, line COUNT is preserved, which is exactly what that boundary detection measures — confirmed this
+holds, not assumed, in the full test below).
+
+**Full round trip, real builder-generated ops** (`scratchpad/t2277-full-roundtrip2.mjs`, using `opFromMarker`
+for two real `drill` ops with real multi-line WHILE/GOTO/peck bodies, not hand-typed stubs — the earlier
+attempts with bare `{params, children:[]}` records emitted nothing, which is correct: an 'op' container is
+transparent at emit time and only emits its CHILDREN, and children come from the builder, not from params
+alone; every earlier turn's own empty-emit puzzles in this session trace to the same gap): disabled the second
+op → exported via `serializeWithMarkers()` → the marker for op2 shows `"disabled":true` in its JSON payload,
+byte-legible → reimported via `importMarkedNc()` (which also exercised the PRE-EXISTING, unrelated
+`groupConsecutiveOps` behavior — two consecutive top-level ops auto-wrap into a `multi_step` container, not
+something this turn introduced) → the disabled op survived NESTED inside that wrapper with `disabled: true`
+intact → **re-emitting the reimported stack produced text BYTE-IDENTICAL to the pre-export emit.** No silent
+re-enable, no silent drop, no drift.
+
+### The nesting question — established, not assumed, and explicitly scoped
+
+Two sub-questions, both empirically answered:
+
+- **Does disabling a container cascade to children?** Yes, both at emit (via the ancestry mechanism, §2) and
+  visually (Blockly's own `getInheritedDisabled()`, confirmed above) — the two independently agree.
+- **What does a disabled atom INSIDE an enabled op mean?** Its own lines comment out; sibling atoms in the
+  same op do not — the ancestry check only fires for lines whose `src` contains a disabled id, so an enabled
+  op with one disabled child atom emits a MIX: most lines live, that atom's lines read `( disabled: ... )`.
+  Coherent and correctly scoped, verified by construction (the mechanism is symmetric with the container
+  case, not a special branch).
+
+**But nested disabled state is NOT round-trip-durable for parametric built-in ops, and this is a scope
+decision, not an oversight.** `opFromMarker` → `makeOp(opType, params, _builderAtoms(opType, params))`
+REGENERATES an op's entire body fresh from its `params` on every reimport — `children` for a built-in like
+drill/pocket/surfacing is a derived, deterministic function of params, never independently read back from a
+marker (the marker's own payload only ever carried `params`, confirmed reading `markerLine`'s signature
+before this turn touched it). A nested atom's `disabled` flag is not a param, so it has no persistence
+channel once the whole subtree is regenerated. **In-session** (Blocks canvas open, no save/reload), a nested
+disable works correctly end to end via the mechanism in §2 — it simply doesn't survive an export→reimport
+cycle for a regenerated op. Op-level disable, the dispatch's own running example throughout, is fully durable
+end-to-end; nested/atom-level disable is a live-session-only capability today. Not building durability for it
+this turn — the fix (carrying children structure through the marker, or a separate persistence channel for
+hand-built/custom-op stacks specifically, which may not share this limitation at all — untested this turn)
+is its own piece of work, reported rather than guessed at.
+
+### Regression sweep
+
+Full suite required — this touches four core, heavily-shared files (`blockEmitter.js`, `stackBridge.js`,
+`opSchema.js`, `programModel.js`) plus `blocksApp.js`. Result reported in the pass-back note (run started
+before this entry was finished; see the commit for the final count).
+
+### Backlog tail — checked, none taken
+
+Surveyed `BACKLOG.md` in full (continuing past what earlier turns this session already covered) — every
+remaining entry is either an already-deferred arc (V4.1 advanced machining, the gateway-tab audit's own
+unaudited Merge tab, the vendor-pack G-code-library/barcode/RECORD-progress/Modbus-injection items, all
+explicitly hardware- or backend-dependent), explicitly "can wait" by the human's own ruling (the analytics
+bot-detection branch), or itself a multi-part feature (the wizard-preview-pane sizing item, with its own
+documented failed attempt and open question). Nothing genuinely one-sitting-sized surfaced. Given this turn's
+primary work was already a substantial, rigorously-verified four-file change, didn't force a low-quality pick
+to satisfy the slot — consistent with t2271/t2273's own precedent for the same situation.
+
+### Mid-task amendment — renamed `applyCapGating`, and made the persistence asymmetry explicit
+
+A human-spotted consequence, correctly caught: the function now does capability gating AND human-suppression,
+and a name describing half of what it does is how the next reader misreads it. Renamed to
+`applyLineSuppression` everywhere (2 files: `blockEmitter.js`, `wizards/stacks/atcTestWizard.js`'s own
+comment; plus a test-comment-only mention in `tests/atc-cap-gate.spec.js`) — no behavior change, confirmed
+by re-running the targeted spec and the full round-trip script after the rename, both still green.
+
+The amendment's real question was already answered by the design, not just the name: **the two suppression
+reasons were already distinguishable in the emitted text** (`( gated: … )` vs `( disabled: … )`, built in
+§2 above, before this amendment landed) — but the amendment's own framing surfaced the SHARPER, more
+important fact worth stating explicitly rather than leaving implicit: gated and disabled must behave
+OPPOSITELY on reimport, and they already do, by construction, not by luck. A `gated` line carries NO
+persisted state — `t.cap`/`caps` are recomputed fresh every emit, so a reimported program whose post later
+gains a capability simply stops gating that line on the next emit, nothing to update. A `disabled` line's
+reason IS persisted (the record's own `disabled` field, riding the marker) — it must stay disabled regardless
+of what the active post can run, because it was a human choice, not a capability limit. Documented this
+explicitly in `applyLineSuppression`'s own doc comment and in ARCHITECTURE.md's dialect section, so the next
+reader finds the reasoning at the code, not just in this log.
+
+Also fixed the architecture map's own drift from this turn's earlier edits (found by the full suite, not by
+inspection): `stackBridge.js`'s `KNOWN_LEAF_RECORD_FIELDS` citation in `architecture-map-1698.test.mjs` still
+held the OLD literal source line (missing `'disabled'`) — updated the citation string. Three `file:line`
+citations in `ARCHITECTURE.md` had also drifted from lines this turn's edits shifted (`KNOWN_LEAF_RECORD_FIELDS`
+:36→:39, INV1's guard :350→:373, INV2's guard :297→:320) plus the `applyCapGating`→`applyLineSuppression`
+rename and the emit-pipeline's own `absorbed`/`feedFolds`/return-statement line shift (:531/:535/:536 →
+:534/:538/:539) — all corrected, each with its own shift annotation matching the file's established convention
+(t1950/t1992's own precedent), not just the raw new number.
+
+### Files changed
+
+`web/blocks/blockly/stackBridge.js` (the `disabled` model field, both directions, both branches),
+`web/blocks/blockEmitter.js` (`collectDisabledIds` + `applyLineSuppression`, renamed from `applyCapGating`),
+`web/blocks/opSchema.js` (`disabled` as a third reserved marker key),
+`web/blocks/programModel.js` (`serializeWithMarkers`/`importMarkedNc` thread it through),
+`web/blocks/blocksApp.js` (the dead `setEnabled` → `setDisabledReason` fix, own reason string),
+`web/wizards/stacks/atcTestWizard.js` (comment-only, the rename), `tests/atc-cap-gate.spec.js` (comment-only,
+the rename), `tests/node/architecture-map-1698.test.mjs` (the stale citation), `ARCHITECTURE.md` (four
+citations corrected, each with its shift annotated). `index.html` untouched.

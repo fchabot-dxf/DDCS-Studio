@@ -42,8 +42,8 @@ export function newBlock(type) {
 }
 
 /** One emitted line + its provenance: src = ancestry [outer…inner] of owning block ids, or null = program-owned. */
-// t640 — a line may carry a DECLARED cap requirement (from its source block's params.cap): applyCapGating folds it to a
-// comment when the active post lacks that cap (e.g. the ATC pneumatic/drawbar M-codes carry cap:'atc'). Only leaf emit tags a cap.
+// t640 — a line may carry a DECLARED cap requirement (from its source block's params.cap): applyLineSuppression folds it
+// to a comment when the active post lacks that cap (e.g. the ATC pneumatic/drawbar M-codes carry cap:'atc'). Only leaf emit tags a cap.
 const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 
 /**
@@ -219,8 +219,8 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     // OP CONTAINER (a recorded op: { opType, label, requires, params, children }) — the structure/record for an
     // op (grouping in Blocks + op-form editing). TRANSPARENT at emit: it just emits its children. Gating is done
-    // PER LINE (applyCapGating below) — more honest than hiding a whole op: you see every line, with the ones the
-    // active post can't run commented out. The op is always kept in the stack.
+    // PER LINE (applyLineSuppression below) — more honest than hiding a whole op: you see every line, with the ones the
+    // active post can't run (or the human turned off) commented out. The op is always kept in the stack.
     if (block.type === 'op') {
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
@@ -519,7 +519,7 @@ export function emitMapped(blocks, settings = {}) {
     applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
     applySerialLibrary(T, dialect);       // t764 — expand {SN} markers → the bump (top) + the per-digit dispatch + the glyph library (once per distinct height, after the program end). NO {SN} marker → byte-identical.
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
-    applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
+    applyLineSuppression(T, dialect, collectDisabledIds(blocks));   // comment out lines the active post can't run, or the human disabled — DISTINGUISHABLY: '( gated: … )' vs '( disabled: … )'
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
     // t2070/t2139 — the two DDCS-syntax guards (inline-IF..THEN skip, then the unconditional flush-left strip —
     // see gcodeSyntaxGuards.js for why they're ONE call with the order baked in). Applied at the ONE boundary,
@@ -802,11 +802,42 @@ function applyModalFeed(T) {
     }
 }
 
-/** Per-line capability gating: on a post that can't run #variables / in-program flow (grbl), comment out the
- *  lines it can't execute, keeping the op's RECORD intact (the op-container stays in the stack). Honest over
- *  hiding — you see every line, with the non-runnable ones commented. Posts that run #vars + flow (DDCS / V4.1 /
- *  DM500 / LinuxCNC / grblHAL) gate nothing. (Per-line can leave a lone runnable move — inherent to macro work.) */
-function applyCapGating(T, dialect) {
+/** t2277 — collect the id of every block (at any depth) whose OWN record carries `disabled: true` (the
+ *  MANUALLY_DISABLED model field — see stackBridge.js's toRecord for why this is read from a SPECIFIC Blockly
+ *  disabled-reason, never the app's own transient post-gating). Threaded into applyLineSuppression below so a
+ *  disabled block's lines comment out via the exact SAME per-line mechanism cap-gating already uses — one
+ *  idiom, one implementation, not a second pass. */
+function collectDisabledIds(blocks, out = new Set()) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.disabled) out.add(b.id);
+        if (b.children) collectDisabledIds(b.children, out);
+        if (b.uiChildren) collectDisabledIds(b.uiChildren, out);
+    }
+    return out;
+}
+
+/** Per-line suppression: comment out a line the active post CANNOT run (capability gating), or that the human
+ *  CHOSE to turn off (disabled), keeping the RECORD intact either way — the op-container stays in the stack,
+ *  the block is never omitted. Honest over hiding — you see every line, with the ones that can't/won't run
+ *  commented. Posts that run #vars + flow (DDCS / V4.1 / DM500 / LinuxCNC / grblHAL) and a program with
+ *  nothing disabled suppress nothing. (Per-line can leave a lone runnable move — inherent to macro work.)
+ *
+ *  t2277 (renamed from applyCapGating — it does two distinguishable things now, not one, and a name
+ *  describing half of what a function does is how the next reader misreads it): the two reasons stay
+ *  DISTINGUISHABLE in the emitted text — `( gated: … )` vs `( disabled: … )` — because they mean opposite
+ *  things at reimport time. A gated line carries NO persisted state (no `disabledIds` entry, no marker
+ *  field) — it is recomputed FRESH from `t.cap`/`caps` on every emit, so if a re-imported program's post
+ *  later gains the capability, that same line simply stops being gated on the very next emit, with nothing
+ *  to update or forget. A disabled line's reason IS persisted (the record's own `disabled` field, carried
+ *  through the marker — see opSchema.js/programModel.js) — it must come back disabled regardless of what
+ *  the active post can run, because it was the human's choice, not a limit. One function, one mechanism, two
+ *  reasons that must never be collapsed into each other in EITHER the label or the persistence.
+ *
+ *  `disabledIds` cascades to every descendant for free: a line's `src` (tag()'s ancestry chain, program root to
+ *  emitting leaf) contains an id the instant ANY ancestor is disabled, so disabling a container disables its
+ *  whole body without a second walk — the same "inherited disabled" semantics Blockly's own canvas shows. */
+function applyLineSuppression(T, dialect, disabledIds) {
     const caps = getCaps(dialect.id);
     // t640 — NO blanket early-return. The old `if (caps.vars && caps.flow !== 'none') return` assumed "#vars + flow ⇒ fully
     // capable ⇒ nothing to gate", but a post can run #vars + flow yet LACK other caps (atc/pneumatic, …) → Expert-only ATC
@@ -814,7 +845,14 @@ function applyCapGating(T, dialect) {
     // every cap ON) every branch below is false → a true no-op (byte-identical). Cheap: one linear pass.
     for (const t of T) {
         const code = (t.line || '').trim();
-        if (!code || code.startsWith('(') || code.startsWith(';')) continue;   // blank / already a comment
+        if (!code || code.startsWith('(') || code.startsWith(';')) continue;   // blank / already a comment — this ALSO
+        // protects a disabled op's own marker line for free: markers already start with '(' and are skipped above,
+        // so a disabled op's marker survives commenting-out and re-import can still find + read it (t2277 round-trip).
+        // (0) HUMAN-CHOSEN disable — checked first (a block the human turned off is off regardless of what the
+        //     active post could otherwise run). Distinct wording from cap-gating: this is a choice, not a limit.
+        if (disabledIds && disabledIds.size && t.src && t.src.some((id) => disabledIds.has(id))) {
+            t.line = `( disabled: ${code.replace(/[()]/g, '').trim()} )`; continue;
+        }
         // (1) DECLARED cap gate: the source block asked for a cap the active post lacks (declare-not-infer — e.g. the ATC
         //     pneumatic/drawbar M-codes carry cap:'atc'; V4.1/DM500 have caps.atc=false → fold the line to an honest comment).
         if (t.cap && !caps[t.cap]) { t.line = `( gated: ${code.replace(/[()]/g, '').trim()} )`; continue; }

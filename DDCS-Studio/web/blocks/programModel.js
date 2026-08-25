@@ -259,7 +259,7 @@ export function serializeWithMarkers() {
     let lastOpId = null;
     (proj.lines || []).forEach((line, i) => {
         const op = opAtLine(i);
-        if (op && op.id !== lastOpId) out.push(markerLine(op.opType, op.params || {}, defVOf(op.opType)));
+        if (op && op.id !== lastOpId) out.push(markerLine(op.opType, op.params || {}, defVOf(op.opType), op.disabled));
         // t812 — keep the op context across a PROGRAM-LEVEL inserted line (the entry waypoint `G0 X Y ( entry )` is owned by
         // the entry sibling, not the op). Resetting to null on it split the op into TWO markers → a duplicate op on reimport.
         // A null line no longer ends the op; the NEXT genuinely-different op still starts its own marker.
@@ -483,6 +483,7 @@ export function importMarkedNc(text, opts) {
             } else {
                 const opRaw = rec && opFromMarker(rec.opType, rec.params);
                 i++;
+                if (opRaw && rec.disabled) opRaw.disabled = true;   // t2277 — the reserved marker key, restored onto the rebuilt op
                 if (opRaw) {
                     // t1920 — VERIFIED, not assumed: try BOTH the op's own full reconstruction and its
                     // terminator-stripped one (see doc comment), and pick whichever's MARGINAL length actually
