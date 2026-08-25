@@ -996,3 +996,94 @@ The Expert-specific results, in one paragraph so this file is not a second copy 
   percent sign. 36 of 335 vendor uses are message-attached. Do not offer it as a blind replacement.
 * ⭐ **Comment bodies are not ASCII-restricted** — the vendor ships 6,664 high bytes of GBK Chinese
   inside SYSDISK comments alone. ⚠ GBK, not UTF-8: a UTF-8 round-trip corrupts vendor macros.
+
+
+## SYSDISK run-state + the WCS table, read live off the Expert `[MEASURED 2026-08-25]`
+*(CNC-FAIRY, controller powered and reachable at 192.168.0.99. **Read-only throughout** — `os.listdir` and
+file reads over SMB. Nothing was written to the controller; no G-code ran; no axis moved.)*
+
+### 1. ⛔ THE V4.1 SMB PROGRESS FINDING DOES NOT TRANSFER — the Expert's layout is different
+The 2026-08-20 note (`.file` + `.break0-0`, read on a V4.1) named "the Expert" as unverified. Now verified,
+and it is **not the same**:
+
+| V4.1 had | Expert actually has |
+|---|---|
+| `.file` (332 B) — current program path | ⛔ **absent** |
+| `.break0-0` (860 B), path field FIRST | `.break0` (400 B) **and** `.break1` (440 B), path/text LAST |
+| 44 × `<prog>.pos` | **142** × `<prog>.pos` |
+
+⇒ Any progress reader must branch per controller. `[CONFIRMED]`
+
+### 2. ⭐ THE BREAK RECORD IS A MODAL-STATE SNAPSHOT — decoded
+Both `.break0`/`.break1` open with the same i32 vector, and it decodes cleanly as **modal G-codes**:
+`17, 90, 94, 21, 40, 49, 99, 54` = **G17 / G90 / G94 / G21 / G40 / G49 / G99 / G54** (`-1` = slot unset).
+Then f64s (feed `1000.0` / `5080.0`, spindle `12000.0`), three i32 counters at `[232] [236] [240]`
+(`10, 351, 8` and `101, 1569, 116`), positions as f64 near offset 320, and **the source text at the break**
+as a trailing string (`.break0` → `/local/A9b_MGETDATA_PULL.nc`; `.break1` → `G53G00Z#150`). `[CONFIRMED]`
+
+⚠ **The counters are NOT decoded.** `[236]` is the right magnitude for a byte offset or a line number, but
+both records are **stale historical breaks** — `.break0`'s program no longer exists on CNCDISK — so there is
+nothing to check them against. ⛔ Do not assume `[232]`=line / `[236]`=offset; it is unproven.
+
+⚠ **And the load-bearing question is still open**: whether ANY of this updates DURING a run, or only at stop.
+That needs a program running with a person at the machine. A baseline of sha256s for a before/after
+comparison is committed at `bench/sysdisk-baseline-2026-08-25.json`.
+
+### 3. ⭐ `eng` INDEXES `setting` DIRECTLY — 1:1, no offset `[CONFIRMED]`
+Verified on six anchors read live: `#78`="Current coordinate"→`setting[78]`=1 · `#267`="Serial 2 baud
+rate"→4 (B115200) · `#279`="Modbus RTU"→**2** · `#295`="Feed rate maximum value"→300 · `#296`/`#297`
+parity/stop→0/0. ⇒ For the `setting` file, **eng index == f64 index**. No `−500` anywhere in this relation.
+
+### 4. ⭐⭐ THE WCS TABLE IS AT `setting[300]`, AND THERE ARE SEVEN OF THEM
+A previously unexamined SYSDISK file, **`coordinate` (360 B = 45 × f64 = 9 rows × 5 axes)**, holds the work
+offsets — and it is a byte-exact mirror of `setting[300..339]`:
+
+```
+coordinate row 0..7  ==  setting[300 + row*5]   ALL MATCH   (row 8 is padding)
+row 0 = 47.650  -666.186  -69.484  -666.186    0.000
+row 1 = 50.130  -665.704  -36.508  -665.944    0.000
+row 2 = 50.670   -34.642  -35.163   -34.642    0.000
+```
+
+⭐ **`eng` says `#78 "Current coordinate" -min=1.000 -max=7.000`** — **seven** coordinate systems, not six —
+and rows 0..6 are exactly seven. `setting[78]` currently reads **1**.
+
+⇒ **Measured relation: WCS n (1..7) lives at `setting[300 + (n−1)*5]`, so WCS 1 → `setting[300]`.**
+
+### 5. ⚠⚠ THIS DISAGREES WITH THE APP AND WITH THE HAND-WRITTEN MACROS, BY EXACTLY ONE SYSTEM
+Both the profile mapper (`_WCS_BASE = 305`) and the owner's own `COPY_WCS.nc`
+(*"Calculate source base address: 805 + [WCS-1]*5"*) put **G54 at `setting[305]`** — which is **row 1**, the
+SECOND row of the measured table. The measurement puts WCS 1 at row 0 / `setting[300]`.
+
+⚠ **This is the shape of the symptom the owner already reported** — *"it pulled the wrong coord"* (t2067).
+
+⛔ **NOT yet a confirmed bug, and must not be "fixed" on this evidence alone.** Two readings survive:
+* **(a) The app is off by one system** — row 0 is WCS 1 and every pull returns its neighbour.
+* **(b) `coordinate` row 0 is a spare/extra row** the table happens to begin with, and `setting[305]` really
+  is WCS 1 — in which case the app is right and only this note is wrong.
+
+⇒ **ONE LOOK AT THE PANEL DECIDES IT.** `setting[78]` = 1, so the active system is WCS 1. Read the current
+work-offset **X** on the pendant:
+* panel shows **47.650** ⇒ reading (a): row 0 is the active system, and the app is off by one. Real bug.
+* panel shows **50.130** ⇒ reading (b): the app is correct, and row 0 is a leading spare.
+
+⚠ Until that look happens this stays `[HYPOTHESIS]`. ⛔ Do not change `_WCS_BASE` on the strength of a file
+comparison — the whole t2067 episode was an address changed on inference.
+
+### 6. ⚠ `cmdstr` IS A SHELL-COMMAND FILE, AND IT CONTAINS A DELETE
+`SYSDISK/cmdstr` (45 B) currently reads, in plain text:
+
+```
+find . -type f | grep ".*\pos$" | xargs rm -f
+```
+
+⇒ SYSDISK carries a **shell command string**, and the one sitting there is a recursive delete of the `.pos`
+files. ⛔ **Read-only. Do not write to `cmdstr` and do not experiment with it** — if the controller executes
+what it finds there, a write is arbitrary command execution on the controller, with no undo. Recorded because
+anything walking SYSDISK will meet this file. `[CONFIRMED present; execution behaviour NOT tested and must
+not be]`
+
+### 7. Smaller reads, for the record
+* `mdiblock` (720 B) = **MDI history** — past hand-typed lines (`#571=1`, `G90 G0 B360`, `#3000=#880`).
+* `processing` (4800 B) = a **recent-programs list**: 96-byte records of name + four i32 counters.
+* `processing1` (4 B) = `5c 5f 52 5b`, not a plausible counter. Undecoded.
