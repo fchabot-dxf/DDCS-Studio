@@ -55270,3 +55270,76 @@ no other twin converted; no hardcoded block removed.
 Full working room. A genuinely mixed turn — mostly a careful, scoped build, but the middle third was
 unplanned regression-hunting after a test failure that could easily have been misread as "some ATC gate
 thing, unrelated" if I hadn't isolated it precisely with git stash before concluding anything.
+
+## t2265 — PART ONE (report, no change): hasTreeLayout is asking the RIGHT question. PART TWO (built): the pairing guard.
+
+### Part One — what hasTreeLayout demands, and whether ATC Check should satisfy it
+
+**What it demands, precisely** (`userOpView.js:106-119`): a REAL `split_horizontal`/`split_vertical` node
+SOMEWHERE in the declared `uiChildren` tree — nothing else counts. `section`/`panel`/`sim`/`param_group`/
+`tab_group` are explicitly, deliberately EXCLUDED from tripping it — the check is narrower than "does this
+op use any GUI-authoring block," on purpose.
+
+**Why, established from a PRIOR verification already in the codebase, not re-derived from scratch**: a
+`blocksApp.js` comment (found while investigating, not written by me) records that this exact question was
+already checked empirically before the gate was narrowed: "formBindings() + renderOpForm()'s own section-
+grouping already produces the complete, correctly field for every sampled twin — Corner 23/23 fields (3
+named sections), WCS 6/6, ATC Length 7/7, Surfacing 30/30, zero exceptions." The FLAT path is not a legacy
+fallback waiting to be replaced — it is a verified, complete, first-class route for anything that doesn't
+need a genuine 2-pane split. `hasTreeLayout`'s narrowness is the CONCLUSION of that check, not an oversight.
+
+**The load-bearing new fact**: `grep -r "split_horizontal\|split_vertical" web/blocks/dataOps/` returns
+NOTHING. Zero of the 32 shipped twins declare one. `hasTreeLayout` is false for every real, registered op in
+the app today — this isn't a gate excluding ATC Check specifically, it's a gate nothing currently satisfies.
+The tree-rendered LIVE FORM PREVIEW path (`renderUiTree`, inside `userOpView.js`'s own render()) is
+completely dormant across the whole shipped app. The ONE place `uiChildren`'s full structure IS genuinely
+exercised live today is the Blocks-tab's own canvas (the visual block-editor representation) — a real,
+separate consumer, confirmed by screenshot last turn, that renders regardless of `hasTreeLayout`.
+
+**The reframe this produces for last turn's own "closing finding"**: I described `code_preview` rendering
+as inert for ATC Check's live preview as a gap. It measures true but the framing undersold what's actually
+happening — for a FLAT-path op, the live "in-place" shell (`#wiz_user`, index.html:451-457) ALREADY carries
+its own hardcoded `.preview-block` sibling to `#wiz_user_form`, and that's what every flat-path twin's code
+preview actually comes from — not from `uiChildren` at all. ATC Check's live code preview was never missing;
+it was already there, via the shared generic shell, the entire time. `code_preview`'s own gap only matters
+for a twin that GENUINELY takes the tree path (where the generic shell gets replaced, not supplemented, by
+what `uiChildren` declares) — and none exists yet.
+
+**The answer**: ATC Check should NOT satisfy `hasTreeLayout`. It is a plain, single-column, 8-field form with
+no side-by-side layout need at all — adding a `split_horizontal` wrapper to trip the gate would be exactly
+the artificial move the dispatch warned against: a real gate correctly reporting a real absence, converted
+into a decoration for a case that has nothing to split. Not changed. The genuinely open question this leaves
+for whenever it's relevant: does ANY of the 32 twins have a real, unmet 2-pane layout need today (something
+that SHOULD trip `hasTreeLayout` but doesn't declare a split node)? Not established this turn — a different
+census than "does ATC Check need it," and not asked for.
+
+### Part Two — the pairing guard, built and proven non-vacuous
+
+New file `tests/node/uichildren-vocabulary-pairing.test.mjs`. Pure list-versus-list, node tier, no Blockly
+boot, per the dispatch's own constraint:
+- RENDERER side: every `node.type === '...'` literal `formWidgets.js`'s `traverse()` branches on, extracted
+  textually — the SAME heuristic `declared-key-coverage-1678.test.mjs` already established for this codebase
+  (a tripwire, not a real static analyzer; documented as such in the new file's own header, matching that
+  precedent's own honesty about false-negative/false-positive risk).
+- BLOCKLY side: `wizards/ops/index.js`'s own `BLOCKS` registry, imported DIRECTLY (confirmed importable at
+  the node tier — plain data, no DOM) rather than re-derived by a second regex pass across ~28 files.
+- ONE direction asserted: every renderer-known type needs a `BLOCKS` entry. The reverse is deliberately NOT
+  checked — `BLOCKS` also holds ~128 real G-code-emitting atom types that were never meant to appear in a
+  `uiChildren` tree at all; requiring all of those to also have a `traverse()` branch would assert the wrong
+  thing.
+
+**Proven non-vacuous, not just written and trusted**: temporarily removed `codePreviewBlock` from
+`wizards/ops/index.js`'s own registry array (reproducing t2263's exact bug) and re-ran — failed, naming
+`code_preview` precisely as the missing pairing. Restored via `git checkout --`, confirmed green again.
+Ran the full node-tier suite (`npm run test:node`): 228/228 pass, including this one.
+
+### Verified
+
+Node-tier suite only — this turn added one new, isolated test file and made zero changes to any production
+code (Part One was report-only, explicitly not acted on). No browser-tier run needed: nothing this turn
+touched can affect anything the browser-tier suite exercises.
+
+### Capacity
+
+Full working room. A cleaner turn than the last three — one focused investigation with a clear, evidence-
+backed answer, one small mechanical build, both scoped exactly to what was asked.
