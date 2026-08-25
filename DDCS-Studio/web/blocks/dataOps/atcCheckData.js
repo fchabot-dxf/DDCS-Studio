@@ -45,6 +45,12 @@ export function atcCheckDataStack(params = ATC_CHECK_DEFAULTS) {
             // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
             // building the pane ATC never had content for.
             { type: 'sim', params: { rotary: false, machine: true, magazine: false, layout2d: false } },
+            // t2269 (wizards-as-data E2 measurement, PILOT) — the top-of-form instructional paragraph.
+            // atc_check's own static shell (index.html:901) uses .settings-hint (style: 'plain') — the SAME
+            // ATC-family class all 6 ATC shells share, genuinely different in rendered result from the
+            // majority .wiz-usage 'callout' style the 8 non-ATC shells use (see formWidgets.js's own
+            // 'usage_text' branch comment) — text copied verbatim from the shell, not paraphrased.
+            { type: 'usage_text', params: { style: 'plain', text: 'A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.' } },
             { type: 'param_group', params: { group: 'Tool Check' }, children: [] },
             // t2263 (wizards-as-data E2 measurement, PILOT) — the ONE node type formWidgets.js's traverse()
             // was missing: a live code preview. atc_check's own static shell (index.html:908-911) uses the

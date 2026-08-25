@@ -1408,6 +1408,24 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 const tag = node.params && node.params.tag;
                 pb.innerHTML = `<span class="label">${escHtml(label)}${tag ? ` <span class="compliant-tag">${escHtml(tag)}</span>` : ''}</span><pre${codeElId ? ` id="${escHtml(codeElId)}"` : ''}></pre>`;
                 container.appendChild(pb);
+            } else if (node.type === 'usage_text') {
+                // t2269 (wizards-as-data E2 measurement, PILOT on ATC Check) — the top-of-form instructional
+                // paragraph 13 of 15 hand-written shells carry, in NO declared node until now. Surveyed first
+                // (t2267): the same purpose exists under TWO unreconciled CSS classes with genuinely different
+                // rendered results, not just different names — .wiz-usage (font-size 10px, a left accent-
+                // border callout with a subtle background tint) on 8 shells, .settings-hint (font-size 11px,
+                // no border, no background — plain small text) on ATC's own 6. This is a real inconsistency,
+                // not one this act resolves unilaterally: `style` is a declared param (defaulting to the
+                // majority 'callout' shape), not a silent pick of one over the other — flagged for a human
+                // ruling in the pass-back, not decided here. `text` is trusted, author-declared markup (the
+                // existing shells already embed <b> for emphasis — e.g. "Settings → ATC"), assigned via
+                // innerHTML like every other declared-content node in this file, not escaped like a short
+                // label/tag string.
+                const ut = document.createElement('div');
+                const style = node.params && node.params.style;
+                ut.className = style === 'plain' ? 'settings-hint' : 'wiz-usage';
+                ut.innerHTML = (node.params && node.params.text) || '';
+                container.appendChild(ut);
             } else if (node.type === 'param_group') {
                 // t1605 — a param_group IS its rows. TRANSPARENT on purpose, exactly like the flat form path
                 // (formBindings treats it as row-order metadata, never chrome): each param_field child picks its

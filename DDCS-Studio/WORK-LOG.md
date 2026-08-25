@@ -55426,3 +55426,118 @@ the 15 respectively need them). Nothing built this turn, per the explicit instru
 
 Full working room. A pure-reading turn — the value was in checking `whenGuard.js` before reporting a gap
 that turned out not to be one, not in the volume of file read.
+
+## t2269 — `usage_text` DECLARED AND PILOTED. Path Anchor deferred to its own turn — real complexity, not a dodge.
+
+### First: does `.wiz-usage` vs `.settings-hint` differ in rendered result, or only in name?
+
+Checked `styles.css` before designing anything, per the explicit instruction not to consolidate silently.
+**They genuinely differ, not just in name**: `.wiz-usage` (line 4944) is a bordered callout — `font-size:
+10px`, a `2px solid var(--accent)` LEFT BORDER, a subtle background tint, real padding. `.settings-hint`
+(line 5808) is plain text — `font-size: 11px`, no border, no background, only a top margin. **Not
+consolidated. Flagged for the human ruling the dispatch itself named** — the node carries BOTH as a declared
+`style` param (`callout` default / `plain` opt-in) rather than picking a winner.
+
+### Built: `usage_text`, both halves
+
+`formWidgets.js`'s `traverse()` gets a new branch (`ut.className = style === 'plain' ? 'settings-hint' :
+'wiz-usage'`), `wizards/ops/usageText.js` registers the matching Blockly block (`fields: ['text', 'style']`,
+matching `panel.js`'s own tiny pattern). `text` is assigned via `innerHTML`, not escaped — the existing
+shells already embed `<b>` for emphasis and the content is author-declared, not user input, same trust level
+every other declared-content branch in this file already carries.
+
+`atcCheckData.js`'s `uiChildren` gets one new entry, `style: 'plain'`, text copied VERBATIM from its own
+shell (index.html:901) — not paraphrased, so the comparison against the shell is a true one.
+
+### A finding bigger than "the declaration was incomplete" — this content is already gone from the live app
+
+Checked the live `#wiz_user` render for ATC Check (the CURRENT, real in-place route) before assuming the
+"shell" side of my own comparison meant what I thought it meant. It doesn't show the instructional paragraph
+at all — the ONLY `.wiz-usage`-classed element present is `#wiz_user_usage`, a DIFFERENT, pre-existing thing
+(the op's own title echo, "Tool Check", not descriptive help) that just happens to share the same CSS class.
+**The rich hint text ("A quick tap on the tool setter that aborts if the tool is broken...") is not merely
+missing from the declaration — it is missing from what a real user sees today**, silently lost somewhere in
+the ATC-port migration (the hand-written `#wiz_atc_check` shell that carried it is dead code, unreachable
+since `opensAs` redirects the real button to the twin). This is a genuinely different, stronger claim than
+"the declaration doesn't yet express this" — it's "this specific piece of user guidance is already gone, and
+declaring it is a restoration, not just a measurement." Confirmed via `usage_text`'s own render remaining
+consistent with `code_preview`'s established finding: still inert on the live route (`hasTreeLayout` is
+still false for Check, unaffected — the flat path doesn't consume `uiChildren` either way), so this doesn't
+put the text back in front of a user yet either — but the loss itself is now a confirmed, dated fact, not a
+guess.
+
+### Verified
+
+Pairing guard passes both before and after (registered both halves together this time, not staged — the
+advisor's own "let it fail and report it" experiment is Path Anchor's, not this one's, since usage_text's
+two halves were built together deliberately). Re-ran the fair-harness experiment: screenshot confirms the
+hint text renders correctly, bold emphasis intact, in the `plain` style matching the shell's own text
+exactly. Live Customize route re-checked directly (not assumed safe): no crash, `tolerance` field still
+gates correctly. Targeted sweep: 24/24 pass, including the full 32-twin `fork-parity-1593` test. Full suite:
+2797 passed, 12 flaky (well inside the observed band), **0 unexpected**.
+
+### Path Anchor — deferred to its own turn, and why
+
+Read `ui/pathAnchorField.js` before scoping it. It is not a simple field: `mountPathAnchor(prefix)` builds
+TWO svg corner-grid pickers bound to `{prefix}stockAttach`/`{prefix}pathDatum`, and its own internal lookup
+is `document.getElementById(prefix + field)` — the OLD static shells' own per-field `id="d_pathDatum"`
+convention, not the `data-param="..."` attribute convention `formfield`/`param_field` nodes use everywhere
+else in the declared vocabulary. Wiring a `path_anchor` node correctly means either extending
+`pathAnchorField.js`'s own lookup to also work by `data-param` (a change to shared code beyond "declare a
+node"), or having the new node render its own two hidden inputs directly rather than relying on formfield
+nodes elsewhere in the tree — a real design decision, not a fill-in-the-template job like `usage_text` or
+`code_preview` were. None of the 6 ATC ops use it either (it's mill-op-only — datum/stock-attach has no ATC
+equivalent), so the pilot would also need a different twin (one of drill/pocket/contour/slot/surfacing/text,
+all already registered). Taking this in its own turn rather than rushing it at the end of this one.
+
+### The new amendment — reproducibility test, queued for after both node types
+
+A mid-task amendment landed asking for a ratchet-style test (render every dual-shell-and-twin op from both
+routes, diff a NORMALIZED semantic description — params/label/help/section/type/default/gate plus
+structural elements — assert the KNOWN gap list exactly, so a new gap fails and a closed gap ALSO fails
+until the list is updated). Explicitly permitted to split ("the two node types come first and this can be
+its own turn"). Taking it at face value: this turn closes with one of the two node types landed
+(`usage_text`); Path Anchor and the reproducibility test are each their own next turns, in that order,
+matching the amendment's own sequencing ("after the two node types").
+
+A SECOND mid-task amendment landed after that: every arc turn now carries one small BACKLOG item as a tail,
+own commit, always separate from the arc work — a return to a pattern that lapsed for roughly ten turns of
+pure arc focus. See its own section below.
+
+### Files changed (arc)
+
+`web/ui/formWidgets.js` (the `usage_text` traverse() branch), `web/wizards/ops/usageText.js` (NEW — the
+Blockly block), `web/wizards/ops/index.js` (registers it), `web/blocks/dataOps/atcCheckData.js` (the one new
+uiChildren entry). `index.html` untouched; no other twin converted; no hardcoded block removed.
+
+### The tail — BACKLOG 19: the wizard-bar dropdown had no overflow protection at all
+
+Ran its own declared `STILL REAL IF` check first (`grep max-height\|overflow ... | grep toolbar-dropdown` →
+no output): still real. `.toolbar-dropdown-content` had no `max-height`, no `overflow` rule, and no JS
+clamping — a group grown past a viewport's height (the Wizard-bar editor explicitly lets a user add/re-icon/
+reorder wizards into any group, unbounded) would push its own bottom items off-screen with no way to reach
+them. Fixed with the entry's own two named cares respected: NOT a fixed pixel cap (`max-height: calc(100vh -
+40px)`, not a constant — this codebase was already bitten once by a hard 400px preview height nothing
+downstream consumed, BACKLOG #10) and NOT an item-count cap (`overflow-y: auto` — the layout was what
+failed, not how many wizards someone chose to keep). Verified on a genuinely short (400px) viewport: the
+tray's own computed `max-height` resolves to `360px` correctly, `overflow-y: auto` is set, and a normal
+8-item group renders with zero visible change (screenshot, `scratchpad/t2269-dropdown-short-viewport.png`).
+Targeted dropdown-touching tests: 6/6 pass (`wizard-bar.spec.js`, `context-menu-wizbar-1458.spec.js`,
+`io-step-shots.spec.js`).
+
+**Which arc step this rides with**: `usage_text` (this turn's own arc work, above) — same turn, separate
+commit, per the amendment's own "the tail is separate, always" rule.
+
+### Files changed (tail)
+
+`web/styles.css` only — one rule (`.toolbar-dropdown-content`), two new declarations.
+
+### Verified (combined, both changes in the working tree)
+
+Full suite: 2794 passed, 15 flaky (inside the observed band), **0 unexpected**.
+
+### Capacity
+
+Full working room. Path Anchor's own genuine complexity (not a dodge — verified by reading its actual
+implementation before scoping it out) is why this turn is one node type deep, not two; said so plainly
+rather than padding the turn with a rushed second build.
