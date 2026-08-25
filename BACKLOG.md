@@ -1819,3 +1819,31 @@ malformed line. There is no user to warn and nothing to ask.
 ⚠ **Not yet a live bug** — it needs a `)` to reach one of those interpolations, and today's sources probably
 never contain one. Which is exactly why it is worth filing rather than trusting: nothing enforces that, and the
 failure mode is silent until a controller chokes on a line that was never meant to be G-code.
+
+---
+
+### 23. NESTED DISABLED STATE IS IN-SESSION ONLY FOR PARAMETRIC OPS
+
+*(established at t2277 while making Disable Block real — reported as a scope boundary rather than hidden, and
+NOT a regression: nested disable did nothing at all before that turn.)*
+
+**STILL REAL IF:** disable a CHILD block inside a parametric op, export the `.nc`, reimport it, and look at
+that child. **Comes back enabled = STILL REAL.**
+
+Disabling a whole op round-trips correctly — that was verified byte-identically end to end. But a block
+disabled *inside* a parametric op does not survive a reimport, because `opFromMarker` regenerates an op's
+children from its params rather than restoring them individually. The child comes back as the generator makes
+it: enabled.
+
+⚠ **Why it matters, and why it is filed rather than shrugged at:** this is the same shape as the hazard that
+motivated the whole turn — something the human deliberately turned OFF coming back ON without saying so. It is
+narrower (a nested block, not an op) and the dangerous case is covered, but the failure mode is identical and
+it is silent.
+
+⛔ **Do NOT "fix" this by making `opFromMarker` restore children individually.** Regenerating children from
+params is what makes a parametric op parametric; a marker that carried per-child state would be a second source
+of truth for the same op and would drift from the params that are supposed to define it.
+
+⇒ If it is worth solving, the disabled state of a child has to be part of the op's own PARAMS — expressible by
+the generator, not stored beside it. That is a design question about what a parametric op's params include, not
+a bug fix. **Worth a ruling before anyone builds it.**
