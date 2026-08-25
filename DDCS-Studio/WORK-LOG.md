@@ -56076,3 +56076,107 @@ finding from this turn's own investigation, not a tail pick.
 
 `BACKLOG.md` (new entry #24). No `web/` source touched — report-only turn, as dispatched. Every verification
 script lives in gitignored `scratchpad/t2279-*.mjs`.
+
+## t2281 — BACKLOG #24, BUILT: a stray block no longer emits. Excluded from the model entirely, greyed +
+warned directly on the canvas. Design question answered with evidence before building, as the dispatch asked.
+
+### Consolidation first: `_isLooseTop` → `isLooseAtomType`, one shared module
+
+New leaf `web/blocks/programShape.js` (zero-import beyond `wizards/ops/index.js`'s `BLOCKS`, following
+`gcodeSyntaxGuards.js`'s own precedent for a small shared predicate two peer files both need — `opSession.js`
+already imports `programModel.js`, so neither could hold the shared copy without one importing the other).
+Both former identical copies (`programModel.js:237`, `opSession.js:609`) now import
+`isLooseAtomType` from here; the name change reflects what it actually checks (a block's TYPE — atom vs op
+container vs framing), leaving room for the NEW, genuinely different CONNECTIVITY question below to have its
+own name. Verified: `grep -rn "_isLooseTop" web/` shows zero remaining code references (comments only, telling
+the consolidation's own history).
+
+### The design question, answered before building — the dispatch's own gate
+
+**The naive rule is wrong, confirmed, not just suspected**: `wizards/ops/program.js`'s own words say a
+SNIPPET (probe/WCS/comms) is simply a stack without progstart/progend — a legitimate program shape built
+entirely from "loose" (non-op) atoms. So "any top-level non-op entry is a stray" would misfire on every
+snippet ever built, and — worse — a stray dropped ADJACENT to a real snippet's own atoms would be
+INDISTINGUISHABLE from it by type or by array adjacency (both are `isLooseAtomType`, both sit next to each
+other in the flattened stack). Confirmed this failure mode directly before designing around it
+(`scratchpad/t2281-*.mjs`).
+
+**Established, not assumed, what the actual signal is: CONNECTIVITY, not type, not raw canvas position.**
+- A well-formed loaded program — op-based OR snippet — is ALWAYS ONE connected top-level chain. Verified for
+  BOTH shapes: loading 3 snippet atoms produces `getTopBlocks(true).length === 1`, with `s2`/`s3` reachable
+  from `s1` via `getNextBlock()` (`stackToWorkspace`'s own loader links consecutive stack entries; separately,
+  `groupConsecutiveOps` already wraps 2+ top-level ops into one `multi_step` on import — the same "one chain"
+  invariant, established machinery, not something this turn added).
+- A block dragged from the toolbox and left unconnected is, by construction, its OWN separate top-level
+  chain — confirmed against BOTH a real op-based program and a real 3-atom snippet: `getTopBlocks(true)` goes
+  from 1 to 2 the instant a genuine `Blockly.Events.BlockCreate` fires for an unconnected block, and the new
+  entry's own next/previous chain never touches the original's.
+- So: partition `getTopBlocks(true)` into top-level chains; the PRIMARY one is whichever contains
+  progstart/progend (an op-based or framed-snippet program declares itself unambiguously), or — failing that
+  (a bare snippet) — the LARGEST by `getDescendants(false).length` (total block count, not top-level chain
+  length: a real op and a lone stray atom both have chain-length 1 at the top level, which would tie; a real
+  drill op carries dozens of descendant atoms, a freshly-dragged stray carries only itself — measured live:
+  32 vs 1). Everything in every OTHER chain is stray.
+- Reporter blocks (e.g. an orphaned `variable` reporter, the same accidental-drag shape as everything else
+  here) are excluded from this comparison entirely — added after considering the edge case: a lone reporter
+  tying or winning "largest" against a genuinely tiny real program would wrongly stray-mark the real content.
+  Mirrors `workspaceToStack`'s own pre-existing reporter filter, applied one step earlier.
+
+This is `findStrayTopBlockIds(ws)` in the new `programShape.js`, fully documented with the evidence inline
+(not just in this log) so the next reader finds the reasoning at the code.
+
+### The fix, built to the dispatch's own exact shape
+
+**Excluded from the emit, never commented in** (unlike `disabled` — a deliberately different mechanism for a
+deliberately different meaning, per the dispatch's own instruction not to conflate an accident with authored
+intent): `stackBridge.js`'s `workspaceToStack()` filters stray top-level blocks out BEFORE flattening, so
+every downstream consumer — `emitMapped`, `saveStates`' undo history, the projected code panel,
+`ddcsGetBlockProgram()` — agrees a stray was never part of the program, consistently, not just at emit time.
+
+**Shown on the canvas as inert**: new `applyStrayMarking(ws)` in `blocksApp.js` greys every block in a stray
+chain (`setDisabledReason(true, 'stray')` — its own reason string, distinct from both `post-gating` and
+`MANUALLY_DISABLED`, so nothing that reads disabled-reasons can misread an accident as either a capability
+limit or the human's own choice) and sets an explanatory warning
+(`"Not connected to your program — this won't run. Connect it, or delete it."`). Called from BOTH
+`renderFromModel`'s existing `applyOpGating` (model→canvas rebuilds) AND — new — `reproject()` (every real
+canvas edit), because a stray is created by a DIRECT canvas drag, which never goes through the model-push
+path `applyOpGating` alone was reachable from.
+
+**A real bug caught before it shipped**: this Blockly build has no `getWarningText()` (confirmed:
+`scratchpad/t2281-debug-warning-api.mjs` — `setWarningText` exists, the getter doesn't), so an initial
+"only clear the warning if the current text is still mine" safety check silently could never fire (it always
+read back `null`, meaning a stray's warning could be SET but never CLEARED once reconnected). Caught by
+testing the reconnect path specifically, not by inspection — fixed by tracking ownership via
+`hasDisabledReason('stray')` (confirmed readable) instead of the nonexistent getter.
+
+### Verified end to end (`scratchpad/t2281-full-verify.mjs`, `-warning-visual-check.mjs`)
+
+1. A normal op-based program: unaffected, `progLen` unchanged, block stays enabled, no warning.
+2. A normal 3-atom snippet (no progstart/progend): unaffected, all 3 atoms present and enabled — the exact
+   case the naive rule would have broken.
+3. A stray dragged into that same snippet: excluded from `ddcsGetBlockProgram()` (2→3, not 2→4), the real
+   atoms stay enabled, the stray itself greys (`isEnabled(): false`) — confirmed VISUALLY via a real DOM check
+   (`.blocklyIconGroup.blocklyWarningIcon` present, rendered) and a screenshot: the real snippet at full
+   opacity, the stray dimmed with a warning triangle, unmistakably distinct.
+4. Reconnecting the stray to the real chain: included again (3→4), enabled again, warning cleared.
+
+### Regression sweep
+
+Touches the central `workspaceToStack()` (every consumer's own read path) plus `blocksApp.js` — full suite
+required. Targeted sweep first (Group-gesture/loose-run-adjacent specs, since the consolidated predicate
+feeds that gesture too): 19 passed, 2 skipped (pre-existing, unrelated), 0 failed. Full suite result in the
+pass-back note (started before this entry was finished).
+
+### The other survey item, filed as asked
+
+Block comments (`change/comment`, from t2279's own survey) filed as BACKLOG #26 — reachable via "Add Comment",
+but the text has no field anywhere in the record model, so it's silently discarded on any round-trip. A
+genuinely separate feature from this turn's `disabled`/`stray` work, not folded in.
+
+### Files changed
+
+`web/blocks/programShape.js` (NEW — `isLooseAtomType`, `findStrayTopBlockIds`), `web/blocks/programModel.js`
++ `web/blocks/opSession.js` (import the consolidated predicate, local copies removed),
+`web/blocks/blockly/stackBridge.js` (`workspaceToStack` excludes strays), `web/blocks/blocksApp.js`
+(`applyStrayMarking`, wired into both `applyOpGating` and `reproject`). `BACKLOG.md` (#26). `index.html`
+untouched.

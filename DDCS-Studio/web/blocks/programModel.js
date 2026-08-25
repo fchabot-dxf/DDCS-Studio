@@ -17,6 +17,7 @@ import { makeXform, makeEntry, makeFlip } from './programFraming.js';   // t812 
 import { defVOf, defVStale, USER_OP_PREFIX } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup); t1079 — defVStale is the ONE staleness rule, shared with the CAM sub-stack boundary; t1972 — the ONE declared "is this a real user op" prefix, already enforced by validateUserOp
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { isLooseAtomType } from './programShape.js';   // t2281 — consolidated from a local `_isLooseTop` duplicate (opSession.js carried the identical copy)
 
 let stack = [];
 let proj = { text: '', lines: [], map: [] };   // cached emitMapped of the stack
@@ -93,7 +94,7 @@ function findOpInStack(blocks, anc, insideUserRoot = false) {
 // t1846 — the DECLARED program-framing types: flat, childless, top-level siblings of a real op that own no op
 // of their own on purpose (programFraming.js's own makeStart/makeEnd/makeXform/makeEntry/makeFlip; endprogram is
 // the SAME role's own name on the raw-decode path, gcodeToStack.js:166). None of these carry an `id` — they are
-// singleton PROGRAM declarations, not independently addressable ops (mirrors `_isLooseTop`'s own existing
+// singleton PROGRAM declarations, not independently addressable ops (mirrors `isLooseAtomType`'s own existing
 // exclusion list a few lines above, widened here to the full declared set). A line belonging to one of these is
 // CORRECTLY unowned by any op — that is the right answer, not a symptom of anything.
 const PROGRAM_FRAMING_TYPES = new Set(['progstart', 'progend', 'endprogram', 'xform', 'entry', 'flip']);
@@ -234,7 +235,6 @@ export function insertOpAfterId(program, id, newOp) {
 // A hand-built atom has no op wrapper, so opAtLine returns null. For the right-click "Group" gesture we instead
 // resolve the CONTIGUOUS run of loose top-level atoms the clicked line belongs to (bounded by a real op / framing),
 // each run grouping independently. proj.map[i] = ancestry [outer…inner]; map[i][0] = the top-level block id.
-const _isLooseTop = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
 /** The loose run (array of top-level block ids) owning projected line `i`, or null when the line is over a real op,
  *  program framing, or nothing. Only valid while the editor matches the live projection (the caller gates that). */
 export function looseRunAtLine(i) {
@@ -242,10 +242,10 @@ export function looseRunAtLine(i) {
     const topId = anc && anc.length ? anc[0] : null;
     if (!topId) return null;
     const idx = stack.findIndex((b) => b && b.id === topId);
-    if (idx < 0 || !_isLooseTop(stack[idx])) return null;            // over a real op / framing → not a loose run
+    if (idx < 0 || !isLooseAtomType(stack[idx])) return null;         // over a real op / framing → not a loose run
     let s = idx, e = idx;
-    while (s > 0 && _isLooseTop(stack[s - 1])) s--;
-    while (e < stack.length - 1 && _isLooseTop(stack[e + 1])) e++;
+    while (s > 0 && isLooseAtomType(stack[s - 1])) s--;
+    while (e < stack.length - 1 && isLooseAtomType(stack[e + 1])) e++;
     return stack.slice(s, e + 1).map((b) => b.id);
 }
 

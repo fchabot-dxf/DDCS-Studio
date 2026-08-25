@@ -31,6 +31,7 @@ import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve meth
 import { methodRampForCycle } from '../wizards/drillWizard.js';   // t1387 — the DECLARED inverse of cycleForMethod: the merged hole block has no leaf TYPE to read method/ramp off
 import { pocketWallOffsetFromInset } from '../wizards/ops/pocketfill.js';   // t1406 — the DECLARED inverse of pocketInsetMm: the re-pointed fill carries `inset`, not `wallOffset`
 import { slotFromRasterParams } from '../wizards/ops/slot.js';   // t1500 — the DECLARED inverse of slotRasterParams: the re-pointed slot carries an atom, not a `slot` leaf
+import { isLooseAtomType } from './programShape.js';   // t2281 — consolidated from a local `_isLooseTop` duplicate (programModel.js carried the identical copy)
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
 // (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
 const find = (prog, type) => {
@@ -606,8 +607,6 @@ export function duplicateOp(opId) {
     return true;
 }
 
-const _isLooseTop = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.type !== 'progend';
-
 /**
  * #headline — wrap a CONTIGUOUS run of LOOSE top-level atoms (a hand-built run with no op wrapper) into ONE editable
  * `group` op, so the editor's line→op map finds it (`findOpInStack` matches `type==='op'`) → the hover ✎ chip appears
@@ -622,7 +621,7 @@ const _isLooseTop = (b) => b && b.type !== 'op' && b.type !== 'progstart' && b.t
 export function groupLooseAtoms(label, ids) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     const idSet = Array.isArray(ids) && ids.length ? new Set(ids) : null;
-    const inRun = (b) => _isLooseTop(b) && (!idSet || idSet.has(b.id));
+    const inRun = (b) => isLooseAtomType(b) && (!idSet || idSet.has(b.id));
     const loose = cur.filter(inRun);
     if (!loose.length) return null;
     // SPAN the program's ADJACENT framing into the group (parity with built-in ops, whose stacks include

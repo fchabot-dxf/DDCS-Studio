@@ -18,6 +18,7 @@ import { setStack, getStack, getProjection, onChange, getGen, flattenOps } from 
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
+import { findStrayTopBlockIds } from './programShape.js';   // t2281 — a block dragged from the toolbox and left disconnected: greyed here, excluded from the model in stackBridge.js's own workspaceToStack
 import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
@@ -61,7 +62,35 @@ function syncSimSocket(b) {
     try { sim.setVisible(has); const lbl = b.getInput('SIM_LBL'); if (lbl) lbl.setVisible(has); if (b.rendered && b.render) b.render(); } catch (_) { /* older Blockly */ }
 }
 
+/** t2281 — grey every block in a STRAY top-level chain (dragged from the toolbox, left disconnected — see
+ *  programShape.js's own doc for how "stray" is decided) directly on the canvas, with a warning explaining
+ *  why. Own reason string ('stray'), distinct from both `post-gating` and Blockly's `MANUALLY_DISABLED`, so a
+ *  stray is never misread as either a post limitation or the human's own deliberate choice by anything that
+ *  reads disabled-reasons. Called on EVERY real edit (reproject) as well as every model→canvas rebuild
+ *  (renderFromModel) — a stray can appear from a direct canvas drag, which never goes through the model. */
+const STRAY_WARNING = "Not connected to your program — this won't run. Connect it, or delete it.";
+function applyStrayMarking(ws) {
+    // t2281 — called standalone from reproject() (every real canvas edit), NOT only wrapped inside applyOpGating
+    // (which only runs on a model→canvas rebuild) — so it must never blindly clear a warning it doesn't own.
+    // A block's warningText is a single slot shared with cap-gating's own message; only touch OUR OWN text.
+    // ⚠ This Blockly build has no getWarningText() to read the CURRENT text back (confirmed:
+    // scratchpad/t2281-debug-warning-api.mjs — setWarningText exists, getWarningText does not) — so "did I set
+    // this warning" is tracked via the 'stray' disabled-reason instead (read BEFORE this pass overwrites it),
+    // which IS reliably readable (hasDisabledReason). Never touches cap-gating's own message either way.
+    const strayIds = findStrayTopBlockIds(ws);
+    for (const b of ws.getAllBlocks(false)) {
+        const isStray = strayIds.has(b.id);
+        const wasStray = !!(b.hasDisabledReason && b.hasDisabledReason('stray'));
+        try { b.setDisabledReason(isStray, 'stray'); } catch (_) { /* older Blockly */ }
+        try {
+            if (isStray) b.setWarningText(STRAY_WARNING);
+            else if (wasStray) b.setWarningText(null);   // only clear if WE set it last pass
+        } catch (_) { /* */ }
+    }
+}
+
 function applyOpGating(ws) {
+    applyStrayMarking(ws);
     const post = resolveActivePost(getActiveProfile().id), caps = getCaps(post.id);
     const dl = { id: post.id, name: post.name, caps };   // dialect-shaped for an atom's gate() predicate
     const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
@@ -821,6 +850,7 @@ async function buildWorkspace() {
   function reproject() {
     const t0 = performance.now();
     setStack(workspaceToStack(ws), 'blockly');             // model + emit + editor text — SYNC (glow / form writeback read it); a REAL edit (t1161 — the render's own echo is disabled)
+    applyStrayMarking(ws);                                 // t2281 — a stray can appear from a direct canvas drag, which never goes through renderFromModel's own applyOpGating
     renderViewsPrompt(getProjection());                    // code panel + selection + live form — SYNC (the edit reflects now)
     _modelMs = performance.now() - t0; _lastEditAt = performance.now();
     schedulePreview();                                     // the heavy 2D/3D preview — DEFERRED to ~RECOMPUTE_MS of quiescence

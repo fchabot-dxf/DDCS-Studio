@@ -9,6 +9,7 @@ import { BLOCKS } from '../../wizards/ops/index.js';
 import { FN, fieldKind, fieldsOf, mouthOf, getBlockly, OP_BLOCKS } from './bridge.js';
 import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
 import { regroupOps } from '../programModel.js';   // t1948 — collapse-on-delete: the SAME flatten-then-regroup pipeline addOperation grows a program with
+import { findStrayTopBlockIds } from '../programShape.js';   // t2281 — a block dragged from the toolbox and left unconnected is its own separate top-level chain; exclude it from the program entirely (see the function's own doc for how "the primary chain" is chosen)
 
 const HAS_CUSTOM_OP = {};
 OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
@@ -223,7 +224,17 @@ function chain(block) {
  *  (`groupConsecutiveOps`, inside `regroupOps`) — this gate decides only whether to invoke it, not a second
  *  wrapping rule. */
 export function workspaceToStack(ws) {
-    const tops = ws.getTopBlocks(true).filter((b) => { const d = BLOCKS[b.type]; return !d || d.kind !== 'reporter'; });
+    // t2281 — a block dragged from the toolbox and left disconnected is its own separate top-level chain, not
+    // part of the program: excluded HERE (not commented into the emit — see applyLineSuppression's own doc for
+    // why that would misrepresent an accident as authored intent) so every consumer (emit, saveStates' undo
+    // history, the projected code panel) agrees it was never part of the program in the first place. The live
+    // Blockly canvas still shows it (blocksApp.js's own gating pass greys it, separately, directly on the
+    // workspace — this function only decides what REACHES the model).
+    const strayIds = findStrayTopBlockIds(ws);
+    const tops = ws.getTopBlocks(true).filter((b) => {
+        if (strayIds.has(b.id)) return false;
+        const d = BLOCKS[b.type]; return !d || d.kind !== 'reporter';
+    });
     const items = tops.flatMap((t) => chain(t));
     const hasWrapper = items.some((b) => b && b.type === 'op' && b.opType === 'multi_step');
     return hasWrapper ? regroupOps(items) : items;

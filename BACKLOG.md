@@ -1969,3 +1969,33 @@ person with no backup at all.
 
 ⇒ Cheapest honest fix is probably the TOOLTIP, which can differ without touching the visual language. A second
 dot state is a bigger design question and would need a ruling.
+
+### 26. A BLOCK'S OWN COMMENT (`setCommentText` / "Add Comment") IS SILENTLY DISCARDED ON ANY ROUND-TRIP
+
+*(found t2279, the Blockly event survey; filed t2281 per the dispatch's own instruction. NOT the same feature
+as t2277's `disabled` — this is `change/comment`, a genuinely separate gap the survey turned up alongside it.)*
+
+**STILL REAL IF:** right-click any block → "Add Comment" → type a note → do ANYTHING that reprojects the
+workspace from the model (edit a param elsewhere, undo, save+reload) → the comment is gone. **Comment text
+missing after any of those = STILL REAL.**
+
+**Confirmed reachable, confirmed not covered.** "Add Comment" is a standard entry on every block's own
+right-click context menu (this app never removes it) and `setCommentText`/`getCommentText` both work
+correctly on the live canvas — but `workspaceToStack()`'s record shape (`blocks/blockly/stackBridge.js`) has
+no `comment` field anywhere, in either `toRecord()` (op branch or the generic atom branch). The text simply
+never makes it into the model at all, so `recToJson()` has nothing to write back on reload — a real block
+comment is USER CONTENT lost with no warning, not merely un-undo-able.
+
+⚠ **Distinct from the six `WorkspaceComment` events (`comment_create`/`delete`/`change`/`move`/`resize`/
+`collapse`)** — those are a DIFFERENT Blockly feature (free-floating sticky notes on the canvas, unattached
+to any block) and are genuinely NOT REACHABLE in this app: no UI path creates one, and `Blockly.WorkspaceComment`
+isn't even defined on this build's namespace. This entry is about the block-attached comment bubble only.
+
+⇒ **The fix shape, if picked up:** add `comment` to `KNOWN_LEAF_RECORD_FIELDS` (native Blockly property, same
+family as `collapsed`/`disabled`, not a `.data` field), read it in `toRecord()` via `b.getCommentText()`,
+write it back in `recToJson()` via `node.icons = { comment: { text, pinned, height, width } }` (Blockly 11's
+own serialization shape for a block comment — VERIFY the exact shape empirically before writing to it, the
+same discipline t2277 and t2281 both used for `disabledReasons`; do not assume from the API name alone).
+⚠ Whether this should ALSO ride the `( @DDCS:1 {…} )` marker (so a comment survives a `.nc` export/reimport,
+not just an in-app reload) is a separate question from whether it survives the Blockly canvas round-trip —
+answer the cheaper one first and report whether the marker question is worth its own turn.
