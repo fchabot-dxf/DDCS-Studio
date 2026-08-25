@@ -602,3 +602,33 @@ exist today, which is why t2263 found this by a Blockly exception in unrelated t
 unused in the same commit that introduced `renderUiTree`. It was found and read before the new one was
 designed — the shapes differ, and the new one is informed by an actual survey of what the 15 shells vary by
 (label, and a compliance tag with four distinct values, both now declared fields rather than assumptions).
+
+
+### ⚠ REFRAME t2265 — the TREE render path is dormant app-wide, and that is mostly fine
+
+Following the vocabulary finding above, one more measurement changes what the arc's remaining cost actually is.
+
+**OBSERVED:** `hasTreeLayout` demands a real `split_horizontal` / `split_vertical` node, and **ZERO of the 32
+twins declare one** (verified by grep, independently). So the tree-rendered live *form* preview is **dormant
+for the whole app**, not for ATC specifically. The only live consumer of `uiChildren`'s full structure today is
+the **Blocks-tab canvas**.
+
+⭐ **And that is mostly correct rather than a gap.** A pre-existing `blocksApp.js` comment records this as
+already verified: the FLAT path is complete for anything without a genuine split need, with zero exceptions
+across Corner, WCS, ATC-Length and Surfacing. The flat path still renders the form **from the declared
+bindings** — label, help, section, type, default, gate. It simply does not consult `uiChildren`'s *structure*,
+which only matters when a wizard genuinely needs a split layout. **None do.**
+
+⚠ **This also corrects t2263's own closing finding, honestly:** ATC Check's live code preview was never
+missing. The flat-path shell (`#wiz_user`) carries its own hardcoded `preview-block` independent of
+`uiChildren`. The `code_preview` node type was still worth declaring — the DECLARATION was genuinely
+incomplete without it — but it was not fixing a user-visible absence, and saying otherwise would overstate it.
+
+⇒ **Ruled: ATC Check should NOT be made to satisfy `hasTreeLayout`.** It has no split-layout need and forcing
+one to reach a code path would be artificial — satisfying a gate rather than answering the question the gate
+asks.
+
+⭐ **So the open question for the arc is now narrower and sharper than "render from the declaration":**
+what does a hand-written shell still provide that the declaration cannot? Known so far: the `preview-block`
+and the `.wiz-box` chrome around it. That list — not the render path — is what remains between 32 twins and
+retiring 15 hand-written shells.
