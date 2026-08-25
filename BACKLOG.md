@@ -1792,3 +1792,30 @@ sites — verify none regress before shipping.
 
 **STILL REAL IF:** `grep -n "document.querySelector\|document.getElementById" DDCS-Studio/web/ui/pathAnchorField.js`
 → any hit means unscoped lookups are still there.
+
+---
+
+### 22. THREE SITES INTERPOLATE TEXT STRAIGHT INTO G-CODE PARENTHESES
+
+*(found t2274 while designing something else, which was then withdrawn. Latent, not burning. Filed rather than
+fixed, because it is unrelated to the thread that surfaced it.)*
+
+**STILL REAL IF:** search the JS for a backtick-paren-dollar-brace opening sequence under `wizards/`,
+`blocks/` and `ui/` — **any hits mean STILL REAL.** Three at the time of writing:
+`wizards/atcInterpreter.js:120`, `wizards/dialects/grbl.js:52` (`hmiToast`), `ui/editorManager.js`.
+
+A G-code comment is delimited by `( … )`, so **text containing a `)` closes the comment early and everything
+after it becomes G-code.** These three build a comment by interpolating a string straight between parens with
+no stripping.
+
+⭐ **`wizards/ops/comment.js` already solves this** for the comment block — it strips `(` and `)` from the text
+before emitting, with its own comment saying why. **The three sites simply do not use that treatment.** So this
+is not a design question; it is the same answer applied in one place and not three.
+
+⚠ **These are APP-GENERATED strings, not the user's own words** — an HMI toast message, an ATC config header.
+That distinction matters: for text the app itself produces, the app should simply be incapable of emitting a
+malformed line. There is no user to warn and nothing to ask.
+
+⚠ **Not yet a live bug** — it needs a `)` to reach one of those interpolations, and today's sources probably
+never contain one. Which is exactly why it is worth filing rather than trusting: nothing enforces that, and the
+failure mode is silent until a controller chokes on a line that was never meant to be G-code.
