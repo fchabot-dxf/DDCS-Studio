@@ -1,10 +1,44 @@
-# HANDOFF → FAIRY (the bridge/gateway seat)
+# HANDOFF → FAIRY (the CNC Fairy Toughbook — the gateway machine)
 
-**Written 2026-08-25 by the Studio-side advisor.** Everything below is bridge-side work that came out of a
-live diagnosis on the owner's own two devices. **Nothing here is built.** The design is fully ruled — five open
-questions were put to the owner and all five are answered — so this is a build handoff, not a design one.
+**Fairy IS the bridge gateway.** It is the Toughbook wired to the DDCS controller and running
+`fairy_gateway.py`. That single fact decides what belongs in this handoff: **it is the only seat where the real
+hardware exists**, so anything needing a live controller happens there and nowhere else.
 
-⚠ **Read [`TRANSPORT.md`](TRANSPORT.md) first.** It is the spec. This file is the orientation around it.
+**Written 2026-08-25 by the Studio-side advisor.** The transport work below is gateway-side, fully ruled, and
+**not built** — five open questions went to the owner and all five came back answered. This is a build handoff.
+
+⚠ **Read [`TRANSPORT.md`](TRANSPORT.md) for the spec.** This file is the orientation around it.
+
+---
+
+## 0. BEFORE ANYTHING — the machine-switch mechanics
+
+⛔ **THE LOOP STATE DOES NOT TRAVEL.** `.handoff/` and its epoch are per-machine. A session on Fairy starts a
+**fresh** handoff loop; it does not inherit the turn counter from the Studio-side machine. Do not try to
+reconcile the two — they are separate loops that happen to share a repo.
+
+**What DOES travel is the branch**, and it is current as of this writing: everything is pushed to
+`wizards-as-data-blocks` and to `main`, working tree clean. `git pull` and you have all of it.
+
+⛔⛔ **AND THE SAFETY RULE THAT OUTRANKS EVERY TASK BELOW: this machine is connected to a real CNC.** No write
+operations to the controller when the owner is not physically present. Reading state, reading the disk,
+inspecting config — all fine. Anything that could move an axis or alter what a running job does is gated on a
+person standing there. **A test that passes on a bench is not the same as a test that passes on a machine with
+a tool in the spindle.**
+
+---
+
+## 0b. WHAT ONLY THIS SEAT CAN DO
+
+The Studio-side machine has no controller, so these have been deferred here rather than guessed at:
+
+- **The whole transport verification** (§7) — a second device sending to a real gateway is the entire point,
+  and the original failure was invisible to every test in the suite.
+- **Anything reading the real controller** — the DDCS ground-truth rule is to verify against the machine and
+  the factory dumps, not against wizard code that encodes assumptions.
+- **Whether a comment character is actually safe in a `.nc`** — a Studio-side backlog item asked for the
+  replacement-character list to be derived from real dumps rather than reasoning. That derivation belongs here.
+- **The gateway's own config** — `backend`, the Drive connection, `local_root` — all live on this machine.
 
 ---
 
