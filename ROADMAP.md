@@ -632,3 +632,39 @@ asks.
 what does a hand-written shell still provide that the declaration cannot? Known so far: the `preview-block`
 and the `.wiz-box` chrome around it. That list — not the render path — is what remains between 32 twins and
 retiring 15 hand-written shells.
+
+
+### THE ARC'S COST, MEASURED — t2267 (survey of all 15 hardcoded shells)
+
+**The question:** what does a hand-written wizard shell still provide that the declaration cannot? This is the
+last thing standing between 32 twins and retiring 15 shells. Answered by reading all 15 in full, not sampling.
+
+**⭐ THE ANSWER IS SHORT — and it is for ALL 32 twins, not per twin.**
+
+**(a) ALREADY EXPRESSIBLE — the node exists and nobody used it**
+- **The settings button.** `form_action_btn` matches ATC's own exactly (`action: 'atcSetup'`). Nothing to build.
+- ⭐⭐ **Sibling-value conditional sub-panels** — the pattern-type switches in drill / pocket / contour / slot,
+  and comm's type cascade. This looked like the single biggest gap in the survey. `whenGuard.js` was checked
+  FIRST and already does it: `guard`/`whenOk` evaluates against resolved params **and already recurses into
+  `uiChildren`**. ⇒ **The largest correction in the survey cut the largest apparent gap to zero.**
+
+**(b) NEEDS A NEW NODE TYPE — two, and both small**
+- **Static top-of-form usage text.** 13 of 15 shells carry one and **no node declares free text at all.**
+  ⚠ And it exists under two unreconciled class names — `.wiz-usage` versus ATC's own `.settings-hint`.
+- **The Path Anchor picker.** 6 of 15 (the mill ops). No `wizards/ops/` file for it either, so it needs
+  **both halves** — see the dual-vocabulary finding above.
+
+**(c) NOT DECLARABLE TODAY — two genuinely hard ones**
+- **The comm-screen mockup.** Not a 3D or 2D toolpath view; no existing node's shape is close.
+- **Computed / dynamic text.** Comm's type-dependent usage paragraph, WCS's runtime-set compliant tag, comm's
+  dynamic hints. **Every text param today is a static string.** This is a capability gap, not a missing node.
+
+**⚠ AND THE 15 SHELLS ARE NOT CONSISTENT WITH EACH OTHER** — which is a finding in its own right, because a
+declaration would have to reproduce whichever behaviour is *correct*, and nobody has said which:
+- comm and wcs abandon the shared `.wiz-2pane` structure entirely
+- ATC's hint class differs from the other nine
+- the compliant tag has **four** distinct forms
+
+⇒ **This is the same uncoordinated per-shell drift that let the ATC resize bug sit unnoticed** (six ATC bodies
+missing the `.viz-split` wrapper every other built-in had). The shells drift because each is written by hand.
+That is the arc's own argument, restated as measurement rather than principle.
