@@ -409,7 +409,7 @@ pane they would have backed) — see WORK-LOG t1734.
 | the data twins | `SEED_BUILDERS`, `web/app.js:100-107` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:98-99`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
 | the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:34-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
 | which block kinds hold children | **`def.mouth`** on each def — see INVARIANT #1 (the one-line reader's file:line lives there, machine-checked) | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
-| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:39`, t2277 shifted from 36 by +3 — `disabled` joined the set) | — |
+| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:46`, t2289 shifted from 39 by +7 — `comment` joined the set) | — |
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:917` (t1996 shifted this from 893 — see INV6); exported as `hookKeysOf` `:924` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
 | per-atom scratch vars | `def.scratch` on each atom; aggregated by `data/universalScratch.js` | — |
@@ -426,14 +426,14 @@ pane they would have backed) — see WORK-LOG t1734.
 ## INVARIANTS — the rule, its guard, and what breaking it looks like
 
 **1 · A record that carries children declares a `mouth`.**
-Guard: `blocks/blockly/stackBridge.js:373` (t2277 — shifted from 350 by +23, the `isManuallyDisabled` helper added above it; t1950 before that — shifted from 326 by +24, the workspaceToStack terminator/wrapper-gate correction's own doc comment) throws by name. Reader: `blocks/blockly/bridge.js:78`.
+Guard: `blocks/blockly/stackBridge.js:393` (t2289 — shifted from 373 by +20, the `comment` doc block + capture/write-back lines added above it; t2277 before that — shifted from 350 by +23, the `isManuallyDisabled` helper added above it; t1950 before that — shifted from 326 by +24, the workspaceToStack terminator/wrapper-gate correction's own doc comment) throws by name. Reader: `blocks/blockly/bridge.js:78`.
 Break it → the children are **silently discarded** on a Blockly round-trip. This replaced four hand-maintained
 kind lists after the *fifth* silent loss (t1069/t1093/t1595/t1627/t1636). A **fifth, still-live** kind list at
 `blocks/blockEmitter.js:40` was surveyed, measured non-lossy, and deliberately left — unifying it is re-litigating
 a decided call.
 
 **2 · A leaf record's top-level fields are declared or the write throws.**
-Guard: `stackBridge.js:320` (t2277 — shifted from 297 by +23, same cause as INV1 above; t1950 before that — shifted from 273 by +24, same cause). Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
+Guard: `stackBridge.js:340` (t2289 — shifted from 320 by +20, same cause as INV1 above; t2277 before that — shifted from 297 by +23, same cause; t1950 before that — shifted from 273 by +24, same cause). Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
 relative plunge silently becomes absolute. Note the resolution shape: `_group` is **tolerated, not persisted** —
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
