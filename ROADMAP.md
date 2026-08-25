@@ -706,7 +706,7 @@ believe.
 
 ### CONVENTION — the memory store is a WRITE-AHEAD LOG, not the system of record
 
-**Worked out with the owner, 2026-08-25**, on discovering that the Studio seat holds **165 project memories**,
+**Worked out with the owner, 2026-08-25**, on discovering that the RENDERRANCHY seat holds **165 project memories**,
 **none** of them in the repo — and that the gateway seat (Fairy) has its own set that has never been compared.
 
 **The problem is not that the two stores are unsynchronised. It is that project knowledge lives in a
@@ -779,7 +779,7 @@ perfectly true memory with a bad description behaves exactly like no memory at a
 session: `CNC-FAIRY` was correctly recorded as the gateway machine with the word "fairy" absent from its
 description, so it was never recalled and a handoff request was misread outright.
 
-⭐ **And it explains the cross-seat result**: Fairy's SEVEN memories outperformed the Studio side's 165 on
+⭐ **And it explains the cross-seat result**: Fairy's SEVEN memories outperformed RENDERRANCHY's 165 on
 the facts that mattered. Few, dense, and each one well described. **A small index with a high hit rate beats a
 large one with poor addressing.**
 

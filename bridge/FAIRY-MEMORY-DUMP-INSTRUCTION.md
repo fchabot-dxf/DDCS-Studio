@@ -1,6 +1,6 @@
 # INSTRUCTION → FAIRY: dump your memory store for cross-seat analysis
 
-**Why this exists.** Both seats have accumulated project memories independently. The Studio side has **165**
+**Why this exists.** Both seats have accumulated project memories independently. RENDERRANCHY has **165**
 files. Fairy has its own set, and the two have never been compared. They will overlap, and — the reason this
 matters — **they may CONTRADICT each other.**
 
@@ -31,7 +31,7 @@ description: <the description line, VERBATIM>
 
 ⚠ **Include the `description` verbatim, not a summary.** Descriptions are what recall matches against, so a
 fact that exists but is described badly behaves exactly like a fact that is missing. That failure happened on
-the Studio side today: `CNC-FAIRY` was correctly recorded as the gateway machine, and the word "fairy" appeared
+RENDERRANCHY today: `CNC-FAIRY` was correctly recorded as the gateway machine, and the word "fairy" appeared
 nowhere in its description — so when the owner said "handoff to fairy" it was not recalled, and the whole thing
 was misread as a handoff to a code seat. **The description is not decoration; it is the index.**
 
@@ -61,13 +61,13 @@ Written down so you can flag anything you already suspect while dumping:
 
 1. ⭐⭐ **CONTRADICTIONS** — the same fact, two different answers. The highest-value output by a distance, and
    the only category that is actively dangerous today.
-2. **UNIQUE TO FAIRY** — facts the Studio side does not have. Expect the hardware knowledge to live here:
+2. **UNIQUE TO FAIRY** — facts RENDERRANCHY does not have. Expect the hardware knowledge to live here:
    what the real controller accepts, what the dumps say, what the gateway actually does in the shop. That
    knowledge cannot be produced on a machine with no controller attached, so it is likely the most valuable
    thing in your store.
-3. **UNIQUE TO STUDIO** — the reverse, for the return trip.
+3. **UNIQUE TO RENDERRANCHY** — the reverse, for the return trip.
 4. **OVERLAP** — the same fact in both. Candidates to move into the repo once, so neither seat owns it.
-5. **STALE** — anything contradicted by the code as it stands now. On the Studio side, 8 of 18 backlog entries
+5. **STALE** — anything contradicted by the code as it stands now. On RENDERRANCHY, 8 of 18 backlog entries
    were stale in a single evening; there is no reason to assume memories rot more slowly.
 
 ⭐ **The intended outcome** is a split, not a merge: **project facts** (conventions, architecture rulings,
@@ -79,7 +79,7 @@ the project.
 
 ## ⚠ ONE THING NOT TO ASSUME
 
-Do not assume the Studio side's version wins on any given disagreement. It has more memories, which is not the
+Do not assume RENDERRANCHY's version wins on any given disagreement. It has more memories, which is not the
 same as better ones — and on anything the real machine can answer, **Fairy is the authority and Studio is
 guessing.** This project's own standing rule is that the dumps outrank the code; the same logic applies to the
 two memory stores.

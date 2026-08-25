@@ -1,17 +1,17 @@
-# CROSS-SEAT MEMORY ANALYSIS — Studio (165) vs Fairy (7)
+# CROSS-SEAT MEMORY ANALYSIS — RENDERRANCHY (165) vs Fairy (7)
 
 **2026-08-25.** Fairy dumped its store as instructed. The comparison is far more one-sided than the counts
 suggest, and **not in the direction the counts suggest.**
 
-⭐ **HEADLINE: three of Fairy's seven were needed on the Studio side TONIGHT and were not there.** One of them
+⭐ **HEADLINE: three of Fairy's seven were needed on RENDERRANCHY TONIGHT and were not there.** One of them
 would have prevented six exchanges of design work. Volume is not value — 165 memories accumulated over 90% of
 the dev time did not contain what 7 memories written at the machine did.
 
 ---
 
-## 1. ⛔ UNIQUE TO FAIRY — hardware truth the Studio seat cannot produce and did not have
+## 1. ⛔ UNIQUE TO FAIRY — hardware truth the RENDERRANCHY seat cannot produce and did not have
 
-These come from a machine with a controller attached. **The Studio seat has none of them.**
+These come from a machine with a controller attached. **The RENDERRANCHY seat has none of them.**
 
 | fact | why it matters |
 |---|---|
@@ -24,13 +24,13 @@ These come from a machine with a controller attached. **The Studio seat has none
 | **The tool-setter diagnosis** | The real bug was a **rapid descent through the setter before any G31 ran**, not a dead signal. It looked like a signal fault for a whole session. **Tell: drive-through at RAPID = approach bug; at PROBE speed = signal bug.** |
 
 ⭐ **This is exactly the asymmetry the handoff predicted**: *"on anything the real machine can answer, Fairy is
-the authority and Studio is guessing."* Confirmed, and stronger than expected.
+the authority and RENDERRANCHY is guessing."* Confirmed, and stronger than expected.
 
 ---
 
-## 2. ⭐⭐ THE FINDING — Fairy already knew what the Studio side spent an evening re-deriving
+## 2. ⭐⭐ THE FINDING — Fairy already knew what RENDERRANCHY spent an evening re-deriving
 
-Tonight the Studio seat designed comment-safety machinery across **four dispatched amendments**, each cut back
+Tonight the RENDERRANCHY seat designed comment-safety machinery across **four dispatched amendments**, each cut back
 by the owner, and finally withdrawn entirely. It then asked Fairy to derive a safe replacement-character list
 **from the dumps**, since the advisor had ruled himself out as a source.
 
@@ -42,7 +42,7 @@ by the owner, and finally withdrawn entirely. It then asked Fairy to derive a sa
 ⇒ The real constraint is **NESTING**, not the character set. And it was fixed in the app months ago.
 
 ⚠ **This is the two-homes defect doing exactly what was predicted of it** — not a contradiction, an *absence*.
-The Studio seat did not hold a wrong belief; it held no belief, and re-derived from scratch while the answer
+The RENDERRANCHY seat did not hold a wrong belief; it held no belief, and re-derived from scratch while the answer
 sat in another store on another machine. **Nothing detected that.** No test, no exception, no grep — precisely
 the failure mode the dump instruction was written to expose.
 
@@ -51,7 +51,7 @@ whether a *flat* comment has any character restriction at all, beyond not nestin
 
 ---
 
-## 3. ⚠ A FEEDBACK MEMORY THE STUDIO SEAT SHOULD HAVE HAD — and visibly needed tonight
+## 3. ⚠ A FEEDBACK MEMORY THE RENDERRANCHY SEAT SHOULD HAVE HAD — and visibly needed tonight
 
 Fairy's `feedback-scope-discipline`:
 
@@ -70,10 +70,10 @@ own newly-recorded rule it belongs in `ROADMAP.md`'s conventions section, where 
 
 ## 4. OVERLAP — the same facts, held twice
 
-- **`wizards-as-data-port`** (Fairy) vs the Studio side's arc docs. Fairy's notes ops have **TWO build paths
-  that must stay in sync** — the same dual-vocabulary hazard the Studio seat rediscovered at t2263 and guarded
+- **`wizards-as-data-port`** (Fairy) vs RENDERRANCHY's arc docs. Fairy's notes ops have **TWO build paths
+  that must stay in sync** — the same dual-vocabulary hazard the RENDERRANCHY seat rediscovered at t2263 and guarded
   with a pairing test. ⚠ **Held in two stores, in different words, neither pointing at the other.**
-- **`multi-pc-agent-setup`** (Fairy) vs `shop-two-pc-network` (Studio). Same topology, two records.
+- **`multi-pc-agent-setup`** (Fairy) vs `shop-two-pc-network` (RENDERRANCHY). Same topology, two records.
 
 ⇒ Both are candidates to move into the repo once and be pointed at from both stores.
 
@@ -81,7 +81,7 @@ own newly-recorded rule it belongs in `ROADMAP.md`'s conventions section, where 
 
 ## 5. NO OUTRIGHT CONTRADICTIONS FOUND
 
-Nothing in Fairy's seven directly contradicts a Studio memory. **The damage was absence, not disagreement** —
+Nothing in Fairy's seven directly contradicts a RENDERRANCHY memory. **The damage was absence, not disagreement** —
 which is worth recording, because it means the danger is not only "two seats believing different things" but
 "one seat not knowing what the other paid to learn."
 

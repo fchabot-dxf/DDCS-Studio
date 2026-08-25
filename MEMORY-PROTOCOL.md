@@ -1,10 +1,10 @@
 # MEMORY PROTOCOL — for every Claude seat on this project
 
-**Both seats read this.** Worked out with the owner 2026-08-25, after comparing the Studio store (165
+**Both seats read this.** Worked out with the owner 2026-08-25, after comparing the RENDERRANCHY store (165
 memories) against Fairy's (7) and finding that **the seven won on the facts that mattered.**
 
 ⭐ **That result is the whole design.** 165 memories accumulated over ninety percent of the dev time did not
-contain what seven written at the machine did — including a constraint the Studio seat then spent an evening
+contain what seven written at the machine did — including a constraint the RENDERRANCHY seat then spent an evening
 re-deriving, and a rule paid for by a tool broken against a table. **A small index with high hit-rate beats a
 large one with poor addressing.**
 

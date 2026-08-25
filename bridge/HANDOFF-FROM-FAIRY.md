@@ -1,4 +1,4 @@
-# HANDOFF ← FAIRY (returning work to the Studio-side seat)
+# HANDOFF ← FAIRY (returning work to the RENDERRANCHY seat)
 
 **The return channel.** `HANDOFF-TO-FAIRY.md` sends work to the gateway machine; this is how it comes back.
 
@@ -10,24 +10,24 @@ epoch are per-machine, so there is no turn marker connecting them and no notific
 
 ## 0. ⛔ GIT DISCIPLINE — two machines, one repo
 
-- **`git pull --rebase` before you commit.** The Studio side commits frequently, sometimes several times an
+- **`git pull --rebase` before you commit.** RENDERRANCHY commits frequently, sometimes several times an
   hour, and it releases from `main`.
 - ⛔ **Never force-push.** A second agent also works in this repo. A force-push over someone's work is the one
   mistake here that cannot be undone by pulling.
 - ⛔ **No `git stash`.** The stash stack is GLOBAL and shared — there are already orphaned entries on it from
   two different seats. Use `git checkout <ref> -- <paths>` or a scratch clone to compare against another
   revision.
-- **Stay in your own files.** Gateway work lives under `bridge/`. If a change genuinely needs a Studio-side
-  file (`DDCS-Studio/web/…`), say so in §2 below rather than making it — the Studio seat is usually mid-turn on
+- **Stay in your own files.** Gateway work lives under `bridge/`. If a change genuinely needs an app-side
+  file (`DDCS-Studio/web/…`), say so in §2 below rather than making it — the RENDERRANCHY seat is usually mid-turn on
   those and a surprise edit lands as a conflict in someone's release.
 
 ---
 
-## 1. ⭐ WHAT THE STUDIO SIDE IS ACTUALLY WAITING FOR
+## 1. ⭐ WHAT RENDERRANCHY IS ACTUALLY WAITING FOR
 
-**This one is BLOCKING** — a queued Studio turn cannot be built without it:
+**This one is BLOCKING** — a queued RENDERRANCHY turn cannot be built without it:
 
-> **The safe comment-character list, derived from the real dumps.** Studio is adding a setting that replaces an
+> **The safe comment-character list, derived from the real dumps.** RENDERRANCHY is adding a setting that replaces an
 > illegal character in a G-code comment, with a user-chosen replacement. The candidate list must come from
 > characters that DEMONSTRABLY appear inside comments in working factory programs — not from reasoning, and not
 > from the advisor, who explicitly ruled himself out as a source.
@@ -43,7 +43,7 @@ epoch are per-machine, so there is no turn marker connecting them and no notific
 >   and grbl ignores parenthesised comments entirely.
 
 **Also useful, not blocking:** whether the bracket-for-expressions / parens-for-comments split holds on the
-other controllers, and anything the real machine says that contradicts a Studio-side assumption. **The standing
+other controllers, and anything the real machine says that contradicts a RENDERRANCHY assumption. **The standing
 rule is that the dumps outrank the wizard code**, because code encodes what somebody believed and dumps encode
 what the machine accepted.
 
@@ -54,11 +54,11 @@ what the machine accepted.
 Keep it short. Four headings, and the third is the one that gets skipped and shouldn't be:
 
 1. **BUILT** — what shipped, with commit hashes. Anything that changes the gateway's behaviour toward a client
-   belongs here, because the Studio side renders that behaviour.
+   belongs here, because RENDERRANCHY renders that behaviour.
 2. **MEASURED** — facts established from the real hardware, with how they were established. These are worth
-   more than the builds: the Studio seat cannot produce them at all.
+   more than the builds: the RENDERRANCHY seat cannot produce them at all.
 3. ⚠ **WHAT I GOT WRONG, OR COULD NOT VERIFY** — premises that turned out false, and anything left unproven and
-   named as such. On the Studio side this section has repeatedly been the most valuable part of a hand-back;
+   named as such. On RENDERRANCHY this section has repeatedly been the most valuable part of a hand-back;
    four advisor premises were wrong in one session and every one was caught this way.
 4. **STILL OPEN** — with a runnable check where possible, so the next reader can decide it in one command
    instead of re-deriving it.
@@ -70,7 +70,7 @@ spindle.
 
 ---
 
-## 3. IF YOU CHANGED SOMETHING THE STUDIO SIDE RENDERS
+## 3. IF YOU CHANGED SOMETHING RENDERRANCHY RENDERS
 
 The client draws the gateway's state — status, transport, job list, the disk index. If any of those payloads
 change shape:

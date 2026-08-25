@@ -16,9 +16,9 @@ For DDCS G-code / macro questions, consult the installed **`ddcs-expert`** skill
 
 ---
 
-## ⭐ HANDOFF FROM THE STUDIO SEAT — 2026-08-25
+## ⭐ HANDOFF FROM THE RENDERRANCHY SEAT — 2026-08-25
 
-Three documents landed on the branch from the Studio-side machine. They do not announce themselves, so they
+FOUR documents landed on the branch from RENDERRANCHY (the desk machine). They do not announce themselves, so they
 are listed here, in the file this seat loads automatically:
 
 | file | what it is |
@@ -28,12 +28,12 @@ are listed here, in the file this seat loads automatically:
 | [`FAIRY-MEMORY-DUMP-INSTRUCTION.md`](FAIRY-MEMORY-DUMP-INSTRUCTION.md) | Dump this seat's memory store so the two can be compared. **Contradictions between the seats are the point** — nothing else detects them. |
 | [`HANDOFF-FROM-FAIRY.md`](HANDOFF-FROM-FAIRY.md) | The return channel, and the git discipline for two machines on one repo. |
 
-⚠ **One Studio turn is BLOCKED on this seat**: the safe comment-character list, derived from real dumps rather
+⚠ **One RENDERRANCHY turn is BLOCKED on this seat**: the safe comment-character list, derived from real dumps rather
 than reasoning. See `HANDOFF-FROM-FAIRY.md` §1.
 
 ⭐ **And note where cross-seat facts should end up.** This file already names the right home —
 `controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` / `[HYPOTHESIS]`. That convention is
-better than the Studio side's own memory store for anything hardware-shaped, because it lives in the repo, it
+better than RENDERRANCHY's own memory store for anything hardware-shaped, because it lives in the repo, it
 travels to every seat, and it records confidence rather than asserting flatly. **Prefer it over a memory for
 any fact about a controller.**
 
@@ -41,7 +41,7 @@ any fact about a controller.**
 ### ⭐ MEMORY PROTOCOL — read before writing a memory
 
 [`../MEMORY-PROTOCOL.md`](../MEMORY-PROTOCOL.md) is the cross-seat rule, worked out after comparing this
-seat's store against the Studio side's. **Seven memories here beat 165 there on the facts that mattered**, and
+seat's store against RENDERRANCHY's. **Seven memories here beat 165 there on the facts that mattered**, and
 the protocol is built from why.
 
 Short version: **the MEMORY is the index (a pointer + a great description), the REPO is the content.** Write

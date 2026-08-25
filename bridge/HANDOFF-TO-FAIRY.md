@@ -4,7 +4,7 @@
 `fairy_gateway.py`. That single fact decides what belongs in this handoff: **it is the only seat where the real
 hardware exists**, so anything needing a live controller happens there and nowhere else.
 
-**Written 2026-08-25 by the Studio-side advisor.** The transport work below is gateway-side, fully ruled, and
+**Written 2026-08-25 by the RENDERRANCHY-side advisor.** The transport work below is gateway-side, fully ruled, and
 **not built** — five open questions went to the owner and all five came back answered. This is a build handoff.
 
 ⚠ **Read [`TRANSPORT.md`](TRANSPORT.md) for the spec.** This file is the orientation around it.
@@ -14,7 +14,7 @@ hardware exists**, so anything needing a live controller happens there and nowhe
 ## 0. BEFORE ANYTHING — the machine-switch mechanics
 
 ⛔ **THE LOOP STATE DOES NOT TRAVEL.** `.handoff/` and its epoch are per-machine. A session on Fairy starts a
-**fresh** handoff loop; it does not inherit the turn counter from the Studio-side machine. Do not try to
+**fresh** handoff loop; it does not inherit the turn counter from the RENDERRANCHY (the desk machine). Do not try to
 reconcile the two — they are separate loops that happen to share a repo.
 
 **What DOES travel is the branch**, and it is current as of this writing: everything is pushed to
@@ -30,13 +30,13 @@ a tool in the spindle.**
 
 ## 0b. WHAT ONLY THIS SEAT CAN DO
 
-The Studio-side machine has no controller, so these have been deferred here rather than guessed at:
+The RENDERRANCHY (the desk machine) has no controller, so these have been deferred here rather than guessed at:
 
 - **The whole transport verification** (§7) — a second device sending to a real gateway is the entire point,
   and the original failure was invisible to every test in the suite.
 - **Anything reading the real controller** — the DDCS ground-truth rule is to verify against the machine and
   the factory dumps, not against wizard code that encodes assumptions.
-- **Whether a comment character is actually safe in a `.nc`** — a Studio-side backlog item asked for the
+- **Whether a comment character is actually safe in a `.nc`** — a RENDERRANCHY backlog item asked for the
   replacement-character list to be derived from real dumps rather than reasoning. That derivation belongs here.
 - **The gateway's own config** — `backend`, the Drive connection, `local_root` — all live on this machine.
 
@@ -119,7 +119,7 @@ carries a NAME, not an id — so renaming the machine would break it too. A mint
 
 ---
 
-## 6. HOW THIS SEAT SHOULD WORK — what earned its keep on the Studio side
+## 6. HOW THIS SEAT SHOULD WORK — what earned its keep on RENDERRANCHY
 
 - **Verify the premise before building on it.** Four of the advisor's own premises were wrong this session and
   the worker caught every one by checking. A dispatch is a hypothesis, not an instruction.
