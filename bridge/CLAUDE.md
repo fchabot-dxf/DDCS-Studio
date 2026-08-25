@@ -36,3 +36,15 @@ than reasoning. See `HANDOFF-FROM-FAIRY.md` §1.
 better than the Studio side's own memory store for anything hardware-shaped, because it lives in the repo, it
 travels to every seat, and it records confidence rather than asserting flatly. **Prefer it over a memory for
 any fact about a controller.**
+
+
+### ⭐ MEMORY PROTOCOL — read before writing a memory
+
+[`../MEMORY-PROTOCOL.md`](../MEMORY-PROTOCOL.md) is the cross-seat rule, worked out after comparing this
+seat's store against the Studio side's. **Seven memories here beat 165 there on the facts that mattered**, and
+the protocol is built from why.
+
+Short version: **the MEMORY is the index (a pointer + a great description), the REPO is the content.** Write
+the fact where every seat reads it — `controllers/<name>/FINDINGS.md` with a confidence tag for anything about
+a machine — and keep a pointer in memory so recall still surfaces it. ⚠ **Write the description in the words
+the OWNER says**, not the codebase's: a true memory with a bad description behaves exactly like no memory.
