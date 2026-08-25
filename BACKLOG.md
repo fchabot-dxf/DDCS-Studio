@@ -1561,7 +1561,7 @@ reasoning behind it, so the loop does not need re-deciding every turn.
 
 ---
 
-### 17. THE DIRTY DOT IS ON AT BOOT ON THE HUMAN'S PHONE - and a fresh browser cannot reproduce it
+### 17. [NOT A BUG — RESOLVED 2026-08-25] THE DIRTY DOT IS ON AT BOOT ON THE HUMAN'S PHONE - and a fresh browser cannot reproduce it
 
 *(human, 2026-08-23: "so the dot in filename is still there on open without changing anything". Reported once
 before and "fixed"; still present on ddcs-studio.pages.dev.)*
@@ -1591,6 +1591,27 @@ Two obvious theories are DEAD: it is not boot-time drift, and it is not the them
 
 **The code already knows something is wrong here:** blocks/saveStates.js:74 calls it "a separate, deeper bug
 traced but not fixed".
+
+
+#### RESOLVED 2026-08-25 — WORKING AS DESIGNED, and the reproduction attempts failed because there was nothing to reproduce
+
+Human, after checking: *"right it checks out if i save refreshing makes dot vanish."*
+
+**The dot means "your localStorage buffer differs from the last `.ddcs` you saved."** The workspace had never
+been saved to a file, so there was no last-saved state for the buffer to match — and nothing ever could. The
+dot was correct, permanently, and a refresh could not clear it because a refresh changes neither side of that
+comparison.
+
+⚠ **Four reproduction attempts failed because the app was never wrong.** Recorded because the effort was real:
+fresh-browser boot, idle drift, reload/returning-user, theme switch, a clean non-caching server, and a
+deployed-build comparison — all measured, all clean, all correct.
+
+⭐ **The lesson is about the DIAGNOSIS, not the code.** Every probe asked *"is boot dirtying something?"* — the
+wrong question. The right one, *"is there a baseline at all?"*, was answerable in one glance at the workspace
+manager, which distinguishes **"Never saved to a file"** from **"Unsaved changes"** in its own state line. Six
+measurements chased a mechanism when the first step should have been checking whether the premise held.
+
+⇒ **See BACKLOG 24 for what IS worth improving here** — the dot itself cannot express that difference.
 
 ---
 
@@ -1913,3 +1934,38 @@ dragged and left unconfigured)? Tested and found: NO immediate emitted lines, bu
 dragged op container has empty `children` until a wizard actually builds it (`opRanges`/`emit()`'s 'op'
 branch is transparent — it emits only its children). A PARTIALLY built or forked op container sitting loose
 could still emit real content; this turn only confirmed the leaf-atom case definitively.
+
+---
+
+### 24. THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
+
+*(surfaced 2026-08-25 by BACKLOG 17, which was NOT a bug — the dot was correct throughout. This is what the
+episode actually exposed.)*
+
+**STILL REAL IF:** open a workspace never saved to a file, and one saved-then-edited. **If the header dot looks
+identical in both, STILL REAL.**
+
+Two very different facts render the same:
+
+```
+NEVER SAVED         your work exists only in this browser. no file exists at all.
+SAVED, THEN CHANGED a file exists and is out of date.
+```
+
+The first is *"you have no backup"*; the second is *"your backup is stale"*. One is far more urgent than the
+other, and the dot says the same thing for both.
+
+⭐ **The app already knows the difference** — `workspaceManager.js:484-486` computes it and its state line says
+either **"Never saved to a file"** or **"Unsaved changes"**. The information exists; the header just does not
+carry it.
+
+⚠ **Evidence it matters, and it is not hypothetical:** the human read the permanent dot as a defect and
+reported it; the advisor then spent SIX measurements hunting a mechanism that did not exist. Both misread the
+same indicator the same way. An indicator that its own author and its own user both misinterpret is
+communicating badly, whatever its logic says.
+
+⛔ **Do not "fix" this by hiding the dot when unsaved** — that would be worse: it would say "no problem" to the
+person with no backup at all.
+
+⇒ Cheapest honest fix is probably the TOOLTIP, which can differ without touching the visual language. A second
+dot state is a bigger design question and would need a ruling.
