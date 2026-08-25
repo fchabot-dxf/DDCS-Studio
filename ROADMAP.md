@@ -702,3 +702,57 @@ strictly worse than either — it is a divergence dressed as a reuse.
 ⚠ **The tell that a rename is owed:** if you have to explain the name away in a comment — *"despite the name,
 this also…"* — the name has already failed. This codebase has several of those and each one cost a turn to
 believe.
+
+
+### CONVENTION — the memory store is a WRITE-AHEAD LOG, not the system of record
+
+**Worked out with the owner, 2026-08-25**, on discovering that the Studio seat holds **165 project memories**,
+**none** of them in the repo — and that the gateway seat (Fairy) has its own set that has never been compared.
+
+**The problem is not that the two stores are unsynchronised. It is that project knowledge lives in a
+per-machine store at all.** Two Claudes believing different things about the same project is the same
+two-homes defect this codebase keeps meeting — with one difference that makes it worse:
+
+⚠ **Every other divergence here was eventually caught by something** — a failing test, a Blockly exception, a
+rendered screenshot, a grep. **Memory drift is caught by nothing.** There is no compiler for a memory and no
+"it still parses" tell, and a stale one is *more* dangerous than none, because memories exist precisely to be
+trusted without re-derivation.
+
+#### The split
+
+```
+PROJECT FACTS   conventions · what the dumps say · architecture rulings · traps
+                → the REPO. then "sync" is just `git pull` — nothing to reconcile,
+                  because there is one copy.
+
+SEAT FACTS      this machine's ports and paths and quirks · how a particular
+                person likes a particular Claude to work
+                → stay local, and MUST NOT sync — they are wrong elsewhere.
+```
+
+⛔ **Neither exact-sync nor periodic-reconciliation is the answer.** Exact sync pushes wrong facts to the wrong
+machine (*"the app serves on 3461 here"* is true on one seat and false on the other). Periodic reconciliation
+needs a discipline nobody sustains — the same reason 8 of 18 backlog entries were stale in a single evening
+while a rule said they should not be.
+
+#### ⭐ The constraint that makes it workable — the owner's own point
+
+> *"claude cant help but write to its local memory"*
+
+True, and fighting a reflex loses. So do not:
+
+1. **Write it locally, immediately, as always.** The reflex is satisfied and nothing is lost in the moment.
+2. **PROMOTE project facts to the repo** — routine, not willpower.
+3. **Leave the memory as a POINTER.** ⭐ *A memory that is a pointer cannot drift, because it has no content to
+   diverge.* Same move as ROADMAP pointing at the arc doc rather than duplicating it.
+
+**The trigger is write time**, because that is when the judgement — *project fact, or seat fact?* — is easiest.
+⚠ And because judgement at write time will sometimes fail, a periodic sweep stays as the BACKSTOP rather than
+the mechanism.
+
+#### Where hardware facts already have a better home than a memory
+
+`bridge/CLAUDE.md` already names it: **`controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` /
+`[HYPOTHESIS]`.** That is strictly better than a memory for anything about a controller — it lives in the repo,
+it travels to every seat, and it **records confidence** rather than asserting flatly, which a memory cannot do.
+⇒ **Prefer it over a memory for any fact about a machine.**
