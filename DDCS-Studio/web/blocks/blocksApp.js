@@ -194,7 +194,13 @@ async function buildWorkspace() {
     // op registry, so a newly registered twin appears without an edit here or anywhere else.
     toolbox: buildToolbox([...opToolboxCategories(), ...learnerToolboxCategories()]), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
-    zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
+    // t2273 (human, from a screenshot: "these overlay i dont want") — the floating zoom-in/out/reset-view buttons
+    // AND the trashcan bin, both scattered over the canvas. wheel:true stays: that's the zoom MECHANISM (scroll +
+    // pinch), not an overlay. Deleting a block still works with the bin gone — drag-to-toolbox and the per-block
+    // "Delete Block" context-menu entry (what a touch long-press opens) are both independent of the trashcan and
+    // verified live (scratchpad/t2273-touch-delete-check.mjs): dragging a block onto the toolbox deletes it, and
+    // the long-press-equivalent context menu still carries "Delete Block".
+    zoom: { controls: false, wheel: true, startScale: 0.9 }, trashcan: false, move: { smoothScroll: true },
     // t2125 (SOUND-PLAN.md section 5b) — Blockly ships its OWN click/delete/disconnect/error-beep audio system,
     // with its own defaults (sounds:true, pathToMedia a Google CDN) unless told otherwise. sounds:false is
     // NOT enough on its own — it only gates Options.hasSounds, whose one consumer in the vendored bundle is

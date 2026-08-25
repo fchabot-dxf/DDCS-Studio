@@ -55648,3 +55648,127 @@ dropped.
 Full working room, and this turn ran long — Path Anchor's own investigation plus the unrelated regression
 chase plus the two deferred amendments add up. Flagging it plainly rather than compressing the next dispatch
 into what's left: the next turn is a clean start, not a continuation squeezed for time.
+
+## t2273 — Blockly's floating overlays removed (verified touch-delete survives). Undo/redo buttons were BUILT,
+VERIFIED, then REVERTED mid-turn once the human ruled on undo semantics and the built version turned out to
+implement exactly the wrong ones. The investigation that drove the build is real and stands; the shape of the
+actual feature is now a ruled, multi-part redesign — reported below, not rushed into what was left of this turn.
+
+### What shipped: remove the floating zoom controls + trashcan
+
+`blocksApp.js:197` — `zoom: { controls: false, wheel: true, startScale: 0.9 }, trashcan: false`. `wheel: true`
+kept untouched (scroll/pinch zoom, the mechanism, not an overlay).
+
+**Verified by doing, not by reasoning, that a block can still be deleted with the bin gone** — the specific
+condition the dispatch made a hard stop on: `scratchpad/t2273-touch-delete-check.mjs` dragged a block onto the
+toolbox (deleted: 2 blocks → 1) and opened the per-block context menu (the same menu a touch long-press opens)
+— `Delete Block` present. Both delete paths are architecturally independent of the trashcan (confirmed by
+disposing it first and re-testing against that state), so removing the bin costs nothing on touch.
+Screenshotted at desktop and 430px (`scratchpad/t2273-overlays-{desktop,narrow430}.png`) — clean canvas, no
+floating chrome, Save wizard / Wizard View pull-tab / Blocks pull-tab all untouched.
+
+### What was BUILT, then REVERTED: undo/redo buttons in the Blocks topbar
+
+Built the buttons matching the editor's own `#btn-undo`/`#btn-redo` idiom (`index.html:249/254`) in a new
+`.blk-topbar-row`, own ids (`blk-btn-undo`/`blk-btn-redo` — reusing the editor's ids would have repeated the
+exact id-collision class of defect just backlogged as #21 for Path Anchor). Investigated the "two undo
+stacks" question the dispatch asked to establish before wiring anything
+(`scratchpad/t2273-undo-stacks-check.mjs`, `-undo-focus-elsewhere.mjs`, `-dump-fields.mjs`,
+`-form-edit-check.mjs`):
+
+1. **No double-fire, ever.** Ctrl+Z is arbitrated cleanly by DOM focus. Canvas focused (after
+   clicking/dragging a block — Blockly parks focus on its own SVG group): only Blockly's own undo fires
+   (`getUndoStack()` decremented, `getRedoStack()` grew, the shared history's own pointer never moved).
+   Focus elsewhere (fresh tab switch, confirmed `document.activeElement` is `<body>`): only the shared
+   program-level `ddcsUndo()` fires (the whole block stack reloaded). One keystroke, one system, always.
+
+2. **Blockly's own undo covers less than it looks like it should.** A placed `drill` op block carries zero
+   editable Blockly fields for its params — X/Y/Z/depth/feed are all edited through the Wizard View form
+   pane instead, which never touches Blockly's own undo stack. So a button wired to `getUndoStack().length`
+   (the dispatch's own proposed wiring) would sit disabled or undo a stale unrelated move after the single
+   most common Blocks-tab edit.
+
+Wired the buttons against the shared program-level history instead (`saveStates.js`'s `undo`/`redo`/
+`canUndo`/`canRedo`/`onChange`) and verified end to end (`scratchpad/t2273-verify-buttons.mjs`): baseline
+state, enable/disable through a real change, click-through undo and redo, all correct.
+
+**Then a wave of amendments landed (6, all substantial) carrying a HUMAN RULING that inverts the premise
+this was built on.** The investigation above is not wrong — it's cited as correct and kept — but the human
+ruled that undo must walk back through what the user physically DID (every drag attempt, including failed
+ones that bounce off a rejected connection), not only through what changed the committed program. That
+makes program-level history the WRONG timeline for canvas gestures, not the safe default I'd reasoned my way
+to. Worse, shipping the buttons as built would have put the exact failure the human was warning against
+directly into the app: Ctrl+Z with the canvas focused (Blockly's own stack, which DOES record drags) and
+clicking the new button (the program stack, which does NOT) would silently disagree about what a user's last
+action was — "two controls that look identical, walking different histories... worse than either behaviour
+alone," in the human's own words. **Reverted both changed files' button portions before committing** — kept
+only the overlay-removal edit in `blocksApp.js`; `styles.css` is back to zero diff. Nothing half-shipped.
+
+### The ruled scope, for whoever picks this up next — three composed rules, not yet built
+
+1. **Undo boundary = the GESTURE, not the delta**, for any coordinate-driven interaction (block drags first;
+   explicitly also named for later — splitter, dock resize, canvas handles — but NOT this turn's build,
+   Blocks is the pilot only). One pointerdown-to-pointerup is one entry, whether or not it changed anything —
+   a failed drag that bounces off a rejected connection is itself a recordable attempt. Buttons and keyboard
+   must read ONE shared timeline; today they'd read two, which is the bug this whole ruling exists to prevent.
+2. **The rule does NOT reach wizard form fields.** Those stay exactly as documented in `saveStates.js`'s own
+   header: preview-only until Insert, snapshotted there. Recording a form edit early would put a state in
+   history the program never actually held.
+3. **The recording boundary is AUTHORING vs VIEWING**, a separate axis from the gesture rule: orbiting the
+   3D preview, panning, inspecting — camera state, never recorded. A wizard canvas handle that sets a param
+   spatially (stock-attach corner, datum position) is read as a form edit expressed spatially — preview-only
+   until Insert, same as any other form field, NOT a raw coordinate gesture — but this needs CONFIRMING, not
+   assuming, and the dispatch asks explicitly whether anything in the Blocks tab itself authors by dragging
+   on a canvas WITHOUT being gated by an Insert (a gap between rules 1 and 3, if one exists).
+
+**Open, unbuilt work the dispatch names for whoever takes this next**, roughly in the priority order given:
+- ⭐⭐ **PRIORITY, checked separately from everything else**: does this app expose Blockly's `disabled`-block
+  state at all, and if so, does the G-code emit honour it? If disabled state lives only in the Blockly
+  workspace and isn't reflected in the op stack, disabling a block could be invisible to both the program
+  history AND the actual emitted G-code — a correctness bug about what the machine cuts, not a UI nicety.
+- A full verdict-per-item pass over Blockly's real event list (pulled from the vendored bundle, not recalled:
+  create/delete/change/move/drag/ui/click/selected/viewport_change/theme_change/toolbox_item_select/
+  trashcan_open/finished_loading/block_field_intermediate_change/bubble_open/var_create/var_delete/var_rename/
+  six comment_* events, plus change's own sub-elements field/collapsed/disabled/mutation/comment/inline) —
+  covered / not-covered-but-cheap / not-covered-and-expensive / not-reachable-in-this-app, per item.
+- Verify group drags already collapse to one undo entry (Blockly's own event grouping suggests yes) and,
+  separately, whether a rejected drag's bump lands in the SAME event group as the drag that triggered it (if
+  not, one user gesture needs two undo presses to reverse — the dispatch flags this as the case most likely
+  to break the new rule in practice).
+- Design the snapshot-widening shape (carry workspace position so a move changes the signature) vs. an
+  alternative (buttons delegate to whichever stack Blockly's own shortcut would have used) — not decided,
+  explicitly left open for whoever builds this to determine which is simpler.
+- Viewport/selection preservation across a restore — ruled NON-OPTIONAL once gestures (not deltas) are the
+  unit, since failed-attempt noise means several undo presses may be needed to reach a real edit, and a view
+  jump on each one turns "untidy" into "intolerable."
+- Whether an undo that restores an IDENTICAL state needs a visible acknowledgement (so a user isn't misled
+  into pressing again and losing something real).
+- No "reopen the wizard on Insert-undo" feature — explicitly ruled out, don't build, don't half-build, don't
+  leave a hook.
+
+This is reported, not built — the dispatch's own language ("REPORT BEFORE SHIPPING if the shape turns out
+bigger than a turn", "BUILD NOTHING BEYOND WHAT IS ALREADY IN FLIGHT" on the event survey) anticipates
+exactly this outcome. The scope above is a redesign with a correctness-flagged sub-question, not a tail.
+
+### Regression sweep
+
+26 Blocks-tab-adjacent spec files (anything touching `blk-topbar`/`saveStates`/`blocksApp`/`blk-ws`) run once
+against the built-then-reverted state: 63 passed, 12 skipped (pre-existing, unrelated — the t1732 `edge_op`
+dead-path skips already flagged for a human/advisor ruling), 0 failed. Full suite run before the revert
+landed: 2794 passed, 14 flaky (observed band), 1 unexpected — `palette-by-role-1623.spec.js:103`
+(block-category-colour assertion, unrelated to anything touched this turn: block colours for
+formfield/param_field/param_group/user_root/sim, no connection to zoom/trashcan config or the since-reverted
+buttons). Reran that spec file alone: 4/4 pass, including the failing test — confirmed a suite-parallelism
+flake, not a regression. Re-ran the 4-file focused sweep again AFTER the revert: 8/8 pass.
+
+### Backlog tail — explicitly skipped, not forgotten
+
+The dispatch marked the tail optional this turn given two user-facing asks. Between the overlay build+verify
+and the undo/redo investigation-then-build-then-revert, the turn is full without one; didn't reach for a
+third thing to pad it.
+
+### Files changed
+
+`web/blocks/blocksApp.js` (overlay config only — `zoom.controls`/`trashcan` → `false`, `wheel` untouched).
+`web/styles.css`: net zero (the `.blk-topbar-row` addition was reverted with the buttons). `index.html`
+untouched.
