@@ -1307,3 +1307,49 @@ Nothing numeric survives the crossing. What survives is:
    not as a reason to fall back to the other controller's index.
 4. ⛔ **Never transfer a numeric finding between controllers.** The `controllers/README.md` rule already says
    this; §13c is the measurement that shows what it costs when ignored.
+
+### 14. ⚠ A NEWER FIRMWARE EXISTS — `2026-08-03-00`. ⛔ NOT FLASHED, and deliberately not, yet
+*(Owner pointed at github.com/foinnc/M350/releases. Read 2026-08-25; the machine was NOT touched.)*
+
+**Running on this machine, read off the System Info page:**
+```
+System Name:   M350-standard [00]
+Software Ver:  2026-04-10-00        <- current
+Hardware Ver:  2021-1213-23
+Cable IP:      192.168.0.99
+```
+
+**The newest release is `2026-08-03-00`**, four months newer, and its notes are short and squarely on top of
+two open questions here:
+
+> 1: Added **Modbus RTU real-time G-code injection** and testing interface.
+> 2: **Optimized Modbus memory map (register address 3000)** to support seamless reception and safe parsing of
+> ASCII code streams up to **246 bytes** per single payload.
+
+⇒ **Both items matter to us.** "Real-time G-code injection" is a transport the gateway does not have and has
+never modelled. And **"optimized Modbus memory map"** is a change to the very thing `master.py`'s register map
+describes — a map that is already second-hand and unattested (§ the position-poll findings). ⚠ A firmware that
+reorganises the Modbus memory map may move, or may already have moved, the addresses we are probing.
+
+#### ⛔ WHY IT IS NOT FLASHED YET — the owner's call, and it is the right one
+> *"finish the current test though before we update"*
+
+The `0x00` diagnosis is **mid-measurement**. `#279` reads `2` in the file and the controller has not been
+rebooted since it was set, so the outstanding test is *reboot, then re-probe*. **Flashing first would confound
+the two**: if Modbus then answered, nothing would distinguish "the reboot applied `#279`" from "the new
+firmware fixed it", and the unresolved case would be worse still. ⇒ **Reboot and re-probe on `2026-04-10-00`
+FIRST. Flash second, as a separate change with its own before/after.**
+
+⚠ Also note the ordering evidence: slave mode was added in **2025-12-11-00** and this machine runs
+**2026-04-10-00**, which is later ⇒ **the running firmware already has slave mode.** A missing feature is
+therefore NOT an explanation for the `0x00`, and an upgrade is not required to make polling possible.
+
+#### WHEN IT IS FLASHED — the procedure already exists, and one trap in it
+`assets/community/modbus-slave-2025-12-11/FLASH-DAY.md` documents the whole USB route (hardware **V1** ⇒ the
+`install/` folder, not `psys/`). ⛔⛔ **Its central warning applies unchanged: never put the `setting` file in
+the install folder** — the OEM read-me states that restores FACTORY parameters, which would wipe axes,
+envelope, tool table and probe params. Back up at the pendant first.
+
+⚠ **And re-run the §13 name-resolution sweep afterwards.** §13 proved the parameter indices are stable across
+four dumps *of firmwares up to 2026-04-10*. A release that reorganises a memory map is exactly the event that
+could break that, and `eng` ships inside the update — so the check costs one pass over the new `eng`.
