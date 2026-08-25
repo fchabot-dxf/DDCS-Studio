@@ -1,18 +1,35 @@
 /**
  * blocks/saveStates.js — program-level undo/redo history (save states).
  *
- * A save state = a snapshot of the program block stack. Snapshots are taken at COARSE points (each wizard Insert)
- * and at GRANULAR points (each block edit) — NOT on form edits, because those are preview-only until Insert (the
- * program/op commits only in WizardManager.insert; closing the wizard discards them). Undo/Redo walk the history
- * and reload the program. An `applying` guard (plus the Blocks app's own muteChanges) stops an undo/redo reload
- * from being recorded as a new state, so there's no feedback loop.
+ * t2287 — DUAL FORMAT, decided per-snapshot by an observable fact (does a Blockly workspace exist yet), never a
+ * global mode: before the Blocks tab has EVER been opened, a save state is the app's own semantic
+ * `{type,params,children}` record — exactly as before this turn, and correct as-is: there is no canvas, so
+ * there is no viewport to preserve either, and "gesture, not delta" has no gesture to record (editor edits and
+ * wizard inserts are already one call per meaningful change, via onProgramChange below). Once a workspace
+ * exists (blocksApp.js registers one, once, the first time it's built — see registerBlocklyBridge), a save
+ * state is Blockly's OWN native serialization (block positions included) plus scroll/scale, taken at GESTURE
+ * boundaries (blocksApp.js's own listener calls recordGesture — see its own doc for why a drag's own
+ * `isStart:false` event is the reliable close signal, with a short debounce for non-drag gestures that never
+ * fire one). A session's history can hold BOTH kinds — the workspace, once created, persists for the rest of
+ * the session (confirmed live, t2287: the SAME instance survives a tab round-trip), so this is a ONE-TIME
+ * boundary, never interleaved back and forth. `apply()` dispatches on each ENTRY's own kind, not on whatever
+ * currently exists — undoing back past the boundary restores a pre-Blocks semantic entry even with a live
+ * workspace mounted (the canvas re-lays-out, since position was never captured for that old entry — expected,
+ * unavoidable, and handled without touching the live workspace's own existence either way).
+ *
+ * Snapshots are taken at COARSE points (each wizard Insert), at GRANULAR points (each editor edit / reconciled
+ * block change), AND — new this turn — at every recorded GESTURE once a workspace exists. NOT on form edits,
+ * because those are preview-only until Insert (the program/op commits only in WizardManager.insert; closing the
+ * wizard discards them — unaffected by this turn, verified below). Undo/Redo walk the history and reload the
+ * program. An `applying` guard (plus the Blocks app's own muteChanges) stops an undo/redo reload from being
+ * recorded as a new state, so there's no feedback loop.
  */
 
 import { onChange as onProgramChange } from './programModel.js';
 import { isWorkspaceDirtyToFile } from '../data/backup.js';   // t2184 (amendment 23) — wouldLoseWork()'s workspace-scope half
 
 const MAX = 100;
-let history = [];      // [{ stack, label }] oldest → newest
+let history = [];      // [{ kind: 'semantic'|'blockly', ...payload, label }] oldest → newest
 let ptr = -1;          // index of the current state
 let applying = false;  // true while we reload a state (so the resulting change isn't re-recorded)
 const subs = new Set();
@@ -22,29 +39,70 @@ const clone = (s) => { try { return JSON.parse(JSON.stringify(s || [])); } catch
 const sig = (s) => { try { return JSON.stringify(s || []); } catch (_) { return ''; } };
 const notify = () => subs.forEach((cb) => { try { cb(); } catch (_) { /* noop */ } });
 
-/** Record the current program as a new save state. Called on Insert + on a block edit. No-op during undo/redo. */
-export function snapshot(label = '') {
-    if (applying) return;                                            // don't record our own undo/redo reloads
-    const snap = clone(getProg());
-    if (ptr >= 0 && sig(history[ptr].stack) === sig(snap)) return;   // identical to current → no real change
+/** t2287 — the ONE seam into Blockly this otherwise-pure-state module has, kept minimal and injected rather
+ *  than imported: blocksApp.js calls this ONCE, the moment its workspace is built (never before — the module
+ *  stays free of any Blockly import either way, matching its existing "pure state" design). `hasWorkspace()`
+ *  is the single observable fact that decides which format a NEW snapshot takes; `capture()`/`restore(state)`
+ *  do the actual Blockly-native save/load + re-derive the semantic layer via blocksApp's own reproject path,
+ *  so this module never needs to know HOW that happens, only that it does. */
+let blocklyBridge = null;
+export function registerBlocklyBridge(bridge) { blocklyBridge = bridge; }
+const hasWorkspace = () => !!(blocklyBridge && blocklyBridge.hasWorkspace());
+
+function pushEntry(entry) {
     history = history.slice(0, ptr + 1);                             // drop any redo tail
-    history.push({ stack: snap, label });
+    history.push(entry);
     if (history.length > MAX) history.shift();
     ptr = history.length - 1;
     notify();
 }
 
+/** Record a new save state. Called on Insert + on a reconciled editor/block edit (via onProgramChange below),
+ *  and directly by confirmDestructiveLoad's own "before edit" recovery point. No-op during undo/redo. Format
+ *  is decided HERE, by `hasWorkspace()` — every caller stays unaware which one it gets. */
+export function snapshot(label = '') {
+    if (applying) return;                                            // don't record our own undo/redo reloads
+    if (hasWorkspace()) {
+        const payload = blocklyBridge.capture();                      // { blocks, scrollX, scrollY, scale }
+        if (!payload) return;                                         // bridge declined (e.g. workspace mid-teardown) — nothing safe to record
+        pushEntry({ kind: 'blockly', ...payload, label });             // no sig-based dedup here — every recorded gesture counts, deliberately (t2287 human ruling)
+        return;
+    }
+    const snap = clone(getProg());
+    if (ptr >= 0 && history[ptr].kind === 'semantic' && sig(history[ptr].stack) === sig(snap)) return;   // identical to current → no real change
+    pushEntry({ kind: 'semantic', stack: snap, label });
+}
+
+/** t2287 — the gesture-boundary entry point, called ONLY from blocksApp.js's own listener (never from
+ *  onProgramChange — see its own updated comment for why 'blockly'-origin changes are skipped there now).
+ *  Thin wrapper so the call site reads as what it is; behaves identically to snapshot() once a workspace
+ *  exists (which it always does when this is called at all — blocksApp.js is the only caller). */
+export function snapshotGesture(label = '') { snapshot(label); }
+
 function apply(state) {
     applying = true;
-    try { if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(clone(state.stack)); }
-    finally { applying = false; }
+    try {
+        if (state.kind === 'blockly') {
+            if (hasWorkspace()) blocklyBridge.restore(state);
+            // else: a blockly-native entry with no live workspace should be unreachable (the workspace persists
+            // for the rest of the session once built — confirmed live, t2287) — but fail SILENTLY rather than
+            // throw if it ever happens, matching this module's existing defensive style throughout.
+        } else if (window.ddcsLoadBlockStack) {
+            window.ddcsLoadBlockStack(clone(state.stack));             // exactly today's path — safe even with a live workspace mounted (already the normal load-while-Blocks-open case)
+        }
+    } finally { applying = false; }
     notify();
 }
 
+// t2287 — Undo/Redo flush any gesture the Blockly bridge is still debouncing BEFORE reading the history: a
+// gesture inside its own quiet window has no entry yet, so pressing Undo right after finishing an edit (an
+// entirely normal fast sequence) would otherwise skip that edit's own state (found live,
+// undo-reproject-echo.spec.js). A no-op when there's nothing pending, or no workspace at all.
+const flushPendingGesture = () => { try { if (blocklyBridge && blocklyBridge.flushGesture) blocklyBridge.flushGesture(); } catch (_) { /* best-effort */ } };
 export const canUndo = () => ptr > 0;
 export const canRedo = () => ptr < history.length - 1;
-export function undo() { if (canUndo()) { ptr -= 1; apply(history[ptr]); } }
-export function redo() { if (canRedo()) { ptr += 1; apply(history[ptr]); } }
+export function undo() { flushPendingGesture(); if (canUndo()) { ptr -= 1; apply(history[ptr]); } }
+export function redo() { flushPendingGesture(); if (canRedo()) { ptr += 1; apply(history[ptr]); } }
 export const undoLabel = () => (canUndo() ? history[ptr].label : '');
 export const redoLabel = () => (canRedo() ? history[ptr + 1].label : '');
 
@@ -137,13 +195,28 @@ export async function confirmDestructiveLoad(incoming, opts = {}) {
 const LABELS = { load: 'insert', blockly: 'block edit', editor: 'edit', refresh: '' };
 
 /** Subscribe to the program model + seed a baseline. Called once at app start (after initProgramModel). Every real
- *  program change becomes a save state — op insert ('load'), block edit ('blockly'), editor edit ('editor'). Form
- *  edits never reach here (preview-only until Insert); 'refresh' (post-proc recompute) and our own undo/redo
- *  reloads (the `applying` guard) are skipped, so there's no loop. */
+ *  program change becomes a save state — op insert ('load'), editor edit ('editor'). Form edits never reach here
+ *  (preview-only until Insert); 'refresh' (post-proc recompute) and our own undo/redo reloads (the `applying`
+ *  guard) are skipped, so there's no loop.
+ *  t2287 — 'blockly'-origin ALSO skipped here now: it fires once per qualifying Blockly event (potentially many
+ *  times per gesture), which used to collapse to ~one entry only because position-only intra-gesture changes
+ *  happened to produce a byte-identical semantic stack. That coincidence is gone once gestures are recorded
+ *  deliberately — snapshotting 'blockly' here too would create one entry per EVENT, not per gesture. Ownership
+ *  moves entirely to blocksApp.js's own gesture-boundary listener (snapshotGesture), which is a strict superset:
+ *  anything that used to reach here via 'blockly' fires a real, non-UI Blockly event, which the gesture listener
+ *  already watches — nothing is lost, gestures are just grouped correctly instead of one-entry-per-sub-event. */
 let _wired = false;
 export function initSaveStates() {
     if (_wired) return; _wired = true;
-    onProgramChange(({ origin }) => { if (origin !== 'refresh' && origin !== 'reproject') snapshot(LABELS[origin] || origin); });   // t1161 — 'reproject' = the post-render echo (blocksApp) that re-syncs ids/defaults, NOT a user edit → no Undo state
+    // t2287 — deferred to a microtask: onProgramChange fires DURING setStack, synchronously, before every
+    // subscriber has run — including blocksApp's own renderFromModel, which does the actual workspace rebuild
+    // (stackToWorkspace) synchronously inside ITS subscriber callback. Capturing here undeferred can run BEFORE
+    // that rebuild (subscriber order is registration order, and this module's onProgramChange is wired at app
+    // boot, earlier than blocksApp's), snapshotting the STALE pre-rebuild workspace instead of the one matching
+    // the new stack. A microtask always runs after the current synchronous turn (setStack's whole subs.forEach)
+    // finishes, so by the time capture() runs, any live workspace already reflects the new model — regardless of
+    // subscriber order. (Found live: a scripted load-then-drag undid to an EMPTY workspace, not the loaded one.)
+    onProgramChange(({ origin }) => { if (origin !== 'refresh' && origin !== 'reproject' && origin !== 'blockly') queueMicrotask(() => snapshot(LABELS[origin] || origin)); });   // t1161 — 'reproject' = the post-render echo (blocksApp) that re-syncs ids/defaults, NOT a user edit → no Undo state
     snapshot('open');   // baseline so the first edit has somewhere to undo back to
     // Keep the header Undo/Redo buttons' enabled state in sync with the history. Re-find them each tick (the
     // header may render before or after this runs), so it's robust to ordering. onChange fires on every snapshot

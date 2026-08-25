@@ -15,6 +15,7 @@ import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { installTokenGuard } from './blockly/tokenGuard.js';   // t1712 (cycle ACT 5) — REFUSE an ineligible live-value connection on the canvas
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange, getGen, flattenOps } from './programModel.js';   // blocks = a VIEW of the shared program model; t1928 — flattenOps sees inside a multi_step import wrapper
+import { registerBlocklyBridge, snapshotGesture } from './saveStates.js';   // t2287 — the undo redesign: registers the ONE seam saveStates.js has into Blockly (capture/restore its native serialization), and the gesture-boundary trigger (see the listener below)
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
@@ -306,6 +307,41 @@ async function buildWorkspace() {
   search.addEventListener('search', runSearch);   // the ✕ clear button fires 'search'
   window.__blkWs = ws;   // debug/test accessor
 
+  // t2287 — the undo redesign's ONE seam into Blockly: registered ONCE, the moment the workspace exists (never
+  // before — saveStates.js stays free of any Blockly import either way). `hasWorkspace` is the single
+  // observable fact saveStates.js's own snapshot() branches on; capture/restore do the actual native
+  // save/load. restore() re-derives the semantic layer via the SAME setStack+renderViewsPrompt path any live
+  // edit already goes through — the emit/editor/form layer never needs to know a restore just happened.
+  registerBlocklyBridge({
+    hasWorkspace: () => !!ws,
+    capture: () => {
+      // t2287 — selection rides alongside scroll/scale, same reason: Blockly.serialization.workspaces.save()
+      // carries neither (confirmed live, scratchpad/t2287-workspace-serialization-check.mjs — its own saved
+      // shape is `{blocks}` only), so both are captured as separate fields rather than assumed included.
+      const sel = B.getSelected ? B.getSelected() : null;
+      try { return { blocks: B.serialization.workspaces.save(ws), scrollX: ws.scrollX, scrollY: ws.scrollY, scale: ws.scale, selectedId: sel ? sel.id : null }; }
+      catch (_) { return null; }   // nothing safe to record (e.g. mid-teardown) — snapshot() itself no-ops on null
+    },
+    restore: (state) => {
+      B.Events.disable();
+      try { B.serialization.workspaces.load(state.blocks, ws); } catch (_) { /* corrupt/foreign snapshot — leave the canvas as-is rather than half-load it */ }
+      finally { B.Events.enable(); }
+      // t2287 — scale BEFORE scroll: Blockly's own setScale() recalculates scrollX/Y internally to keep the
+      // current view centred across the scale change (confirmed live — it calls ws.scroll() itself), so calling
+      // scroll() first only gets silently overwritten the instant setScale() runs. Scale first, then scroll
+      // last, so ours is the value that actually sticks.
+      try { if (state.scale != null && ws.setScale) ws.setScale(state.scale); ws.scroll(state.scrollX || 0, state.scrollY || 0); } catch (_) { /* viewport restore is best-effort, never fatal */ }
+      try { const b = state.selectedId ? ws.getBlockById(state.selectedId) : null; B.common.setSelected(b || null); } catch (_) { /* the selected block may no longer exist (deleted since) — leaving selection empty is correct, not fatal */ }
+      setStack(workspaceToStack(ws), 'blockly');   // t1948-style echo, NOT recorded as a new gesture — 'blockly'-origin is skipped by saveStates.js's own onProgramChange wiring
+      renderViewsPrompt(getProjection());
+    },
+    // t2287 (found live, undo-reproject-echo.spec.js) — saveStates' undo()/redo() call this FIRST: a gesture
+    // still sitting inside its 200ms quiet window has no entry yet, so an Undo pressed right after finishing an
+    // edit (a fast, entirely normal sequence) would silently skip that edit — closeGesture is defined further
+    // down in this same builder, referenced here via hoisting.
+    flushGesture: () => closeGesture({ immediate: true }),
+  });
+
   // ---- Suggested-next strip (A): chips for the most-likely next blocks (learned from your programs + a curated
   //      seed); click to append. Updates as the program changes. ----
   const STMT = new Set(PALETTE.filter((d) => d.kind !== 'reporter' && !d.hidden).map((d) => d.type));   // insertable (no reporters; t903 — no hidden atoms like safetraverse until P2.5)
@@ -405,6 +441,14 @@ async function buildWorkspace() {
     try { ws.setScale(0.9); } catch (_) { /* */ }
     try { ws.scroll(30, 30); } catch (_) { /* pre-render */ }
   };
+  // t2287 — `place`'s own THIRD, delayed call (400ms out, below) can land well after a model rebuild finished,
+  // clobbering the viewport back to its own fixed (30,30)/0.9 default. Harmless before this turn (nothing read
+  // scrollX/scrollY back), but the undo redesign's own gesture capture DOES — a drag closing within that same
+  // 400ms window (a real, if narrow, real-world case: undo/redo → immediately re-drag) would silently capture
+  // whatever `place` just reset the view to, not where the user actually was. `_placeDeadline` names the
+  // window place() might still be about to overwrite; the gesture-boundary listener's own closeGesture() defers
+  // its capture past it rather than reading a viewport that's about to be stomped.
+  let _placeDeadline = 0;
 
   // Render the right pane (3D preview + live form) from a projection { text, lines, map }.
   // t788 — split into the PROMPT half (live form — cheap, and read synchronously by the form writeback) and the
@@ -878,6 +922,7 @@ async function buildWorkspace() {
     // (or will queue) its own correct echo.
     queueMicrotask(() => { try { if (getGen() === myGen) setStack(workspaceToStack(ws), 'reproject'); } catch (_) { /* ws torn down */ } });   // sync ids, no Undo state, no re-render
     if (_dev) _dev.onModelRender();   // re-grow the always-on "expose as knob" affordances after a clean rebuild
+    _placeDeadline = Date.now() + 450;   // t2287 — 450ms: safely past place()'s own last scheduled call at +400ms
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
   }
@@ -959,6 +1004,56 @@ async function buildWorkspace() {
     }
     recordEdit(opBlk.id, t.warmId, detail);
   }
+
+  // t2287 — GESTURE-BOUNDARY tracking for the undo redesign: one save state per GESTURE (a drag, a field edit,
+  // a context-menu Delete/Duplicate/Disable), never per underlying Blockly event and never per position delta
+  // — the human's own ruling is that an ATTEMPT is a real action, whether or not it changed anything.
+  //
+  // A short trailing DEBOUNCE on `e.group` is the close signal, not Blockly's own `drag`/`isStart:false` event
+  // (tried first, rejected: confirmed live, scratchpad/t2287-group-close-timing.mjs — real content-changing
+  // events, like the final snap/connect `move`, keep firing with the SAME group AFTER `isStart:false`, so
+  // closing right there would snapshot an INCOMPLETE mid-gesture state, not the gesture's true result). Waiting
+  // for quiet is slightly slower (one short timer) but always captures the gesture's FINAL state, and it is the
+  // only signal that reliably closes a non-drag gesture (a field edit, a context-menu action) too — those never
+  // fire a drag pair at all — including the very LAST action of a session, which needs no further event to
+  // reveal its own end.
+  let _gestureGroup = null;              // the group currently open, or null between gestures
+  let _gestureHasRealEvent = false;      // ≥1 non-UI event in this group? (a pure pan/select group must never record — item 4, authoring not viewing)
+  let _gestureTimer = null;
+  const GESTURE_QUIET_MS = 200;
+  function closeGesture(opts) {
+    if (_gestureTimer) { clearTimeout(_gestureTimer); _gestureTimer = null; }
+    const shouldSnapshot = _gestureGroup && _gestureHasRealEvent;
+    _gestureGroup = null; _gestureHasRealEvent = false;   // tracking resets immediately either way — the NEXT gesture starts clean regardless of any deferred capture below
+    if (!shouldSnapshot) return;
+    // t2287 (found live, undo-reproject-echo.spec.js) — a flush demanded BY Undo/Redo (opts.immediate) needs the
+    // entry to exist before that same call returns, or the very edit Undo is meant to revert never got its own
+    // save state (a fast Undo right after an edit can land well inside the 200ms quiet window). No place()
+    // hazard applies to a demanded flush — that deferral only protects the NATURAL debounce-driven close from a
+    // model-rebuild's own scheduled viewport reset, which isn't in flight here.
+    if (opts && opts.immediate) { snapshotGesture('block edit'); return; }
+    const wait = _placeDeadline - Date.now();   // t2287 — defer the capture itself (not the boundary detection) past any pending place() reset, so it never reads a viewport about to be stomped
+    if (wait > 0) setTimeout(() => snapshotGesture('block edit'), wait);
+    else snapshotGesture('block edit');
+  }
+  ws.addChangeListener((e) => {
+    if (muteChanges) return;             // our own model→canvas echoes (renderFromModel) are never a human gesture
+    // t2287 (found live, undo-reproject-echo.spec.js) — the "strict superset" claim above assumed every real
+    // content-changing event carries a group, because a mouse-driven Gesture (drag, click-to-edit-a-field)
+    // always sets one. It's false for a REAL change made with no Gesture open at all — e.g. a direct field
+    // write (`block.setFieldValue(...)`), which is exactly how the rest of this app's own edit paths (and this
+    // suite) drive a "the user changed a value" edit outside of a mouse drag. `e.group` is '' for the entire
+    // life of such an event, not just briefly before Blockly assigns one — so gating recording on `if (grp)`
+    // silently dropped it: a real edit that never became an undo state. Folding it under a stable sentinel group
+    // gives it the same debounce-batched, deferred-past-place() recording as everything else, rather than a
+    // special second path.
+    const grp = e.group || '__ungrouped__';
+    if (grp !== _gestureGroup) closeGesture();   // a genuinely NEW group (or a new ungrouped event) started → the previous one, if any, is over
+    _gestureGroup = grp;
+    if (!e.isUiEvent) _gestureHasRealEvent = true;
+    if (_gestureTimer) clearTimeout(_gestureTimer);
+    _gestureTimer = setTimeout(closeGesture, GESTURE_QUIET_MS);
+  });
 
   // ---- workspace events: structural change → re-emit + record edits ----
   ws.addChangeListener((e) => {

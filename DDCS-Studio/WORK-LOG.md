@@ -56367,3 +56367,141 @@ design (whichever it resolves to, snapshot() just checks `ws` at capture time).
 ### Files changed
 
 None. Verification scripts in gitignored `scratchpad/t2285-*.mjs`.
+
+## t2287 — THE UNDO REDESIGN, BUILT: gesture-based, dual-format, viewport- and selection-preserving. Two real
+bugs found and fixed during the build (place() timing hazard, setScale() scroll clobbering); two more found and
+fixed by the full suite AFTER the build looked done (an ungrouped real edit was silently dropped; Undo/Redo
+could race a still-open gesture). All four were genuine, none were test artifacts.
+
+### The design — decided per-snapshot by one observable fact, exactly as t2285/t2286 proposed
+
+`saveStates.js` now holds a `{kind:'semantic'|'blockly', ...}` history. `snapshot()` branches on
+`hasWorkspace()` (a bridge `blocksApp.js` registers once, the moment its workspace is built, per
+`registerBlocklyBridge`): no workspace yet → the existing sig-deduped semantic record, unchanged; a live
+workspace → Blockly's own `serialization.workspaces.save(ws)` plus `scrollX`/`scrollY`/`scale`/`selectedId`
+(none of which `save()` itself carries — confirmed live, `savedKeys` is `["blocks"]` only), with **no
+dedup** — every recorded gesture counts, per the human's own standing ruling. `apply()` dispatches on each
+ENTRY's own `kind`, so a session's history legitimately crosses the boundary once (never back-and-forth — the
+workspace persists for the rest of the session once built, confirmed live via a same-`ws.id` Studio→Blocks
+round-trip) and both kinds keep working correctly on either side of it.
+
+### The gesture-boundary mechanism — debounce on `e.group`, not `isStart:false`
+
+One save state per GESTURE (a drag, a field edit, a context-menu action), not per underlying Blockly event and
+not per position delta. Tried first and rejected: closing on the drag event's own `isStart:false` — confirmed
+live (`t2287-group-close-timing.mjs`) that real content-changing events (the final snap/connect `move`) keep
+firing with the SAME group AFTER `isStart:false`, so closing there snapshots an INCOMPLETE mid-gesture state.
+Landed on a 200ms trailing debounce keyed on `e.group`, reset on every event sharing that group, firing
+`closeGesture()` after quiet — this closes both drag and non-drag (field-edit, context-menu) gestures
+correctly, including the very last action of a session, which needs no further event to reveal its own end.
+
+### Two bugs found DURING the build, both real, both fixed
+
+1. **`place()`'s delayed reset could clobber a gesture's own viewport capture.** `place()` (pre-existing,
+   hardcodes `ws.scroll(30,30)`/`ws.setScale(0.9)`, scheduled via rAF + `setTimeout(120)` + `setTimeout(400)`
+   from `renderFromModel`) could fire and overwrite the viewport a gesture was closing into, if that close
+   landed inside the ~400ms window. Found via monkeypatching `ws.scroll` with a stack trace
+   (`t2287-restore-debug.mjs`), which caught `place()`'s own call landing at the exact wrong observed value.
+   Fixed with a `_placeDeadline` tracker (set on every `renderFromModel`, checked in `closeGesture()` to defer
+   the capture itself — not the boundary detection — past it).
+2. **`ws.setScale()` recalculates scroll internally, silently overwriting a scroll set before it.** Confirmed
+   live (a monkeypatched `ws.scroll` trace showed `Xh.setScale` in the call stack). `restore()` originally
+   called `scroll()` then `setScale()` — wrong order, X-axis restore landed off (target 90 vs restored −81.9,
+   Y matched). Reordered: scale first, scroll last, so the restore's own scroll call is the final word.
+   Confirmed exact-match afterward (`t2287-viewport-correct-test.mjs`: `{x:90,y:80}` both ways).
+
+Also found and fixed in the same pass: **selection wasn't captured or restored at all** — `save()` doesn't
+carry it (confirmed, `savedKeys` is blocks-only), so undo/redo of a selected block left selection wherever
+Blockly happened to leave it, not where it was. Added `selectedId` to both `capture()` and `restore()`
+(`B.common.setSelected`, wrapped — the block may no longer exist if deleted since). Confirmed fixed live:
+select a1 → drag → undo → redo → still selected a1.
+
+### The dispatch's own demanded test — mixed-history boundary crossing, PASS
+
+`t2287-mixed-history-crossing.mjs`: editor-only edits (no workspace yet, semantic entries) → open Blocks → a
+real drag (blockly entry) → undo repeatedly, crossing back across the boundary, 3 times. Zero throws,
+`wsModelAgree: true` at every step. This was the dispatch's own named "the case no natural test will cover" —
+closed.
+
+### Group drags collapse to ONE undo entry — verified, not merely inferred
+
+A 3-block connected stack, dragged by its head block (drags all 3 as one Blockly group): one undo restores
+ALL THREE to their exact pre-drag positions in one press, not one atom at a time
+(`t2287-group-drag-debug.mjs`, later `-recheck.mjs`). This came for free from keying the debounce on
+`e.group` — Blockly's own grouping IS the group-drag boundary, no separate handling needed. But getting this
+verification working surfaced a THIRD real bug (below), unrelated to grouping itself.
+
+### Bug found chasing the group-drag test: an `onProgramChange`-driven capture ran BEFORE the rebuild it should have captured
+
+The group-drag script's own "load 3 blocks, then drag" sequence undid the drag back to an EMPTY workspace, not
+the loaded one. Root cause: `initSaveStates()`'s `onProgramChange` handler (wired at app boot, so registered
+in the `subs` Set BEFORE `blocksApp.js`'s own `renderFromModel` subscriber, which only registers once Blocks
+is first opened) ran its `snapshot()` — and therefore `capture()` — synchronously, DURING `setStack`'s own
+`subs.forEach`, which can be BEFORE `renderFromModel`'s synchronous `stackToWorkspace` rebuild has run,
+depending on subscriber order. The captured "load" entry was of the stale PRE-rebuild workspace, not the one
+matching the new stack. Fixed by deferring the capture to a `queueMicrotask` — a microtask always runs after
+the current synchronous turn (the WHOLE `subs.forEach`) finishes, so by the time it fires, any live workspace
+already reflects the new model, regardless of subscriber registration order. Re-ran the group-drag test,
+mixed-history-crossing, and the viewport/selection checks after this fix — all still pass.
+
+### Full suite run #1 — 1 real (`unexpected`) failure, found and fixed
+
+`npm test`: node tier 228/228. e2e tier: **2788 passed, 20 flaky, 1 unexpected, 26 skipped** (~30 min).
+The one unexpected failure, `tests/undo-reproject-echo.spec.js` — "a real block-value edit is undoable" — was
+a REAL regression, not a flake: it edits a field via `block.setFieldValue('9', 'NUM')` directly, bypassing any
+mouse-driven Blockly Gesture entirely. `e.group` is `''` for that event's ENTIRE life (not just briefly before
+one gets assigned, as the gesture listener's own comment had assumed) — Blockly only assigns a group when a
+Gesture is open, and this edit never opens one. The gesture-boundary listener's `if (grp)` gate silently
+dropped it: a real, committed change that never became an undo state. This falsifies the design's own "strict
+superset" claim — the gesture listener does NOT structurally see every real edit `onProgramChange`'s old
+'blockly'-origin path used to catch, only every GROUPED one. Fixed by folding group-less real events under a
+stable sentinel key (`'__ungrouped__'`) so they get the same debounce-batched recording as everything else,
+rather than being silently invisible to the mechanism. This is a genuine app-level risk, not just a test
+artifact: any programmatic field write outside a mouse Gesture (this is literally how the rest of the app's
+own test suite simulates "the user changed a value") would have silently lost its own undo state.
+
+### Second bug the same failing test's retry surfaced: Undo/Redo can race a still-open gesture
+
+Fixing the group-less case alone still left the test failing: a fast `clickUndo()` right after the edit landed
+well inside the 200ms debounce window, so the edit's own entry hadn't been pushed yet when Undo read the
+history — Undo popped to the state BEFORE the edit even existed as a state. This is a real, ordinary sequence
+(finish typing, immediately press Ctrl+Z), not a synthetic-only risk. Fixed by giving the bridge a
+`flushGesture()` (a `closeGesture({immediate:true})` variant that snapshots synchronously, skipping the
+`_placeDeadline` deferral — that deferral only protects the natural debounce-driven close from a model
+rebuild's own pending viewport reset, which isn't in flight during a demanded flush) and having `saveStates.js`'s
+`undo()`/`redo()` call it before touching `ptr`. A flush that finds a real pending edit pushes it as the new
+current entry FIRST, so Undo/Redo then correctly steps away from it, never past it.
+
+### Form-field exclusion — live-verified this turn, not just reasoned about
+
+The dispatch asked this be re-verified under the new mechanism, not just asserted architecturally.
+`t2287-formfield-live-check.mjs`: opened a wizard (`openWiz('drill', ..., true)`), edited its params object
+directly + `updateWiz()` (what a real field edit ultimately drives) — `canUndo` stayed `false` throughout.
+`insertWiz()` — `canUndo` became `true`, `label: "insert"`. Confirmed live: forms are preview-only until
+Insert, exactly as before this turn, unaffected by the redesign.
+
+### MAX = 100 — reconfirmed sensible, no change made
+
+t2285 covered this abstractly (snapshot RATE rises under gesture recording, not snapshot SIZE); this turn's
+own build confirms the mechanism a gesture actually IS is coarse enough that 100 stays a sensible depth — a
+3-block group drag is one entry, not three, and a rapid multi-field programmatic edit debounces into one
+entry too. No adjustment made; revisit only if a real session is observed exhausting the cap in normal use.
+
+### Full suite run #2 — after all four fixes: genuinely green
+
+`npm test` re-run in full after the ungrouped-event and flush-before-undo fixes (both single-file re-runs
+already confirmed clean; the full run is the actual merge-gate evidence, not the single-spec one). node tier
+228/228. e2e tier: **2793 passed, 16 flaky, 0 unexpected, 26 skipped** (~23.5 min). `unexpected` count is the
+number that matters and it's zero — run #1's one real failure is gone, no new ones appeared. The flaky set
+(16, all different specs than run #1's 20 — no overlap) is pre-existing test-infra noise, unrelated to this
+turn's files; none of them touch `saveStates.js`/`blocksApp.js` or the undo mechanism.
+
+### Files changed
+
+- `DDCS-Studio/web/blocks/saveStates.js` — dual-format history (`snapshot`/`apply`/`registerBlocklyBridge`/
+  `snapshotGesture`), the deferred (`queueMicrotask`) capture fix, `flushPendingGesture()` wired into
+  `undo()`/`redo()`.
+- `DDCS-Studio/web/blocks/blocksApp.js` — the Blockly bridge (`capture`/`restore`/`flushGesture`, selection +
+  scale-before-scroll ordering included), `_placeDeadline` tracking, the gesture-boundary listener (debounce
+  on `e.group`, ungrouped-event sentinel fold-in).
+- Verification scripts in gitignored `scratchpad/t2287-*.mjs` (kept, not committed).
