@@ -55160,3 +55160,113 @@ suspicious rather than reported as-is.
 
 Full working room. Another investigation-only turn, deliberately — "ship nothing" was the instruction and
 the value here is the measurement, not an edit.
+
+## t2263 — DECLARE THE MISSING NODE TYPE: `code_preview`, PILOT ON ATC CHECK. A real regression found and fixed along the way — the vocabulary turned out to be DUAL, not single.
+
+### Step 1 — establish whether the 15 hardcoded blocks are the same thing (asked first, not assumed)
+
+Grepped every `preview-block` occurrence in `index.html` and read each one. They are NOT identical:
+- **Label**: "CODE PREVIEW" on 13 of 15; `atc_table`'s own is "APPLY MACRO" (it writes registers to the
+  controller, not code to insert — a genuinely different action).
+- **Compliant-tag**: present with FOUR distinct texts — "(DDCS M350 COMPLIANT)" (the majority),
+  "(RUN ON CONTROLLER)" (`atc_table`), "(VERIFY ON YOUR MACHINE)" (`atc_change`) — and absent entirely on two
+  (`wiz_user_code`, the generic custom-op shell; `comm_preview_block`). WCS's own tag is a THIRD case again —
+  an empty `<span id="wcsStatus">` filled in by separate JS at runtime, not a static string at all.
+
+This ruled out a parameterless node before any design work started, exactly as asked: `label` and `tag` are
+both declared fields on the new block, not hardcoded in the renderer.
+
+### Step 2 — declare it, PILOT on ATC Check only
+
+`formWidgets.js`'s `traverse()` gets a new `code_preview` branch, matching the shell's own `.preview-block`
+markup exactly (same CSS classes, so it inherits the existing styling for free). `renderUiTree`'s own
+signature grows one new OPTIONAL parameter, `codeElId` — deliberately NOT wired to the view's own
+`view.codeElId` (which would make the new `<pre>` collide with the STATIC shell's own identically-`id`'d one
+the moment both exist in the same host) — left id-less by default, additive and safe for every one of
+`renderUiTree`'s other (zero, currently) callers.
+
+`atcCheckData.js`'s own `uiChildren` gets one new entry: `{ type: 'code_preview', params: { tag: '(DDCS M350
+COMPLIANT)' } }` — the standard pattern, matching what its own shell (index.html:908-911) already shows.
+
+### A real regression, found and root-caused before it could ship
+
+Ran the targeted test sweep. Two failures: `tooltable-gate-1890.spec.js`'s own ATC-Check gate test
+("tolerance field never settled a gate state") and `fork-parity-1593.spec.js`'s full 32-twin sweep. Isolated
+with `git stash` on just the two changed files — the tests passed clean against the original code, confirming
+the change caused it, not a pre-existing flake.
+
+Root cause, found by reproducing the exact failing call (`ddcsEditWizardDef('user_atc_check_data')`) with
+console/page-error listeners attached: `TypeError: Invalid block definition for type: code_preview`, thrown
+from Blockly itself. **The uiChildren vocabulary is not single — it's dual.** Every node type that
+`formWidgets.js`'s `traverse()` understands ALSO needs a matching Blockly block definition, because the same
+declaration feeds BOTH the form renderer and the Blocks-tab's own visual block-editor canvas
+(`Blockly.defineBlocksWithJsonArray`, fed from `wizards/ops/index.js`'s registry — one small file per node
+type: `panel.js`, `sim.js`, `paramField.js`, etc., ~28 of them). Declaring `code_preview` for formWidgets.js
+alone left Blockly with an unrecognized block type, and the resulting exception aborted the WHOLE Customize
+route's render pass before it ever reached the tolerance field — a crash, not a cosmetic gap, and one that
+reached a form field entirely unrelated to the new node by pure sequencing (the exception fired before
+render() got that far).
+
+Found, while root-causing, that this is not a first attempt: `code_preview_panel` (title/maxHeight, no
+compliant-tag) was drafted and deleted in the SAME commit that introduced `renderUiTree` (`0bd8b38c`) —
+pruned as unused scaffolding, never consumed by a real declaration. Checked its shape before designing my
+own rather than assuming mine should match it: the field shape genuinely differs (no compliant-tag at all in
+the old draft, which the actual 15-block survey shows is real, load-bearing variation) — a fresh design
+informed by the survey, not a revival of the old one.
+
+**Fixed by completing the second half**, matching the established, tiny, declarative pattern every other
+`wizards/ops/*.js` file already uses (`panel.js` is 12 lines; `sim.js` is 15): new file
+`wizards/ops/codePreview.js` (`type: 'code_preview', fields: ['label', 'tag'], emit: () => []`), registered
+in `wizards/ops/index.js` alongside `panelBlock`/`simBlock`. This is a small, mechanical, same-shape
+addition — not a new feature, not scope creep — and it was NECESSARY: leaving the declaration half-built
+would have shipped a live regression on an already-registered, already-reachable op. Re-ran the exact
+reproduction: no more exception, `tolerance` field found, correctly gated (`disabled: true`, the right
+tooltip). Re-ran both originally-failing test files: 7/7 pass, including the full 32-twin fork-parity sweep.
+
+### Re-ran my own experiment — the structural gap is closed
+
+`scratchpad/t2261-declaration-render.mjs` (the SAME fair harness from last turn — real `.wiz-2pane`/
+`.wiz-controls` ancestor classes, cross-checked against the real live route, exactly as instructed):
+declaration-alone now shows "CODE PREVIEW (DDCS M350 COMPLIANT)" in the correct green compliant-tag style,
+matching the shell's own text and CSS exactly. Confirmed by screenshot, not just DOM query.
+
+One honest ordering note, not itself a defect: the code-preview block renders BEFORE the 8 field rows in the
+declaration-alone output, while the shell shows fields-then-preview. Traced to `atcCheckData.js`'s own
+`param_group` node declaring `children: []` — its 8 fields were never explicitly placed by the tree at all,
+so they land via `renderUiTree`'s own "orphan" safety net (fields not attached during traversal get appended
+at the very end) — AFTER my code-preview node, which the tree DOES explicitly place. This is a pre-existing
+characteristic of Check's own param_group declaration, not something the new node introduces; not touched,
+since fixing it (populating param_group's own children) is outside this turn's one-node-type scope.
+
+### The honest finding this turn ends on
+
+The Blockly-canvas side (left panel, Customize route) now correctly shows the new "code preview" block,
+screenshotted directly. But the LIVE FORM PREVIEW panel (right side, what a user actually sees) does **not**
+show it — because ATC Check's `hasTreeLayout` check (`userOpView.js`) requires a `split_horizontal`/
+`split_vertical` node to route through `renderUiTree` at all, and Check has neither. Both live preview
+routes (in-place and Customize) still take the FLAT `renderOpForm`-only path for this op, exactly as
+established last turn — so this addition is currently INERT for what a real user sees today. That's not a
+shortcoming specific to `code_preview` — it's the SAME gate every one of the 32 twins is subject to, and
+confirms (rather than contradicts) last turn's finding: the declaration is now provably complete and correct
+for the tree-rendered case, but ATC Check doesn't currently exercise that case live. Making it do so is a
+different, separate change (adding a real split-node structure, or loosening `hasTreeLayout`'s own
+condition) — not something this turn's scope asked for or attempted.
+
+### Verified (full suite)
+
+Required — new node type touching a shared renderer (`formWidgets.js`) and the Blockly block registry
+(`wizards/ops/index.js`), both consumed across all 32 twins even though only one (`atcCheckData.js`) now
+declares the new type. 2790 passed, 19 flaky (inside the observed trend band), **0 unexpected**.
+
+### Files changed
+
+`web/ui/formWidgets.js` (the `code_preview` traverse() branch + `renderUiTree`'s new optional `codeElId`
+param), `web/wizards/ops/codePreview.js` (NEW — the Blockly block definition), `web/wizards/ops/index.js`
+(registers it), `web/blocks/dataOps/atcCheckData.js` (the one new uiChildren entry). `index.html` untouched;
+no other twin converted; no hardcoded block removed.
+
+### Capacity
+
+Full working room. A genuinely mixed turn — mostly a careful, scoped build, but the middle third was
+unplanned regression-hunting after a test failure that could easily have been misread as "some ATC gate
+thing, unrelated" if I hadn't isolated it precisely with git stash before concluding anything.

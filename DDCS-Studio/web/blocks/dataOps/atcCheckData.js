@@ -46,6 +46,11 @@ export function atcCheckDataStack(params = ATC_CHECK_DEFAULTS) {
             // building the pane ATC never had content for.
             { type: 'sim', params: { rotary: false, machine: true, magazine: false, layout2d: false } },
             { type: 'param_group', params: { group: 'Tool Check' }, children: [] },
+            // t2263 (wizards-as-data E2 measurement, PILOT) — the ONE node type formWidgets.js's traverse()
+            // was missing: a live code preview. atc_check's own static shell (index.html:908-911) uses the
+            // STANDARD label+tag pair every non-ATC-Table built-in shares — see formWidgets.js's own
+            // 'code_preview' branch comment for the full survey of the 15 hardcoded blocks this generalizes.
+            { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
         ],
         children: exec,
     }];

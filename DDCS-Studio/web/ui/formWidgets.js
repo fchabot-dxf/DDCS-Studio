@@ -1285,7 +1285,13 @@ function allMouthChildren(obj) {
     return Object.values(obj).flatMap((v) => (Array.isArray(v) ? v : []));
 }
 
-export function renderUiTree(host, uiTree, bindings, byParam = {}) {
+// t2263 (wizards-as-data E2 measurement) — codeElId is OPTIONAL and additive: the ONE existing caller
+// (userOpView.js) can pass its own view.codeElId so a declared 'code_preview' node's <pre> gets populated by
+// the SAME update() mechanism that already writes into the static shell's own hardcoded preview-block — but
+// only when a caller opts in. Omitted (every other current use), the rendered <pre> carries no id at all, so
+// it can never collide with the static shell's own #wiz_user_code sibling — see the 'code_preview' branch's
+// own comment for why reusing that id directly would be unsafe for an op whose in-place route is already live.
+export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = null) {
     const readers = [];
 
     function traverse(nodes, container) {
@@ -1382,6 +1388,26 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                 container.appendChild(pnlBox);
                 if (node.uiChildren) traverse(Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []), container);
                 if (node.children) traverse(Array.isArray(node.children) ? node.children : (node.children.DO || []), container);
+            } else if (node.type === 'code_preview') {
+                // t2263 (wizards-as-data E2 measurement, PILOT on ATC Check ONLY) — the one node type all 32
+                // twins' declarations are missing: every hand-written built-in hardcodes its own <div
+                // class="preview-block"> in index.html, entirely outside uiChildren. 15 occurrences checked
+                // first, not assumed identical: label is "CODE PREVIEW" everywhere except atc_table's "APPLY
+                // MACRO"; the compliant-tag varies too ("(DDCS M350 COMPLIANT)" / "(RUN ON CONTROLLER)" /
+                // "(VERIFY ON YOUR MACHINE)" / absent entirely for wiz_user_code and comm's own generic shells /
+                // dynamically JS-filled for WCS) — real variation, so both are params, not hardcoded here.
+                // codeElId is DELIBERATELY NOT defaulted to the caller's own view.codeElId (e.g. 'wiz_user_code')
+                // even though that would make update() populate it for free: an op registered via opensAs (ATC
+                // Check already is) has a STATIC shell with that EXACT id already live in the SAME #wiz_user_form
+                // ancestor for the in-place route — reusing it would collide with, not replace, the existing one.
+                // Left id-less unless a future caller explicitly threads its own id through renderUiTree's new
+                // param — structure only, proven safe; live-content wiring is the reported, NOT solved, gap.
+                const pb = document.createElement('div');
+                pb.className = 'preview-block';
+                const label = (node.params && node.params.label) || 'CODE PREVIEW';
+                const tag = node.params && node.params.tag;
+                pb.innerHTML = `<span class="label">${escHtml(label)}${tag ? ` <span class="compliant-tag">${escHtml(tag)}</span>` : ''}</span><pre${codeElId ? ` id="${escHtml(codeElId)}"` : ''}></pre>`;
+                container.appendChild(pb);
             } else if (node.type === 'param_group') {
                 // t1605 — a param_group IS its rows. TRANSPARENT on purpose, exactly like the flat form path
                 // (formBindings treats it as row-order metadata, never chrome): each param_field child picks its
