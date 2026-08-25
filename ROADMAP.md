@@ -571,3 +571,34 @@ not composing them.
 **⚠ The one case multi-op does NOT cover:** stitching `.nc` files that Studio did not author — programs posted
 elsewhere, or files already sitting on the controller. Multi-op composes ops *within* Studio. That gap is real
 but thin: two-sided and externally-posted work goes through Fusion for this shop, and nobody has asked for it.
+
+
+### ⭐ THE NODE VOCABULARY HAS TWO HOMES — measured t2263
+
+**The wizards-as-data arc's remaining cost, established by experiment rather than estimate.**
+
+t2261 rendered an ATC twin from its declaration alone and diffed it against the hand-written shell: everything
+matched except one thing, the **code-preview panel**, which all 15 shells hardcode outside the declaration.
+So the gap looked like one missing node type.
+
+**t2263 found it is one missing node type in TWO PLACES.** Every `traverse()`-known type ALSO needs a matching
+Blockly block file under `wizards/ops/` (~28 tiny per-type files feeding `defineBlocksWithJsonArray`). Declare
+a type in one home and not the other and Blockly throws `Invalid block definition for type: …`.
+
+⚠⚠ **And the failure is not local.** That exception ABORTS THE WHOLE RENDER of the Customize route — at
+t2263 it broke an unrelated field (`tolerance`) purely by sequencing, in two test files that had nothing to do
+with the change. **A half-declared node type is not a missing feature; it is a crash that takes unrelated
+fields down with it.**
+
+⇒ So the vocabulary is itself a two-homes structure — the same shape this project has met repeatedly
+(a helper in 4 copies, a boot wait in 16 files, sub-tab CSS in 3 homes, a tab token duplicated under two
+names). Whatever else the arc does, **adding a node type means adding it twice, and nothing enforces the pair.**
+
+⚠ Worth considering, not yet ruled: whether the two halves can be generated from one declaration, or at
+minimum whether a test can assert that every `traverse()` type has a `wizards/ops/` twin. That check does not
+exist today, which is why t2263 found this by a Blockly exception in unrelated tests rather than directly.
+
+⭐ Also recorded: a PRIOR attempt at this exact concept (`code_preview_panel`) existed and was pruned as
+unused in the same commit that introduced `renderUiTree`. It was found and read before the new one was
+designed — the shapes differ, and the new one is informed by an actual survey of what the 15 shells vary by
+(label, and a compliance tag with four distinct values, both now declared fields rather than assumptions).
