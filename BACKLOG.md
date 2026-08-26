@@ -2358,3 +2358,47 @@ use, which is a reasonable place for a *next free slot* default and a poor place
 ⇒ **Neither half needs a decision from the owner.** What both need is a turn: start the pool past the
 shipped placeholders (or feed the controller's eng into the allocator, which is the real fix), and let the
 `baseSlot` default stay a default. ⚠ Still do NOT touch the confirmed-correct constants listed above.
+
+---
+
+### 30. THE WIZARDS-AS-DATA EQUIVALENCE PROOFS ARE EXPERT-ONLY — V4.1 and V3/DM500 are never compared
+
+*(raised by the owner 2026-08-26, twice; measured by the advisor the same day)*
+
+**OBSERVED:**
+
+```
+test files exercising v41/dm500 anywhere        67
+of the 24 twin / as-data / parity specs          4   (preview-dialect-parity, homing-refusal-reaches-twin,
+                                                      comm-twin, io-step-twin)
+⛔ every *-as-data spec                          0   drill · bore · slot · text · atc-warmup
+```
+
+⇒ **The arc's central claim — "the data twin reproduces the wizard" — is proven on the dialect with the
+FEWEST users.** `v41-and-v3-outnumber-expert`: a V4.1/V3-only defect is an escalation.
+
+⛔ **NOT in scope, and do not widen it into this:**
+- **The FORM reproduction** (t2299 drill, t2301 pocket) is dialect-independent by construction. The form is a
+  view of the **op model**; the dialect is applied downstream at emit. Nothing to cover there.
+- **Unrolling.** The DDCS family (Expert, V4.1, V3/DM500) is **parametric-only** as of a few weeks before
+  2026-08-26, per the owner. grbl is the only unroll target and was never part of the reproducibility claim.
+
+⭐ **Why it is a real gap and not just missing checkboxes.** If the twins only had to produce the same STACK,
+dialect would be irrelevant — same stack in, same dialect fold downstream, identical text for every dialect.
+But `drill-as-data.spec.js:149` compares **emitted TEXT byte-for-byte on one dialect**, and the data path now
+has hooks that CAN branch per dialect: `postInstantiate` (how t2293 solved clearance's fan-out) and
+cap-gating, which reads dialect capabilities. **A V4.1-only divergence between builder and twin would pass
+every test we have.**
+
+**THE FIX IS CHEAP — no new machinery:** add the V4.1 and DM500 dialects to the sweep that already exists in
+each `*-as-data` spec. Same harness, one more comparison per dialect.
+
+⚠ **Expect DM500 to be the one that finds something, if anything does.** Its `ifGoto` uses WORD operators and
+a space before the label (`IF #1 EQ #2 GOTO5`) where V4.1 uses symbolic and no space (`IF#1=#2GOTO5`) — and
+unlike V4.1, whose dialect file claims *"EVERY primitive confirmed LIVE"*, the DM500's syntax is **declared,
+not attested**. ⛔ Nobody has a DM500 to test against; `COMMENT-CHARACTERS.md` rates its evidence
+`[HYPOTHESIS]` on 47 comments.
+
+**STILL REAL IF:** `grep -l "ddcs-v41\|dm500" DDCS-Studio/tests/*as-data*.spec.js | wc -l`
+→ **0 means STILL REAL.** *(This check greps for what the FIX looks like, not what the bug looks like — see
+AGENTS.md rule 8.)*
