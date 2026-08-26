@@ -2393,11 +2393,26 @@ every test we have.**
 **THE FIX IS CHEAP — no new machinery:** add the V4.1 and DM500 dialects to the sweep that already exists in
 each `*-as-data` spec. Same harness, one more comparison per dialect.
 
-⚠ **Expect DM500 to be the one that finds something, if anything does.** Its `ifGoto` uses WORD operators and
-a space before the label (`IF #1 EQ #2 GOTO5`) where V4.1 uses symbolic and no space (`IF#1=#2GOTO5`) — and
-unlike V4.1, whose dialect file claims *"EVERY primitive confirmed LIVE"*, the DM500's syntax is **declared,
-not attested**. ⛔ Nobody has a DM500 to test against; `COMMENT-CHARACTERS.md` rates its evidence
-`[HYPOTHESIS]` on 47 comments.
+⭐⭐ **DM500 IS ATTESTED — corrected 2026-08-26. We HAVE the vendor firmware** (`bridge/controllers/dm500/`),
+and the advisor wrote "declared, not attested" without looking at it. Extracted from the vendor's own macros:
+
+```
+symbolic   IF #11>0 GOTO6     IF #12<=#493 GOTO1    IF #9==#5 GOTO8    IF #4<#3 GOTO5
+word       IF #2004LT0 GOTO1  IF #450LT0 GOTO1                         IF #4LT#3 GOTO5
+                                                                       ↑ the SAME comparison, BOTH ways
+```
+
+⇒ **Studio's declared DM500 form is correct** — `ifGoto` emits `IF <lhs><WORDOP><rhs> GOTO<label>`, which is
+exactly `IF #4LT#3 GOTO5`. ⭐ And the vendor uses **symbolic and word operators interchangeably in its own
+files**, so the controller plainly accepts both. ⚠ Note the shape precisely: a **space before `GOTO`**, and
+**no space** around the operator — the opposite of the Expert, which takes no space before `GOTO`.
+
+⭐ **This makes the fix STRONGER, not unnecessary:** there is real ground truth to compare a twin's emit
+against, so adding DM500 to the sweep is checkable rather than speculative.
+
+⚠ **What is still genuinely unattested is the RUNTIME**, not the syntax — nobody has a DM500 to run anything
+on, and `COMMENT-CHARACTERS.md` rates its comment evidence `[HYPOTHESIS]` on 47 comments. ⇒ Syntax: evidenced.
+Behaviour: not.
 
 **STILL REAL IF:** `grep -l "ddcs-v41\|dm500" DDCS-Studio/tests/*as-data*.spec.js | wc -l`
 → **0 means STILL REAL.** *(This check greps for what the FIX looks like, not what the bug looks like — see
