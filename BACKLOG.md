@@ -2218,3 +2218,30 @@ nothing was written. `#168` moved `9999 → 1` between two captures, which made 
 ⛔ **Not in scope, explicitly:** the `> 0` guard at `ui/settingsPanel.js:2285-2287`, soft-limit validation,
 or anything that inspects a pulled value and decides it looks wrong. Per the ruling above — fix the read,
 not the user.
+
+⚠ **STATE, 2026-08-26 — UNCONFIRMED, and not worth more of the owner's attention until someone sees it.**
+
+Verified from the raw capture bytes (`setting` float64 array, `#161-163` / `#166-168`):
+
+```
+2026-06-10   Z− −9999   Z+ 9999   both unfenced → far_reach returns None → nothing written ✅
+2026-07-31   Z− −9999   Z+    1   one-sided     → returns +1
+```
+
+⇒ The parameter change is real and dated. **What is NOT established is that anything is broken today** — the
+trace is from reading `far_reach()`, never from running a pull.
+
+⭐ **And the owner's motive matters here:** they set the Z soft limit *so that Studio could see their travel* —
+the soft-limit register was the only channel available to communicate an envelope. ⛔ So this is NOT a case of
+"leave the user's machine config alone": that parameter was configured **to serve the app**. They no longer
+recall whether they also typed the travel into Studio directly, or set the negative limit at some point (the
+captures show `Z−` unset in both, so if they did it did not persist).
+
+**One observation settles it, and it costs nothing to wait for:** after the next profile pull from the Expert,
+does the machine envelope read ~150 mm in Z, or 1 mm?
+
+- **150** → the app reads the envelope somewhere this trace missed. **Refute this entry and delete it.**
+- **1** → confirmed; fix `far_reach()`'s one-sided branch as described above.
+
+⛔ **Do not investigate further before that observation.** Three separate machine settings were escalated as
+faults on 2026-08-26 and all three were normal, deliberate configuration.
