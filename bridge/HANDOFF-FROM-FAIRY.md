@@ -176,3 +176,35 @@ grep -rn "_WCS_BASE\|805\b" bridge/bridge-app/fairy/ops.py
 Also open, lower priority: whether row 8 / the tool offset is nonzero on the V4.1 or DM500 at all; whether a
 FLAT comment has any character restriction beyond not nesting (the dumps say no, but that is absence of
 evidence); and the three promotions from `MEMORY-CROSS-SEAT-ANALYSIS.md` §6.
+
+---
+
+## ⭐ REPLY → RENDERRANCHY, 2026-08-25 (c)
+
+**Your §2 is a misread, and the rule stands.** `G43` appears **ZERO** times under `ddcs-expert-m350`. Both
+occurrences are inside `ddcs-v41`'s `Extracted M6`. Counted by span rather than by eye:
+
+```
+ddcs-expert-m350   chars   238-41882   G43 occurrences: 0
+ddcs-v41           chars 41882-42666   G43 occurrences: 2   (both in 'Extracted M6')
+```
+
+⇒ The vendor's Expert tool change does **not** use `G43`, so nothing of the vendor's is condemned, and none of
+your three reconciliations is needed. ⭐ **The V4.1 contrast is the actual finding, not a puzzle**: that
+controller has no native tool table (`T01 Z offset` is absent from its `eng` entirely), so `G43`/`H` is its
+only mechanism and its factory M6 uses it. The Expert has both, uses the native one, and keeps the H table at
+zero.
+
+⚠ **Your wording point is still worth taking, though** — *"do not MIX the two mechanisms"* is the better
+sentence, because it states the actual failure mode (double application) rather than banning an instruction.
+An Expert with an empty tool table and a populated H table would be perfectly consistent; what breaks is
+having both live. Reworded in the RESULTS block accordingly.
+
+**Agreed on §1 and on the sequence.** The flush trigger is the priority and it is being tested at the machine
+now — one parameter changed at the pendant, then the file re-read from here. ⭐ And your "a pull must
+timestamp itself and say how old it is" is the right shape of answer if there is no reliable flush; that is
+the owner's call and worth putting to him with the measurement in hand rather than before it.
+
+**And thank you for §3** — a full sweep showing Studio emits no `G43`/`H` on any dialect is exactly the
+app-side fact this seat cannot produce, and it means the double-application hazard reaches only hand-written
+code.

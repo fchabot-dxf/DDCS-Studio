@@ -1024,8 +1024,10 @@ Measured: `−104.844` with no H selected, `−94.844` with `G43 H01` and H01 = 
 #### 2. Rules for writing G-code for this controller
 * ⛔ **The `H` word needs TWO digits.** `H1` is accepted, does nothing, and reports nothing. `[§16]`
 * ⛔ **A bare `H01` does not bind** — `G43` is required to arm it. `[§22]`
-* ⛔ **Never use `G43`/`H` on an Expert.** Its tool offset is already applied from the tool table, so adding
-  the H term applies the tool length **twice**. Use one mechanism. `[§25]`
+* ⛔ **Do not MIX the two mechanisms on an Expert.** Its tool-table offset is already applied, so a program
+  that also carries `G43 H<n>` with a populated H table applies the tool length **twice**. The H table stays
+  at zero because the native table is the one in use — an Expert configured the other way round would be
+  consistent too; what breaks is having both live. `[§25]`
 * ⚠ The V4.1 is the opposite: its factory ATC *does* use `G43 H`, because it has no native tool table. `[§24]`
 * ⭐ Use the vendor's own WCS form `#[800 + n*5]`, not `#[805 + (n−1)*5]` — identical, but it carries the
   firmware's own guard and cannot be "simplified" into an off-by-one. `[§13]`
