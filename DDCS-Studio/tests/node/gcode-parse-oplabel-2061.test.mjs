@@ -10,7 +10,7 @@ import { activeDialectOpts } from '../../web/wizards/previewEmit.js';
 /**
  * t2061 — Tier 3's last parked item, collected. `opLabel()` used a single-level regex
  * (`/\(([^()]*)\)/`) to find a bare-comment op header — for a comment containing its OWN parentheses
- * (Studio's real drill header, "( ---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ---- )"), the
+ * (Studio's OLD drill header, "( ---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ---- )"), the
  * regex matched the FIRST paren pair it could complete, which is the INNER "(grid)", not the header —
  * confirmed live at t2055, returning "grid" instead of the operation's actual name. Pocket's own header has
  * no nested parens and was always correct — the control that proves this was op-dependent, not universal.
@@ -21,9 +21,18 @@ import { activeDialectOpts } from '../../web/wizards/previewEmit.js';
  * (pocket's own is equally decorated with "----" dashes); truncating or cleaning up the text would make
  * drill's label inconsistent with every other op instead of fixing the actual defect, which was never about
  * how ornate a header is, only about capturing the right one.
+ *
+ * t2305 UPDATE — drill's REAL header is no longer nested at all: the nested `(grid)` this test's own name
+ * cited was ITSELF a live defect (a comment DDCS closes at the first `)`, "everything after it parsed as
+ * G-code" — see holecycle.js's own t2305 comment), fixed at the EMITTER by replacing the nesting with `:`.
+ * That retires this test's own real-world nested-paren example; `opLabel`'s general nested-paren-handling
+ * robustness (which this test used to prove via that real example) is still independently covered by the
+ * SYNTHETIC case below ('(outer (mid (inner) mid) outer)') — unaffected by the emitter fix, since it is a
+ * hand-written string, not a real emit. The golden string here was invalid G-code; updated, not just
+ * re-asserted.
  */
 
-test('THE LIVE BUG, confirmed by execution against Studio\'s REAL emitted drill header: no longer "grid"', () => {
+test('drill\'s REAL emitted header, confirmed by execution: a clean, non-nested comment (t2305 fixed the nesting at the emitter)', () => {
     const def = registerUserOp(drillDataDef());
     const build = builderOf(def.opType);
     const params = { ...DRILL_DEFAULTS, pattern: 'grid', cols: 2, rows: 1, dx: 20 };
@@ -31,7 +40,7 @@ test('THE LIVE BUG, confirmed by execution against Studio\'s REAL emitted drill 
     const headerLine = text.split(/\r?\n/).find((l) => /^\s*\(.*\)\s*$/.test(l));
     expect(headerLine, 'a real bare-comment header line exists in the real emit').toBeTruthy();
     const label = opLabel(headerLine);
-    expect(label, 'the FULL header, not the inner "(grid)" fragment').toBe('---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ----');
+    expect(label, 'the full header, no longer nested (t2305)').toBe('---- DRILL, parametric: 2 holes: grid x peck · @work 52 ----');
     expect(label).not.toBe('grid');
 });
 

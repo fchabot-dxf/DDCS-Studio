@@ -61,7 +61,9 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
     const tinyTxt = new PocketWizard().generate(tiny);
     const refuseTxt = new PocketWizard().generate({ ...tiny, dia: 4 });   // t1444 — strictly smaller: no motion at all
     out.pocketRefuse = { says: /cannot fit/.test(refuseTxt), flags: /#1505=1/.test(refuseTxt), noMotion: !/^\s*G[0-9]+\s+[XY]/m.test(refuseTxt) };
-    const tinyHeader = /parametric: 1 hole \(single\) x peck/.test(tinyTxt);
+    // t2305 — the header used to nest `(single)` inside the comment's own outer `( … )`, invalid G-code
+    // (DDCS closes at the first `)`); fixed at the emitter (holecycle.js) by replacing the nesting with `:`.
+    const tinyHeader = /parametric: 1 hole: single x peck/.test(tinyTxt);
     const tinyDepthSeed = /^#81=3/m.test(tinyTxt);
     const tinyZFeed = /G1 Z\[[^\]]*#\d+[^\]]*\] F/.test(tinyTxt);
     const tinyNoArc = !/G3 /.test(tinyTxt);

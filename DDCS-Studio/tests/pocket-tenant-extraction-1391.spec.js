@@ -219,7 +219,9 @@ test('THE HEADER — the too-small arm now declares @work, and its trace is not 
             work: readDeclaredWork(txt), capped: tr.stats.capped, cuts: tr.stats.feed,
         };
     });
-    expect(r.header, 'the fallback emits the parametric header').toMatch(/parametric: 1 hole \(single\) x peck/);
+    // t2305 — the header used to nest `(single)` inside the comment's own outer `( … )`, invalid G-code
+    // (DDCS closes at the first `)`); fixed at the emitter (holecycle.js) by replacing the nesting with `:`.
+    expect(r.header, 'the fallback emits the parametric header').toMatch(/parametric: 1 hole: single x peck/);
     expect(r.header, 'carrying its declared work token').toMatch(/@work \d+/);
     expect(r.work, 'which reads back as a real count').toBeGreaterThan(20);
     expect(r.capped, 'and the arm traces whole').toBe(false);

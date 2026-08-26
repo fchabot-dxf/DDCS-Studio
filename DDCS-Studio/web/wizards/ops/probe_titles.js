@@ -32,5 +32,9 @@ export const circularTitleBlock = {
     category: 'Control',
     defaults: { featureType: 'bore' },
     fields: ['featureType'],
-    emit: (p) => `( Circular | ${p.featureType === 'boss' ? 'Boss (outside)' : 'Bore (inside)'} )`
+    // t2305 — LIVE DEFECT: 'Boss (outside)'/'Bore (inside)' nested a paren pair inside this comment's own
+    // outer `( … )`. No vendor dialect nests a comment (bridge/controllers/COMMENT-CHARACTERS.md §1, 0/2248
+    // vendor comments nested) — DDCS closes at the first `)`, so " )" fell outside and was parsed as code.
+    // Replaced with `-`, that doc's own #1-ranked safe separator (1488 vendor occurrences).
+    emit: (p) => `( Circular | ${p.featureType === 'boss' ? 'Boss - outside' : 'Bore - inside'} )`
 };

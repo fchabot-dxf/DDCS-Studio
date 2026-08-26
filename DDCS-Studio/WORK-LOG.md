@@ -57650,3 +57650,96 @@ cross-dialect test), `tests/atc-warmup-as-data.spec.js` (new cross-dialect test)
 
 **Part 2** (committed separately): `web/ui/workspaceManager.js` (`renderCurrent()`'s three-way state class),
 `web/styles.css` (`.wsm-state`'s shape-glyph rules), `tests/workspace-state-glyph-2303.spec.js` (new).
+
+## t2305 — LIVE DEFECT, owner-reported from the running app: inserting Drill emitted a header comment DDCS's
+own check reported 4 errors on. Root cause confirmed by reading, not guessed: `wizards/ops/holecycle.js`
+nested a paren pair inside a comment's own outer `( … )` — no vendor dialect nests one (bridge/controllers/
+COMMENT-CHARACTERS.md §1, 0 nested across 2,248 vendor comments) — DDCS closes the comment at the FIRST `)`,
+so everything after "(single)" (` x peck ---- )`, including the word `peck` and the `@work` token) fell
+OUTSIDE the comment and was parsed as G-code. Fixed there plus two more of the SAME class the sweep found;
+built the permanent guard the dispatch asked for; updated every golden that encoded the invalid text.
+
+### THE THREE SITES, each fixed by REPLACING the nesting with a vetted separator, not stripping the string
+
+Per `bridge/controllers/COMMENT-CHARACTERS.md`'s own §2/§5 ranked list (measured on 2,248 vendor comments) —
+`-` `.` `:` `=` `!` `,` — NOT square brackets or `#` (read as expressions/variables at the controller, that
+doc's own explicit ⛔). `stripCommentParens` (BACKLOG #22, t2291) was never in this path on purpose: it
+sanitises USER-interpolated text; these are hardcoded parentheses an author typed into a template literal —
+blanket-stripping would have silently eaten intended punctuation elsewhere in the SAME strings.
+
+1. **`wizards/ops/holecycle.js`** (the owner's own report) — `(${pattern})` → `: ${pattern}`, keeping the
+   line's own pre-existing `·` (for the work-marker) as a visually distinct SECOND separator rather than
+   reusing the same one for two different kinds of thing.
+2. **`wizards/ops/probe_titles.js`** (found by the dispatch's own first sweep) — `'Boss (outside)'` /
+   `'Bore (inside)'` → `'Boss - outside'` / `'Bore - inside'` (hyphen, that doc's #1-ranked candidate, 1488
+   vendor occurrences). Noted, not touched: this file's OWN pre-existing `|` separator convention
+   (`Edge | X pos`, etc.) is itself UNVETTED per that same doc (`|` appears in zero vendor comments, only in
+   files this repo wrote) — a real, adjacent finding, out of THIS turn's scope (the dispatch named the nested
+   parens specifically, not the file's whole separator choice).
+3. **`wizards/ops/surfaceraster.js`** (found by THIS turn's own sweep, not the dispatch's) — `tan(${r3(ang)}deg)`
+   inside the ramp-entry comment → `tan ${r3(ang)}deg` (parens dropped entirely; reads fine as prose). Only
+   reachable off the non-default `entry:'ramp'` arm, which is exactly why a defaults-only sweep missed it —
+   found by a light branch-variant pass, not the defaults-only check alone. Shared code: this ONE fix also
+   closes pocket's own ramp-entry path (pocket's `_para` arm rides the same `surfaceraster` atom surfacing
+   does) — confirmed by re-running the guard against the pre-fix baseline, which caught it under BOTH opTypes.
+
+### THE SWEEP, properly — not just a line-scoped regex
+
+A regex over template literals (the dispatch's own first pass) would miss a comment assembled across lines
+or built by concatenation. Built instead as a RUNTIME check: emit every one of the 21 built-in wizard
+STACKS, every one of 5 data-op TWINS, and every one of 143 raw PALETTE block types (calling `.emit` directly
+with its own declared defaults — catches an atom like `circular_title` that no current wizard stack actually
+assembles, confirmed by grep: it has exactly one reference anywhere, its own declaration), all at their
+defaults, PLUS a light pass of branch-selecting param variants (`method:'helical'`, `pattern:'circle'`,
+`entry:'ramp'`, `shape:'polygon'`, …) — the variant pass is what found site #3, which the defaults-only pass
+missed entirely. Zero further violations found after all three fixes, across BOTH passes.
+
+### THE PERMANENT GUARD — `tests/comment-nesting-guard-2305.spec.js`
+
+Exactly what the dispatch asked for: emits every wizard/data-op/block combination above and asserts no line's
+first comment ever opens a second `(` before its own `)` closes. Proved non-vacuous by temporarily restoring
+all three source files to their pre-fix committed versions (`git show HEAD:`) and re-running — it correctly
+caught 8 violations across drill/bore/pocket/surfacing before the fix, confirmed the pocket↔surfacing shared-
+code prediction above, and passed clean once the fixes were restored.
+
+### GOLDENS UPDATED — the previous expected text was invalid G-code, not a value worth re-asserting
+
+Found by grepping every test for the OLD header text, not assumed complete from the 3 source fixes alone:
+
+- `tests/node/gcode-parse-oplabel-2061.test.mjs` — its own real-drill-header example WAS the nested-paren
+  case (t2061's own bug, a DIFFERENT defect in the PARSER, fixed separately at the time). That real example
+  is now retired (drill's real header is no longer nested at all); updated to the new text, and the general
+  nested-paren-parsing robustness `opLabel` still needs (for a hand-authored comment, or a future author who
+  reintroduces the pattern) stays independently covered by the file's own SYNTHETIC test just below it,
+  unaffected by this fix since it's a hand-written string, not a real emit.
+- `tests/value-fidelity-1520.spec.js` — two hardcoded header substrings (drill and bore), updated.
+- `tests/pocket-asblocks.spec.js` / `tests/pocket-tenant-extraction-1391.spec.js` — found ONLY by the full
+  suite (not by the targeted sweep above, since neither is named `*-as-data`): pocket's own too-small
+  fallback rides `holecycle` too (t1391's own re-point), so its header carried the exact same defect and the
+  exact same two hardcoded-regex tests needed the exact same one-character fix.
+- `tests/fixtures/pocket-golden.json` — **checked, NOT regenerated.** The 96-combo sweep this golden covers
+  never sets `entry:'ramp'` (pocket's own default is `plunge`), so surfaceraster.js's fix never touches it;
+  and the 40 `|tiny|` entries that DO carry the old nested-paren "DRILL/BORE, parametric" text via holecycle
+  are the t1444-refused cases — pocket-e0-superset.spec.js's own comparison logic exempts them BY NAME (the
+  golden's own stale bytes for those 40 keys are already dead, unread data, per that file's own established
+  discipline: "the golden is not regenerated" for ruled-away cases). Verified by running the test, not
+  assumed from the exemption comment: `goldenDiffs: 0` before AND after every fix.
+
+### Regression sweep
+
+Full suite run TWICE: run 1 caught the two golden-string regressions above (`pocket-asblocks.spec.js`,
+`pocket-tenant-extraction-1391.spec.js`) — neither found by the targeted `*-as-data`/`value-fidelity` sweep,
+confirming the full-suite requirement wasn't a formality. Run 2, after both fixes: **2804 passed, 0
+unexpected, 18 flaky** (25.5m) — every flaky entry a boot/workspace-init timeout on a spec this turn never
+touched, passed on retry, the same parallel-load-timeout pattern this project's own memory already names.
+
+### Files changed
+
+- `web/wizards/ops/holecycle.js`, `web/wizards/ops/probe_titles.js`, `web/wizards/ops/surfaceraster.js` —
+  the three nested-paren sites, each fixed with a vetted non-paren separator.
+- `tests/comment-nesting-guard-2305.spec.js` (new) — the permanent sweep, proven non-vacuous.
+- `tests/node/gcode-parse-oplabel-2061.test.mjs`, `tests/value-fidelity-1520.spec.js`,
+  `tests/pocket-asblocks.spec.js`, `tests/pocket-tenant-extraction-1391.spec.js` — golden strings updated to
+  the new, valid header text.
+- `tests/fixtures/pocket-golden.json` — **unchanged**, confirmed correctly so (see above), not silently
+  skipped.

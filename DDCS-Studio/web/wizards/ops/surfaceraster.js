@@ -1477,7 +1477,13 @@ function rampLines(o) {
         // remaining drop: a whole bite on every level but the last, and exactly the clamped remainder on a partial
         // one. Reading `#43` there made the ramp `(stepdown − lastBite)/tan(angle)` too long on the final level — the
         // slot kernel's 9.54mm at the shipped defaults — and spent that much of the descent in air.
-        `    ${V.run}=[[${V.z} - ${V.prevZ}] * ${r3(invTan)}]   ( ramp run = the drop actually left / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
+        // t2305 — LIVE DEFECT (found by the same-class sweep, not the original report): `tan(${r3(ang)}deg)`
+        // nested a paren pair inside this comment's own outer `( … )` — the same "no vendor dialect nests"
+        // class as holecycle.js's/probe_titles.js's own fixes (bridge/controllers/COMMENT-CHARACTERS.md §1).
+        // Only reachable off the default entry mode (`entry:'ramp'`), which is why the earlier defaults-only
+        // check missed it — dropped the parens around the tangent's argument entirely rather than substituting
+        // a separator; "tan 3deg" reads fine as prose without them.
+        `    ${V.run}=[[${V.z} - ${V.prevZ}] * ${r3(invTan)}]   ( ramp run = the drop actually left / tan ${r3(ang)}deg — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run needed is longer than the distance available
         // along the declared vector, a ramp cannot be cut and the tool plunges instead — with the reason in the
         // program, not silently. t1483 — the limit is now the LIVE span register, so a dialled area moves it too;

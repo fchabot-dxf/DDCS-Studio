@@ -126,12 +126,14 @@ test('CAUSE 1 — a ONE-HOLE drill does not come back a six-hole grid, and a BOR
     const bore = await roundTrip(page, 'user_bore_data');
     // The pattern word is load-bearing: `single` is not in the array block's list, so the canvas rewrote it to
     // `grid` and the program came back drilling SIX holes on a 20mm pitch that the operator never asked for.
-    expect(drill.after, 'one hole, single, peck').toContain('DRILL, parametric: 1 hole (single) x peck');
+    // t2305 — the header used to nest `(single)` inside the comment's own outer `( … )`, invalid G-code
+    // (DDCS closes at the first `)`); fixed at the emitter (holecycle.js) by replacing the nesting with `:`.
+    expect(drill.after, 'one hole, single, peck').toContain('DRILL, parametric: 1 hole: single x peck');
     expect(drill.after, 'and the loop walks exactly one').toContain('WHILE [#89 < 1] DO1');
     expect(drill.after, 'byte-identical through the canvas').toBe(drill.before);
     // …and `cycle` the same way: `bore-step` is not one of the canned-cycle words, so a BORE came back a DRILL —
     // a helical/stepped bore replaced by a peck cycle at the bore's feed is a broken part, not a cosmetic diff.
-    expect(bore.after, 'still a bore, still stepping').toContain('BORE, parametric: 1 hole (single) x bore-step');
+    expect(bore.after, 'still a bore, still stepping').toContain('BORE, parametric: 1 hole: single x bore-step');
     expect(bore.after, 'and it still cuts the full circle a bore is').toContain('( full circle )');
     expect(bore.after, 'byte-identical through the canvas').toBe(bore.before);
 });

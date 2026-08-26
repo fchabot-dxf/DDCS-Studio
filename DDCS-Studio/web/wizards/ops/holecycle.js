@@ -499,7 +499,13 @@ export function holeCycleLines(p = {}) {
         // no byte-equivalence bridge sees it.
         // …and it declares ONLY when it can be TRUE (t1389). `holeCycleWorkSteps` returns null the moment any input it
         // multiplies is a live expression, and the token is then omitted entirely — see the note on that function.
-        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'} (${pattern}) x ${cycle}`
+        // t2305 — LIVE DEFECT: `(${pattern})` used to wrap the pattern name in its OWN parens, nested inside
+        // this comment's own outer `( … )`. DDCS closes a comment at the FIRST `)` it sees — no vendor dialect
+        // nests (bridge/controllers/COMMENT-CHARACTERS.md §1, measured on 2,248 vendor comments, 0 nested) —
+        // so everything after "(single)" (` x peck ---- )`) fell OUTSIDE the comment and got parsed as G-code
+        // words. Replaced with `:` (that doc's own §2 ranked list; keeps `·` distinct for the work-marker
+        // below so the two separators don't read as the same kind of thing).
+        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'}: ${pattern} x ${cycle}`
             + `${holeCycleWorkSteps(p) == null ? '' : ' · ' + workMarker(holeCycleWorkSteps(p))} ---- )`,
         `${V.depth}=${depthSeed}   ( total depth — LIVE: a pendant can turn this )`,
         `${V.bite}=${biteSeed}   ( ${cycle === 'peck' ? 'bite per peck' : 'pitch per pass'} — LIVE )`,
