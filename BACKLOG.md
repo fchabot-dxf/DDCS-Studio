@@ -2526,3 +2526,31 @@ suggests. Syntax: evidenced. Runtime: not — and `COMMENT-CHARACTERS.md` rates 
 **STILL REAL IF:** `grep -l "ddcs-v41\|dm500" DDCS-Studio/tests/*as-data*.spec.js | wc -l`
 → **0 means STILL REAL.** *(This check greps for what the FIX looks like, not what the bug looks like — see
 AGENTS.md rule 8.)*
+
+---
+
+### 31. THE `|` SEPARATOR IN COMMENT TITLES IS UNVETTED — zero vendor occurrences
+
+*(found at t2305 while fixing the nested-paren defect; adjacent to that turn's scope, deliberately not touched)*
+
+`wizards/ops/probe_titles.js` and `corner_title.js` build their comment titles with a pipe:
+`( Corner | FL OUTSIDE | Seq: YX | … )`.
+
+⚠ **`|` appears ZERO times inside a comment across the vendor corpora** measured in
+[`bridge/controllers/COMMENT-CHARACTERS.md`](bridge/controllers/COMMENT-CHARACTERS.md) — 2,248 vendor comments
+across three DDCS controllers, plus 4,656 LinuxCNC ones. ⇒ It is not *known bad*; it is **unattested**, which
+is a weaker thing than the vetted list (`-` `.` `:` `=` `!` `,`) and a stronger thing than a guess.
+
+⛔ **Do NOT mass-replace it on that basis alone.** Absence from a corpus is not evidence of rejection, and
+these titles have been shipping. The measured, *governing* constraint is **nesting**, and that is now fixed
+and guarded (`comment-nesting-guard-2305.spec.js`).
+
+**What would actually settle it**, cheaply and with no hardware:
+- ⭐ the **bench V4.1 at `10.0.0.50`** is motorless and reachable from the dev seat — a comment containing `|`
+  either parses or it does not
+- or ask the vendor (Q.G. Zhang, Messenger) alongside the next question, since that channel is open and answers
+
+⇒ **Low priority.** Filed so the finding is not lost, not because it is urgent.
+
+**STILL REAL IF:** `grep -c "| " DDCS-Studio/web/wizards/ops/probe_titles.js` → any hit means the pipe is
+still in the emitted titles.
