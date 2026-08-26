@@ -1999,3 +1999,57 @@ same discipline t2277 and t2281 both used for `disabledReasons`; do not assume f
 ⚠ Whether this should ALSO ride the `( @DDCS:1 {…} )` marker (so a comment survives a `.nc` export/reimport,
 not just an in-app reload) is a separate question from whether it survives the Blockly canvas round-trip —
 answer the cheaper one first and report whether the marker question is worth its own turn.
+
+### 27. ⛔ THE WORK↔MACHINE FRAME EQUATION USES 1 OF 5 TERMS — the WCS-zero write is silently wrong under a tool offset
+
+*(carried forward from `VENDOR-PACK-FIXES-PLAN.md` (t2117-t2121, Stage D/T9) — the plan's own file is deleted,
+t2295 doc cleaning, its Stages A-C shipped; this ONE item was explicitly gated behind a human go and never
+built. Preserved here rather than lost with the plan.)*
+
+**Evidence** (`Docs/最完整的M350坐标换算公式/Coordinate system offsets DDCSE.txt`, verbatim): `#852 = #882 -
+#807 - #1430 - #837 - #900` (mach − G54 − T-offset − G52 − H-length). Studio uses only 1 of the 5 terms —
+`viz/sceneFrame.js:66` `wcsOffsetAt()` returns only `{x,y,z}` from the WCS row; `engine/envelopeCheck.js:113`
+is literally `const mach = (workPt[ax]||0) + (wo[ax]||0)`. Absent everywhere: G52 (`#835-#839`), the per-tool
+T offset (`#1390`/`#1410`/`#1430` + `[#1300-1]`), and the H tool-length table (`#900-#915`).
+
+**Propagates into emit twice:** `wizards/dialects/ddcs-expert-m350.js:119-134` `wcsZeroAtCurrent` emits what
+reduces to `#807=#882` — the vendor names this EXACT form as wrong ("the command #807=#882 will set not '0'
+for the Z axis in G54, but '25'" — worked with a T1 Z offset of −25). `wizards/ops/wcsIndirect.js:36-42`
+`wcswrite` (shared by `cornerWizard.js`/`edgeWizard.js`/`middleWizard.js`) builds `[#1927-#6]` with no
+tool-offset term either.
+
+**Documented correct form** (still incomplete — omits G52/H, exact only when both are zero, per two
+independent sources confirming G52 is silently operator-writable via the 加深/抬高 buttons):
+```
+Z:   #[807+[#578-1]*5] = #882 - #[1430+[#1300-1]]
+```
+
+⛔ **THE GATE, unchanged:** this changes what gets written to a live WCS on machines using fixed-probe tool
+setting or ATC auto-measure (`#1305=1`) — the power-user population. Highest-value fix in the original sweep
+AND the worst failure mode if wrong. Requires an explicit human go, a bench check with a known non-zero tool
+offset, and its own turn — do not fold into an unrelated dispatch.
+
+### 28. HELD — `T.nc` OVERWRITES THE ATC DISPATCHER (needs a design ruling, not a patch)
+
+*(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H1 — the plan's own file is deleted, t2295.)*
+
+`atcGenerator.generateToolChangeNc` (`controllerFiles.js:33`) replaces the one-line dispatcher `T#1504`,
+bypassing `O20000`'s whole magazine state machine (`#1302` dispatch, dust cover, magazine open/close, per-tool
+Z, auto tool-setting, position restore). Blast radius is a real tool change on a real magazine — the right
+fix (write into `slib-g.nc`/`O20000` vs warn loudly) is a design decision the plan explicitly deferred to a
+human ruling, never built.
+
+### 29. HELD — CAM `baseSlot: 22` AND THE `POOL_MIN = 1100` COLLISION (needs a ruling, not proven, not fixed)
+
+*(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H2 — the plan's own file is deleted, t2295.)*
+
+Two open questions, both explicitly weakened-not-proven in the original verification: (1) the vendor PDF's CAM
+tables run CAM1→cam10/m30 … CAM10→cam19/m39, but the PDF never states 10 is the maximum, the vendor's own CAM
+picker screenshot has a scrollbar sized for ~22+ entries, and community packs run CAM10-CAM21 — slot 22 is
+undocumented, not proven impossible. (2) `slotPack.nextParam()` starts at `POOL_MIN = 1100`, and the live
+SYSDISK eng already ships `#1100`-`#1102 -m30` / `#1103`-`#1105 -m31` as placeholders, so a new user's first
+slot collides — `mergeEng` DOES report `paramCollisions` against the real file at merge time (not silent), but
+`usedParams()` only walks the pack's own slots, never the controller's eng. Fixing properly means feeding the
+controller's eng into the allocator (an API change). Confirmed correct as-built, do NOT touch:
+`POOL_MIN=1100, POOL_MAX=1499, MIRROR=1500`, `slotGroup = slot+20`, the icon format (360×180, 24bpp, BI_RGB,
+54-byte header, bottom-up, no palette, xppm/yppm 3780).

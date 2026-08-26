@@ -1,8 +1,10 @@
 # Item 4 — the Unified Travel/START Model
 
 **Status:** DESIGN (scout `f45d57c` done; this is the draft for human shaping — same playbook as `SPATIAL-MODEL-SPEC.md`). The "crux."
-**Origin:** the human's screenshot (the diag-travel "locked at 24"; the missing 4th/5th markers) + `MIDDLE-PROBE-BACKLOG.md` turn-117
-("THE CRUX") + `FEATURE-CANVAS-PROBE-SCOPE.md`.
+**Origin:** the human's screenshot (the diag-travel "locked at 24"; the missing 4th/5th markers) + `MIDDLE-PROBE-BACKLOG.md`
+turn-117 ("THE CRUX") + `FEATURE-CANVAS-PROBE-SCOPE.md` (both since deleted, t2295 doc cleaning — their own
+conclusions shipped and are superseded; kept here only as historical attribution for where this spec's own
+origin traces to).
 
 ## The headline (scout): it's a FLIP, not a build
 Today the dependency is **INVERTED** — **START ← TRAVEL** in every probe wizard (each derives the start from a travel/reach field via
@@ -41,4 +43,5 @@ the seam ALREADY EXISTS:
   `reposition()` count; emit **value-identical** to today for the default start positions (no regression).
 - middle: the 4th+5th markers appear for Z-first / both-axis; the "locked 24" disconnect is GONE.
 
-Refs: `MIDDLE-PROBE-BACKLOG.md` turn-117 · `FEATURE-CANVAS-PROBE-SCOPE.md`
+Refs: `MIDDLE-PROBE-BACKLOG.md` turn-117 · `FEATURE-CANVAS-PROBE-SCOPE.md` (both deleted t2295 — see the
+origin note above)
