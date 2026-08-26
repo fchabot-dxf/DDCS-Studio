@@ -45,6 +45,18 @@ Before deleting or commenting out anything that looks unused: **find its consume
 callers is thirty seconds. Both of the worst regressions this week were confident removals of code
 that was load-bearing.
 
+### 6. A plan lives at the repo root while it is being built, and is DELETED the day it ships
+
+Git keeps it — a completed plan is worse than no plan, because a reader cannot tell intent from
+description, and a stale plan invites the next reader to build from a picture of the repo that no
+longer exists. The one-time sweep in `docs/REPO-SANITATION-PLAN.md` (2026-07-29) cleaned root
+completely; root grew **seven new `*-PLAN.md` files in the four weeks after**, because nothing said
+where a new plan goes or when it leaves. A sweep without a rule refills — the t2295 doc-cleaning turn
+deleted 18 more DONE/STALE/DUPLICATE docs for exactly this reason (verdict table in `DDCS-Studio/
+WORK-LOG.md`). When a plan ships: delete it in its own commit (`git rm`, no content edits alongside),
+carrying forward only what is still genuinely undone (to `BACKLOG.md` or a fresh, scoped doc) — never
+archive a finished plan "just in case."
+
 ---
 
 ## ⚠ Load-bearing code — do not remove
