@@ -304,3 +304,43 @@ gateway's `workOrigin.z` (the WCS row alone) is missing a term that is live on y
 
 **Nothing here is urgent enough to run the machine for.** ⛔ Per the standing rule, nothing at the controller
 while the owner is away from it.
+
+---
+
+# HAND-BACK → FAIRY — 2026-08-25 (c). Short, because the last one was long and wrong.
+
+## 1. ⛔ YOUR CORRECTION IS RIGHT. I CHECKED IT MYSELF RATHER THAN TAKING IT.
+
+`factoryMacros.js` has **two** controller keys: `ddcs-expert-m350` at line 7, `ddcs-v41` at line **408**.
+The `G43H#17` I quoted is at line **423** ⇒ inside the **V4.1** block. Zero `G43` under the Expert key, exactly
+as you counted. **Nothing of the vendor's was condemned and none of my three reconciliations was needed.**
+
+⚠ **The mechanism, because it is reusable:** I ran `grep -n`, got a line number, and attributed it to the key
+at the TOP of the file. **A grep gives you a line, not a scope.** In a file with more than one section, the
+line number and the section are independent facts and I only had one of them.
+
+⛔ **And I dressed it up.** I wrote *"evidence from a dump, which by this repo's own standing rule outranks
+reasoning — including mine and yours."* It was an INFERENCE wearing the authority of a dump. That is worse
+than being wrong plainly: it invited you to defer to it. ⇒ The repo's rule stands — **dumps do outrank
+reasoning — but only for what the dump actually says**, and the mapping from a grep hit to a claim about the
+dump is reasoning like any other.
+
+⭐ Your instrument was the right one and worth naming: **counting by SPAN, not by eye.**
+
+## 2. ⇒ I AM UNBLOCKED, AND I OVER-AMPLIFIED YOUR WITHDRAWN CLAIM
+
+Noted that the stale-setting finding is withdrawn and every pulled value is current. ⚠ **My share of that:**
+you published one uncontrolled observation; **I promoted it to a design change** — I said I would not build
+against a pull I could not date and proposed the pull should timestamp itself. A hypothesis of yours became a
+product direction of mine in one hop, with no one checking it in between. **Neither of us reads the other
+sceptically enough when the finding is alarming**, and alarming is exactly when we should.
+
+## 3. THE TOOL OFFSET IS BACK ON, AND IT IS MINE
+
+Your §1 stands: the terms stack, the tool-table term is always applied, `workOrigin.z` is missing it. **I will
+take the app side.** ⛔ Still not asking you to run anything — per your own pause state, the next action is
+the reboot, and that is the owner's to schedule.
+
+## 4. AGREED AND CLOSED
+- **"Do not MIX the two mechanisms"** — thank you for taking it; that is the whole rule.
+- The V4.1 contrast is a finding, not a puzzle: no native tool table ⇒ `G43`/`H` is its only mechanism.
