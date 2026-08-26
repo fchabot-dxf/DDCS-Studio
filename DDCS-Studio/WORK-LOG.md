@@ -57848,3 +57848,87 @@ names.
   only, no behavior change).
 - `tests/wizard-multiop-context-2176.spec.js` — Part 2's third test updated to assert the new behavior,
   proven non-vacuous.
+
+## t2309 — THE FLIP: GATE FAILED, STOPPED before building. No code changed this turn.
+
+Dispatch: wrap drill's two top-level uiChildren nodes (`sim`, `param_group`) in a `split_horizontal`, so
+`hasTreeLayout` flips true and `renderUiTree` takes over from `index.html`'s shell — mirroring `.wiz-2pane`
+(index.html:327) exactly, per the dispatch's own instruction: "MATCH IT, do not invent a layout." Gate-first,
+as the last five turns did: read whether the split branch renders `.wiz-2pane`'s actual structure before
+touching anything. It does not, on the one axis that matters most — pane WIDTH.
+
+### OBSERVED — `.wiz-2pane`'s real layout (`styles.css:2392-2402`)
+
+```css
+.wiz-2pane { display: flex; gap: 14px; height: 100%; min-height: 0; align-items: stretch; }
+.wiz-2pane > .wiz-controls { order: 1; flex: 0 0 360px; ... }   /* FIXED 360px, left (via order, DOM-independent) */
+.wiz-2pane > .wiz-visual   { order: 2; flex: 1 1 0; ... }        /* FILLS remaining space, right */
+```
+
+The controls pane is a **fixed 360px column**; the visual pane **fills whatever is left** — not a proportional
+split. On a normal desktop viewport the visual pane is easily 2-3× the controls pane's width.
+
+### OBSERVED — `renderUiTree`'s `split_horizontal` (`formWidgets.js:1301-1320`)
+
+```js
+const ratio = (node.params && node.params.ratio) || '1:1';
+const parts = ratio.split(':').map(Number);
+const flex1 = parts[0] || 1, flex2 = parts[1] || 1;
+pane1.style.cssText = `flex: ${flex1}; ...`;
+pane2.style.cssText = `flex: ${flex2}; ...`;
+```
+
+`ratio` is two plain numbers (`Number('360px')` → `NaN` → falls back to `1`) — the node has **no way to
+express "fixed pixels + fill the rest."** It is PROPORTIONAL-ONLY: default `1:1` renders two EQUAL-width
+panes. On the same desktop viewport, the controls pane would balloon from a disciplined 360px to ~50% of the
+available width (a form built for a narrow fixed column, now stretched wide and sparse), while the visual
+pane would shrink from "most of the screen" to half — a materially different layout, not the same one at a
+pixel or two off. This is exactly the failure mode the dispatch itself named in advance: **"if it produces
+something structurally different, STOP and report, because a flip that changes the layout is not a flip, it
+is a redesign."** It does; this is that report.
+
+### A second, independent mismatch (SOLVABLE, not itself a blocker) — LEFT/RIGHT is inverted
+
+The shell puts controls LEFT / visual RIGHT via CSS `order` (`.wiz-controls{order:1}`, `.wiz-visual{order:2}`)
+— independent of DOM order, which actually has `.wiz-visual` FIRST in the markup (index.html:328) and
+`.wiz-controls` second (index.html:341). Drill's own uiChildren carries the SAME DOM order today (`sim` at
+drillData.js:280, `param_group` at :281) — matching the dispatch's own diagram (sim as pane1/LEFT). But
+`renderUiTree` has no `order`-independence mechanism; it appends panes in traversal order with no CSS
+override. Wrapped as the diagram shows, sim would render LEFT and param_group RIGHT — the opposite of the
+shipped UI. This one IS solvable within the existing declared vocabulary without touching `formWidgets.js` —
+just assign `children: { LEFT: [param_group], RIGHT: [sim] }` in the wrap instead of DOM order — so it is not
+what stopped this turn; named here because it's a second real gap the same investigation surfaced, and the
+fix is cheap enough that whoever picks this back up shouldn't have to re-derive it.
+
+### A third, corroborating gap (found while checking the above, not independently sought)
+
+`.wiz-2pane`'s narrow-viewport breakpoint (`styles.css:2454-2460`) collapses the whole layout to a single
+stacked column (visuals on top, content-sized; controls below, full width) — a real, exercised responsive
+behavior. `renderUiTree`'s split box is a static `flex-direction: row` (or `column`) with no media query and
+no equivalent collapse logic. Not evaluated further once the width-ratio finding alone was dispositive, but
+worth naming: even resolving the ratio gap leaves the responsive behavior unaddressed.
+
+### NOT reached — the rest of the gate
+
+`path_anchor` (drillData.js:228) sits inside `geometryGroup`, itself inside `param_group`'s children — so it
+mounts in the controls pane in the DECLARED tree regardless of the width problem (answers gate question 2 at
+the structural level; not exercised live, since nothing was rendered). t2293/BACKLOG #21 and t2301/BACKLOG
+#20's dormant bugs were NOT checked live — they only wake once a tree layout actually renders, and nothing
+was rendered this turn. Screenshot / owner's-eyes verification, `drill-form-reproduction-2299.spec.js`, and
+the full suite were NOT run — there is no code change to verify.
+
+### The gate, as options — not decided here
+
+- **(A) Extend `split_horizontal`/`split_vertical` to support a fixed-pixel pane** (e.g. a `ratio` value like
+  `"360px:*"`, or a distinct param) alongside the existing proportional form. New declared vocabulary, not
+  "wrap two nodes" — a bigger, owner-worthy change than this turn's own scope, and it would affect every
+  future op using a split, not just drill.
+- **(B) Accept a proportional approximation** (e.g. a ratio tuned to look right at one common viewport width)
+  as "close enough," explicitly diverging from the shell's fixed-360px discipline. Drifts at other widths;
+  the dispatch's own "say so plainly rather than adjusting the tree to compensate" argues against quietly
+  picking this.
+- **(C) Don't flip drill this turn.** Escalate the split node's proportional-only design as its own finding —
+  today NO wizard using this vocabulary could exactly reproduce a fixed-sidebar-plus-fill layout, which may
+  matter beyond drill.
+
+No code touched. Nothing to commit, nothing to revert.
