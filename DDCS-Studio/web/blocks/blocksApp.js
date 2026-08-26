@@ -13,6 +13,7 @@ import { newBlock } from './blockEmitter.js';
 import { suggestNext, recordProgram } from './suggest.js';   // next-block suggestions
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { installTokenGuard } from './blockly/tokenGuard.js';   // t1712 (cycle ACT 5) — REFUSE an ineligible live-value connection on the canvas
+import { installDisableGuard } from './blockly/disableGuard.js';   // t2307 (BACKLOG #23) — REFUSE disabling a child inside a parametric op (its generator would silently forget)
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange, getGen, flattenOps } from './programModel.js';   // blocks = a VIEW of the shared program model; t1928 — flattenOps sees inside a multi_step import wrapper
 import { registerBlocklyBridge, snapshotGesture } from './saveStates.js';   // t2287 — the undo redesign: registers the ONE seam saveStates.js has into Blockly (capture/restore its native serialization), and the gesture-boundary trigger (see the listener below)
@@ -251,6 +252,7 @@ async function buildWorkspace() {
   });
   ws.getAudioManager().setMuted(true);   // t2129 — the actual mute; sounds:false above only stops preload
   installTokenGuard(ws);   // t1712 (cycle ACT 5) — REFUSE an ineligible token connection, the third authoring surface
+  installDisableGuard(ws);   // t2307 (BACKLOG #23) — REFUSE disabling a child inside a parametric op
 
   // GUARANTEE the popup singletons' DOM exists, so Blockly's global window-resize handler can never crash in
   // DropDownDiv.hide() (it blind-touches a `div` that createDom sets ONLY when no .blocklyDropDownDiv exists).
