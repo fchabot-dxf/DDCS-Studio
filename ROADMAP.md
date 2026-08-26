@@ -785,7 +785,70 @@ large one with poor addressing.**
 
 #### Where hardware facts already have a better home than a memory
 
-`bridge/CLAUDE.md` already names it: **`controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` /
+`bridge/controllers/README.md` already names it: **`controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` /
 `[HYPOTHESIS]`.** That is strictly better than a memory for anything about a controller — it lives in the repo,
 it travels to every seat, and it **records confidence** rather than asserting flatly, which a memory cannot do.
 ⇒ **Prefer it over a memory for any fact about a machine.**
+
+---
+
+# 🌉 THE BRIDGE — plan, guardrails, and what still needs the machine
+
+*Merged here 2026-08-25 from `bridge/ROADMAP.md`, which was dated 2026-06-07 and had been overtaken. One
+roadmap, not two. Goal unchanged: **push G-code from anywhere, run it on the DDCS Expert M350, and read back
+how it went — without exposing the machine.***
+
+⛔ **Two controllers, never mixed** — [`bridge/controllers/README.md`](bridge/controllers/README.md). The
+bridge targets the **Expert** (the studio).
+
+## ✅ Proven on the real machine (2026-06-06)
+- **SMB R/W** to the Expert (`\\192.168.0.99\CNCDISK`/`SYSDISK`, guest=root) — push jobs, read state.
+- **Modbus `MSETDATA`** push (COM6, 115200 8N1, slave 1; `reg = #(n+1)<<8|#n`, little-endian).
+- **Beacon/checkpoint readback** (`CHECKPOINT_TEST.nc` → `28417/18/19`, wedge-free).
+- **PC tooling:** `ddcs_lint.py` (validated vs ~70 macros), `modbus_slave.py`, `checkpoint_insert.py`.
+- Findings recorded in [`bridge/controllers/expert-m350/FINDINGS.md`](bridge/controllers/expert-m350/FINDINGS.md).
+
+## ⛔ THE OLD "NOW" IS SUPERSEDED — read [`bridge/TRANSPORT.md`](bridge/TRANSPORT.md) instead
+The 2026-06-07 plan said: build `fairy/` on a LocalFolder backend, **swap in R2 (Cloudflare)**, then ship a
+**Cloudflare Pages + Worker** front end. Steps 1–2 happened. **Steps 3–4 did not, and should not be revived:**
+
+| the old plan | what is actually true |
+|---|---|
+| swap in the **R2** backend | ⛔ **R2 cannot run in the shipped exe** — `build_fairy.ps1` excludes boto3. A **Google Drive** backend was built instead (BYO cloud, stdlib-only). |
+| a **Cloudflare Pages + Worker** front end | ⛔ never built. Studio's own **Gateway tab** is the front end. |
+| *"the bridge relays via the cloud (R2), not a LAN link"* | ⚠ now a **fan-out**: local **and** cloud at once, ruled but not built — `TRANSPORT.md`. |
+
+⇒ ⭐ **`bridge/TRANSPORT.md` is the live spec.** Fully ruled — five open questions went to the owner and all
+five came back answered — and **not built**.
+
+## 🧰 Tooling backlog
+- [ ] `ddcs_lint.py`: **G/M-code landmine scan** (`G02.4`/`G03.4`, `G10`, `G28`, `G41/G42`, canned cycles) so
+      one pass does syntax + DDCS compatibility. Gate submissions on it.
+- [ ] Linter rule: flag a live **`MGETDATA`** with no confirmed-responding slave (it hard-wedges).
+- [ ] ⭐ Linter rule: flag a **one-digit `H` word** — `H1` is silently ignored by the Expert and `H01` is not
+      (FINDINGS §16). Nothing reports it, which is exactly what a linter is for.
+- [ ] [`CONFORMANCE_CORPUS.md`](bridge/controllers/expert-m350/CONFORMANCE_CORPUS.md): use the wired Expert as
+      a parser oracle to build engine fixtures.
+
+## 🔬 Open experiments — need the machine ⛔ do NOT blind-test; each bad one costs a reboot
+- [ ] ⭐ **Modbus position poll answers `0x00`** — needs a controller **reboot** first (`#279` is set but
+      serial params only apply at startup), then re-probe. The one action currently blocking it.
+- [ ] **Remote start** without the panel: can `sysstart` re-Select and run a PC-named file, or a `#2037`
+      virtual Start button? This is the gate for hands-free delivery→run.
+- [ ] **`error.nc` alarm routing:** can a macro there `MSETDATA` an alarm code back to the PC?
+- [ ] Does a bare **`H01` on a Z move** bind without `G43`? (FINDINGS §22 — the exact posted form.)
+- [ ] Do `.break0`/`.break1`/`processing` update **during** a run? Baselines in `expert-m350/bench/`.
+- [ ] Flash firmware **`2026-08-03-00`** — adds Modbus G-code injection, reorganises the Modbus memory map.
+      ⛔ **After** the reboot test, as its own change with its own before/after.
+
+## ⚠️ Guardrails — hard-won, each one cost a reboot or a tool
+- ⛔ **Reading `#1630-#1636`** (analyze-channel status) from a job → **wedge → reboot.**
+- ⛔ **Blocking `MGETDATA`** with a slave that does not answer → **wedge → reboot.** The bridge is **push-only.**
+- ⛔ **Delivery is automatic; RUNNING is operator-pressed.** No autonomous motion without an independent
+      hardware E-stop + watchdog ([`bridge/controllers/shared/ARCHITECTURE.md`](bridge/controllers/shared/ARCHITECTURE.md)).
+- ⚠ A printshop **guest WiFi isolates clients**, and the studio's WiFi is not the owner's to administer —
+      ⛔ do not design the product around that site. See [`context/SETUP.md`](context/SETUP.md).
+
+## 🌱 Later / maybe
+- Pre-load multiple jobs on the controller (job tag in a second register) — out of scope until needed.
+- Live low-latency jog/control (separate app, hard real-time, hardware-safety-gated).

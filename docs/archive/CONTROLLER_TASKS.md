@@ -10,7 +10,7 @@
 > - **DDCS V4.1** — bench sandbox (`10.0.0.50`), motorless. Hardening / dev rig only.
 >
 > Canonical: [`bridge/controllers/README.md`](../../bridge/controllers/README.md) · Expert [`FINDINGS.md`](../../bridge/controllers/expert-m350/FINDINGS.md)
-> · V4.1 [`FINDINGS.md`](../../bridge/controllers/v4.1/FINDINGS.md) · [`bridge/ROADMAP.md`](../../bridge/ROADMAP.md)
+> · V4.1 [`FINDINGS.md`](../../bridge/controllers/v4.1/FINDINGS.md) · [`ROADMAP.md`](../../ROADMAP.md) → the Bridge section
 > · system [`ddcs-studio-roadmap`](ddcs-studio-roadmap).
 >
 > Status legend: ✅ confirmed · ❌ refuted · 🟡 partial / mixed · ⬚ open · 🔵 needs ESP32 (~$6) · 🟣 needs capture card · ~~obsolete~~
