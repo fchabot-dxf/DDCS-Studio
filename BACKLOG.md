@@ -1838,7 +1838,12 @@ sites — verify none regress before shipping.
 
 ---
 
-### 22. THREE SITES INTERPOLATE TEXT STRAIGHT INTO G-CODE PARENTHESES
+### 22. [✅ SHIPPED t2291 — `40149e3a`] THREE SITES INTERPOLATE TEXT STRAIGHT INTO G-CODE PARENTHESES
+
+⚠ **Its own STILL REAL IF check now gives FALSE POSITIVES — do not reopen on it.** The grep matches the
+interpolation, and the fix often sanitises on an EARLIER line: `editorManager.js:240` does
+`title = stripCommentParens(title)` before interpolating at `:248`. Five sites were converted (two more than
+this entry listed) to one exported `stripCommentParens`; `hmiPrompt`/`hmiInput` were deliberately left.
 
 *(found t2274 while designing something else, which was then withdrawn. Latent, not burning. Filed rather than
 fixed, because it is unrelated to the thread that surfaced it.)*
@@ -1891,7 +1896,7 @@ of truth for the same op and would drift from the params that are supposed to de
 the generator, not stored beside it. That is a design question about what a parametric op's params include, not
 a bug fix. **Worth a ruling before anyone builds it.**
 
-### 24. ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
+### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
 *(found t2279, investigating the Blockly event survey's own "loose blocks" question — the dispatch's own
 hypothesis was that a disconnected block is probably INVISIBLE to the program stack. The opposite is true,
@@ -1970,7 +1975,7 @@ person with no backup at all.
 ⇒ Cheapest honest fix is probably the TOOLTIP, which can differ without touching the visual language. A second
 dot state is a bigger design question and would need a ruling.
 
-### 26. A BLOCK'S OWN COMMENT (`setCommentText` / "Add Comment") IS SILENTLY DISCARDED ON ANY ROUND-TRIP
+### 26. [✅ SHIPPED t2289 — `21aae360`] A BLOCK'S OWN COMMENT (`setCommentText` / "Add Comment") IS SILENTLY DISCARDED ON ANY ROUND-TRIP
 
 *(found t2279, the Blockly event survey; filed t2281 per the dispatch's own instruction. NOT the same feature
 as t2277's `disabled` — this is `change/comment`, a genuinely separate gap the survey turned up alongside it.)*
