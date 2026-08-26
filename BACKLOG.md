@@ -2592,3 +2592,62 @@ parameter-driven canvas exists for, and it works today.
 
 **STILL REAL IF:** `grep -c "pointerdown" DDCS-Studio/web/viz/featureCanvas.js` returns hits but a search for
 a two-pointer/pinch path finds none → still real.
+
+---
+
+### 33. ⛔ THE Ø HANDLE ROTATES THE WHOLE PATTERN — one handle drives two params, so neither is controllable
+
+*(reported by the owner from the drill wizard, 2026-08-26: "diameter marker moves position too, and that's
+not ok — it's impossible to control and keep the position")*
+
+⭐ **THE ASYMMETRY THE OWNER IS ASKING FOR, stated plainly:**
+
+```
+drag POSITION  →  the whole array moves, and the Ø marker FOLLOWS   ✅ correct today, keep it
+                  ⇒ the Ø marker's position is DERIVED. dragging the parent moves the child.
+                  ⛔ but it must NOT change the diameter VALUE.
+drag Ø         →  ONLY the diameter changes                          ⛔ BROKEN — it also rotates every hole
+```
+
+**ROOT CAUSE, OBSERVED.** `drillData.js:337` declares the ring as a **fused polar handle**:
+
+```js
+handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', fieldA: 'startAngle', … })
+```
+
+and `viz/canvasWidgets.js:87-91` writes **both** on every drag:
+
+```js
+if (d.fieldA)  m[d.fieldA] = Math.atan2(dy, dx) * DEG;          // ← the angle, from ANY drag
+if (d.rScale)  m[d.field]  = clampMin(Math.hypot(dx, dy) …);    // ← the diameter
+```
+
+⇒ **Any** movement of that handle sets `startAngle` from the cursor's bearing. Since `startAngle` rotates
+every hole about the centre, changing the diameter **always** moves the holes. The centre never moves — but
+every hole does, which is what "it moves the position" describes from the outside.
+
+⚠ **The fusion is deliberate** — `canvasWidgets.js`'s own comment calls it *"the rotate gesture, fused with
+radius like a drill ring"*, and it documents the escape hatch: *"omit `fieldA` for radius-only."* ⇒ This is a
+**design decision that did not survive contact with the gesture**, not an oversight.
+
+⛔ **It also violates a standing principle:** handles are independent — dragging one never moves another, and
+relative positions are derived. A fused handle cannot honour that, because one gesture writes two params with
+no way to isolate either.
+
+**OPTIONS** — the owner's call, since it changes a gesture they use:
+
+```
+A ⭐ SPLIT IT — a radius-only Ø handle (omit fieldA) + a separate rotate handle for startAngle.
+     Honours the principle, each gesture controllable, costs one more marker on the canvas.
+B    MODE-DETECT — keep one handle; write the radius when the drag is mostly radial, the angle when
+     mostly tangential. Fewer markers, but a gesture whose meaning depends on direction is hard to
+     predict and harder to undo.
+C    RADIUS-ONLY — omit fieldA and drop the rotate gesture from this handle entirely.
+     Simplest, and startAngle stays editable as a form field.
+```
+
+⚠ **Check the other fused handles before fixing just this one** — `fieldA` also appears in
+`wizards/ops/fillText.js` and `wizards/views/drillView.js`. If they share the shape, they share the defect.
+
+**STILL REAL IF:** `grep -n "fieldA" DDCS-Studio/web/blocks/dataOps/drillData.js` → any hit means the ring
+handle still writes two params.
