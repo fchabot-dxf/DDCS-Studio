@@ -2410,9 +2410,16 @@ files**, so the controller plainly accepts both. ⚠ Note the shape precisely: a
 ⭐ **This makes the fix STRONGER, not unnecessary:** there is real ground truth to compare a twin's emit
 against, so adding DM500 to the sweep is checkable rather than speculative.
 
-⚠ **What is still genuinely unattested is the RUNTIME**, not the syntax — nobody has a DM500 to run anything
-on, and `COMMENT-CHARACTERS.md` rates its comment evidence `[HYPOTHESIS]` on 47 comments. ⇒ Syntax: evidenced.
-Behaviour: not.
+⛔ **NO HARDWARE IS NEEDED FOR THIS ITEM. Do not park it waiting for a DM500.** Owner, 2026-08-26:
+*"we can build and test the app for the dm500 still, we will test another time."*
+
+⇒ The fix compares **builder emit vs twin emit in the DM500 dialect** — both sides run in the app, and the
+vendor firmware in `bridge/controllers/dm500/` is the ground truth for the syntax. **Pure software, runnable
+today.**
+
+⚠ What genuinely needs hardware is a separate, later question: whether the controller BEHAVES as its syntax
+suggests. Syntax: evidenced. Runtime: not — and `COMMENT-CHARACTERS.md` rates the DM500's comment evidence
+`[HYPOTHESIS]` on 47 comments. ⛔ **Neither blocks the sweep.**
 
 **STILL REAL IF:** `grep -l "ddcs-v41\|dm500" DDCS-Studio/tests/*as-data*.spec.js | wc -l`
 → **0 means STILL REAL.** *(This check greps for what the FIX looks like, not what the bug looks like — see
