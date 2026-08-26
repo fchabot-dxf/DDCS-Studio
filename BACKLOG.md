@@ -2061,6 +2061,42 @@ wizard's emitted WCS write, with a known non-zero tool offset, and check whether
 that offset. **Off ⇒ real, proceed to the gate above. Equal ⇒ this entry is wrong and gets corrected, not
 built.** No motion, no human decision, no live-WCS write required to answer it.
 
+### ⭐⭐ 2026-08-26, ADVISOR, BY READING — THE Z CASE WAS NEVER DUMP-GROUNDED
+
+`ddcs-expert-m350.js`'s `wcsZeroAtCurrent` justifies itself in its own comment:
+
+> *"Dump-grounded: `SAVE_WCS_XY_AUTO.nc` / `COPY_WCS.nc` use the INTERMEDIATE-VAR indirect form."*
+
+**Both files were read in full. OBSERVED:**
+
+```
+SAVE_WCS_XY_AUTO.nc   reads #880/#881 only; computes address 805+ and 806+ only;
+                      writes X and Y.                      ⛔ NEVER TOUCHES Z.
+COPY_WCS.nc           copies offsets +0, +1, +3  (X, Y, A) ⛔ SKIPS +2, WHICH IS Z.
+```
+
+⇒ ⭐ **The cited evidence covers X, Y and A, and systematically excludes Z.** Studio extends the same
+register-write pattern to Z (`#[#151+2]=#882`), and Z is the one axis carrying a tool-offset term. **The
+"dump-grounded" claim is true for the axes it names and does not reach the axis in question.**
+
+⚠ **Second observation, and it weakens the grounding further:** both files sit under **`CNCDISK`**, which
+`context/../COMMENT-CHARACTERS.md` classifies explicitly as **OURS, not the vendor's** — *"sitting on the disk
+proves they were transferred, not that the controller accepted them."* `SAVE_WCS_XY_AUTO.nc`'s own header
+(*"Based on working park position macro pattern with variable priming"*) is hand-authored in our style. ⇒ the
+justification cites **our own output as ground truth**.
+
+⛔ **This does NOT resolve the entry — it sharpens it.** Two things are now both true and in tension:
+
+```
+the Z write is UNATTESTED, exactly where the vendor's formula says a term is missing
+AND a 68 mm error would be UNMISSABLE, and nobody has seen one
+```
+
+⇒ **INFERRED, not observed:** the most likely reconciliation is still self-consistency — the probed
+position already carries the offset. **The reproduction below remains the next action**, and it now has a
+sharper question: *does anything in the shipped product write WCS **Z** from `#88x` at all, or only X/Y?* If
+Studio's real probe flows are also XY-only in practice, the defect is latent rather than live.
+
 ⚠ **Why this correction is here at all:** the entry was escalated to the owner as a decision without anyone
 checking whether the symptom exists — the same error as promoting the other seat's stale-`setting`-file claim
 to a product direction hours earlier the same day. **A confidently-worded backlog entry is a CLAIM, and the
