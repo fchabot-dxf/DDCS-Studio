@@ -2132,7 +2132,7 @@ Z, auto tool-setting, position restore). Blast radius is a real tool change on a
 fix (write into `slib-g.nc`/`O20000` vs warn loudly) is a design decision the plan explicitly deferred to a
 human ruling, never built.
 
-### 29. HELD — CAM `baseSlot: 22` AND THE `POOL_MIN = 1100` COLLISION (needs a ruling, not proven, not fixed)
+### 29. HELD — CAM `baseSlot: 22` AND THE `POOL_MIN = 1100` COLLISION [⭐ (2) NOW PROVEN, (1) BOUNDED — 2026-08-26]
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H2 — the plan's own file is deleted, t2295.)*
 
@@ -2146,3 +2146,44 @@ slot collides — `mergeEng` DOES report `paramCollisions` against the real file
 controller's eng into the allocator (an API change). Confirmed correct as-built, do NOT touch:
 `POOL_MIN=1100, POOL_MAX=1499, MIRROR=1500`, `slotGroup = slot+20`, the icon format (360×180, 24bpp, BI_RGB,
 54-byte header, bottom-up, no palette, xppm/yppm 3780).
+
+---
+
+#### ⭐ ADVISOR, 2026-08-26 — both halves measured against the repo's own captures. OBSERVED, not inferred.
+
+**(2) THE COLLISION IS REAL. Promoted from "weakened-not-proven" to PROVEN.**
+
+Read straight out of the captured live controller eng
+(`assets/capture/20260731T181343Z/SYSDISK/eng`):
+
+```
+#1100 #1101 #1102   -m30   "Parameter name 1/2/3"     ← shipped placeholders
+#1103 #1104 #1105   -m31   "Parameter name 1/2/3"
+```
+
+⇒ `slotPack.nextParam()` starts at **`POOL_MIN = 1100`**, which is **exactly** the first shipped
+placeholder. **A new user's first allocated slot collides on its first parameter, every time — not a corner
+case.** `mergeEng` does report it (`paramCollisions`) rather than failing silently, so the symptom is a
+merge-time complaint, not corruption.
+
+⭐ **The window is small and exact: six params, `#1100`-`#1105`, two groups.** m30/m31 are the ONLY `-m`
+groups the shipped eng populates — **`-m31` is the highest `-m` tag in the entire file.** ⚠ A cheap
+mitigation exists (start the pool past them) but it treats the symptom; the entry's own diagnosis stands —
+`usedParams()` walks only the pack's own slots and never the controller's eng, and that is the actual defect.
+
+**(1) SLOT 22 IS NOT REFUTED — but it is now BOUNDED, which the entry could not say before.**
+
+```
+attested in real community packs:   macro_cam … 17, 18, 19, 20, 21     ← 21 is the HIGHEST observed
+baseSlot: 22                        → the FIRST unattested slot, by exactly one
+```
+
+⇒ The claim "undocumented, not proven impossible" is correct and can be sharpened: **22 is not vaguely
+beyond the documentation — it is precisely one past the highest number anyone has been observed to use.**
+
+⚠ **The live eng cannot settle the maximum**, and this is worth stating so nobody re-runs the check: it
+ships only the first two groups (m30/m31), so its silence above m31 is **absence of placeholders, not
+evidence of a ceiling.**
+
+⛔ **Still needs a ruling, and still not something to "just try"** — the failure mode is a CAM entry the
+controller does not surface, on a machine in production.
