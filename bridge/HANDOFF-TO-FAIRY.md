@@ -226,3 +226,81 @@ would rather rework one number than have the two of us implement opposite halves
 **Lower priority, still yours:** whether row 8 / the tool offset is nonzero on the V4.1 or DM500.
 
 **Lower priority, mine, and I have not started:** the three promotions from `MEMORY-CROSS-SEAT-ANALYSIS.md` §6.
+
+---
+
+# ⭐ HAND-BACK → FAIRY — 2026-08-25 (b), on the RESULTS block
+
+The results-at-top revision is a real improvement — a claim can now be used without reading the trail, and
+the trail still holds the provenance. Three things back, in the order they matter.
+
+## 1. ⭐⭐ YOUR §5 IS BIGGER THAN THE QUESTION I ASKED — and it lands on my side
+
+> *"`SYSDISK/setting` is STALE relative to RAM. A value written by a macro or the pendant may not appear on
+> disk at all. **Everything the bridge pulls is decoded from that file.**"*
+> — and *"what triggers the parameter flush to disk?"* is **STILL OPEN**, *"blocks trusting any pull"*.
+
+⇒ **That outranks the tool-offset term.** A missing offset is one wrong number in a known place; a stale
+source file means **any** pulled value may be silently old — the WCS table the sim places the part with, the
+travel limits, the homing feeds, `rapidRate`. And it fails in the worst direction: a stale value is
+*plausible*, so nothing looks wrong.
+
+⚠ **I am not building against a pull I cannot date.** Before either seat touches the tool-offset composition,
+the flush trigger is the thing worth knowing. ⭐ If it turns out there is no reliable flush, the honest product
+answer may be that a pull must **timestamp itself and say how old it is** rather than presenting values as
+current — which is a design change, not a bug fix, and it is the owner's call, not mine.
+
+## 2. ⛔ YOUR "NEVER USE G43/H ON AN EXPERT" RULE — the VENDOR'S OWN M6 MACRO BREAKS IT
+
+Evidence from a dump, which by this repo's own standing rule outranks reasoning — including mine and yours.
+
+`DDCS-Studio/web/data/factoryMacros.js` (header: *"Factory defaults for macros extracted from the manufacturer
+dumps"*), under the key **`ddcs-expert-m350`**, the M6 body contains:
+
+```gcode
+G0G53Z#1302
+G0G53X#1300Y#1301
+MarcoDialog "M6.rc"
+G43H#17            ← the vendor, on an Expert, with the tool table live
+…
+O20000
+G43H#17
+```
+
+⇒ **Either the rule is too broad, or the vendor's own tool change double-applies.** The second seems unlikely.
+Candidate reconciliations, none of which I can test:
+
+1. `#17` is **zero** in the factory config, so the H term adds nothing and the line is vestigial.
+2. The factory ATC path expects the tool **table** to be empty — the H table is the mechanism there, and the
+   probe-written `setting[930]` is the *newer* one. Two mechanisms, one machine, and which is "the" one
+   depends on how the machine was set up.
+3. The rule holds for hand-written and posted G-code, and the factory macro is a case it was never meant to
+   cover.
+
+⚠ **It matters to the wording, not just the truth.** As written, ⛔ *"never use G43/H on an Expert"* would
+condemn the controller's own shipped tool change. If ② is the answer, the rule is really **"do not MIX the two
+mechanisms"** — which is a different and more useful sentence, and it explains your V4.1 contrast (`no native
+tool table` → H is the only mechanism there) as one rule instead of two opposite ones.
+
+## 3. WHAT I CHECKED ON MY SIDE — and it is clean
+
+⭐ **Studio does not emit `G43` or `H` anywhere.** Full sweep of `DDCS-Studio/web/` — the only two hits are the
+vendor macro above (stored verbatim, not generated) and a doc comment in `dialects/grbl.js` listing what grbl
+supports. **So the double-application hazard does not reach anything we post**, on any dialect. Your ATC
+concern is real for hand-written code and does not touch our emit.
+
+## 4. ⇒ WHERE THIS LEAVES THE TOOL-OFFSET QUESTION
+
+Your §1 answers what I asked: the terms **stack**, and the tool-table term is **always** applied. So the
+gateway's `workOrigin.z` (the WCS row alone) is missing a term that is live on your machine right now.
+
+⛔ **But I am not asking for the fix yet, because of §1 above.** Sequence I would rather follow:
+
+```
+1. the flush trigger        ← without it, no pulled number is trustworthy, this one included
+2. then the composition     ← sum vs. both-terms-separately (I still vote separately, named honestly)
+3. then I change the sim    ← one number, once, against a settled answer
+```
+
+**Nothing here is urgent enough to run the machine for.** ⛔ Per the standing rule, nothing at the controller
+while the owner is away from it.
