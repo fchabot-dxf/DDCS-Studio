@@ -129,6 +129,14 @@ tool Z offset is not the G43/G49 mechanism; it is unconditional.** Modal state s
 `.break1` with a different layout. The break record decodes as a modal G-code snapshot
 (G17/G90/G94/G21/G40/G49/G99/G54) + feed + spindle + positions + three undecoded counters + the source text.
 
+**g. ⭐ THE PENDANT'S PARAMETER SCREEN IS NOW MAPPED** →
+[`controllers/expert-m350/PARAM-PAGE-MAP.md`](controllers/expert-m350/PARAM-PAGE-MAP.md). `eng`'s `-m` tag is
+the Param List section id; the map lists all 13 sections with every parameter, unit and edit permission, and
+7 of the 13 are confirmed against photographs rather than inferred. ⛔ Sections gather **scattered** number
+ranges (Backlash holds `#190-200` *and* `#400-415`), so a parameter cannot be found by its number — which is
+exactly why this took a bench session to notice. ⚠ Regenerate per controller: the V4.1's `eng` is a different
+vocabulary entirely.
+
 **f. ⚠ `SYSDISK/cmdstr` holds a plain-text shell command** — currently `find . -type f | grep ".*\pos$" |
 xargs rm -f`. ⛔ Never write to it.
 

@@ -1441,6 +1441,9 @@ second section: **Home** (`-m7`) holds `#100-118`, `#122-127` **and** `#235-239`
 ⇒ ⚠ **Never look for a parameter by scrolling to its number.** That is why `#400` could not be found: it is
 numerically far from everything around it on screen, and only `-m13` locates it.
 
+⇒ ⭐ **THE FULL MAP IS GENERATED AND COMMITTED: [`PARAM-PAGE-MAP.md`](PARAM-PAGE-MAP.md)** — all 13
+sections, every parameter with its unit and edit permission. Read that rather than the summary below.
+
 **The section map, straight out of `eng`** (`-m` ⇒ the ranges it gathers):
 ```
 -m7  Home           100-118  122-127  235-239        [CONFIRMED against the pendant]

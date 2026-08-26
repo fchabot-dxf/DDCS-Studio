@@ -14,6 +14,21 @@ findings and assets separate so a fact proven on one is never silently assumed o
    re-confirmed on the one you're working with — **especially serial/Modbus and network direction.**
 4. Log new results in the correct `FINDINGS.md` with a confidence tag.
 
+## ⭐ Finding a parameter on the pendant — do NOT scroll to its number
+`eng`, which ships on the controller beside `setting`, is a complete machine-readable description of the
+parameter set: name, unit, range, edit permission, **and the Param List section** (`-m`). Two things follow:
+
+* **[`expert-m350/PARAM-PAGE-MAP.md`](expert-m350/PARAM-PAGE-MAP.md)** — all 13 pendant sections and the
+  parameters each one holds, generated from `eng` and checked against photographs of the screen.
+* ⛔ **Sections gather SCATTERED ranges.** Backlash holds `#190-200` **and** `#400-415`; Home holds
+  `#100-127` **and** `#235-239`. Looking for a parameter near its numeric neighbours does not work — that
+  is why `#400` "H01 tool length offset" was unfindable until the map existed.
+* ⭐ `eng` index == `setting` f64 index, and a macro address is `setting index + 500`. One file therefore
+  answers *what a slot means*, *where it is on screen*, and *how a macro addresses it*.
+
+⚠ **Per-controller, like everything else here.** The V4.1's `eng` has 314 entries to the Expert's 585 and
+does not even contain `Current coordinate` — regenerate the map from that controller's own `eng`.
+
 ## Comparison matrix (current best knowledge)
 
 | Capability | DDCS V4.1 (bench, `10.0.0.50`) | DDCS Expert / M350 (target) |

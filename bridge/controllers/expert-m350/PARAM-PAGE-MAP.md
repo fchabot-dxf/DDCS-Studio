@@ -6,6 +6,23 @@ photographs. The `-m` tag in each `eng` entry IS the Param List section id.
 ⛔ **Sections gather SCATTERED number ranges.** Manual ends at `#289` and Process begins at `#60`;
 Home holds `#100-127` *and* `#235-239`. ⇒ never look for a parameter by scrolling to its number.
 
+## ⭐ HOW TO USE THIS WHEN ASKING A HUMAN TO CHANGE A PARAMETER
+
+⛔ **Never give a bare number.** Give the route: **Param page → *section* → `#nnn` *name***.
+
+> ✅ "Param page → **Backlash** → `#400` H01 tool length offset → set 10.000"
+> ❌ "set `#400` to 10.000"   ← this cost a real bench session; `#400` is nowhere near its numeric
+>    neighbours on screen, and the owner could not find it.
+
+The owner named the payoff directly: *"enormous help — when you ask me to change a param on the fly you can
+point me to the section by name."* Look the section up here first; it is two seconds and it removes a hunt at
+the machine, where the human is standing and the agent is not.
+
+⚠ Also state the **edit permission** column when it says privileged — those need an elevated login, and
+finding that out mid-hunt is its own delay.
+
+---
+
 | `-m` | section | count | ranges | source |
 |---|---|---|---|---|
 | `-m1` | **Machine** | 28 | `0-3 6-9 11-21 443-444 449-450 488-492` | by elimination |
