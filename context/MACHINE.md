@@ -19,10 +19,32 @@ jobs for a while."* **Real parts come off it.** See [`SETUP.md`](SETUP.md) for w
 ## THE ENVELOPE — and the SIGNS are the point
 
 ```
-X    0 → +1000 mm     POSITIVE
-Y    0 →  -735 mm     ⚠ NEGATIVE
-Z    0 →  -150 mm     ⚠ NEGATIVE
+X    0 → +756 mm      POSITIVE      ⭐ CONFIRMED from the machine's own setting file
+Y   +5 → -776 mm      ⚠ NEGATIVE    ⭐ CONFIRMED
+Z          not set    ⚠ see below   ⛔ NO negative soft limit configured
 ```
+⭐ **MEASURED 2026-08-26 by Fairy**, read out of `SYSDISK/setting` in two independent captures
+(2026-06-10 and 2026-07-31 — identical), by `eng` name, in the pendant's own **Software limit** section:
+
+| param | name | value |
+|---|---|---|
+| `#155` | Enable software limits | **1** (on) |
+| `#166` / `#161` | X positive / negative | **+756** / `−9999` (unset) |
+| `#167` / `#162` | Y positive / negative | **+5** / **−776** |
+| `#168` / `#163` | Z positive / negative | **+1** / `−9999` ⛔ **unset** |
+
+⛔⛔ **THE SKILL'S NUMBERS WERE WRONG, AND `ops.py` WAS RIGHT.** The `X 1000 / Y −735 / Z −150` above came
+from `CORE_TRUTH.md` and read as this machine's travel; the machine says **756** and **776**, which are
+exactly the figures `ops.py`'s docstrings use. They were never generic examples — they are this machine,
+and the discrepancy this file flagged is resolved in `ops.py`'s favour. ⇒ ⭐ **The dump outranked the
+document, again.**
+
+⚠⚠ **AND THE ONE THAT MATTERS: Z HAS NO NEGATIVE SOFT LIMIT.** `#163` reads `−9999`, the parameter's floor,
+i.e. never configured — while `#155` says soft limits are ON and X and Y are properly fenced. So the axis
+that carries the tool toward the spoilboard is the one the controller is not fencing. ⛔ **Not a bug to
+"fix" from here** — it may be deliberate, and `G54 Z0` = the spoilboard is SACRED. **Raise it with the
+owner; do not write a limit to a production machine.**
+⚠ Note `#168` (Z positive) moved `9999 → 1` between the two captures, so this block IS being adjusted.
 
 ⭐ **Machine zero is at the limit switches**, and two of three axes travel NEGATIVE from it. A formula that
 assumes positive travel is wrong here on Y and Z.
@@ -49,7 +71,8 @@ of anything** — that is what the offset is FOR.
 
 | what | source | confidence |
 |---|---|---|
-| the travels, `G28` back-off, `G10` broken | the `ddcs-expert` skill's `CORE_TRUTH.md` | ⚠ **derived / community**, NOT measured at this machine |
+| the travels | ⛔ **the skill was WRONG** — superseded by `setting` `#161-#168` | ⭐ **CONFIRMED, two captures** |
+| `G28` back-off, `G10` broken | the `ddcs-expert` skill's `CORE_TRUTH.md` | ⚠ **derived / community**, NOT measured here — ⚠ and its travel figures proved wrong, so treat the rest as unverified too |
 | in production, two-sided work in Fusion | the owner, directly | ⭐ stated |
 | the WCS table's real shape | `FINDINGS.md` §10 — panel-verified on all six systems | ⭐ **CONFIRMED at the machine** |
 
@@ -58,6 +81,5 @@ docstrings use **X 756 / Y 776** while illustrating the soft-limit sentinel logi
 examples rather than this machine's declared travel — but that was not established, and if they came from a
 real dump then one of the two sets of numbers is wrong.
 
-⇒ ⭐ **This is settleable, and only from one seat.** The real soft limits live in the controller's own
-`setting` file (`ops.py`'s `_SOFT_NEG` / `_SOFT_POS`). **Fairy can read them directly**; Ranchy has captures.
-Whoever gets there first: record the measured numbers here and tag them CONFIRMED, and delete this note.
+✅ **SETTLED 2026-08-26 by Fairy** — read from the captured `setting` files, no machine power needed.
+`ops.py`'s `X 756 / Y 776` are this machine's real soft limits, not examples. Numbers above.
