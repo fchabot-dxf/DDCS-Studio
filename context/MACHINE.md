@@ -11,6 +11,21 @@ carries confidence tags this file cannot.
 
 ---
 
+## IDENTITY
+
+```
+machine     Ultimate Bee 1010
+controller  DDCS Expert / M350, hardware V1
+firmware    2026-04-10-00   (slave mode present — it was added 2025-12-11-00)
+```
+
+⭐ **Hardware V1 decides the flash route: the `install/` folder, NOT `psys/`.** The vendor ships per-model
+trees (`only_for_V1_model/install/`, `only_for_V2_model/psys/`) and they are not interchangeable.
+
+⛔⛔ **NEVER put the `setting` file in the install folder.** The OEM read-me states that restores FACTORY
+parameters — which would wipe axes, envelope, tool table and probe params. Back up at the pendant first.
+Full procedure: `../bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/FLASH-DAY.md`.
+
 ## ⭐ IT IS IN PRODUCTION
 
 Owner, 2026-08-26: *"the expert and ultimate bee are mostly working, ive been able to run parts and 2 sided
