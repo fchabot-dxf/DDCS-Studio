@@ -78,6 +78,29 @@ SCRIPT, restating its steps in prose — in a doc, a memory, or a commit message
 drifts. **Run the script; point at it.** This script's own header records that its predecessor had already
 drifted the same way once.
 
+
+### 8. Closing a backlog item means editing its HEADING, not appending to its body
+
+```
+### 14. [✅ SHIPPED t2221 — `hash`] THE THING          ← the heading carries the verdict
+```
+
+**The heading is what anyone scanning `BACKLOG.md` reads.** An update appended to the body is invisible to
+that scan, so a finished item keeps advertising itself as open — and the next person either re-investigates
+it or plans around a problem that no longer exists.
+
+⚠ **On 2026-08-26 SEVEN entries were closed in the code and open in the file** — #6, #8, #10, #14, #22, #24,
+#26. Every one had a `✅ UPDATE` in its body. **Not one had a tagged heading.** Two of them had been fixed
+three weeks earlier.
+
+**When you close one:**
+- tag the heading: `[✅ SHIPPED tNNNN — <commit>]`, or `[STALE]` / `[REFUTED]` / `[NOT A BUG]`
+- keep the body — the reasoning is worth more than the tidiness, and a REFUTED entry teaches more than a
+  deleted one. ⚠ This is the opposite of rule 6: a PLAN is deleted when it ships, a BACKLOG ENTRY is tagged.
+  The plan describes work to do; the entry records what was wrong and why, which stays useful.
+- ⛔ if its `STILL REAL IF` check would now give a FALSE POSITIVE, say so in the entry. #22's check still
+  matches its own fix, because the sanitisation happens a line above the interpolation it greps for.
+
 ---
 
 ## ⚠ Load-bearing code — do not remove
