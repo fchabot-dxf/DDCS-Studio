@@ -1763,6 +1763,15 @@ which that is - otherwise the check is as ambiguous as the prose it replaced.
 
 ### 19. [SHIPPED t2269 — viewport-derived cap, no item-count limit] THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
 
+⚠ **Its STILL REAL IF check is UNRELIABLE — re-derive it before trusting it.** The check greps
+`styles.css` for `max-height`/`overflow` on `toolbar-dropdown` and treats NO output as still-real. It
+returns no output today. ⛔ That does NOT mean the defect is back: a **viewport-derived cap computed in
+JS** is invisible to a CSS grep, and the sibling menus clamp in JS (`ui/opContextMenu.js:45`,
+`ui/globalFunctions.js:421`). ⭐ **A check written against the SYMPTOM'S SHAPE breaks when the fix
+changes that shape** — the same failure as #21's and #22's checks, all three in the same direction.
+⚠ Advisor could not confirm the fix's mechanism from CSS alone; whoever reopens this must verify in the
+running app, not by grep.
+
 *(found at t2245 while measuring whether spaced pills made the menu too tall — the height question was the
 prompt, this is what the measuring turned up. Pre-existing, NOT introduced by that change.)*
 
@@ -1830,7 +1839,13 @@ branch genuinely cannot fire, before E2 registers anything beyond ATC.
 **STILL REAL IF (systemic half):** `grep -l "panel" DDCS-Studio/web/blocks/dataOps/*Data.js | wc -l`
 → **any count above 6 means the systemic half is STILL REAL.**
 
-### 21. `ui/pathAnchorField.js` looks up its own mount point GLOBALLY — latent, currently dormant, found t2271
+### 21. [✅ SHIPPED t2293] `ui/pathAnchorField.js` looks up its own mount point GLOBALLY — latent, currently dormant, found t2271
+
+⚠ **Its STILL REAL IF check now gives FALSE POSITIVES — do not reopen on it.** The fix keeps `document`
+as the DEFAULT root on purpose, so the 6 static call sites stay byte-for-byte unchanged; the string the
+check greps for therefore still appears (`pathAnchorField.js:46` is
+`(root !== document && root.querySelector('[data-param=…]')) || document.getElementById(…)` — scoped
+first, document as fallback). Two other hits are a stylesheet-injection guard and the fix's own comment.
 
 **OBSERVED:** `mountPathAnchor(prefix)` (`ui/pathAnchorField.js:57`) finds its host with
 `document.querySelector('.pa-mount[data-prefix="${prefix}"]')` — the WHOLE document, not scoped to any
