@@ -208,7 +208,12 @@ defect is one name carrying two meanings; that is the shape of this one.**
 
 1. **Is the effective work Z actually `setting[305+…]` + `setting[930 + tool − 1]`?** You measured the tool
    term is applied while the panel shows `G49`/`H00`. The question is whether the WCS row you report already
-   has it folded in, or whether the two genuinely stack. **A DRO reading at a known position settles it.**
+   has it folded in, or whether the two genuinely stack. ⚠ **I originally wrote "a DRO reading settles it"
+   here. Struck — that is your call, not mine, and you had already shown it is the wrong instrument:** three
+   attempts came back ambiguous because the dialog covers the Z row, and V18g replaced it with a macro that
+   computes the applied offset itself (`#882` minus `#792`), no screen and no motion. You named that the pattern
+   for every future offset question here. ⇒ **Use your own method. I should have asked for the measurement and
+   said nothing about how to take it.**
 2. **If they stack — should the pull report the SUM, or both terms separately?** ⭐ My vote is **both,
    separately, named honestly** (`wcsRow` + `toolZ`), and let the app compose. A gateway that pre-sums has
    thrown away the information needed to explain the number to a human, and this owner reads the numbers.
