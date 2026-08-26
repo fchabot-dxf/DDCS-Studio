@@ -15,7 +15,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -538,8 +538,8 @@ export function maybeMaterializeParamGroup(def) {
 function collapseGuardsByDefault(rec) {
     if (!rec) return;
     if (rec.type === 'guard') rec.collapsed = true;
-    (rec.children || []).forEach(collapseGuardsByDefault);
-    (rec.uiChildren || []).forEach(collapseGuardsByDefault);
+    childrenOf(rec.children).forEach(collapseGuardsByDefault);
+    childrenOf(rec.uiChildren).forEach(collapseGuardsByDefault);
 }
 
 // S4-5 — reconstruct a user op into a Blocks op (the shared step editWizardDef + the multi-op editWizardDefs both use):

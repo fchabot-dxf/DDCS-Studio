@@ -31,6 +31,7 @@ import { translateProgram, rotateProgram, mirrorProgram, relativizeProgram } fro
 import { programRotation, flipForSetup } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY}); t879 — the two-sided per-setup FLIP
 import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
 import { applyDdcsSyntaxGuards } from '../data/gcodeSyntaxGuards.js';   // t2141 — a dependency-free leaf (see its own header for why: importing these FROM here dragged the whole ops registry into an unrelated caller)
+import { childrenOf } from './userOps.js';   // t2317 — the ONE children/uiChildren shape normalization (t2315), shared here too
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -128,7 +129,7 @@ function resolveParams(params, scope) {
  *  source of truth, replacing the placeOnStock bbox SNAPSHOT for migrated atoms. Null (no atom declares an extent, or
  *  a container's child can't measure itself) → the place fold keeps the frozen snapshot, so un-migrated ops are unchanged. */
 function liveExtent(blocks, scope) {
-    for (const b of (blocks || [])) {
+    for (const b of childrenOf(blocks)) {
         if (!b) continue;
         const def = BLOCKS[b.type];
         if (!def) continue;
@@ -154,7 +155,7 @@ export function placeShiftOfStack(blocks, bboxOverride = null) {
     const scope = Object.create(null);
     let place = null;
     const walk = (bs) => {
-        for (const b of (bs || [])) {
+        for (const b of childrenOf(bs)) {
             if (!b) continue;
             const d = BLOCKS[b.type];
             if (d && d.kind === 'place') { place = b; return true; }
@@ -484,10 +485,15 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 //
 // The three original types now declare exactly what they used to be given, in the same order, from the same counter —
 // asserted byte-identical on the programs that use them, because "the same numbers" is the whole safety argument.
+// t2317 — the FOURTH consumer t2315's own WORK-LOG named as a risk: this walk also recurses into `uiChildren`
+// (defensive — an atom needing a flow label could in principle live there too), and crashed the same way
+// flattenBlocks used to (`for (const b of (list||[]))`, assuming array) the first time emitMapped ever ran on
+// an op whose uiChildren held a split_horizontal node's own object-shaped children (drill's flip, this turn).
+// childrenOf (userOps.js) — same shared helper, not a third hand-rolled copy.
 function uniquifyFlowLabels(blocks) {
     let n = 91;
     const walk = (list) => {
-        for (const b of (list || [])) {
+        for (const b of childrenOf(list)) {
             if (!b) continue;
             const def = BLOCKS[b.type];
             const names = (def && typeof def.flowLabels === 'function') ? (def.flowLabels(b.params || {}) || [])
@@ -543,7 +549,7 @@ export function emitMapped(blocks, settings = {}) {
 
 /** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */
 function findEntryBlock(blocks) {
-    for (const b of (blocks || [])) {
+    for (const b of childrenOf(blocks)) {
         if (!b) continue;
         if (b.type === 'entry') return b;
         const u = b.uiChildren && findEntryBlock(b.uiChildren); if (u) return u;
@@ -589,7 +595,7 @@ function applyEntryWaypoint(T, blocks) {
 /** t1365 — does this program carry a SKIM fold (a whole-op jog-relative frame)? Declared, not sniffed. */
 function hasSkimFold(blocks) {
     const walk = (bs) => {
-        for (const b of (bs || [])) {
+        for (const b of childrenOf(bs)) {
             if (!b) continue;
             const d = BLOCKS[b.type];
             if (d && d.kind === 'skim') return true;
@@ -810,7 +816,7 @@ function applyModalFeed(T) {
  *  disabled block's lines comment out via the exact SAME per-line mechanism cap-gating already uses — one
  *  idiom, one implementation, not a second pass. */
 function collectDisabledIds(blocks, out = new Set()) {
-    for (const b of (blocks || [])) {
+    for (const b of childrenOf(blocks)) {
         if (!b) continue;
         if (b.disabled) out.add(b.id);
         if (b.children) collectDisabledIds(b.children, out);
@@ -823,7 +829,7 @@ function collectDisabledIds(blocks, out = new Set()) {
  *  `comment` (Blockly's comment-bubble text — see stackBridge.js's toRecord/recToJson). Threaded into
  *  applyAttachedComments below, the same walk shape as collectDisabledIds. */
 function collectComments(blocks, out = new Map()) {
-    for (const b of (blocks || [])) {
+    for (const b of childrenOf(blocks)) {
         if (!b) continue;
         if (b.comment) out.set(b.id, b.comment);
         if (b.children) collectComments(b.children, out);

@@ -6,6 +6,7 @@
  * (v2 authoring) is just a visual way to set def.panel — same registry.
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { childrenOf } from '../../blocks/userOps.js';   // t2317 — the ONE children/uiChildren shape normalization (t2315)
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { middleAxes } from '../middleWizard.js';   // t1211 — the ONE middle axis-order resolver (the handle decls must agree with the emit)
 import { opSimStarts, resolveRelToIndex, edgeSideIsNear } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass; edgeSideIsNear — t2032, the SAME "pos/dir ⇒ near face" rule the sim-start marker uses, reused for the 2D wall glyph
@@ -167,7 +168,7 @@ export function pinnedStartsFor(def, params, spots) {
 // DECLARES its vector geometry + drag handles (declare-not-infer); the twin's 2D renders whatever it declares. text is
 // the first consumer (real letters + pos/rotation handles); per-feature handles for other ops ride this same hook later.
 function _flattenStack(blocks, out = []) {
-    for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.uiChildren) _flattenStack(b.uiChildren, out); if (b.children) _flattenStack(b.children, out); }
+    for (const b of childrenOf(blocks)) { if (!b) continue; out.push(b); if (b.uiChildren) _flattenStack(b.uiChildren, out); if (b.children) _flattenStack(b.children, out); }
     return out;
 }
 function _previewGeometryOf(def, params) {

@@ -32,7 +32,7 @@
  */
 import { getBlockly, FN } from './bridge.js';
 import { workspaceToStack } from './stackBridge.js';
-import { flattenBlocks, getUserDef } from '../userOps.js';
+import { flattenBlocks, getUserDef, childrenOf } from '../userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
 import { matches } from '../dataOps/deriveBindings.js';
 import { tokenPolicyFor, isTokenAttempt } from '../../wizards/ops/util.js';
 import { toast } from '../../ui/gateway/util.js';
@@ -68,8 +68,8 @@ function buildPolicyMap(ws) {
                 }
             }
         }
-        for (const c of (rec && rec.children) || []) collect(c);
-        for (const c of (rec && rec.uiChildren) || []) collect(c);
+        for (const c of childrenOf(rec && rec.children)) collect(c);
+        for (const c of childrenOf(rec && rec.uiChildren)) collect(c);
     };
     for (const rec of workspaceToStack(ws)) collect(rec);
     return map;

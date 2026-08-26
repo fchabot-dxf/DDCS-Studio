@@ -23,7 +23,7 @@ import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curat
 import { findStrayTopBlockIds } from './programShape.js';   // t2281 — a block dragged from the toolbox and left disconnected: greyed here, excluded from the model in stackBridge.js's own workspaceToStack
 import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
-import { getUserDef, flattenBlocks } from './userOps.js';
+import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
@@ -722,9 +722,7 @@ async function buildWorkspace() {
     const { def, stack, authoredHere, customizing, userRoot, placedOpFallback } = deriveLiveWizard();
 
     function checkLayoutNodes(nodes) {
-      if (!nodes) return false;
-      const list = Array.isArray(nodes) ? nodes : (typeof nodes === 'object' ? Object.values(nodes).flat() : []);
-      for (const n of list) {
+      for (const n of childrenOf(nodes)) {
         if (!n) continue;
         if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'panel'].includes(n.type)) return true;
         if (n.children && checkLayoutNodes(n.children)) return true;

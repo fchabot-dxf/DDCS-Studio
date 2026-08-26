@@ -58166,3 +58166,118 @@ change to foundational, shared machinery, not just an absence of red.
 - `tests/children-of-shape-2315.spec.js` (new) — `childrenOf` unit coverage, the crash-reproduction
   regression guard, and an equivalence proof against `hasTreeLayout`'s old inline formula. Proven non-vacuous.
 - `drillData.js` — untouched (confirmed clean before and after every edit this turn).
+
+## t2317 — THE FLIP, attempt 4: layout gate PASSED cleanly, machinery held up to a full crash-and-fix cycle,
+and the flip STILL didn't ship — a genuine resurfacing of t2293/BACKLOG #21, found live and confirmed by A/B,
+not assumed. STOPPED and reverted per the dispatch's own instruction. `drillData.js` is back at HEAD.
+
+### THE EDIT, and what it immediately exposed
+
+Applied the exact wrap t2313 gate-checked and t2315 unblocked: `split_horizontal` (`ratio:'360px:*'`,
+`children:{LEFT:[param_group…],RIGHT:[sim]}`). `drill-form-reproduction-2299.spec.js`'s first two tests
+(structure, wording) passed immediately — the layout gate held. The third (emit-equivalence, driving the REAL
+`emitMapped`) crashed: `TypeError: (blocks||[]) is not iterable`, this time inside `blockEmitter.js`'s own
+`uniquifyFlowLabels`. **A fourth (and fifth, sixth…) consumer** — t2315's own sweep covered `flattenBlocks`/
+`traverse`/`hasTreeLayout` (the presentation-tree/binding-derivation side) but never looked at
+`blockEmitter.js` (the EMISSION side), a genuinely separate module with its own independently-hand-rolled
+walkers.
+
+### THE SECOND SWEEP — blockEmitter.js has SIX of its own, plus three more elsewhere
+
+Grepped `blockEmitter.js` for the same `for (const b of (x||[]))` shape and found six: `liveExtent`,
+`placeShiftOfStack`'s own `walk`, `findEntryBlock`, `hasSkimFold`'s own `walk`, `collectDisabledIds`,
+`collectComments` — all recursing into `.children`/`.uiChildren` the identical way `flattenBlocks` used to.
+Fixed all six with the SAME shared `childrenOf` (confirmed no circular import risk both directions before
+adding it: `userOps.js` and its own dependency tree import nothing from `blockEmitter.js`).
+
+Re-running the reproduction test's third case surfaced the SAME pattern in **`.forEach`** form —
+`(rec.children || []).forEach is not a function` inside `devMode.js`'s `collapseGuardsByDefault`, called from
+`reconstructUserOpBlock` (the real `ddcsEditWizardDef` load path, not exercised by the emit-equivalence test
+alone). t2315's own `for...of`-only grep pattern had missed this shape entirely. Broadened the sweep to
+`.forEach` too and found three more real sites: `blocks/blockly/tokenGuard.js`'s `collect` (the live-token
+policy map, walked on every workspace load), `wizards/ops/panelTypes.js`'s own independent `_flattenStack`
+(feeds `previewGeometry` — directly relevant to "DRAG a hole-pattern handle," the owner's #1 check), and
+`blocksApp.js`'s `checkLayoutNodes` (already correct, but a FOURTH independent copy of the same normalization
+— folded into the shared helper for consistency, not because it was broken).
+
+**Fixed and reverified in a loop, not all at once**: each fix immediately re-ran `drill-form-reproduction-
+2299.spec.js`'s third test until it passed clean (46 blocks loaded, `op`/`user_root`/`split_horizontal`
+present, zero page errors) — confirmed via `t2317-debug.spec.js` (scratch, not kept) capturing the actual
+`console.warn`'d Error object (Playwright's console-message text alone shows a JSHandle stub for object args;
+had to `.evaluate()` each arg to pull the real message/stack).
+
+### TWO GAPS FOUND, NOT FIXED (neither blocks this turn's crash, both out of scope)
+
+- `whenGuard.js`'s `pruneGuards` — mutates via `splice`/index, so `childrenOf`'s array-returning shape doesn't
+  drop in; already self-guards (`if (!Array.isArray(blocks)) return blocks;`) so an object-shaped children
+  silently skips pruning rather than crashing. Drill's own tree has no `guard` nodes, so moot for this turn;
+  a future op combining `split_horizontal` with a `guard` inside a pane would need this fixed for real.
+- `stackBridge.js`'s `chainToJson(rec.uiChildren)` call site — guarded by `rec.uiChildren.length` (`undefined`
+  on an object, so falsy), meaning an object-shaped `uiChildren` is silently DROPPED from the Blockly-canvas
+  round-trip's own PRESENTATION mouth, not crashed. Not exercised by the owner's own checklist (form-view
+  concerns, not the raw Blockly-canvas save/round-trip path) — noted, not chased under this turn's time.
+
+### THE ACTUAL FLIP — worked, verified two ways, then STOPPED anyway
+
+With all the above fixed, the flip rendered correctly through the REAL wizard-open path —
+`window.ddcsStudio.wizardManager.open('user_drill_data')` (routes through `userOpView`, confirmed by reading
+`wizardManager.js:247`: any `user_`-prefixed opType goes to `userOpView`, not a devMode/Customize-only path).
+**Caught my own false start first**: `ddcsEditWizardDef` opens the Blocks-tab devMode/Customize canvas, whose
+own side-panel "Form" preview toggle turned out to be a DIFFERENT, flat-only rendering path (no PATTERN/TOOL/
+DEPTH&FEED sections visible) — not what the owner's checklist means by "open Drill." Screenshotting THAT gave
+a misleading read; switched to the real `wizardManager.open()` gesture, which showed PATTERN/TOOL/DEPTH & FEED
+sections, controls-left/visual-right, matching `.wiz-2pane`'s real shape (screenshot sent to the user this
+turn — `t2317-drill-flipped.png`).
+
+**Then checked for the two named dormant bugs — and one fired.** A duplicate-id sweep against this SAME real
+render found `d_pathDatum` and `d_stockAttach` each present TWICE. Before reporting it as live, ruled out my
+own false-positive risk from the earlier misfire: reverted `drillData.js` to HEAD and re-ran the IDENTICAL
+sweep against the PRE-flip flat-mode render — **zero duplicates, `path_anchor`'s mount not even present**
+(`path_anchor` is a tree-only node; flat mode never renders it, so it can't collide there). Re-applied the
+flip and re-swept: the two duplicates came back. **This is t2293/BACKLOG #21, genuinely resurfacing, confirmed
+by A/B rather than a single observation** — `path_anchor`'s own branch (formWidgets.js) stamps `d_pathDatum`/
+`d_stockAttach` onto its OWN rendered input to reproduce `pathAnchorField.js`'s expected id convention, and the
+OLD static shell's own hidden `<input id="d_pathDatum">` (index.html) is still present in the same document —
+t2293's fix scoped `mountPathAnchor`'s OWN internal lookup to `container`, but never removed the underlying
+duplicate-id condition it was scoped to survive.
+
+Per the dispatch's own explicit instruction ("if either fires, THAT is the finding of the turn — report it, do
+not patch around it") and t2313's own precedent (same disposition for a different blocker): **reverted
+`drillData.js` to HEAD again.** The machinery fixes (blockEmitter.js, devMode.js, panelTypes.js,
+tokenGuard.js, blocksApp.js) are independent of the flip and stay — real crashes, now fixed, whether or not
+this specific op ever flips.
+
+### Non-vacuous, proven the same way as every prior gated turn
+
+Temporarily shadowed `blockEmitter.js`'s imported `childrenOf` with the exact pre-fix `(x||[])` formula and
+re-ran `tests/emit-childrenof-shape-2317.spec.js`: both tests fail (the same class of TypeError). Restored,
+re-ran clean.
+
+### Files changed
+
+- `web/blocks/blockEmitter.js` — 6 walkers (`liveExtent`, `placeShiftOfStack`, `findEntryBlock`,
+  `hasSkimFold`, `collectDisabledIds`, `collectComments`) switched to `childrenOf`.
+- `web/blocks/devMode.js` — `collapseGuardsByDefault`'s two `.forEach` calls switched to `childrenOf`.
+- `web/blocks/blockly/tokenGuard.js` — `collect`'s two loops switched to `childrenOf`.
+- `web/blocks/blocksApp.js` — `checkLayoutNodes` folded into the shared helper (was already correct).
+- `web/wizards/ops/panelTypes.js` — `_flattenStack` switched to `childrenOf`.
+- `tests/emit-childrenof-shape-2317.spec.js` (new) — `emitMapped`/`placeShiftOfStack` crash-reproduction
+  regression guards. Proven non-vacuous.
+- `drillData.js` — reverted to HEAD (twice — once mid-turn, once at the end); no net change.
+- `scratchpad/t2317-drill-flipped.png` — the owner's-eyes screenshot, sent this turn, NOT kept in the repo.
+
+### Found, reported, not fixed: t2293/BACKLOG #21 genuinely resurfaces on the flip
+
+`d_pathDatum` and `d_stockAttach` each render as TWO DOM elements with the same id the moment
+`split_horizontal` activates `path_anchor`'s tree-mode branch — confirmed absent in flat mode, confirmed
+present in tree mode, by direct A/B, not inferred. The underlying duplicate-id condition t2293's own comment
+named as a risk is real; that fix scoped the WIDGET's own lookup to survive it, not removed it. Whoever picks
+the flip back up needs to resolve the actual duplication (e.g., a tree-mode-aware id scheme for `path_anchor`,
+or hiding/removing the shell's own static hidden inputs when a twin's tree is active) before drill can flip.
+
+### Regression sweep
+
+Full suite: **2817 passed, 0 failed, 18 flaky** (28.2m). No failure at all — every flaky entry is a spec this
+turn never touched, none in `blockEmitter.js`/`devMode.js`/`tokenGuard.js`/`blocksApp.js`/`panelTypes.js`'s
+own broad blast radius, recovering on retry. A real green run for changes to five separate, widely-imported
+files, none of which had a single test regress.
