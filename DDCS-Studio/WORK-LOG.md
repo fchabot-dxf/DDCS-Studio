@@ -57564,3 +57564,89 @@ Another heavy turn immediately following t2299's own heavy one — Part 2 alone 
 regression in shared authoring code, found and root-caused rather than tested around. Landing here: main
 green, both parts complete and about to commit separately as dispatched. Flagging plainly per standing
 convention.
+
+## t2303 — TWO PARTS, both verification-shaped (the arc's own next step stays with the owner — a fork:
+reproduce 4 more mill forms vs register the twins at E2). PART 1 (BACKLOG #30): V4.1/DM500 added to the
+*-as-data equivalence sweeps — clean everywhere, no divergence found, one file already covered (a dispatch-
+measurement correction). PART 2 (BACKLOG #25, owner-ruled): the workspace header's save-state dot now shows
+THREE states, not two ORed into one — shape carries the meaning, not colour alone.
+
+### PART 1 — BACKLOG #30: dialect coverage for the *-as-data equivalence sweeps
+
+The dispatch's own measurement ("67 test files exercise v41 or dm500, but every single *-as-data spec is
+ZERO") held for 4 of the 5 named files — checked each individually before assuming uniform, not applied
+blind:
+
+- **`drill-as-data.spec.js`** — genuinely zero dialect coverage. Added a NEW test (`listPosts()` × 3
+  representative sweep entries — WCS line, pattern-shape change, off-origin placement), mirroring
+  `pocket-data-emit.spec.js`'s own established cross-dialect pattern (t1900) exactly.
+- **`bore-as-data.spec.js`** — already had a cross-dialect spot-check, but only `['grbl', 'rs274ngc']` —
+  genuinely zero V4.1/DM500, matching the dispatch's own claim for THIS file precisely. Extended the existing
+  array to `['grbl', 'rs274ngc', 'ddcs-v41', 'ddcs-v3-dm500']` — the smallest possible edit, no new test.
+- **`slot-as-data.spec.js`** — **already fully covered**: a complete `listPosts()`-based cross-dialect test
+  already exists (t1900, the SAME turn that gave pocket its own), already exercising all 7 dialects including
+  V4.1 and DM500, already green. The dispatch's own "every single spec is ZERO" measurement was wrong for
+  this ONE file — reported here rather than silently duplicating already-existing coverage or silently
+  doing nothing without saying why.
+- **`text-as-data.spec.js`** — genuinely zero; added a NEW test (defaults / a different string / centered
+  alignment), same pattern as drill's.
+- **`atc-warmup-as-data.spec.js`** — genuinely zero; added a NEW test (defaults / stage-1 rpm+time / stage-2
+  rpm+time), same pattern, respecting this file's own established "do NOT `registerUserOp` here — already
+  boot-seeded" convention (t1585's own comment) rather than reintroducing the double-registration throw it
+  documents.
+
+**No divergence found anywhere** — every one of the 4 new/extended cross-dialect checks passed clean on the
+first run, V4.1 and DM500 included. Nothing to report as a finding beyond the slot correction above; per the
+dispatch's own instruction ("if a divergence turns up, report it, do not fix it") there was nothing to NOT
+fix. `emitMapped`'s own dialect resolution (`settings.dialect || getDialect(settings.profileId)`) confirmed
+by reading directly — `{ profileId: dialectId }` is the correct, minimal settings shape for `emitEquivalence`,
+same as `resolveActivePost(id)` resolves to with no test-override active (confirmed by reading that function
+too, not assumed equivalent).
+
+### PART 2 — BACKLOG #25 (owner-ruled): the workspace state badge, three shapes not two
+
+**Located the right glyph first, not the first one found.** The dispatch's own citation
+(`ui/workspaceManager.js:498`) pointed at `.wsm-state` — the small state PILL inside the workspace-manager
+overlay's "current workspace" header row (`.wsm-cur-head`) — not the app's OWN persistent top-bar dot
+(`#hdrWsDirtyDot`, `ui/fileSaveState.js`), which shares the "header dot" nickname in its own prior WORK-LOG
+history (t2188) but is a genuinely separate, already-binary indicator this dispatch does not ask to change.
+Confirmed by matching the dispatch's own line numbers exactly (498 for the OR, 484-486 for the state-text
+derivation) against what's actually in the file, rather than assuming the more literally-named element was
+the target.
+
+`renderCurrent()`'s `dirty || !everSaved ? 'is-dirty' : 'is-saved'` collapsed two independent facts — `dirty`
+(a file exists, changed since) and `!everSaved` (no file has ever existed) — into ONE class, even though the
+adjacent state TEXT (`state`, lines 493-494) already correctly said three different things. Now three
+classes: `is-saved` / `is-stale` / `is-never-saved`. Owner's own ruling followed exactly: no-file is the MORE
+urgent state (localStorage is a working buffer, the .ddcs is the only portable copy — no file means no
+backup exists anywhere), so it gets the HOLLOW RING (a hollow ring reads as "open, unresolved" more readily
+than a filled dot does), not a paler version of the stale-file's FILLED dot. Shape carries the meaning, not
+colour alone (`.wsm-state::before`, a small circle: `background:currentColor` filled for stale,
+`border:1.5px solid currentColor; background:transparent` hollow for never-saved, `display:none` for the
+calm saved state) — a colourblind reader sees two distinct marks regardless.
+
+**New test** `tests/workspace-state-glyph-2303.spec.js` — the existing coverage
+(`workspace-manager-1223/1231.spec.js`) only ever asserted the state TEXT, never the glyph, which is exactly
+why the text/glyph disagreement shipped unnoticed in the first place. Asserts the actual computed style
+(`background-color`, `border-width`) of the `::before` glyph for all three states, not just the class name —
+proved non-vacuous by temporarily restoring both files to their pre-fix committed versions (`git show HEAD:`)
+and confirming all 3 new assertions fail there (they did, on the SAVED-state glyph-hidden assertion
+specifically — the OLD css had no `::before` rule for `.wsm-state.is-saved` at all, `display:inline` by
+default, not `none`).
+
+### Regression sweep
+
+Full suite: **2808 passed, 0 unexpected, 13 flaky** (21.4m) — every flaky entry a boot/workspace-init timeout
+on a spec neither part touched (`pocket-cavity-2d`, `probe-port-gate-1880`, `undo-reproject-echo`,
+`wcs-sync-gate-1906`, …), passed on retry, the same parallel-load-timeout pattern this project's own memory
+already names.
+
+### Files changed
+
+**Part 1** (committed separately): `tests/drill-as-data.spec.js` (new cross-dialect test),
+`tests/bore-as-data.spec.js` (existing spot-check extended to 4 dialects), `tests/text-as-data.spec.js` (new
+cross-dialect test), `tests/atc-warmup-as-data.spec.js` (new cross-dialect test).
+`tests/slot-as-data.spec.js` — **untouched**, already had full coverage.
+
+**Part 2** (committed separately): `web/ui/workspaceManager.js` (`renderCurrent()`'s three-way state class),
+`web/styles.css` (`.wsm-state`'s shape-glyph rules), `tests/workspace-state-glyph-2303.spec.js` (new).

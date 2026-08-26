@@ -6744,9 +6744,18 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
 .wsm-cur-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .wsm-cur-name { font-size: 15px; font-weight: 700; }
-.wsm-state { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.wsm-state { font-size: 11px; font-weight: 700; padding: 2px 8px 2px 6px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
 .wsm-state.is-saved { color: var(--text-dim); border: 1px solid var(--border); }
-.wsm-state.is-dirty { color: var(--accent, #2d7ff9); border: 1px solid color-mix(in srgb, var(--accent, #2d7ff9) 55%, transparent); background: color-mix(in srgb, var(--accent, #2d7ff9) 12%, transparent); }
+/* BACKLOG #25 (owner-ruled) — SHAPE carries the meaning, not colour alone: a FILLED dot for a stale file
+   (unsaved changes, but a .ddcs still exists somewhere) vs a HOLLOW RING for no file at all (no portable
+   copy exists — the more urgent of the two, so it gets the more visually distinct mark, not a paler version
+   of the same one). Someone who can't tell the colours apart still sees two different glyphs. */
+.wsm-state.is-stale, .wsm-state.is-never-saved { color: var(--accent, #2d7ff9); border: 1px solid color-mix(in srgb, var(--accent, #2d7ff9) 55%, transparent); background: color-mix(in srgb, var(--accent, #2d7ff9) 12%, transparent); }
+.wsm-state.is-never-saved { color: var(--warn, #e0a72d); border-color: color-mix(in srgb, var(--warn, #e0a72d) 65%, transparent); background: color-mix(in srgb, var(--warn, #e0a72d) 14%, transparent); }
+.wsm-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.wsm-state.is-saved::before { display: none; }
+.wsm-state.is-stale::before { background: currentColor; }
+.wsm-state.is-never-saved::before { background: transparent; border: 1.5px solid currentColor; box-sizing: border-box; }
 .wsm-cur-when { font-size: 11px; color: var(--text-dim); }
 .wsm-delta { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
 .wsm-drow { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-dim); }

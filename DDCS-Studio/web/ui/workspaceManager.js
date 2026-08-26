@@ -492,10 +492,18 @@ function renderCurrent(ov) {
     // writes a nameless mark at all; this keeps the display honest for browsers that already have one.)
     const everSaved = !!name;
     const state = !everSaved ? 'Never saved to a file' : (dirty ? 'Unsaved changes' : 'Saved');
+    // BACKLOG #25 (owner-ruled) — THREE states, not two ORed into one: `dirty` (a file exists, this session
+    // has since changed) and `!everSaved` (no file has EVER been made) used to both collapse to the same
+    // 'is-dirty' class, so the glyph disagreed with the state TEXT above (which already, correctly, says
+    // three different things). No-file is the MORE urgent state — localStorage is a working buffer, the
+    // .ddcs file is the only portable copy, so "no file" means no backup exists anywhere — so it gets the
+    // more prominent HOLLOW RING (styles.css), not the milder filled dot a stale-but-real file gets. The
+    // shape distinction (filled vs hollow), not colour alone, carries the meaning (styles.css's own comment).
+    const stateClass = !everSaved ? 'is-never-saved' : (dirty ? 'is-stale' : 'is-saved');
     host.innerHTML = `
         <div class="wsm-cur-head">
             <span class="wsm-cur-name">${esc(name || 'Untitled workspace')}</span>
-            <span class="wsm-state ${dirty || !everSaved ? 'is-dirty' : 'is-saved'}">${esc(state)}</span>
+            <span class="wsm-state ${stateClass}">${esc(state)}</span>
             ${everSaved && at ? `<span class="wsm-cur-when">${esc(new Date(at).toLocaleString())}</span>` : ''}
         </div>
         <div class="wsm-delta">${
