@@ -133,3 +133,40 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
   expect(r.sampleHasPlunge, 'emits a real plunge to depth').toBe(true);
   expect(r.clearancePass, 'frontier: clearance fans out to progstart + the leaf, unbound here').toBe(false);
 });
+
+// BACKLOG #30 — the sweep above only ever compared the EXPERT dialect. Same harness (emitEquivalence,
+// settings.profileId), one more comparison per dialect, no new machinery — mirrors pocket-data-emit.spec.js's
+// own cross-dialect test (t1900).
+test('text-as-data: cross-dialect — byte-identical to textStack for EVERY registered dialect', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const { textStack } = await import('/wizards/textWizard.js');
+    const { textDataDef, TEXT_DEFAULTS, TEXT_DATA_OPTYPE } = await import('/blocks/dataOps/textData.js');
+    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { listPosts } = await import('/wizards/dialects/index.js');
+
+    registerUserOp(textDataDef());
+    const dataBuilder = builderOf(TEXT_DATA_OPTYPE);
+    const S = (o) => ({ ...TEXT_DEFAULTS, ...o });
+    const sweep = [S({}), S({ text: 'HELLO' }), S({ align: 'center' })];
+
+    const dialects = listPosts().map((p) => p.id);
+    let diffs = 0, first = null, combos = 0;
+    for (const dialectId of dialects) {
+      for (const p of sweep) {
+        combos++;
+        const a = emitEquivalence(textStack, dataBuilder, [p], { profileId: dialectId });
+        if (!a.pass) { diffs++; if (!first) first = { dialectId, p, ...a.firstDiff }; }
+      }
+    }
+    return { diffs, first, combos, dialectCount: dialects.length };
+  });
+  if (r.first) console.log('XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + ' @ ' + JSON.stringify(r.first.params) + '\n--TWIN--\n' + (r.first.b || '').slice(0, 800) + '\n--BUILTIN--\n' + (r.first.a || '').slice(0, 800));
+  expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+  expect(r.combos, 'the sweep = 7 dialects × 3 representative cases').toBe(21);
+  expect(r.diffs, 'cross-dialect byte-identical for EVERY registered dialect, incl. V4.1 and DM500').toBe(0);
+});

@@ -107,3 +107,40 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
   if (!(r.sampleHasSpindle && r.sampleHasDwell && r.sampleHasEnd)) console.log('SAMPLE:\n' + r.sampleExec);
   expect(r.sampleHasSpindle && r.sampleHasDwell && r.sampleHasEnd, 'emits real spindle/dwell/end G-code').toBe(true);
 });
+
+// BACKLOG #30 — the sweep above only ever compared the EXPERT dialect. Same harness (emitEquivalence,
+// settings.profileId), one more comparison per dialect, no new machinery — mirrors pocket-data-emit.spec.js's
+// own cross-dialect test (t1900).
+test('atc-warmup-as-data: cross-dialect — byte-identical to atcWarmupStack for EVERY registered dialect', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const { atcWarmupStack } = await import('/wizards/atcWarmupWizard.js');
+    const { ATC_WARMUP_DEFAULTS, ATC_WARMUP_DATA_OPTYPE } = await import('/blocks/dataOps/atcWarmupData.js');
+    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { listPosts } = await import('/wizards/dialects/index.js');
+
+    // t1585 — do NOT registerUserOp: this twin is already boot-seeded (seedDefaultPortedUserOps); a second
+    // registration in the same page session throws (see the main test's own comment above).
+    const dataBuilder = builderOf(ATC_WARMUP_DATA_OPTYPE);
+    const S = (o) => ({ ...ATC_WARMUP_DEFAULTS, ...o });
+    const sweep = [S({}), S({ rpm1: 8000, time1: 45 }), S({ rpm2: 18000, time2: 5 })];
+
+    const dialects = listPosts().map((p) => p.id);
+    let diffs = 0, first = null, combos = 0;
+    for (const dialectId of dialects) {
+      for (const p of sweep) {
+        combos++;
+        const a = emitEquivalence(atcWarmupStack, dataBuilder, [p], { profileId: dialectId });
+        if (!a.pass) { diffs++; if (!first) first = { dialectId, p, ...a.firstDiff }; }
+      }
+    }
+    return { diffs, first, combos, dialectCount: dialects.length };
+  });
+  if (r.first) console.log('XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + ' @ ' + JSON.stringify(r.first.params) + '\n--TWIN--\n' + (r.first.b || '').slice(0, 800) + '\n--BUILTIN--\n' + (r.first.a || '').slice(0, 800));
+  expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+  expect(r.combos, 'the sweep = 7 dialects × 3 representative cases').toBe(21);
+  expect(r.diffs, 'cross-dialect byte-identical for EVERY registered dialect, incl. V4.1 and DM500').toBe(0);
+});

@@ -159,3 +159,47 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
   // must CONVERGE, same as frontier #2 did above.
   expect(r.clearancePass, 'frontier #3 SOLVED: clearance now emits byte-identical (fan-out bound via postInstantiate)').toBe(true);
 });
+
+// BACKLOG #30 — the sweep above only ever compared the EXPERT dialect (emitEquivalence's own default settings).
+// A V4.1- or DM500-only divergence between builder and twin would have passed everything above: the data path can
+// branch per dialect through postInstantiate and cap-gating, so "same STACK" does not imply "same TEXT on every
+// controller". Same harness (emitEquivalence, settings.profileId → blockEmitter.js's own dialect resolution), one
+// more comparison per dialect, no new machinery — mirrors pocket-data-emit.spec.js's own cross-dialect test (t1900).
+test('drill-as-data: cross-dialect — byte-identical to drillStack for EVERY registered dialect', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const { drillStack } = await import('/wizards/drillWizard.js');
+    const { drillDataDef, DRILL_DEFAULTS, DRILL_DATA_OPTYPE } = await import('/blocks/dataOps/drillData.js');
+    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { listPosts } = await import('/wizards/dialects/index.js');
+
+    const def = drillDataDef();
+    registerUserOp(def);
+    const dataBuilder = builderOf(DRILL_DATA_OPTYPE);
+
+    const base = { ...DRILL_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
+    const S = (o) => ({ ...base, ...o });
+    // A small REPRESENTATIVE slice of the main sweep above — a WCS line, a pattern-shape change, and an
+    // off-origin placement — the three axes the file's own header names as the actually-branching territory.
+    const sweep = [S({}), S({ wcs: 'g54' }), S({ pattern: 'circle', count: 6, dia: 40, x0: 20, y0: -10 })];
+
+    const dialects = listPosts().map((p) => p.id);
+    let diffs = 0, first = null, combos = 0;
+    for (const dialectId of dialects) {
+      for (const p of sweep) {
+        combos++;
+        const a = emitEquivalence(drillStack, dataBuilder, [p], { profileId: dialectId });
+        if (!a.pass) { diffs++; if (!first) first = { dialectId, p, ...a.firstDiff }; }
+      }
+    }
+    return { diffs, first, combos, dialectCount: dialects.length };
+  });
+  if (r.first) console.log('XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + ' @ ' + JSON.stringify(r.first.params) + '\n--TWIN--\n' + (r.first.b || '').slice(0, 800) + '\n--BUILTIN--\n' + (r.first.a || '').slice(0, 800));
+  expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+  expect(r.combos, 'the sweep = 7 dialects × 3 representative cases').toBe(21);
+  expect(r.diffs, 'cross-dialect byte-identical for EVERY registered dialect, incl. V4.1 and DM500').toBe(0);
+});

@@ -40,8 +40,11 @@ test('byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ra
             if (twin !== builtin) { diffs++; if (!first) first = lineDiff(twin, builtin, { ramp: p.ramp, pattern: p.pattern, holeDia: p.holeDia }); }
         }
         // cross-dialect spot-check
+        // BACKLOG #30 — was grbl+rs274ngc only, ZERO V4.1/DM500 coverage: the data path can branch per dialect
+        // through postInstantiate and cap-gating, so "same stack" never implied "same text on the DDCS posts
+        // specifically" — added, not assumed clean.
         let dialectDiffs = 0;
-        for (const profileId of ['grbl', 'rs274ngc']) for (const p of [D, { ...D, ramp: 'helix' }]) {
+        for (const profileId of ['grbl', 'rs274ngc', 'ddcs-v41', 'ddcs-v3-dm500']) for (const p of [D, { ...D, ramp: 'helix' }]) {
             if (emitMapped(build(p), { profileId }).text !== emitMapped(drillStack(p), { profileId }).text) dialectDiffs++;
         }
         // WIRING — a sentinel cut param lands in the merged hole block (holeDia → the bore-radius entry, r=(holeDia-toolDia)/2).
@@ -55,6 +58,6 @@ test('byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ra
     expect(r.registered, 'user_bore_data registered').toBe(true);
     if (r.first) console.log('BORE DIFF @ ' + JSON.stringify(r.first.p) + ' line ' + r.first.line + '\n--TWIN--\n' + (r.first.twinCtx || []).join('\n') + '\n--BUILTIN--\n' + (r.first.builtinCtx || []).join('\n'));
     expect(r.diffs, 'byte-diff ZERO across pattern × ramp × cut × placement × wcs').toBe(0);
-    expect(r.dialectDiffs, 'byte-diff ZERO cross-dialect (grbl + rs274)').toBe(0);
+    expect(r.dialectDiffs, 'byte-diff ZERO cross-dialect (grbl + rs274ngc + V4.1 + DM500)').toBe(0);
     expect(r.wire, 'WIRING: holeDia=94 tool=6 → bore radius 44 lands (t1385: as a term in G0 X[44 + #reg])').toBe(true);
 });
