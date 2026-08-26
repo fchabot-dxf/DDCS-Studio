@@ -366,15 +366,97 @@ export function pocketPreviewGeometry(p) {
     return { paths, handles, bbox };
 }
 
+// t2301 — POCKET'S FORM, DECLARED: reproducing `#wiz_pocket`'s hardcoded shell (index.html:463-541) structurally
+// — same section order, same field order, same per-shape grouping — per the arc's own "reproduce, don't
+// improve" rule (t2299's own drill build is the model; `field_ref` is the SAME node type, deliberately not
+// `formfield`/`param_field` — see formWidgets.js's own comment on why those collide with devMode's authoring
+// blocks). Gate step confirmed EVERY field the shell actually shows has a matching POCKET_BINDING_SPECS entry
+// (OBSERVED: grepped index.html + POCKET_BINDING_SPECS side by side, param by param) — no shell→binding gap,
+// so nothing here needed a STOP.
+//
+// THE DISPATCH'S OWN QUESTION — does the shape switch need guard/whenGuard for form layout? NO, and the gate
+// is what shows it: POCKET_BINDING_SPECS already carries a per-FIELD `when` clause for every shape-conditional
+// param (w/h: `when:{shape in [rect,ellipse]}`; dia: `when:{shape in [circle,polygon]}`; sides: `when:{shape
+// is polygon}` — lines 128-131 above), the EXACT same per-binding visibility mechanism drill's own PATTERN
+// switch already used successfully (grid/circle/rect/line groups, t2299) with zero guard machinery. A
+// `field_ref` node places an already-bound row; the row's OWN `when` decides whether it shows. `guard`/
+// `pruneGuards` (whenGuard.js) is for STRUCTURAL forks in the BLOCK STACK itself (pocket's real ones: strategy/
+// tooSmall/refuse/rest, all resolved by `resolveArm`/`pruneGuards` well before the form ever renders) — a
+// different layer from FORM-row visibility, which was never blocked here in the first place. Filed as a real
+// arc finding (mirrors t2297's own "the dispatched mechanism doesn't apply, something simpler already covers
+// it"), not built, because there was nothing to build.
+//
+// TWO DESIGN DECISIONS:
+//   (1) `strategy` sits in the SHAPE section (right after `shape`), matching the SHELL's own placement
+//       (index.html:491-496) — even though its OWN binding declares `section: T` (POCKET_STRUCT_BINDINGS,
+//       "spliced ahead of direction/stepover so it LEADS the clearing cluster" in the FLAT form). A `field_ref`
+//       node places by param name only; the binding's own `section` metadata is read by the flat-render path,
+//       not this tree, so the two can legitimately diverge — the shell's own hand-written layout is what this
+//       tree reproduces, not the binding's own declared grouping.
+//   (2) `dia` and `sides` are BOTH placed as plain siblings in ONE circle/polygon dimension group, not nested
+//       (the shell nests `p_dim_sides` inside `p_dim_circle`, visually, but that nesting carries no additional
+//       gating logic beyond each field's own `when` — `dia` shows for circle OR polygon, `sides` shows for
+//       polygon only, and each field's own binding already carries the narrower or wider clause independently,
+//       so a flat sibling placement reproduces the same show/hide behavior without inventing a nested container
+//       node formWidgets.js's vocabulary doesn't have anyway).
+//
+// ORPHAN SET, LARGER than drill's and worth naming explicitly: the shell has NO UI at all — confirmed by
+// grepping index.html AND pocketView.js, zero hits either place — for `direction`, `entry` (+ its 3 own
+// sub-fields `rampAngle`/`helixDia`/`helixPitch`), `confirmEvery`, the REST MACHINING cluster (`restTool`/
+// `restDia`/`restStepover`), and `material` (the feedsuggest widget, same as drill's own orphan). These are
+// real, meaningfully-documented bindings (t800/t804/t871 in POCKET_BINDING_SPECS above) that the hand-coded
+// shell was simply never updated to expose — not a wiring gap, a pre-existing FEATURE gap in the shell itself,
+// predating this turn. Surfaced by formWidgets.js's own orphan-fallback net (t1561), same mechanism as
+// drill's smaller set, pinned by name in the reproduction test rather than left as an unexplained fallback.
 /** The wrapped superset template: pocketStack(DEFAULTS, {superset:true}) under the user_root/panel/sim/param_group prefix. */
 function pocketDataStack(defaults) {
+    const shapeGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'shape' } },
+        { type: 'field_ref', params: { param: 'strategy' } },   // design decision (1) — shell placement, not the binding's own section
+        { type: 'field_ref', params: { param: 'originX' } },
+        { type: 'field_ref', params: { param: 'originY' } },
+        { type: 'field_ref', params: { param: 'offZ' } },
+        { type: 'path_anchor', params: { prefix: 'p_' } },
+    ] };
+    const rectDimGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'w' } },
+        { type: 'field_ref', params: { param: 'h' } },
+    ] };
+    const circleDimGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'dia' } },
+        { type: 'field_ref', params: { param: 'sides' } },   // design decision (2) — flat sibling, each field's own `when` gates it
+    ] };
+    const toolGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'toolNum' } },
+        { type: 'field_ref', params: { param: 'rpm' } },
+    ] };
+    const toolStepoverGroup = { type: 'grid_container', params: { columns: 3 }, children: [
+        { type: 'field_ref', params: { param: 'toolDia' } },
+        { type: 'field_ref', params: { param: 'stepoverPct' } },
+        { type: 'field_ref', params: { param: 'wallOffset' } },
+    ] };
+    const depthFeedGroup = { type: 'grid_container', params: { columns: 3 }, children: [
+        { type: 'field_ref', params: { param: 'depth' } },
+        { type: 'field_ref', params: { param: 'stepdown' } },
+        { type: 'field_ref', params: { param: 'clearance' } },
+        { type: 'field_ref', params: { param: 'wcs' } },   // shell places WCS here, NOT in the SHAPE section (unlike drill's own layout)
+        { type: 'field_ref', params: { param: 'feed' } },
+        { type: 'field_ref', params: { param: 'plunge' } },
+    ] };
     return [{
         type: 'user_root',
         params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            { type: 'param_group', params: { group: 'Pocket' }, children: [] },
+            { type: 'param_group', params: { group: 'Pocket' }, children: [
+                { type: 'usage_text', params: { text: 'Clears a rectangular or circular pocket with an end mill in the active WCS. Drag the handles in the 2D layout (square = place, round = size); the 3D view verifies the cut. Walls are offset inward by the tool radius so the finished pocket matches the size you type. Spindle start + end-of-program come from Settings.' } },
+                { type: 'section', params: { title: 'SHAPE' }, children: [shapeGroup, rectDimGroup, circleDimGroup] },
+                { type: 'section', params: { title: 'TOOL' }, children: [toolGroup] },
+                { type: 'section', params: { title: 'TOOL & STEPOVER' }, children: [toolStepoverGroup] },
+                { type: 'section', params: { title: 'DEPTH & FEED' }, children: [depthFeedGroup] },
+                { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+            ] },
         ],
         children: appendToolSel(appendEntry(pocketStack(defaults, { superset: true }))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
     }];
