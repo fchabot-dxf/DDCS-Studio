@@ -49,9 +49,10 @@ vs the collapsible `.form-sec` the `section` node always renders).
 
 ## OPEN — blocked on the owner, nothing else
 
-1. **The 3 NEVER-STARTED docs** — delete or keep: the `wizard manager and entry points` plan,
-   `SLAVE-CHANNEL-TESTS.md`, `parse-out-ghidra-guide.md`. *(Abandoned and not-started-yet look identical from
-   inside the repo.)*
+1. ✅ **The 3 NEVER-STARTED docs — RULED 2026-08-26.** The wizard-manager plan is DELETED (its subject
+   cannot be found by name any more, so there was nothing to merge). `SLAVE-CHANNEL-TESTS.md` is KEPT — it is
+   the test plan for the reboot below, not dead. `parse-out-ghidra-guide.md` is KEPT pending that reboot: if
+   the slave channel answers, it is unnecessary; if it does not, it is the fallback.
 2. **The WCS-zero tool-offset term** (`BACKLOG.md`) — ⛔ **not a go/no-go yet.** Its next action is a
    READ-ONLY reproduce-or-refute, because a 68 mm Z error cannot hide and nobody has seen one.
 3. **Roles: the override's SHAPE.** Roles are automatic and derived from configuration; changing one must
