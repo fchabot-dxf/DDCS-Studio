@@ -27,8 +27,23 @@ function injectStyle() {
     document.head.appendChild(s);
 }
 
-function buildPicker(prefix, field) {
-    const id = prefix + field, fld = () => document.getElementById(id);
+/**
+ * t2293 (BACKLOG #21) — THE REAL ROOT CAUSE: `document.getElementById(prefix+field)` assumes that id is unique
+ * document-wide, which held for 6 static shells (surfacing/text/slot/pocket/contour/drill) each with their OWN
+ * single hidden `<input id="d_pathDatum">`. It stops holding the moment a declared `path_anchor` uiChildren node
+ * (formWidgets.js) ALSO stamps that same id onto its own reproduced row's input, alongside — not instead of —
+ * the old hidden shell, which is still present in the document. Two elements can then legally share the id, and
+ * a document-wide lookup finds whichever the browser happens to hit first — not necessarily the caller's own.
+ * `root.querySelector('#'+id)` would still be an ID lookup and doesn't fix the underlying ambiguity (the SAME
+ * duplicate-id hazard other unrelated code doing its own getElementById could still hit); the declared row
+ * already carries `[data-param="field"]` (every `renderFormWidget` row does, formWidgets.js's own convention),
+ * unique WITHIN the caller's own container, so a scoped root prefers that instead of trusting the id at all.
+ * The unscoped/document-default path (every existing static call site) has no `data-param` on its hand-written
+ * hidden input, so it keeps the ORIGINAL id lookup — byte-for-byte, verified live (t2293-pathanchor-*.mjs).
+ */
+function buildPicker(prefix, field, root = document) {
+    const id = prefix + field;
+    const fld = () => (root !== document && root.querySelector(`[data-param="${field}"]`)) || document.getElementById(id);
     const wrap = document.createElement('div'); wrap.className = 'ap'; wrap.dataset.field = id; wrap.title = TIP[field];
 
     const svg = document.createElementNS(SVGNS, 'svg');
@@ -51,12 +66,16 @@ function buildPicker(prefix, field) {
     return wrap;
 }
 
-/** Build (once) the STOCK + PATH anchor pickers into a wizard form's `.pa-mount[data-prefix]`. Idempotent. */
-export function mountPathAnchor(prefix) {
+/** Build (once) the STOCK + PATH anchor pickers into a wizard form's `.pa-mount[data-prefix]`. Idempotent.
+ *  `root` (t2293, BACKLOG #21) — an OPTIONAL scope, defaulting to `document` so the 6 existing static call
+ *  sites are byte-for-byte unchanged. A declared `path_anchor` node (formWidgets.js) passes its OWN container —
+ *  the one place two `.pa-mount[data-prefix]` nodes could otherwise coexist (the old hidden shell's + this
+ *  one's), same reason `buildPicker`'s own `fld()` prefers a scoped lookup over the shared id. */
+export function mountPathAnchor(prefix, root = document) {
     injectStyle();
-    const mount = document.querySelector(`.pa-mount[data-prefix="${prefix}"]`);
+    const mount = root.querySelector(`.pa-mount[data-prefix="${prefix}"]`);
     if (!mount || mount.dataset.built) return;
     mount.dataset.built = '1';
-    mount.appendChild(buildPicker(prefix, 'stockAttach'));
-    mount.appendChild(buildPicker(prefix, 'pathDatum'));
+    mount.appendChild(buildPicker(prefix, 'stockAttach', root));
+    mount.appendChild(buildPicker(prefix, 'pathDatum', root));
 }

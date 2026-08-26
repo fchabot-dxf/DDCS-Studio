@@ -56791,3 +56791,156 @@ touching this turn's files.
 - `DDCS-Studio/web/wizards/dialects/rs274ngc.js` — `hmiToast` wrapped (same).
 - `DDCS-Studio/web/ui/editorManager.js` — title derivation now calls the shared helper; own whitespace-collapse
   preserved as a separate, subsequent step.
+
+## t2293 — PART 1: 2 of 5 value params bound (`holeDia`, `clearance`); 3 stay unbound, method-entangled, reported
+not silently forced. PART 2: BACKLOG #21 closed, the id-collision pathAnchorField.js's own root cause. Two commits.
+
+### PART 1 — closing t2291's wiring gap, minus `method`
+
+**Per-param gate, OBSERVED not inferred (re-read `#wiz_drill`, `drillWizard.js`, `holecycle.js`, and — critically —
+`programFraming.js`'s `makeStart`, none of which t2291 needed to open):**
+
+- **`holeDia`** — the shell exposes it UNCONDITIONALLY (`d_holeDia`, always visible, both methods' own tooltip
+  text on the SAME field). Not method-entangled: peck mode genuinely uses it (it's the drill bit size), unlike
+  the bore-only trio below. **BOUND.**
+- **`clearance`** — the shell exposes it unconditionally (`d_clearance`, DEPTH & FEED). Not method-entangled.
+  IS a genuine fan-out — confirmed by reading, not assumed from the param name: `drillStack` (drillWizard.js)
+  sets `holecycle.params.clearance` directly, AND separately `programFraming.js`'s `makeStart` independently
+  sets `progstart.params.clearance` from the SAME source param — two blocks, two keys, one incoming value.
+  `drillData.js`'s own header comment already named this "frontier #3," and the SAME comment appears verbatim
+  in `boreData.js`/`textData.js`/`surfacingData.js` — a systemic, not drill-specific, gap. **BOUND anyway**,
+  via the pattern `pocketData.js` already uses for its OWN "derived socket" fan-out (its own comment, verbatim:
+  *"one source, no fan-out bindings"*) — an ordinary single binding on the PRIMARY socket (`holecycle`, matching
+  depth/peck/feed) plus a `postInstantiate` hook that copies the resolved value onto the SECOND socket
+  (`progstart`), composed with the existing `spindleHeadPatch` the same way `surfacingData.js`/`pocketData.js`/
+  `boreData.js` already compose it with their OWN derived-socket rewrites. Not a new mechanism invented for
+  this turn — an established one, previously just not applied here.
+- **`toolDia` / `pitch` / `ramp`** — the shell exposes ALL THREE, but only inside `#d_method_bore`
+  (`style="display:none"` unless method=helical). This IS the entanglement the dispatch's own conditional
+  warned about, confirmed rather than assumed: `method` is unbound (out of scope, per the dispatch's explicit
+  ruling), so the twin's `cycle` is permanently baked to the peck path at template-build time — binding these
+  three would add form fields with genuinely NO reachable UI path to ever show them (their own `when:
+  {param:'method', is:'helical'}` gate can never pass) and NO observable effect on emit (peck's own emit path
+  never reads them). **NOT BOUND** — reported, not forced sideways; the dispatch's own IN/OUT table had
+  optimistically listed these three as "IN," but its OWN Step 1 instruction ("if entangled, say so and stop")
+  is exactly what applies here, and the finding overrides the table, per the dispatch's own explicit priority.
+
+**Byte-identical at defaults — proven per param, not assumed clean because the shell "just adds a field":**
+first attempt showed `false` — traced to an UNRELATED, pre-existing effect (`spindleHeadPatch`, already on
+`drillDataDef` before this turn, injecting a live M3/spin-up pair my naive reference comparison didn't
+account for) — re-isolated (`instantiate()` alone vs the reference `drillStack()` builder, THEN
+`postInstantiate`'s own marginal effect checked separately with the unrelated spindle patch neutralized):
+both genuinely byte-identical (`t2293-drill-bindings-verify2.mjs`). `holeDia` carries no explicit `default`
+(DRILL_DEFAULTS never declared one) so the binding inherits the FROZEN template's own baked value (12,
+`drillWizard.js`'s own `num(params.holeDia,12)` fallback) — **not** the hardcoded shell's OWN different default
+(6) — a real, pre-existing divergence between the shell and the wizard-stack builder, predating this turn,
+correctly left untouched rather than "fixed" into a behaviour change.
+
+**Non-default values verified to actually reach the emit, not just accepted and silently dropped**
+(`t2293-drill-bindings-verify.mjs`, `-holedia-refusal-check2.mjs`): `clearance=77` appears exactly twice in the
+emitted text (`G0 Z77 ( clearance )` from `progstart`, `G0 Z77 ( full retract )` from `holecycle`) — confirming
+the fan-out genuinely writes BOTH sockets, not just one. `holeDia` never appears literally in the emitted text
+(it only feeds a build-time tool-fit refusal, `holecycle.js:401`, never a printed register) — so its own
+correctness check is the refusal itself: `holeDia=3` (< the frozen `toolDia=6`) correctly refuses
+(`"No toolpath — the 6mm tool cannot fit the 3mm hole"`), `holeDia=20` and the unbound default (12) correctly
+do not. An early, over-broad regex (`/refus|narrow/i`) gave a FALSE positive/negative pair here — the peck
+cycle's own, unrelated "a zero bite never advances — refuse instead of looping forever" comment matched
+regardless of `holeDia` — caught by re-checking against the EXACT refusal string before trusting the result.
+
+**Step 3 — re-enumeration, reported as found, not as expected.** The dispatch's own stated expectation was
+"everything except `method` and the `d_tool` picker." What I actually find: that, PLUS `toolDia`/`pitch`/`ramp`
+also still unreachable — all three genuinely entangled with the same `method` gap, not a separate omission.
+Remaining, in order of how load-bearing each is:
+- `method` — out of scope THIS turn by the dispatch's own explicit instruction, its own turn — but NOT an
+  unsolved architecture problem, per the advisor's own mid-turn correction (amendment, t2293): `whenGuard.js`'s
+  structural-binding + prune mechanism (a param with no `blockIndex`, driving which arm of a guarded template
+  survives at build) already exists and is already proven on a HARDER case — corner's own 8-way mutually-
+  exclusive corner×probeSeq guard, `cornerData.js:25`. `method` maps onto that pattern directly (a two-way
+  guard, easier than corner's eight), and the one real wrinkle it would raise — params common to BOTH arms
+  needing their sockets duplicated in the unpruned superset — is also already solved there (`cornerData.js:47`
+  derives bindings over a CANONICAL-PRUNED stack for exactly this reason). `drillData.js`'s own header calling
+  this a "REMAINING FRONTIER" predates that work and is now stale, not a live blocker — left as-is this turn
+  (not touched, per the amendment's own instruction not to widen scope), corrected here instead so this
+  entry doesn't carry the same stale claim forward.
+- `toolDia`/`pitch`/`ramp` — entangled with `method` (this turn's own finding, above); closing these three is
+  the SAME turn as `method`, not a separate one — they have no independent reproduction path.
+- The `d_tool` library picker — still no declared node or binding pattern covers a fire-once "apply to other
+  fields" convenience (unchanged from t2291; not re-investigated this turn, out of scope).
+- The `section` node's always-collapsible chrome vs the shell's bare `<span class="section-label">` — still a
+  named, non-gating cosmetic divergence (unchanged from t2291).
+
+**Still no `uiChildren` tree, no reproduction test** — per the dispatch's own explicit instruction, those wait
+until the gate is genuinely clean (still isn't: `method` + its three dependents remain).
+
+### PART 2 — BACKLOG #21: the id collision was the real root cause, not just a lookup site to patch
+
+`pathAnchorField.js`'s `document.getElementById(prefix+field)` assumed the id is document-unique — true for
+every existing static shell (surfacing/text/slot/pocket/contour/drill, one hidden input each) but false the
+moment a declared `path_anchor` node (formWidgets.js, t2271) ALSO stamps that same id onto its own reproduced
+row's input, coexisting with — not replacing — the old shell's. **Named as the real defect, not patched
+around**: a root-scoped `getElementById`-equivalent (`root.querySelector('#'+id)`) would still be an ID lookup
+trusting an id that can legitimately collide; the fix instead prefers the declared row's own `[data-param]`
+attribute (every `renderFormWidget` row already carries one, unique within its own container) when a scope
+root is given, falling back to the original id lookup only for the unscoped/document-default path — which is
+every existing static call site, verified unchanged.
+
+`mountPathAnchor(prefix, root = document)` / `buildPicker(prefix, field, root = document)` — both optional,
+defaulting to `document`. `formWidgets.js`'s `path_anchor` branch now passes its OWN `container` as the root.
+
+**Verified live, not just by inspection:**
+- The static `drill` shell (one of the 6): opened via `openWiz('drill', ..., true)`, clicked the real picker
+  cell, confirmed the hidden field updates (`before:"" → after:"np"`) — byte-for-byte, unchanged behaviour.
+- **The actual collision, reproduced and shown fixed**: opened the real static drill shell (its own
+  `#d_stockAttach` + `.pa-mount[data-prefix="d_"]` now live), THEN rendered a SECOND, scoped `path_anchor`
+  node with the SAME prefix `d_` into a separate container — the exact scenario the entry describes. Clicked
+  the SCOPED picker's own cell: the scoped field updated (`"" → "np"`), and the OLD static shell's global
+  field stayed completely untouched (`globalFieldUntouched: true`). Before this fix, the scoped picker's own
+  `document.getElementById('d_stockAttach')` would have found and silently written to the WRONG (static
+  shell's) field instead of its own — this is what "bites the moment any twin gets a real tree layout" means,
+  reproduced directly rather than taken on faith.
+- `grep -n "document.querySelector|document.getElementById" pathAnchorField.js` (the dispatch's own "STILL
+  REAL IF" check): 2 hits remain, both expected — the unrelated `#pa-style` singleton-injection guard, and the
+  new `fld()`'s own document-default FALLBACK (which is the byte-for-byte-preserved behaviour for the 6 static
+  sites, not a miss).
+
+### Regression sweep — 2 real (`unexpected`) failures, both pinned-frontier tests updated, not bugs
+
+Node tier: 228/228. Full suite run #1: **2787 passed, 18 flaky, 4 unexpected, 26 skipped.** Two of the four
+were DIRECTLY caused by Part 1, and correctly so — both were pinning the exact frontier gap this turn closed:
+
+- `drill-as-data.spec.js` asserted `clearancePass` (varying clearance across the twin vs the reference
+  wizard) **must diverge** (`.toBe(false)`) — that WAS true when clearance was unbound; it is no longer true
+  now that the fan-out is bound. Updated to `.toBe(true)`, following the EXACT precedent already set for
+  frontier #2 (live bbox) earlier in the same file's own history — a "SOLVED" comment + flipped assertion.
+- `drill-bindings-identity-1385.spec.js`'s `DRILL_FROZEN` fixture pinned the exact param/key/blockIndex/default
+  tuple for every drill binding, in order — 31 rows, now 33. Inserted `holeDia`/`clearance` at their actual
+  declared position (blockIndex 8, the collapsed `holecycle` leaf, same as depth/peck/feed) with their real
+  derived defaults (12, 5). `BORE_FROZEN` untouched (boreData.js not touched this turn).
+
+Both re-ran green in isolation after the fix. The other two unexpected failures — `probe-port-gate-1880`,
+`wizard-face-1599` — investigated separately, unrelated to either part: re-run in isolation, `probe-port-
+gate-1880` passed clean on the first try; `wizard-face-1599`'s two entries needed one retry each (Playwright's
+own "flaky," not "failed," on the isolated re-run) — both appear in the flaky list of nearly every full-suite
+run this whole session (t2287/t2289/t2291), confirmed pre-existing, not caused by this turn.
+
+**Full suite run #2 — after both test-expectation fixes: genuinely green.** node tier 228/228. e2e tier:
+**2795 passed, 14 flaky, 0 unexpected, 26 skipped** (~22.6 min). `probe-port-gate-1880` and `wizard-face-1599`
+both reappear in THIS run's own flaky list too — consistent with "pre-existing, order/timing-sensitive," not
+a fluke of the isolated re-run.
+
+### Files changed
+
+**Part 1** (own commit):
+- `DDCS-Studio/web/blocks/dataOps/drillData.js` — two new bindings (`holeDia`, `clearance`); `postInstantiate`
+  extended to compose the clearance fan-out copy with the existing `spindleHeadPatch`; `flattenBlocks` imported.
+- `DDCS-Studio/tests/drill-as-data.spec.js` — frontier #3 (clearance) flipped from a pinned divergence to a
+  pinned convergence, matching frontier #2's own precedent in the same file.
+- `DDCS-Studio/tests/drill-bindings-identity-1385.spec.js` — `DRILL_FROZEN` gains `holeDia`/`clearance` at
+  their real declared position and defaults (31 → 33 rows).
+
+**Part 2** (own commit):
+- `DDCS-Studio/web/ui/pathAnchorField.js` — `mountPathAnchor`/`buildPicker` gain an optional scope root
+  (default `document`); `fld()` prefers a scoped `[data-param]` lookup over the shared id.
+- `DDCS-Studio/web/ui/formWidgets.js` — `path_anchor` branch passes its own `container` as the root.
+
+Verification scripts in gitignored `scratchpad/t2293-*.mjs` (kept, not committed).

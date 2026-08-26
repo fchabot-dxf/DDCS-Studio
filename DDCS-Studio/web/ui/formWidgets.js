@@ -1457,7 +1457,12 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 mount.className = 'pa-mount';
                 mount.dataset.prefix = prefix;
                 container.appendChild(mount);
-                import('./pathAnchorField.js').then((m) => m.mountPathAnchor(prefix)).catch(() => {});
+                // t2293 (BACKLOG #21) — pass OUR OWN container as mountPathAnchor's scope root: an old static
+                // shell's hidden `.pa-mount[data-prefix]` + `#${prefix}pathDatum` can coexist in the SAME
+                // document as this declared node's own reproduced ones, and a document-wide lookup would find
+                // whichever the browser hits first, not necessarily ours. See pathAnchorField.js's own comment
+                // for the full root-cause account.
+                import('./pathAnchorField.js').then((m) => m.mountPathAnchor(prefix, container)).catch(() => {});
             } else if (node.type === 'param_group') {
                 // t1605 — a param_group IS its rows. TRANSPARENT on purpose, exactly like the flat form path
                 // (formBindings treats it as row-order metadata, never chrome): each param_field child picks its
