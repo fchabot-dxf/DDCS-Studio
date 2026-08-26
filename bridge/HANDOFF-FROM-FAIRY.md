@@ -241,3 +241,74 @@ that compares two readings should say when each was taken.
 terms separately and name them honestly rather than pre-summing — still looks right to me, and nothing is
 gating it. The gateway's `workOrigin.z` is missing the tool-table term (`#1430` / `setting[930]`, currently
 `−68.336` on this machine), and that term is applied unconditionally.
+
+---
+
+# ⏸ PAUSE STATE — Fairy, 2026-08-25. Read this first.
+
+*This file has grown by append; the sections above are the session in order. **This block is the current
+state.** Everything else is provenance.*
+
+## 1. THE MACHINE — safe, nothing left mid-test
+Read off the controller at pause time. Nothing is in a modified or risky state:
+
+| | value | |
+|---|---|---|
+| `#131` Probing cycle count | `2` | ⭐ restored (the flush test used 3 then 4) |
+| `#400` H01 tool length offset | `0` | ⭐ restored — the H table is empty, as it should be |
+| `#930` T01 Z offset | `−68.336` | untouched — the probe's own value |
+| `#279` Modbus RTU | `2` (Slave) | set, **but the controller has NOT been rebooted since** |
+| G54 Z0 / spoilboard | untouched | ⛔ never written at any point today |
+
+**8 test macros are on CNCDISK** (`V18a`–`V18g`, `V19`). Harmless — all motion-free, all self-restoring.
+Delete or keep. Sources are in `controllers/expert-m350/verify/`.
+
+## 2. ⇒ THE NEXT ACTION — one thing, and it needs a human at the machine
+⭐ **Reboot the controller, then Fairy re-runs the Modbus probe.**
+
+Why: the position poll answers a single `0x00` byte to every request. `#279` reads `Slave` in the file, but
+serial parameters only take effect at startup and the machine has not restarted since it was set — the vendor
+manual says *"Please restart the system after setting the parameters!"*. While it is off, confirm the SABRENT
+is on **DB9 port 2** (Modbus is Serial 2; port 1 is the keyboard port and looks identical to this failure).
+
+Then the probe is read-only and takes seconds — no macros for the human, nothing to read off a screen.
+
+⛔ **Reboot BEFORE flashing, not after.** Firmware `2026-08-03-00` exists and is tempting (it adds *Modbus RTU
+real-time G-code injection* and *optimizes the Modbus memory map at register 3000*), but flashing first would
+confound the diagnosis: if Modbus then answered, nothing would separate "the reboot applied `#279`" from "the
+new firmware fixed it". Flash second, as its own change with its own before/after — and re-run the §13 name
+sweep afterwards, since a memory-map reorganisation is exactly what could move the addresses. Procedure and
+the parameter-wipe trap: `assets/community/modbus-slave-2025-12-11/FLASH-DAY.md`.
+
+## 3. WHAT THIS SESSION SETTLED
+Full statement: **`controllers/expert-m350/FINDINGS.md` → the RESULTS block at the top.** In one line each:
+
+* **Z offset = WCS + tool-table + H**, three additive terms. The tool-table term (`#1430`, probe-written) is
+  applied **always**; the H term only after `G43 H01`.
+* ⛔ **The `H` word needs two digits** — `H1` is silently ignored. A bare `H01` does not bind without `G43`.
+* ⭐ **`G43`/`G49` work correctly** — measured `−104.844 → −94.844 → −104.844`.
+* ⛔ **Do not MIX the two offset mechanisms** on an Expert, or the tool length applies twice. The V4.1 is the
+  opposite case: no native tool table, so `G43`/`H` is its only mechanism and its factory M6 uses it.
+* ⭐ **One addressing rule:** macro `#N` → `setting[N−500]` → `eng` entry `#(N−500)`.
+* ⭐ **`eng` maps the pendant**: `-m` is the Param-page section, `-p` is edit permission →
+  `controllers/expert-m350/PARAM-PAGE-MAP.md`. ⛔ Sections gather scattered ranges; never search by number.
+* ⭐ **`_WCS_BASE = 305` is CORRECT**, panel-verified on all six systems.
+
+## 4. ⚠ TWO THINGS I GOT WRONG TODAY — both propagated before they were caught
+1. **A WCS off-by-one**, inferred from a file comparison. Refuted by one look at the pendant. §5.
+2. **"The `setting` file is stale relative to RAM."** ⛔ **False.** It came from comparing two readings taken at
+   different moments. Retested with one parameter and one variable (V19): pendant edit and macro write both
+   reach the disk immediately. **It blocked RENDERRANCHY**, who wrote *"I am not building against a pull I
+   cannot date"* — they are explicitly unblocked above. §19.
+
+⇒ Both were confident claims from uncontrolled observations. ⭐ **The control that would have caught the second
+cost four lines of G-code.** Worth the reflex next time: *which moment did each number come from?*
+
+## 5. STILL OPEN
+| question | needs |
+|---|---|
+| Modbus poll answers `0x00` | ⭐ **the reboot above** — then Fairy probes |
+| Does `H01` on a **Z move** bind without `G43`? (the exact posted form) | a real Z move, human present |
+| Do `.break0`/`.break1`/`processing` update **during** a run? | a program running, human present. Baselines committed at `bench/` |
+| Flash `2026-08-03-00`? | after the reboot result, as its own step |
+| Gateway `workOrigin.z` is missing the tool-table term | ⭐ **RENDERRANCHY's** — unblocked, nothing gating it |
