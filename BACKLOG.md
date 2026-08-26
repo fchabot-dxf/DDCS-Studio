@@ -1963,7 +1963,7 @@ failure mode is silent until a controller chokes on a line that was never meant 
 
 ---
 
-### 23. NESTED DISABLED STATE IS IN-SESSION ONLY FOR PARAMETRIC OPS
+### 23. [⭐ RULED 2026-08-26 — author-declared toggles APPROVED; the silent-forget half is separable] NESTED DISABLED STATE IS IN-SESSION ONLY FOR PARAMETRIC OPS
 
 *(established at t2277 while making Disable Block real — reported as a scope boundary rather than hidden, and
 NOT a regression: nested disable did nothing at all before that turn.)*
@@ -2019,6 +2019,35 @@ source of truth) rather than working around it.
 ⇒ **Recommended framing for the ruling:** not *"should nested disable persist?"* but *"should an op's author
 be able to declare a child SWITCHABLE?"* — which is answerable, has a shipped mechanism, and stops short of
 making every block in every op independently persistent.
+
+#### ✅ RULED BY THE OWNER, 2026-08-26 — YES. Author-declared switchable children.
+
+**The build, and it is an application of shipped machinery, not new design:**
+- an op's author wraps a switchable child in a `guard`, keyed to a plain boolean param
+- that param is a **STRUCTURAL binding** (no `blockIndex` — it drives the prune, not a socket), exactly as
+  corner's `probeZFirst` does today
+- it then round-trips through the marker like any other param, appears in the form, and the generator reads
+  it ⇒ **one source of truth**, which is what the entry's own ⛔ demanded
+
+⚠ **CHECK REPRESENTABILITY PER OP BEFORE PROMISING IT.** A parametric op's children are generated from
+params, so a toggle needs a stable referent. ⭐ Drill is fine — `array{drill}` holds ONE child stamped at N
+points, so the boolean means "all of them". ⛔ *"Disable the third hole"* has no stable referent and must not
+be attempted.
+
+#### ⚠⚠ WHAT THIS RULING DOES **NOT** CLOSE — and it is the original hazard
+
+A child the author did **not** declare switchable still round-trips **silently back ON**. The entry's own
+motivating danger — *"something the human deliberately turned OFF coming back ON without saying so"* —
+survives for every undeclared child.
+
+⇒ **So the honest companion to this ruling is to stop failing silently.** When a user disables a child that
+has no declared toggle, the app should **say that the state will not persist** — refuse the gesture, or mark
+it visibly as session-only. ⛔ **Silently accepting a disable it cannot keep is the worst of the three
+options**, and it is what ships today.
+
+⭐ That is a smaller, separable piece of work than the toggles themselves, and it is the one that removes the
+hazard. **The toggles add a capability; the refusal removes the danger.** Do the refusal first if only one
+gets built.
 
 ### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
