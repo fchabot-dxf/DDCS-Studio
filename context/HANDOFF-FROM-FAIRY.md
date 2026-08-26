@@ -25,7 +25,7 @@ epoch are per-machine, so there is no turn marker connecting them and no notific
 
 ## 1. ⭐ WHAT RENDERRANCHY IS ACTUALLY WAITING FOR
 
-⭐⭐ **ANSWERED 2026-08-25 — see [`controllers/COMMENT-CHARACTERS.md`](controllers/COMMENT-CHARACTERS.md).** Derived from the vendor corpora with provenance kept separate, method stated so the vetting is checkable, and the per-dialect question answered honestly (Expert `[CONFIRMED]`; V4.1 and DM500 too thin, `[HYPOTHESIS]`; grbl not answerable from dumps).
+⭐⭐ **ANSWERED 2026-08-25 — see [`controllers/COMMENT-CHARACTERS.md`](../bridge/controllers/COMMENT-CHARACTERS.md).** Derived from the vendor corpora with provenance kept separate, method stated so the vetting is checkable, and the per-dialect question answered honestly (Expert `[CONFIRMED]`; V4.1 and DM500 too thin, `[HYPOTHESIS]`; grbl not answerable from dumps).
 ⭐ **The headline is that the governing constraint is NESTING, not the character set** — zero nested comments in 2,248 vendor comments across three DDCS controllers and 4,656 LinuxCNC comments; every nesting instance in this repo is in a file we wrote. That half already shipped at `917f8856`, so the replacement setting is a smaller feature than it was scoped as.
 
 ~~**This one is BLOCKING**~~ — the original ask, kept for the record:
@@ -130,7 +130,7 @@ tool Z offset is not the G43/G49 mechanism; it is unconditional.** Modal state s
 (G17/G90/G94/G21/G40/G49/G99/G54) + feed + spindle + positions + three undecoded counters + the source text.
 
 **g. ⭐ THE PENDANT'S PARAMETER SCREEN IS NOW MAPPED** →
-[`controllers/expert-m350/PARAM-PAGE-MAP.md`](controllers/expert-m350/PARAM-PAGE-MAP.md). `eng`'s `-m` tag is
+[`controllers/expert-m350/PARAM-PAGE-MAP.md`](../bridge/controllers/expert-m350/PARAM-PAGE-MAP.md). `eng`'s `-m` tag is
 the Param List section id; the map lists all 13 sections with every parameter, unit and edit permission, and
 7 of the 13 are confirmed against photographs rather than inferred. ⛔ Sections gather **scattered** number
 ranges (Backlash holds `#190-200` *and* `#400-415`), so a parameter cannot be found by its number — which is

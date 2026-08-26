@@ -141,7 +141,7 @@ pwsh ./build_fairy.ps1          # PyInstaller one-file build → DDCS-Studio.exe
 ```
 
 
-> ⚠️ **Live-machine safety.** Generating and simulating is always safe and offline. *Running* drives real motion and outputs — verify in the simulator first, keep the operator at the machine, and treat anything that moves an axis or toggles an output as live. See [`docs/VERIFY-AT-MACHINE.md`](docs/VERIFY-AT-MACHINE.md).
+> ⚠️ **Live-machine safety.** Generating and simulating is always safe and offline. *Running* drives real motion and outputs — verify in the simulator first, keep the operator at the machine, and treat anything that moves an axis or toggles an output as live. See [`docs/VERIFY-AT-MACHINE.md`](docs/archive/VERIFY-AT-MACHINE.md).
 
 ---
 

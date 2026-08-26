@@ -94,7 +94,7 @@ memory at all**.
 
 **The trigger is write time**, because that is when the judgement is easiest. ⚠ And because it will sometimes
 be skipped, a **periodic cross-seat sweep is the backstop** — dump both stores and compare. The first one
-(2026-08-25) is at `bridge/MEMORY-CROSS-SEAT-ANALYSIS.md` and found three absences, zero contradictions.
+(2026-08-25) is at `context/MEMORY-CROSS-SEAT-ANALYSIS.md` and found three absences, zero contradictions.
 
 ⭐ **The danger is ABSENCE more than DISAGREEMENT.** That sweep found no contradictions at all — what it found
 was one seat not knowing what the other had paid to learn. Nothing detects that: no test, no exception, no

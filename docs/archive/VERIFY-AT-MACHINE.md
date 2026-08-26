@@ -2,7 +2,7 @@
 
 Runtime-behavior claims that a **static dump cannot settle** and where the `ddcs-expert`
 skill (V1.22, Jan 2026) may be **outdated vs the current firmware**. These need confirming
-**on the machine**, then recording in [Expert `FINDINGS.md`](../bridge/controllers/expert-m350/FINDINGS.md) with a confidence tag.
+**on the machine**, then recording in [Expert `FINDINGS.md`](../../bridge/controllers/expert-m350/FINDINGS.md) with a confidence tag.
 
 **Authority model** (see memory `ddcs-ground-truth-reference`):
 - **Dump** = truth for *values & addressing* (params, soft limits, WCS table, `macro = param + 500`).
@@ -125,6 +125,6 @@ skill (V1.22, Jan 2026) may be **outdated vs the current firmware**. These need 
 ---
 
 ## Recording results
-For each: update [Expert `FINDINGS.md`](../bridge/controllers/expert-m350/FINDINGS.md) with the tag, the exact form tried, and the
+For each: update [Expert `FINDINGS.md`](../../bridge/controllers/expert-m350/FINDINGS.md) with the tag, the exact form tried, and the
 observed result. Anything that **contradicts the skill** → also note it so the dialect
 (`DDCS-Studio/web/wizards/dialects/ddcs-expert-m350.js`) and the sim engine can be corrected.

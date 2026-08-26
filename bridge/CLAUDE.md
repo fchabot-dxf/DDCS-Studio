@@ -18,55 +18,28 @@ For DDCS G-code / macro questions, consult the installed **`ddcs-expert`** skill
 
 ---
 
-## ⭐ THE SEATS AND WHERE THEY ARE — read this before writing "the other machine"
+## ⛔ WHERE THE SEATS ARE — NOT HERE
 
-Recorded 2026-08-25 in the owner's own words, after this was got wrong four times in one evening.
+⭐ **[`../context/SEATS.md`](../context/SEATS.md)** — who reaches which controller, from where, and the
+VS Code setup. **[`../context/SETUP.md`](../context/SETUP.md)** — the two places, what is wired to what,
+⛔ the safety rules.
 
-| seat | where | on the controller? | role |
-|---|---|---|---|
-| **FAIRY** / CNC Fairy | **the studio** | **YES** | the controller-connected PC. runs the **gateway**. the only seat with real hardware. **You are here.** |
-| **ASUS TUF** | **the studio** | no | a laptop. same WiFi, metres from Fairy. |
-| **RENDERRANCHY** | **home** | no | the desk PC. **~90% of dev happens here.** The other Claude seat. |
+⚠ This file carried a copy of that table until 2026-08-25. Two copies of the same fact is what put the
+reachability row somewhere nobody looked — one fact, one home.
 
-⇒ **TWO LOCATIONS**, not one: the studio (Fairy + the TUF) and the owner's home (RenderRanchy). Anything
-that assumes the two seats share a LAN is wrong — see [`TRANSPORT.md`](TRANSPORT.md).
-
-### ⛔ "STUDIO" — the word carries two meanings, and never a third
-
-```
-"the studio"    the PLACE — the owner's ARTIST STUDIO, where the CNC is
-"DDCS Studio"   the APP
-```
-
-**Both are the owner's.** Context disambiguates them and that is fine. ⛔ **Never use it for a machine or a
-seat** — that third meaning was invented on RENDERRANCHY on 2026-08-25 and written into six committed
-documents before the owner caught it. If a document here says "the Studio seat", it means RENDERRANCHY and it
-is a leftover.
-
-⭐ **Why it happened, because it generalises:** RENDERRANCHY's own name was recorded in **no memory anywhere**,
-so with no name for the machine in use, one got borrowed from the product. **A missing fact does not present
-as a gap — it presents as an invention.** It never felt like a thing unknown; it felt like writing. ⚠ That is
-the blind spot in [`../MEMORY-PROTOCOL.md`](../MEMORY-PROTOCOL.md) §6: the domain check catches *"I would be
-guessing about the machine"*, and does **not** catch *"I have no name for this, so I will invent one."*
-
-⚠ **And the word was already here.** `shop-two-pc-network` read *"STUDIO — the two are METRES APART"* — the
-owner's vocabulary, sitting in a memory, read as a formatting heading instead of as a name. **A fact can be
-present, correct, and still not land** if it is not read as the thing it is. Its "two PCs" means **two at the
-studio**, not two in total.
-
-## ⭐ HANDOFF FROM THE RENDERRANCHY SEAT — 2026-08-25
+## ⭐ THE CROSS-SEAT DOCS — now in [`../context/`](../context/)
 
 FOUR documents landed on the branch from RENDERRANCHY (the desk machine). They do not announce themselves, so they
 are listed here, in the file this seat loads automatically:
 
 | file | what it is |
 |---|---|
-| [`HANDOFF-TO-FAIRY.md`](HANDOFF-TO-FAIRY.md) | **Start here.** Orientation: what only this machine can do, the machine-switch mechanics, and the live-CNC safety rule that outranks every task. |
+| [`HANDOFF-TO-FAIRY.md`](../context/HANDOFF-TO-FAIRY.md) | **Start here.** Orientation: what only this machine can do, the machine-switch mechanics, and the live-CNC safety rule that outranks every task. |
 | [`TRANSPORT.md`](TRANSPORT.md) | The spec. Fully ruled — five open questions went to the owner and all five came back answered. **Not built.** |
-| [`FAIRY-MEMORY-DUMP-INSTRUCTION.md`](FAIRY-MEMORY-DUMP-INSTRUCTION.md) | Dump this seat's memory store so the two can be compared. **Contradictions between the seats are the point** — nothing else detects them. |
-| [`HANDOFF-FROM-FAIRY.md`](HANDOFF-FROM-FAIRY.md) | The return channel, and the git discipline for two machines on one repo. |
+| [`FAIRY-MEMORY-DUMP-INSTRUCTION.md`](../context/FAIRY-MEMORY-DUMP-INSTRUCTION.md) | Dump this seat's memory store so the two can be compared. **Contradictions between the seats are the point** — nothing else detects them. |
+| [`HANDOFF-FROM-FAIRY.md`](../context/HANDOFF-FROM-FAIRY.md) | The return channel, and the git discipline for two machines on one repo. |
 
-⏸ **FAIRY SESSION PAUSED 2026-08-25 — start at [`HANDOFF-FROM-FAIRY.md`](HANDOFF-FROM-FAIRY.md) → the
+⏸ **FAIRY SESSION PAUSED 2026-08-25 — start at [`HANDOFF-FROM-FAIRY.md`](../context/HANDOFF-FROM-FAIRY.md) → the
 PAUSE STATE block at the BOTTOM of that file.** It carries the machine's state (safe, nothing mid-test), the
 single next action (reboot the controller, then re-probe Modbus), what the session settled, and two claims
 that turned out wrong after they had already propagated.

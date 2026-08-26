@@ -14,7 +14,7 @@ be trusted without re-derivation.
 
 ## WHAT TO PRODUCE
 
-One file: **`bridge/FAIRY-MEMORY-DUMP.md`**, committed and pushed to the branch. It travels with the repo;
+One file: **`context/FAIRY-MEMORY-DUMP.md`**, committed and pushed to the branch. It travels with the repo;
 nothing else does.
 
 For **every** file in your project memory directory, in this shape, one after another:

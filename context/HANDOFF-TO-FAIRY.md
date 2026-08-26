@@ -7,7 +7,7 @@ hardware exists**, so anything needing a live controller happens there and nowhe
 **Written 2026-08-25 by the RENDERRANCHY-side advisor.** The transport work below is gateway-side, fully ruled, and
 **not built** — five open questions went to the owner and all five came back answered. This is a build handoff.
 
-⚠ **Read [`TRANSPORT.md`](TRANSPORT.md) for the spec.** This file is the orientation around it.
+⚠ **Read [`TRANSPORT.md`](../bridge/TRANSPORT.md) for the spec.** This file is the orientation around it.
 
 ---
 

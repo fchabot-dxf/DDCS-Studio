@@ -1,16 +1,16 @@
 # CONTROLLER TASKS & TESTS — DDCS Expert (M350) & V4.1
 
 > **Master index** of every controller-centric test/experiment and its status. The detailed method for each
-> lives in [`bridge/archive/EXPERIMENTS.md`](../bridge/archive/EXPERIMENTS.md) (the full plan, Tracks A–E);
+> lives in [`bridge/archive/EXPERIMENTS.md`](../../bridge/archive/EXPERIMENTS.md) (the full plan, Tracks A–E);
 > confirmed results live in the per-controller `FINDINGS.md`. This file is the **at-a-glance roll-up** — update
 > the status here when a test resolves, and record the *detail* in `FINDINGS.md` with a confidence tag.
 >
-> **Two controllers, never cross-apply** — see [`bridge/controllers/README.md`](../bridge/controllers/README.md).
+> **Two controllers, never cross-apply** — see [`bridge/controllers/README.md`](../../bridge/controllers/README.md).
 > - **DDCS Expert / M350** — the real studio machine (`\\192.168.0.99\`, Modbus on COM6). The target.
 > - **DDCS V4.1** — bench sandbox (`10.0.0.50`), motorless. Hardening / dev rig only.
 >
-> Canonical: [`bridge/controllers/README.md`](../bridge/controllers/README.md) · Expert [`FINDINGS.md`](../bridge/controllers/expert-m350/FINDINGS.md)
-> · V4.1 [`FINDINGS.md`](../bridge/controllers/v4.1/FINDINGS.md) · [`bridge/ROADMAP.md`](../bridge/ROADMAP.md)
+> Canonical: [`bridge/controllers/README.md`](../../bridge/controllers/README.md) · Expert [`FINDINGS.md`](../../bridge/controllers/expert-m350/FINDINGS.md)
+> · V4.1 [`FINDINGS.md`](../../bridge/controllers/v4.1/FINDINGS.md) · [`bridge/ROADMAP.md`](../../bridge/ROADMAP.md)
 > · system [`ddcs-studio-roadmap`](ddcs-studio-roadmap).
 >
 > Status legend: ✅ confirmed · ❌ refuted · 🟡 partial / mixed · ⬚ open · 🔵 needs ESP32 (~$6) · 🟣 needs capture card · ~~obsolete~~
@@ -101,7 +101,7 @@ Goal: deliver + run jobs on the Expert from the PC with **zero added hardware**.
 
 ## Recently done
 - **Controller profiles (Phase 5)** — `Ops.profile()` returns a live profile (tabs + `pins`) + startup/UI
-  validation. [`PROFILE_BUILD_TASK.md`](../bridge/controllers/expert-m350/PROFILE_BUILD_TASK.md) complete.
+  validation. [`PROFILE_BUILD_TASK.md`](../../bridge/controllers/expert-m350/PROFILE_BUILD_TASK.md) complete.
 - **A7** `#2037` confirmed live. · **A8** MDI file-injection refuted. · **A9-a/b** hardware-free inbound
   refuted (uservar 2-way RAM/file isolation; `MGETDATA` = analyzer wedge, zero frames) → **C1 settled as
   the architecture**. Bonus: `uservar` disk file is a lazy snapshot (not live readback).

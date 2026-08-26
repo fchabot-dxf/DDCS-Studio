@@ -1,7 +1,7 @@
 # DDCS Expert (M350) — At-Machine Verification: HANDOFF
 
 Status of the at-machine verification pass against the checklist in
-[`../../../../docs/VERIFY-AT-MACHINE.md`](../../../../docs/VERIFY-AT-MACHINE.md).
+[`../../../../docs/VERIFY-AT-MACHINE.md`](../../../../docs/archive/VERIFY-AT-MACHINE.md).
 Full evidence + reasoning lives in [`../FINDINGS.md`](../FINDINGS.md) (search the `V# RESULT` headers).
 This file is the quick "where are we / how to resume" sheet.
 

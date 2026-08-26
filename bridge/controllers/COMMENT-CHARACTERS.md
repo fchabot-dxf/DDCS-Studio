@@ -1,7 +1,7 @@
 # COMMENT CHARACTERS — what actually appears inside a comment, derived from the dumps
 
 **Measured on `CNC-FAIRY` 2026-08-25**, answering the blocking question in
-[`../HANDOFF-FROM-FAIRY.md`](../HANDOFF-FROM-FAIRY.md) §1: *"the safe comment-character list, derived from real
+[`../../context/HANDOFF-FROM-FAIRY.md`](../../context/HANDOFF-FROM-FAIRY.md) §1: *"the safe comment-character list, derived from real
 dumps rather than reasoning."* Cross-dialect, so it lives here beside the other cross-controller docs rather
 than inside one controller's `FINDINGS.md`.
 

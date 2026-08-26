@@ -2,7 +2,7 @@
 
 > The worker's append-only trail. `git diff` records *what* changed; this records the **WHY** — the
 > micro-decisions, the dead-ends tried and abandoned, anything not visible in the code. Newest at the bottom.
-> Companion: [`NEXT-SESSION.md`](NEXT-SESSION.md) (current state + next task) · [`ROADMAP.md`](ROADMAP.md) (the plan — advisor-owned, read-only).
+> Companion: [`NEXT-SESSION.md`](../../NEXT-SESSION.md) (current state + next task) · [`ROADMAP.md`](../../ROADMAP.md) (the plan — advisor-owned, read-only).
 
 ---
 

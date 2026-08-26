@@ -123,7 +123,7 @@ un-deferred the machine-frame in `SIMULATION-NOTES.md`. See git history for the 
 
 Reviewed `data/atcGenerator.js`, `wizards/atcChangeWizard.js`, `wizards/atcTestWizard.js`,
 `wizards/atcLengthWizard.js`, and the probe wizards against the firmware-derived reference
-[`DDCS-ATC-WORKFLOW.md`](DDCS-ATC-WORKFLOW.md). **Fixed 2026-06 (see "Applied" below)** — but the M-code
+[`DDCS-ATC-WORKFLOW.md`](../../bridge/controllers/expert-m350/DDCS-ATC-WORKFLOW.md). **Fixed 2026-06 (see "Applied" below)** — but the M-code
 map still needs confirming against `bridge/controllers/expert-m350/FINDINGS.md` / a live ATC before trusting.
 
 **1. Two divergent auto tool-change generators (the biggest issue).**
