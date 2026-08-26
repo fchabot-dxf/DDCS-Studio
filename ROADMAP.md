@@ -124,7 +124,7 @@ Surfaced by inspecting a real surfacing program on the **CNC-FAIRY** controller 
 - **🧪 Test-env note (CNC-FAIRY):** the full Playwright suite would NOT run on this box — the browser-binary download **hangs on extraction** (`chrome-headless-shell`; the ~114 MB zip downloads fine, then the extractor wedges, likely AV scanning the 192 MB exe — same FP surface as above). Workaround that WORKED: let the download finish, kill the stuck installer, `unzip` the zip from `%TEMP%\playwright-download-*\` manually into `ms-playwright\chromium_headless_shell-1208\`, `touch INSTALLATION_COMPLETE`; smoke test then green (pocket golden `goldenDiffs:0`). **Full suite still to be run in a clean location.**
 
 ### 🔩 AT-THE-MACHINE — finish the DDCS fixed tool-setter (do these standing at CNC-FAIRY)
-Full context in [`TOOL-SETTER.md`](docs/specs/TOOL-SETTER.md). Workflow is **NO ATC** — manual tool change, a **single slot T1 rewritten on every change**; **G54 Z0 = spoilboard, SACRED (never rewrite).** The working probe is **`G31 … P2 L1`** (factory `O502` watches mis-resolved `#1075/#1077` and drives through).
+Full context in [`RESTORE-CUSTOM-MACROS/README.md`](bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/RESTORE-CUSTOM-MACROS/README.md) — which supersedes the old `docs/specs/TOOL-SETTER.md` (deleted t2296: its diagnosis was the dead-signal one, corrected later to **a rapid descent through the setter before any `G31` ran**). Workflow is **NO ATC** — manual tool change, a **single slot T1 rewritten on every change**; **G54 Z0 = spoilboard, SACRED (never rewrite).** The working probe is **`G31 … P2 L1`** (factory `O502` watches mis-resolved `#1075/#1077` and drives through).
 1. **Measure the ONE missing constant: setter touch-top height above the spoilboard** (the setter→spoilboard link, the reference that made the raw `TOOLSET.nc` come out ~60 mm wrong). If the setter sits ON the spoilboard = its thickness; else measure spoilboard-surface→setter-top with calipers. No spoilboard contact, no reference tool needed.
 2. **Build the single-slot T1 macro:** probe `P2 L1` → compute the T1 offset from `[setter touch #1927] − [stored G54 Z0] − [the constant]` → write **only** T1's offset (`#1430`), **never** the WCS/G54 Z. Rewritten each manual tool change.
 3. **Jog-verify before cutting:** set a tool, jog to G54 Z0, confirm the tip sits on the spoilboard. If it's off by ~2× the height, the offset **sign is flipped** — invert it. Do NOT run a program until this reads right (a wrong tool offset crashes).
@@ -827,8 +827,10 @@ five came back answered — and **not built**.
 - [ ] Linter rule: flag a live **`MGETDATA`** with no confirmed-responding slave (it hard-wedges).
 - [ ] ⭐ Linter rule: flag a **one-digit `H` word** — `H1` is silently ignored by the Expert and `H01` is not
       (FINDINGS §16). Nothing reports it, which is exactly what a linter is for.
-- [ ] [`CONFORMANCE_CORPUS.md`](bridge/controllers/expert-m350/CONFORMANCE_CORPUS.md): use the wired Expert as
-      a parser oracle to build engine fixtures.
+- [ ] Use the wired Expert as a **parser oracle** to build engine fixtures. ⚠ The corpus/fixture-replay
+      mechanism `CONFORMANCE_CORPUS.md` proposed was never built (doc deleted t2296); what actually took
+      hold is the [`verify/`](bridge/controllers/expert-m350/verify/) + [`FINDINGS.md`](bridge/controllers/expert-m350/FINDINGS.md) workflow — one motion-free macro per question, its result
+      recorded with a confidence tag. ⭐ Build on THAT, not on a replay corpus nobody wrote.
 
 ## 🔬 Open experiments — need the machine ⛔ do NOT blind-test; each bad one costs a reboot
 - [ ] ⭐ **Modbus position poll answers `0x00`** — needs a controller **reboot** first (`#279` is set but
