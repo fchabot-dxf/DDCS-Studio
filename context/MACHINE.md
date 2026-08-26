@@ -31,7 +31,7 @@ Z          not set    ⚠ see below   ⛔ NO negative soft limit configured
 | `#155` | Enable software limits | **1** (on) |
 | `#166` / `#161` | X positive / negative | **+756** / `−9999` (unset) |
 | `#167` / `#162` | Y positive / negative | **+5** / **−776** |
-| `#168` / `#163` | Z positive / negative | **+1** / `−9999` ⛔ **unset** |
+| `#168` / `#163` | Z positive / negative | **+1** / `−9999` — unset, and ⭐ ruled NORMAL by the owner |
 
 ⛔⛔ **THE SKILL'S NUMBERS WERE WRONG, AND `ops.py` WAS RIGHT.** The `X 1000 / Y −735 / Z −150` above came
 from `CORE_TRUTH.md` and read as this machine's travel; the machine says **756** and **776**, which are
@@ -39,12 +39,24 @@ exactly the figures `ops.py`'s docstrings use. They were never generic examples 
 and the discrepancy this file flagged is resolved in `ops.py`'s favour. ⇒ ⭐ **The dump outranked the
 document, again.**
 
-⚠⚠ **AND THE ONE THAT MATTERS: Z HAS NO NEGATIVE SOFT LIMIT.** `#163` reads `−9999`, the parameter's floor,
-i.e. never configured — while `#155` says soft limits are ON and X and Y are properly fenced. So the axis
-that carries the tool toward the spoilboard is the one the controller is not fencing. ⛔ **Not a bug to
-"fix" from here** — it may be deliberate, and `G54 Z0` = the spoilboard is SACRED. **Raise it with the
-owner; do not write a limit to a production machine.**
-⚠ Note `#168` (Z positive) moved `9999 → 1` between the two captures, so this block IS being adjusted.
+**Z has no negative soft limit** — `#163` reads `−9999`, the parameter's floor, i.e. never configured,
+while `#155` says soft limits are ON and X and Y are fenced.
+
+⭐ **RULED BY THE OWNER, 2026-08-26 — this is NORMAL, not a finding: *"soft limits are optional though."***
+
+⛔ **Do not re-raise it, and do not "fix" it.** A soft limit is an opt-in fence, not a safety feature the
+machine is missing. On a router where `G54 Z0` is the spoilboard and every cut goes INTO the stock, a
+negative Z limit would have to sit below the deepest legitimate cut — set it wrong and it **stops
+production** rather than protecting anything. Leaving it unset is a normal choice.
+
+⚠ It was written up here as *"the axis that carries the tool toward the spoilboard is the one the controller
+is not fencing"* — true as a sentence, and misleading as a framing. **The second time in one day that a
+plainly-alarming reading of a real measurement dissolved once the owner applied ordinary knowledge of their
+own machine** (the first: a probe-set tool offset being non-zero, which is what tool offsets are for).
+⇒ **Measure freely; be slow to call a measurement a hazard.**
+
+⚠ Still worth knowing: `#168` (Z positive) moved `9999 → 1` between the two captures, so this block IS
+being adjusted by someone.
 
 ⭐ **Machine zero is at the limit switches**, and two of three axes travel NEGATIVE from it. A formula that
 assumes positive travel is wrong here on Y and Z.
