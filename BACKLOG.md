@@ -2000,11 +2000,31 @@ same discipline t2277 and t2281 both used for `disabledReasons`; do not assume f
 not just an in-app reload) is a separate question from whether it survives the Blockly canvas round-trip —
 answer the cheaper one first and report whether the marker question is worth its own turn.
 
-### 27. ⛔ THE WORK↔MACHINE FRAME EQUATION USES 1 OF 5 TERMS — the WCS-zero write is silently wrong under a tool offset
+### 27. [⛔ OWNER-REFUTED 2026-08-26 — DO NOT WORK THIS AS WRITTEN] THE WORK↔MACHINE FRAME EQUATION USES 1 OF 5 TERMS — the WCS-zero write is silently wrong under a tool offset
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md` (t2117-t2121, Stage D/T9) — the plan's own file is deleted,
 t2295 doc cleaning, its Stages A-C shipped; this ONE item was explicitly gated behind a human go and never
 built. Preserved here rather than lost with the plan.)*
+
+⛔⛔ **THE OWNER REFUTED THIS ENTRY, 2026-08-26: *"27 is bullcrap, my 68mm offset is set
+intentionally."*** And they are right on the substance:
+
+⭐ **A non-zero tool-length offset is not an anomaly — it is the whole point of a tool-length offset.**
+This entry, and the advisor's handling of it, repeatedly treated the EXISTENCE of a −68.336 offset as
+if it were a lurking fault. It is a deliberately probe-set tool length on a machine that has been
+**running real parts and two-sided jobs for months**. ⇒ If Studio's WCS write mishandled it, the very
+first part would have been scrap or a crash. **It did not happen.**
+
+⚠ **What is left is much smaller than the entry claims** and must not be worked from its current
+wording: a question about whether the emitted form is exact under configurations we do not have
+(non-zero `G52`, a populated `H` table). ⛔ **Nobody rewrites a live-WCS write on that basis.**
+
+⭐ **The lesson, since it recurred all day:** "unverified" is not "unknown" on a machine in
+production. **Months of good parts are evidence**, and they outrank a formula read out of a document.
+The advisor escalated this to the owner twice — first as a go/no-go, then with the offset's size
+dressed up as "45% of Z travel" — before the owner pointed out the offset was simply intentional.
+
+*(Original text kept below, unedited, so the reasoning error stays visible.)*
 
 **Evidence** (`Docs/最完整的M350坐标换算公式/Coordinate system offsets DDCSE.txt`, verbatim): `#852 = #882 -
 #807 - #1430 - #837 - #900` (mach − G54 − T-offset − G52 − H-length). Studio uses only 1 of the 5 terms —

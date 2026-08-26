@@ -30,11 +30,12 @@ assumes positive travel is wrong here on Y and Z.
 ⛔ **`G28` IS NOT MACHINE ZERO.** It goes to back-off positions ~5 mm off the switches
 (`Pr122-Pr126` / `#622-#626`): **X +5.0, Y −5.0, Z −5.0**. ⇒ **Use `G53` when you mean machine zero.**
 
-⭐⭐ **Z travel is only 150 mm, and that is load-bearing for judging a claimed error.** The tool-offset
-question in `BACKLOG.md` posits a WCS-Z wrong by **68.336 mm** — **45% of the entire Z axis.** On a machine
-running real parts, an error that size is not subtle; it is a crash or a cut in mid-air on the first job.
-⇒ **The missing symptom is strong evidence**, and any analysis claiming a large silent Z error has to explain
-why nothing happened.
+⭐ **Z travel is only 150 mm.** Worth holding when judging any Z figure — the axis is short, so a
+clearance or retract that looks modest can be a large fraction of it.
+
+⚠ **A non-zero tool-length offset is NORMAL, not a warning sign.** The owner's is intentional and
+probe-set (−68.336 at the time of writing). ⛔ **Do not treat the existence of a tool offset as evidence
+of anything** — that is what the offset is FOR.
 
 ## WCS
 
