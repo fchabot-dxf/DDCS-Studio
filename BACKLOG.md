@@ -577,8 +577,43 @@ genuinely distinct (open a WORKSPACE vs load a PROGRAM into the editor) — nobo
 ⇒ If two are the same act, collapse them. If they differ, the LABELS must say how, because right now they do
 not. ⛔ Report before collapsing — this is a naming/behaviour call, not a tidy-up.
 
-### 10. MULTI-OP APPROACHABILITY: the wizard preview shows ONE op, with no idea where it sits
+### 10. [✅ CORE SHIPPED t2176 — three tails open, see the update] MULTI-OP APPROACHABILITY: the wizard preview shows ONE op, with no idea where it sits
 *(design conversation with the human, 2026-08-22)*
+
+#### ✅ UPDATE (advisor, 2026-08-26) — THE FIX BELOW SHIPPED AT t2176. Verified in the code, not assumed.
+
+`wizardManager.js:623` is no longer `getGcode: () => host.__gcode || ''`. It reads:
+
+```js
+getGcode: () => host.__contextGcode || host.__gcode || ''
+host.__contextGcode = this._contextGcode(wholeProgramCtx);   // t2176
+```
+
+And `_contextGcode` (`:591`) does exactly what this entry proposed: takes the whole stack, splices the live
+draft in via `replaceOpById`, and re-emits the **entire program** through the same dialect fold. Best-effort,
+falling back to the single-op preview rather than breaking it.
+
+⭐ **PLAY SCOPE was answered — differently, and deliberately.** `createPreviewPanel.js:216-226` introduces
+`getPlayGcode`: the panel SHOWS the whole program but PLAYS this op's isolated code, so Play is byte-identical
+to before. The start-OFFSET into a whole-program run that this entry asked for was **deferred on purpose**,
+with the reason recorded: it is real `GcodeExecutionEngine` work, and that engine is also the send
+safety-gate's parser (`ui/gateway/views/send.js`). ⛔ Do not treat that as an oversight.
+
+#### ⚠ WHAT REMAINS — the three tails, none of them the headline
+
+1. **A NEW op still previews in isolation.** `_contextGcode` opens with
+   `if (!wholeProgramCtx || !this.editingOpId) return null;` ⇒ the context exists only when EDITING AN
+   EXISTING op. Inserting a new one is exactly the moment you most want to see where it lands.
+2. **RE-TRACE COST was never measured.** This entry called it *"the one real risk"* and asked for a
+   measurement before assuming it is fine. No measurement is recorded. ⭐ The proposed mitigation (trace ops
+   before yours once, re-trace only from your op onward) is also unbuilt — it may simply not be needed, but
+   nobody has checked on a 12-op program.
+3. **The start-offset Play**, deferred above. Its own turn, whenever the engine work is worth it.
+
+⛔ **The BACKDROP fallback is now definitively dead** — it existed only in case the trace cost proved
+prohibitive, and the whole-program trace shipped without it.
+
+---
 
 **The complaint:** *"without [a cad editor] multiop is lacking approachability."* Open a wizard on op 3 of a
 12-op program and you cannot see where your pocket sits relative to anything else.
