@@ -41,7 +41,7 @@ import { drillStack } from '../../wizards/stacks/drillWizard.js';
 import { patternPoints } from '../../wizards/drillWizard.js';   // patternPoints itself is a pass-through re-export (defined in ops/index.js), not a moved builder — stays at the old path
 import { skipSet } from '../../wizards/ops/holecycle.js';   // t2042 — the SAME declared skip parse the real emit's IF/GOTO gates on
 import { pointsBBox } from '../../wizards/ops/placement.js';   // t718 — the hole-CENTRES bbox for the placement-parity shift
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, flattenBlocks } from '../userOps.js';   // t2293 — flattenBlocks for the postInstantiate clearance fan-out copy
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
@@ -140,7 +140,31 @@ export const DRILL_BINDING_SPECS = [
     // feed rides the shared val() pass-through — all genuinely eligible, not just "no branch found".
     { param: 'depth', tokenEligible: true, match: { type: 'holecycle' }, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
     { param: 'peck', tokenEligible: true, help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", match: { type: 'holecycle' }, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
+    // t2293 (BACKLOG arc, closing the wiring gap t2291's own gate found) — holeDia: the shell exposes it
+    // unconditionally (drillView.js's own HOLE Ø field, shown for BOTH peck and bore) and it is NOT
+    // method-entangled the way toolDia/pitch/ramp are (peck mode genuinely uses it — it's the drill bit size —
+    // unlike the bore-only trio, which the shell only shows once method=helical, itself unbound and out of
+    // scope this turn). tokenRefusal, not tokenEligible: holeCycleLines' own tool-fit refusal
+    // (holeCycleToolRefusal, holecycle.js:401) reads holeDia as a plain JS number at BUILD time, on every
+    // cycle including peck (t1444's own ruling extended the check universally) — a `#var` token here would
+    // reach that comparison as NaN, not a real value. NO explicit `default`: DRILL_DEFAULTS never declared
+    // one, so the binding inherits the socket's own BAKED value (12, drillWizard.js's own `num(params.holeDia,
+    // 12)` fallback) rather than the shell's DIFFERENT hardcoded default (6) — binding must not also silently
+    // change what a default-valued op emits; that pre-existing 6-vs-12 divergence between the shell and the
+    // wizard-stack builder is real but predates this turn and is out of scope to fix here.
+    { param: 'holeDia', tokenRefusal: 'Feeds the build-time tool-fit refusal (a hole narrower than its tool refuses, on every cycle) — a categorical decision about whether the program builds at all, not a value inside one.', match: { type: 'holecycle' }, key: 'holeDia', type: 'number', units: 'mm', label: 'Hole Ø', help: "Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)." },
     { param: 'feed', tokenEligible: true, match: { type: 'holecycle' }, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
+    // t2293 — clearance: the shell exposes it unconditionally (DEPTH & FEED's own CLEARANCE Z), not
+    // method-entangled — but it is a genuine FAN-OUT (drillWizard.js's own drillStack sets it on BOTH the
+    // framing progstart, via programFraming.js's makeStart, AND the holecycle leaf itself — confirmed by
+    // reading both, not assumed from the param name). `deriveBindings`/`instantiate` write ONE (blockIndex,key)
+    // per binding row, so this binds the holecycle leaf's own copy the ordinary way (matching depth/peck/feed
+    // above) and the progstart copy is kept in sync via `drillDataDef`'s own postInstantiate below — the SAME
+    // established pattern pocketData.js already uses for its own frozen-superset "derived socket" rewrites
+    // (pocketData.js:426-452's own comment: "one source, no fan-out bindings"), not a new mechanism invented
+    // for this turn. `DRILL_DEFAULTS.clearance` (5) already matches both the shell's own default and
+    // drillStack's own `num(params.clearance, 5)` fallback — no discrepancy to preserve here.
+    { param: 'clearance', tokenEligible: true, match: { type: 'holecycle' }, key: 'clearance', type: 'number', units: 'mm', default: DRILL_DEFAULTS.clearance, label: 'Clearance Z' },
     { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
@@ -230,6 +254,13 @@ export function drillDataDef() {
     def.previewGeometry = (p) => drillPatternGeometry(p, false);   // t716 — hole pattern + pos + pattern handles (diameter DISPLAY)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', depthOnly: true };   // t1026 — the depth-only ruler (peck drill has no stepdown): axis + total-depth grip, no pass ticks
-    def.postInstantiate = spindleHeadPatch;   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
+    // t2293 — clearance's own fan-out (its OTHER copy, on the framing progstart — see the binding's own comment
+    // above) kept in sync here, composed with the existing spindleHeadPatch (same shape as surfacingData.js/
+    // pocketData.js/boreData.js, all of which compose spindleHeadPatch with their OWN derived-socket rewrite).
+    def.postInstantiate = (stack, resolved) => {
+        const r = resolved || {};
+        if (r.clearance !== undefined) for (const b of flattenBlocks(stack)) if (b && b.type === 'progstart' && b.params) b.params.clearance = r.clearance;
+        return spindleHeadPatch(stack);   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
+    };
     return def;
 }

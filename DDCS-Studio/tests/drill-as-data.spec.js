@@ -6,9 +6,12 @@ import { test, expect } from '@playwright/test';
  * BYTE-IDENTICAL G-code to the hand-coded drillStack across a param sweep. Proven with the reusable equivalence
  * harness (blocks/dataOps/equivalence.js) that every future Stage-5 port will reuse.
  *
- * Also pins the FRONTIER: three things a pure {template,bindings} def cannot yet express (method swap, live bbox,
- * fan-out clearance) are demonstrated as EXECUTABLE divergences — turning the documented limits into regression
- * tripwires (if a future format extension closes one, the matching divergence test fails and flags the win).
+ * Also pins the FRONTIER: things a pure {template,bindings} def cannot yet express are demonstrated as EXECUTABLE
+ * divergences — turning the documented limits into regression tripwires (if a future format extension closes
+ * one, the matching divergence test fails and flags the win, exactly as it did for live bbox — t-numbered below
+ * — and for clearance's own fan-out, t2293: an ordinary binding on the primary socket plus a postInstantiate
+ * copy onto the second, the SAME pattern pocketData.js already used for its own derived-socket rewrites).
+ * STILL OPEN: method swap (peck→bore is a structural block-TYPE change instantiate() cannot express).
  */
 test('drill-as-data: the data def emits byte-identical G-code to drillStack across a param sweep', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -68,7 +71,8 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
     const bboxShape = emitEquivalence(drillStack, dataBuilder, [S({ pattern: 'circle', count: 6, dia: 40 })]);
     // STILL-OPEN FRONTIER #1 — method swap (helical → a `bore` child the static template can't become).
     const helical = emitEquivalence(drillStack, dataBuilder, [S({ method: 'helical', holeDia: 12, toolDia: 6, pitch: 0.5 })]);
-    // STILL-OPEN FRONTIER #3 — fan-out clearance (feeds progstart + the drill leaf; unbound here).
+    // t2293 — FRONTIER #3 SOLVED: clearance now binds the holecycle leaf normally + a postInstantiate hook
+    // copies the same resolved value onto the framing progstart (drillData.js's own comment has the full account).
     const clearance = emitEquivalence(drillStack, dataBuilder, [S({ clearance: 25 })]);
 
     // BINDING WIRING — prove EVERY binding routes its param to the SAME socket drillStack does, INDEPENDENT of emit.
@@ -142,7 +146,9 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
   // FRONTIER #2 — SOLVED: the placement now tracks the pattern live, so these previously-divergent cases CONVERGE.
   expect(r.bboxOffsetPass, 'frontier #2 SOLVED: an x0/y0 offset now emits byte-identical (live bbox)').toBe(true);
   expect(r.bboxShapePass, 'frontier #2 SOLVED: a circle pattern now emits byte-identical (live bbox)').toBe(true);
-  // STILL-OPEN frontiers — MUST currently diverge (what the {template,bindings} format cannot yet express).
+  // STILL-OPEN — MUST currently diverge (what the {template,bindings} format cannot yet express).
   expect(r.helicalPass, 'frontier #1: a pure data def cannot swap the drill→bore child (helical diverges)').toBe(false);
-  expect(r.clearancePass, 'frontier #3: clearance fans out to two sockets, unbound here (varying it diverges)').toBe(false);
+  // t2293 — FRONTIER #3 SOLVED: clearance's fan-out (progstart + the holecycle leaf) is now bound; varying it
+  // must CONVERGE, same as frontier #2 did above.
+  expect(r.clearancePass, 'frontier #3 SOLVED: clearance now emits byte-identical (fan-out bound via postInstantiate)').toBe(true);
 });

@@ -60,7 +60,14 @@ const DRILL_FROZEN = [
     { param: 'skip', key: 'skip', blockIndex: 7, default: '' },
     { param: 'depth', key: 'depth', blockIndex: 8, default: 5 },
     { param: 'peck', key: 'peck', blockIndex: 8, default: 5 },
+    // t2293 — holeDia/clearance, newly bound (BACKLOG arc, closing t2291's wiring gap): same blockIndex (8,
+    // the collapsed holecycle leaf) as the other cut params, in DECLARATION order (depth, peck, holeDia, feed,
+    // clearance, rpm — see drillData.js's own DRILL_BINDING_SPECS). holeDia carries no explicit `default`, so
+    // it reads the socket's own baked value (12, drillWizard.js's `num(params.holeDia,12)` fallback) — NOT the
+    // hardcoded shell's own different default (6), a pre-existing, deliberately untouched divergence.
+    { param: 'holeDia', key: 'holeDia', blockIndex: 8, default: 12 },
     { param: 'feed', key: 'feed', blockIndex: 8, default: 100 },
+    { param: 'clearance', key: 'clearance', blockIndex: 8, default: 5 },
     { param: 'rpm', key: 'rpm', blockIndex: 4, default: 0 },
 ];
 const BORE_FROZEN = [
