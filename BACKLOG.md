@@ -2066,7 +2066,7 @@ could still emit real content; this turn only confirmed the leaf-atom case defin
 
 ---
 
-### 25. THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
+### 25. [⭐ RULED 2026-08-26 — shape distinction approved, ready to build] THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
 
 *(surfaced 2026-08-25 by BACKLOG 17, which was NOT a bug — the dot was correct throughout. This is what the
 episode actually exposed.)*
@@ -2127,8 +2127,16 @@ with no file is one cleared cache from gone; a stale file is merely behind.
 `:484-486` computes both. **Only the header glyph collapses them.** ⇒ Whatever is chosen, the glyph and the
 state line must agree; today they disagree, which is why both the owner AND the advisor misread the same dot.
 
-⛔ **Not a ruling I should make alone** — it is a visible change to the one indicator the owner looks at
-most, and they have already been misled by it once.
+✅ **RULED BY THE OWNER, 2026-08-26: *"i like your distinction."*** ⇒ **The SHAPE distinction is approved** —
+filled dot for a stale file, HOLLOW ring for no file at all. **Ready to build; no further ruling needed.**
+
+⚠ **Build notes, so the point is not lost in implementation:**
+- ⛔ **The hollow ring is not "less severe" — it is the MORE urgent state.** Do not let a colour ramp
+  (green → amber → red) carry the meaning on its own; the shape is what says *different kind of problem*.
+  A viewer who cannot distinguish the colours must still see two different marks.
+- **Make the glyph agree with the state line**, which already says the right words at `:484-486`. They
+  disagree today, and that disagreement is the whole defect.
+- ⛔ Do not hide the dot in the never-saved case, per the entry's own warning above.
 
 ⇒ Cheapest honest fix is probably the TOOLTIP, which can differ without touching the visual language. A second
 dot state is a bigger design question and would need a ruling.
