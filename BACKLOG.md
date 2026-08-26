@@ -2029,6 +2029,43 @@ setting or ATC auto-measure (`#1305=1`) — the power-user population. Highest-v
 AND the worst failure mode if wrong. Requires an explicit human go, a bench check with a known non-zero tool
 offset, and its own turn — do not fold into an unrelated dispatch.
 
+---
+
+### ⭐⭐ 2026-08-26 — THE FIRST STEP IS **REPRODUCE OR REFUTE**, NOT BUILD. The symptom is missing.
+
+Raised with the owner as a go/no-go. **They refused the premise, correctly**, and the argument is decisive
+enough to change what this entry asks for:
+
+> *"it would be weird it isn't like that no?"*
+
+⭐ **A 68 mm Z error CANNOT HIDE.** Fairy measured the live tool offset on the owner's own Expert at
+`setting[930] = −68.336`, applied unconditionally. If a Studio probe wizard wrote G54 Z off by that much,
+the next cut would plunge into the table or cut air 68 mm high — found in minutes, not months. **The absence
+of that symptom is EVIDENCE**, not merely absence of testing. This code has shipped for months.
+
+⇒ **So the possibilities reorder, and "confirmed defect awaiting approval" is the wrong framing:**
+
+```
+①  the owner zeroes at the PENDANT → Studio's write path never runs on their machine
+②  ⭐ the probe flow is SELF-CONSISTENT — if the probed position already carries the offset,
+    writing #882 raw is correct FOR THIS PATH, even though the vendor's warning about a bare
+    "#807=#882" command stands. Two errors that cancel.
+③  the formula analysis is right and the BLAST RADIUS is wrong
+```
+
+② is the most likely: the vendor's warning is about setting a WCS from the current position *generally*; a
+**probe-derived** zero may measure through the same offset, so the terms cancel.
+
+⛔ **THEREFORE the next action on this entry is NOT the fix.** It is a read-only reproduction: take one probe
+wizard's emitted WCS write, with a known non-zero tool offset, and check whether the resulting zero is off by
+that offset. **Off ⇒ real, proceed to the gate above. Equal ⇒ this entry is wrong and gets corrected, not
+built.** No motion, no human decision, no live-WCS write required to answer it.
+
+⚠ **Why this correction is here at all:** the entry was escalated to the owner as a decision without anyone
+checking whether the symptom exists — the same error as promoting the other seat's stale-`setting`-file claim
+to a product direction hours earlier the same day. **A confidently-worded backlog entry is a CLAIM, and the
+question "which moment did that number come from?" applies to it exactly as it does to a measurement.**
+
 ### 28. HELD — `T.nc` OVERWRITES THE ATC DISPATCHER (needs a design ruling, not a patch)
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H1 — the plan's own file is deleted, t2295.)*
