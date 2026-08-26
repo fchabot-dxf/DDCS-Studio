@@ -64,8 +64,20 @@ are listed here, in the file this seat loads automatically:
 | [`FAIRY-MEMORY-DUMP-INSTRUCTION.md`](FAIRY-MEMORY-DUMP-INSTRUCTION.md) | Dump this seat's memory store so the two can be compared. **Contradictions between the seats are the point** — nothing else detects them. |
 | [`HANDOFF-FROM-FAIRY.md`](HANDOFF-FROM-FAIRY.md) | The return channel, and the git discipline for two machines on one repo. |
 
-⚠ **One RENDERRANCHY turn is BLOCKED on this seat**: the safe comment-character list, derived from real dumps rather
-than reasoning. See `HANDOFF-FROM-FAIRY.md` §1.
+⏸ **FAIRY SESSION PAUSED 2026-08-25 — start at [`HANDOFF-FROM-FAIRY.md`](HANDOFF-FROM-FAIRY.md) → the
+PAUSE STATE block at the BOTTOM of that file.** It carries the machine's state (safe, nothing mid-test), the
+single next action (reboot the controller, then re-probe Modbus), what the session settled, and two claims
+that turned out wrong after they had already propagated.
+⭐ The controller facts live in [`controllers/expert-m350/FINDINGS.md`](controllers/expert-m350/FINDINGS.md)
+→ **the RESULTS block at the top**. The numbered sections below it are the investigation in the order it
+happened, corrections included — provenance only, not needed to use the results.
+⭐ To find any parameter on the pendant: [`controllers/expert-m350/PARAM-PAGE-MAP.md`](controllers/expert-m350/PARAM-PAGE-MAP.md).
+⛔ Sections gather scattered number ranges, so never search by parameter number — and when asking a human to
+change one, give **Param page → section → `#nnn` name**, never a bare number.
+
+✅ ~~One RENDERRANCHY turn is BLOCKED on this seat: the safe comment-character list~~ — **DELIVERED**:
+[`controllers/COMMENT-CHARACTERS.md`](controllers/COMMENT-CHARACTERS.md). The governing constraint turned out
+to be **nesting, not the character set**, and that half already shipped at `917f8856`.
 
 ⭐ **And note where cross-seat facts should end up.** This file already names the right home —
 `controllers/<name>/FINDINGS.md`, tagged `[CONFIRMED]` / `[TO TEST]` / `[HYPOTHESIS]`. That convention is
