@@ -2278,7 +2278,7 @@ Z, auto tool-setting, position restore). Blast radius is a real tool change on a
 fix (write into `slib-g.nc`/`O20000` vs warn loudly) is a design decision the plan explicitly deferred to a
 human ruling, never built.
 
-### 29. HELD — CAM `baseSlot: 22` AND THE `POOL_MIN = 1100` COLLISION [⭐ (2) NOW PROVEN, (1) BOUNDED — 2026-08-26]
+### 29. [⭐ ANALYSED — no owner ruling needed, see 2026-08-26 (b)] CAM `baseSlot: 22` AND THE `POOL_MIN = 1100` COLLISION [⭐ (2) NOW PROVEN, (1) BOUNDED — 2026-08-26]
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H2 — the plan's own file is deleted, t2295.)*
 
@@ -2331,5 +2331,30 @@ beyond the documentation — it is precisely one past the highest number anyone 
 ships only the first two groups (m30/m31), so its silence above m31 is **absence of placeholders, not
 evidence of a ceiling.**
 
-⛔ **Still needs a ruling, and still not something to "just try"** — the failure mode is a CAM entry the
-controller does not surface, on a machine in production.
+#### ✅ ADVISOR, 2026-08-26 (b) — NO OWNER RULING NEEDED. Both halves are smaller than the entry reads.
+
+**(2) THE COLLISION IS SAFE, JUST UNHELPFUL. Traced end to end:**
+
+```
+slotPack.js:201   a colliding param goes to paramCollisions, NOT to `added`   ⇒ nothing is overwritten
+macrosApp.js:2003 the user is shown, in RED: "#param collisions (already defined in the eng): #1100, …"
+```
+
+⇒ **Not corruption — a bad first-run experience.** A new user's first slot lands on the vendor's shipped
+`#1100-#1105` placeholders, gets a red message naming numbers that mean nothing to them, and has to work out
+that the pool simply starts in an occupied place. ⭐ **The defect is the STARTING POINT, not the merge.**
+
+⚠ The entry's own diagnosis stands and is still the right fix — `usedParams()` walks only the pack's own
+slots and never the controller's eng. ⛔ But this is a **usability** item, not a safety one, and it should be
+sized as such.
+
+**(1) `baseSlot: 22` IS A FALLBACK DEFAULT, not an assertion about the hardware.**
+
+`macrosApp.js:1914`: `const base = (_camPack.meta && _camPack.meta.baseSlot) || 22;` ⇒ 22 applies only when a
+pack declares no `baseSlot` of its own. ⭐ Combined with the measured bound — community packs attest
+`macro_cam` up to **21** — the default sits exactly one past the highest number anyone has been observed to
+use, which is a reasonable place for a *next free slot* default and a poor place for an *assumed valid* one.
+
+⇒ **Neither half needs a decision from the owner.** What both need is a turn: start the pool past the
+shipped placeholders (or feed the controller's eng into the allocator, which is the real fix), and let the
+`baseSlot` default stay a default. ⚠ Still do NOT touch the confirmed-correct constants listed above.
