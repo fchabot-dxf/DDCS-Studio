@@ -324,7 +324,7 @@ handoff protocol greps it.
 for the signature's value, changing it INVALIDATES every stored `autostartGenSig` — check whether a
 mismatch merely shows a staleness note or triggers a regeneration before changing it.
 
-### 6. Hand-authored T.nc / error.nc G-code is DISCARDED on reload
+### 6. [✅ FIXED t2143 — confirmed stale t2219] Hand-authored T.nc / error.nc G-code is DISCARDED on reload
 *(found 2026-08-22, same sweep — and only findable because of the item above)*
 
 `ui/macrosApp.js:607-626` writes `getSettings().systemHooks.T` and `.error` — the user's **hand-written**
@@ -455,7 +455,7 @@ to get workspace actions is the obvious gesture; the chevron then becomes a seco
 **Files:** `web/index.html` (move the span out of the anchor), `web/ui/headerPost.js` (menu head + version
 footer, `Workspace:` line is at :151), `web/styles.css` (truncation).
 
-### 8. ⛔ `M6.rc` is offered as an EDITABLE G-code file — it is a compiled GUI resource
+### 8. [✅ REMOVAL SHIPPED t2143 — mostly stale, confirmed t2219] ⛔ `M6.rc` is offered as an EDITABLE G-code file — it is a compiled GUI resource
 *(human, 2026-08-22: "is m6.rc the right filename? not .nc?" — the name is right; the classification is not)*
 
 `data/controllerFiles.js:50` declares, in the V4.1 tree:
@@ -1289,7 +1289,7 @@ riding on a navigation control.
 ⇒ Delete the dead override branches, de-duplicate `homingPostIsExpert`, and route both through the workspace
 profile the way t2137 did for the `settingsPanel` copy.
 
-### 14. TWO DEAD-CODE CLUSTERS IN THE EDITOR CHROME, found during t2155 and deliberately NOT swept
+### 14. [✅ SHIPPED t2221 — all THREE clusters, a third found during the sweep] TWO DEAD-CODE CLUSTERS IN THE EDITOR CHROME, found during t2155 and deliberately NOT swept
 *(worker, t2155 — reported rather than removed, because a refactor turn must not also be a removal turn)*
 
 Both are pre-`t2078` leftovers: `t2078` rebuilt the editor's button row as one flex row and these two never
