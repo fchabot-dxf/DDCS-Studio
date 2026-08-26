@@ -1761,16 +1761,29 @@ which that is - otherwise the check is as ambiguous as the prose it replaced.
 
 ---
 
-### 19. [SHIPPED t2269 — viewport-derived cap, no item-count limit] THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
+### 19. [✅ SHIPPED t2269 — CSS cap VERIFIED t2296 — viewport-derived cap, no item-count limit] THE WIZARD-BAR DROPDOWN HAS NO OVERFLOW PROTECTION AT ALL
 
-⚠ **Its STILL REAL IF check is UNRELIABLE — re-derive it before trusting it.** The check greps
-`styles.css` for `max-height`/`overflow` on `toolbar-dropdown` and treats NO output as still-real. It
-returns no output today. ⛔ That does NOT mean the defect is back: a **viewport-derived cap computed in
-JS** is invisible to a CSS grep, and the sibling menus clamp in JS (`ui/opContextMenu.js:45`,
-`ui/globalFunctions.js:421`). ⭐ **A check written against the SYMPTOM'S SHAPE breaks when the fix
-changes that shape** — the same failure as #21's and #22's checks, all three in the same direction.
-⚠ Advisor could not confirm the fix's mechanism from CSS alone; whoever reopens this must verify in the
-running app, not by grep.
+✅ **CONFIRMED FIXED — advisor verified in the CSS, 2026-08-26.** `styles.css:1511` `.toolbar-dropdown-content`
+carries `max-height: calc(100vh - 40px)` + `overflow-y: auto`, with its own comment citing
+*"BACKLOG 19 (t2245 finding, t2269 fix)"*. **The viewport-derived cap is CSS, not JS.**
+
+⛔ **Its STILL REAL IF check below is BROKEN — it reports the fix as missing. Do not reopen on it.**
+`grep "max-height|overflow" styles.css | grep toolbar-dropdown` finds the `max-height` line and then discards
+it, because that line sits **23 lines below** the selector and does not itself contain the word.
+
+⭐⭐ **All THREE broken checks in this file share one cause: a LINE-scoped grep cannot verify a BLOCK-scoped
+fact.**
+
+```
+#19  the fix is 23 lines BELOW  the selector the check greps for
+#22  the fix is 8 lines ABOVE   the interpolation the check greps for
+#21  the fix is on the same line but deliberately KEEPS the old string as a fallback
+```
+
+⇒ **When writing a STILL REAL IF, prefer a check that survives the fix**: a test name, a symptom in the
+running app, or a grep for what the FIX looks like rather than what the BUG looked like. A check written
+against the bug's shape reports "still broken" the moment the shape changes — always in the expensive
+direction, because it sends someone to re-investigate finished work.
 
 *(found at t2245 while measuring whether spaced pills made the menu too tall — the height question was the
 prompt, this is what the measuring turned up. Pre-existing, NOT introduced by that change.)*
