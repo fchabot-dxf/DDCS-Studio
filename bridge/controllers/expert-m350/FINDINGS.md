@@ -1389,7 +1389,7 @@ discarded, and `G43` still latches, so it *looks* like it worked.
 ⇒ ⛔ **Always emit two digits.** This is the silent-failure class: a program asking for a tool offset and
 receiving none, with every indication of success. It cost most of this bench session to find.
 
-### 17. ⚠⚠ EVERY POSTED PROGRAM ON THIS MACHINE CARRIES `H01`, AND IT BINDS
+### 17. ~~EVERY POSTED PROGRAM CARRIES H01 AND IT BINDS~~ ⛔ **WITHDRAWN — see §22.** It does NOT bind without `G43`.
 The Fusion post writes it on the first Z move, unprompted — the owner confirmed it is not a deliberate choice:
 ```
 G00X405.724Y60.991
@@ -1403,7 +1403,7 @@ move until `M30`. On a machine where **G54 Z0 = the spoilboard is SACRED**, that
 to bind — only `G43 H01` was tested. **Whether the bare `H01` on a Z move applies the offset is UNTESTED**,
 and it is the case that actually matters for real programs. ⇒ Next bench item.
 
-### 18. ⚠ `G49` DOES NOT CLEAR A LATCHED `G43` — and its real behaviour is still unknown
+### 18. ⚠ `G49` DOES NOT CLEAR A LATCHED `G43` (display only) — ⛔ **SUPERSEDED by §21: G49 cancels a LIVE offset correctly.**
 Running `G49` left the modal block reading `G43`. Both attested corpus forms exist (standalone ×4, and
 `G90 G17 G80 G49 M05 M09` ×14), so this is not a syntax error.
 ⛔ **But this proves nothing about cancelling an offset**: every `G49` run had `H00` selected, so there was
@@ -1463,3 +1463,58 @@ that parameter, and every parameter is readable at any level. All 38 `-p1` entri
 (machine type, RTCP, axis names/types/vectors, kinematics, comms, home mode); the other 539 are
 operator-editable. 13 of the 38 also say *"Restart takes effect"*; **zero** `-p0` entries do.
 ⇒ ⛔ This also means a `-p1` parameter can be READ by anything at any time — the gate is on writes only.
+
+### 21. ⭐⭐⭐ G43/G49 CLOSED — the mechanism is FULLY FUNCTIONAL, and §17's hazard is WITHDRAWN
+*(V18f and V18g, 2026-08-25. Both macros compute the applied offset themselves as `#882 − #792` and print it,
+so nothing depends on reading a DRO the message box covers. Motion-free; H01 saved and restored by the macro.)*
+
+**Every measurement, one table:**
+
+| step | applied Z offset | verdict |
+|---|---|---|
+| nothing selected | `−104.844` | WCS + tool-table only |
+| `G43 H01` (H01 = 10) | **`−94.844`** | ⭐ applies, exactly 10 |
+| `G49` | **`−104.844`** | ⭐ **cancels, exactly** |
+| bare `H01`, no `G43` | `−104.844` | ⛔ **does NOT bind** |
+| `G43 H1` (one digit) | `−104.844`, modal stays `H00` | ⛔ silently ignored (§16) |
+| `M30` | `−104.844` | resets the selection |
+
+⇒ **`G43`/`G49` are a correctly working pair.** Both the "G43 is cosmetic" and "G49 is ignored" hypotheses are
+**REFUTED**. §18's observation that a latched `G43` survived a `G49` was real but proved nothing about
+cancelling — nothing was selected, so there was nothing to cancel; with a live offset the modal block flipped
+back to `G49` *and* the offset returned. ⛔ Do not cite §18 as evidence that `G49` is broken.
+
+### 22. ⛔ `G43` IS REQUIRED TO ARM THE H OFFSET — a bare `H` word does nothing
+`H01` on its own line **parses without error and has no effect**: the modal H field stayed `H00` and the offset
+did not move. ⇒ the H word is not self-arming on this controller. `[CONFIRMED]`
+
+⭐⭐ **THEREFORE §17'S HAZARD IS WITHDRAWN.** §17 claimed every posted program was carrying a live tool offset
+because the Fusion post writes `Z15.24H01`. **It is not**, and the reason is the very thing that made the post
+look dangerous: those files contain **no `G43` anywhere**, and without `G43` the `H01` does not bind. The two
+facts cancel. ⇒ Posted programs are inert with respect to the H table, and putting a value in `#400` would
+**not** silently shift them.
+
+⚠ **ONE CASE REMAINS UNTESTED, and it is the exact posted form.** The corpus writes `H01` **attached to a
+motion word** (`Z15.24H01`); what was tested is `H01` alone on its own line. Some controllers latch an H word
+on any block, others only alongside motion. ⇒ `[H-word-on-a-Z-move without G43: UNTESTED]` — it needs a real Z
+move, so it is a deliberate, human-present bench item, not something to slip into a macro.
+⇒ Until that runs, treat §22's conclusion as **strongly supported but not total**: the safe reading is that the
+H table should be left at zero regardless, which costs nothing since nothing on this machine uses it.
+
+### 23. ⭐ THE SELF-READ MEASUREMENT METHOD IS VALIDATED
+`#792` (workpiece Z) **does** track an offset change live, inside a running macro: V18g's own
+`none → selected` step moved by exactly 10.000 with no motion and no screen involved.
+
+⇒ ⭐ **This retroactively validates V18f's null result** — the bare-`H01` reading of "no change" is a real
+measurement, not a blind instrument. And it establishes the pattern for every future offset question here:
+```
+#111 = [#882 - #792]      ( sample the applied offset      )
+<the instruction under test>
+#112 = [#882 - #792]      ( sample it again                )
+#1510 = #111
+#1511 = #112
+#1505 = -5000(before=%.3f after=%.3f)
+```
+⛔ Worth preferring over reading the pendant: the message box sits over the Z row for exactly the window in
+which a modal offset is live, and `M30` resets the selection before the dialog clears — which is why three
+earlier attempts at this question came back ambiguous.
