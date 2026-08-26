@@ -1332,7 +1332,17 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     const childNodes = Array.isArray(node.children) ? node.children : (node.children.DO || []);
                     traverse(childNodes, body);
                 }
-            } else if (node.type === 'formfield' || node.type === 'param_field') {
+            } else if (node.type === 'field_ref' || node.type === 'formfield' || node.type === 'param_field') {
+                // t2299 — prefer 'field_ref' for a NEW presentation tree. 'formfield'/'param_field' stay
+                // supported here (nothing shipped used either as a presentation reference before this), but
+                // both strings are ALSO real BLOCK types flattenBlocks/bindingsFromStack/paramFieldsFromStack
+                // scan for OUTSIDE this tree: an AUTHORED formfield block (t397, composable-wizard-authoring —
+                // a user drags one into `param_group.children`, the SAME uiChildren location a presentation
+                // tree uses) declares a brand-new bound field FROM its own block; this node instead just PLACES
+                // an already-bound param's already-rendered row. Same uiChildren location, same string, two
+                // unrelated meanings — reusing either name here silently corrupts registerUserOp's own scan of
+                // the SAME stack (a presentation reference gets misread as an authored spec, matched against 0
+                // blocks). 'field_ref' has no such double meaning, so a fresh tree can't collide with it.
                 const paramName = node.params && node.params.param;
                 if (paramName && byParam[paramName]) {
                     container.appendChild(byParam[paramName].row);

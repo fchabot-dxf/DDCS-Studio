@@ -135,11 +135,13 @@ test('THE SWITCH — every binding survives the 2-into-1 collapse: same params, 
             boreFlat: flattenBlocks(boreDataDef().template).map((b) => b.type),
         };
     });
-    // The flatten really did lose a block — the premise of everything below.
+    // The flatten really did lose a block — the premise of everything below. (Not an exact length check: that
+    // would re-couple this to drill's own uiChildren presentation-node count, which t2299 legitimately grew and
+    // will keep growing — see the delta-based blockIndex checks further down, which prove "one block shorter"
+    // precisely, via oldAt('depth')-oldAt('pattern')===1 pre-collapse vs at('depth')===at('pattern') post.)
     for (const [name, flat] of [['drill', r.drillFlat], ['bore', r.boreFlat]]) {
         expect(flat, `${name}: the merged template carries holecycle`).toContain('holecycle');
         expect(flat, `${name}: and no longer an array container`).not.toContain('array');
-        expect(flat.length, `${name}: one block shorter than the 12-block literal flatten`).toBe(11);
     }
     for (const [name, got, want] of [['drill', r.drill, DRILL_FROZEN], ['bore', r.bore, BORE_FROZEN]]) {
         expect(got.length, `${name}: the same number of bindings — none dropped by a match that found nothing`).toBe(want.length);
@@ -156,12 +158,21 @@ test('THE SWITCH — every binding survives the 2-into-1 collapse: same params, 
         // THE COLLAPSE, MEASURED: the two old body indices are now one.
         const at = (p) => got.find((b) => b.param === p).blockIndex;
         const oldAt = (p) => want.find((b) => b.param === p).blockIndex;
-        expect(at('pattern'), `${name}: the pattern cluster still sits where the array did`).toBe(oldAt('pattern'));
+        // t2299 — a PREFIX DELTA, not a hardcoded equality: DRILL_FROZEN's own indices were captured against
+        // whatever `uiChildren` held at freeze time (t1385: panel/sim/param_group, 3 nodes — the header's own
+        // "WRAP_PREFIX_COUNT" already named this a presentation-prefix artifact, not a body-collapse fact).
+        // drill's uiChildren is now a fully declared form (t2299) — its presentation prefix legitimately grew,
+        // and re-deriving that fixed size on every future form edit is exactly the [[hardcoded-wrap-offset-drift]]
+        // trap. `wcs` is the one framing param every twin here keeps stable in RELATIVE position — measuring the
+        // delta off it once makes the whole relationship robust to the prefix's own size, which is what this
+        // block is actually testing (the array→holecycle collapse), not the prefix itself.
+        const delta = at('wcs') - oldAt('wcs');
+        expect(at('pattern') - delta, `${name}: the pattern cluster still sits where the array did`).toBe(oldAt('pattern'));
         expect(at('depth'), `${name}: and the CUT params merged onto that same block (was ${oldAt('depth')})`).toBe(at('pattern'));
         expect(oldAt('depth') - oldAt('pattern'), `${name}: which were two DIFFERENT blocks before`).toBe(1);
-        // …and the framing sockets did not budge.
+        // …and the framing sockets did not budge RELATIVE to each other.
         for (const p of ['rpm', 'wcs', 'originX']) {
-            expect(at(p), `${name}: "${p}" (framing) keeps its exact index — the merge was local to the body`).toBe(oldAt(p));
+            expect(at(p) - delta, `${name}: "${p}" (framing) keeps its exact relative index — the merge was local to the body`).toBe(oldAt(p));
         }
     }
 });

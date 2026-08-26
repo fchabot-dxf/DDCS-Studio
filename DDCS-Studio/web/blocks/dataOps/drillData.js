@@ -190,14 +190,95 @@ export const DRILL_BINDING_SPECS = [
 /** The WRAPPED template — factored out of `drillDataDef` (t1385) so the binding derivation below and the def itself read
  *  the SAME stack. Without that they could disagree, which is the whole failure mode identity bindings exist to prevent.
  *  Mirrors `centerDrillData`'s `cdrillDataStack`. */
+// t2299 — THE ARC'S PAYOFF: drill's form expressed ENTIRELY as declared uiChildren, reproducing `#wiz_drill`'s
+// hardcoded shell (index.html:326-433) — same section order, same labels, same field order, same wording, per
+// the turn's own "reproduce, don't improve" rule. Two prior gates (t2291: 6 params never bound; t2297: `method`
+// was never a structural fork) both found real, turn-costing problems and are now closed — this is the first
+// attempt to actually reach Step 2. Does NOT flip the live render path: `hasTreeLayout()` (userOpView.js) only
+// switches to `renderUiTree` when a `split_horizontal`/`split_vertical` node exists anywhere in uiChildren,
+// which this tree deliberately has none of (a single-pane flip was never asked for) — so this is inert for the
+// twin's own CURRENT flat-mode rendering, verified live, not assumed (see the reproduction test's own comment
+// for how it exercises this tree directly instead, matching the t2269/t2271 pilot precedent).
+//
+// TWO DESIGN DECISIONS, made once here rather than re-litigated per field:
+//   (1) HOLE Ø / PECK carry NO section wrapper. The shell's own "METHOD" section-label (`d_method_label`) is
+//       UNCONDITIONALLY hidden by `drillView.js`'s `applyVariant()` on every open (t2297's own finding) — a
+//       human never sees that header text on this twin — while its two sibling fields (HOLE Ø, PECK) DO stay
+//       visible. A `section`/`group_box` node always renders a title; reproducing "no title shown" faithfully
+//       means no section node here, not a section node with an empty/hidden title (which formWidgets.js's own
+//       node types don't support anyway).
+//   (2) `count` (HOLE COUNT) is declared ONCE, under the CIRCLE group, not twice. The shell has two separate
+//       DOM ids for it (`d_count` for circle, `d_lcount` for line) — `drillView.js`'s own comment names this a
+//       plumbing quirk of the ORIGINAL hand-coded form ("count lives in d_count for circle but d_lcount for
+//       line, so a flat map can't express it"), already consolidated to ONE shared binding
+//       (`when:{param:'pattern',in:['circle','line']}`) by the time this def existed. A `field_ref` node picks
+//       an ALREADY-RENDERED row out of `byParam` by param name — referencing the same param twice would just
+//       relocate one DOM row to its second reference, not duplicate it — so one declaration, gated the same
+//       `when` the binding already carries, correctly shows under EITHER pattern. Filed, not fixed: the LINE
+//       group's own field order therefore reads spacing→angle without its own adjacent count field, unlike the
+//       shell's `d_lcount,d_spacing,d_angle` grouping — a cosmetic reordering the reproduction test's own field-
+//       set/order/label comparison (drill-form-reproduction-*.spec.js) treats as one param, not two DOM ids.
 function drillDataStack(p = DRILL_DEFAULTS) {
+    const geometryGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'pattern' } },
+        { type: 'field_ref', params: { param: 'skip' } },
+        { type: 'field_ref', params: { param: 'originX' } },
+        { type: 'field_ref', params: { param: 'originY' } },
+        { type: 'field_ref', params: { param: 'offZ' } },
+        { type: 'path_anchor', params: { prefix: 'd_' } },
+        { type: 'field_ref', params: { param: 'wcs' } },
+    ] };
+    const gridGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'cols' } },
+        { type: 'field_ref', params: { param: 'rows' } },
+        { type: 'field_ref', params: { param: 'dx' } },
+        { type: 'field_ref', params: { param: 'dy' } },
+    ] };
+    const circleGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'dia' } },
+        { type: 'field_ref', params: { param: 'count' } },   // shared with line — see design decision (2) above
+        { type: 'field_ref', params: { param: 'startAngle' } },
+    ] };
+    const rectGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'w' } },
+        { type: 'field_ref', params: { param: 'h' } },
+        { type: 'field_ref', params: { param: 'nx' } },
+        { type: 'field_ref', params: { param: 'ny' } },
+    ] };
+    const lineGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'spacing' } },
+        { type: 'field_ref', params: { param: 'angle' } },
+    ] };
+    const toolGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'toolNum' } },
+        { type: 'field_ref', params: { param: 'rpm' } },
+    ] };
+    const holeDiaGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'holeDia' } },
+    ] };
+    const peckGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'peck' } },
+    ] };
+    const depthFeedGroup = { type: 'grid_container', params: { columns: 3 }, children: [
+        { type: 'field_ref', params: { param: 'depth' } },
+        { type: 'field_ref', params: { param: 'clearance' } },
+        { type: 'field_ref', params: { param: 'feed' } },
+    ] };
     return [{
         type: 'user_root',
         params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the hole pattern + pos + pattern-size handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            { type: 'param_group', params: { group: 'Drill' }, children: [] },
+            { type: 'param_group', params: { group: 'Drill' }, children: [
+                { type: 'usage_text', params: { text: 'Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.' } },
+                { type: 'section', params: { title: 'PATTERN' }, children: [geometryGroup, gridGroup, circleGroup, rectGroup, lineGroup] },
+                { type: 'section', params: { title: 'TOOL' }, children: [toolGroup] },
+                holeDiaGroup,
+                peckGroup,
+                { type: 'section', params: { title: 'DEPTH & FEED' }, children: [depthFeedGroup] },
+                { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+            ] },
         ],
         children: appendToolSel(appendEntry(drillStack(p))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
     }];

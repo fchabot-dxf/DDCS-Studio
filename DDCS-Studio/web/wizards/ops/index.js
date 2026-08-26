@@ -90,6 +90,7 @@ import { simStartBlock } from './simStart.js';
 import { formFieldBlock } from './formField.js';
 import { camTableBlock, camFieldBlock } from './camField.js';   // block-native-params S1 — the pendant-field family (metadata, emits [])
 import { paramFieldBlock } from './paramField.js';   // block-native-params S5.1 — the FORM-face row (metadata, emits [])
+import { fieldRefBlock } from './fieldRef.js';   // t2299 — a presentation-tree PLACEMENT reference, deliberately not formfield/param_field (see its own header)
 import { layoutWidgetBlock } from './layoutWidget.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
@@ -129,7 +130,7 @@ export const PALETTE = [
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
     paramBlock, regionPickBlock, coordListBlock, panelBlock, codePreviewBlock, usageTextBlock, pathAnchorBlock, layoutBlock, splitHorizontalBlock, splitVerticalBlock, gridContainerBlock, tabGroupBlock, tabPageBlock, groupBoxBlock, formDropdownBlock, formCheckboxBlock, formSegmentedBlock, formDiagramBlock, formActionBtnBlock, layout2dCanvasBlock, shapeRectBlock, shapeCircleBlock, shapeLineBlock, shapeMarkerBlock, cornerGridPickerBlock, regionPickFieldBlock, toolLibraryPickerBlock, threadPresetPickerBlock, declaredIoPickerBlock, sliderFieldBlock, stepperFieldBlock, simBlock, simStartBlock, formFieldBlock, layoutWidgetBlock, userRootBlock, sectionBlock, opUnitBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + layout-splitters + grid/tab/card containers + dropdown/toggle/segmented controls + SVG diagrams + LAYOUT-2D preview box + region/tool/thread/IO pickers + slider/stepper inputs + preview-rig + per-pass sim-start declarations + FORM value-field blocks + LAYOUT-2D widget blocks + titled concern-section + declared sub-unit boundary + structural-control blocks)
-    paramGroupBlock, paramFieldBlock,                          // Wizard Form (block-native-params S5.1 — the FORM-field container + row; metadata, emits [])
+    paramGroupBlock, paramFieldBlock, fieldRefBlock,           // Wizard Form (block-native-params S5.1 — the FORM-field container + row; metadata, emits []) + t2299 placement reference
     camTableBlock, camFieldBlock,                              // CAM Pendant (block-native-params S1 — the pendant-field container + row; metadata, emits [])
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];

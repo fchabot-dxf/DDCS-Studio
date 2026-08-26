@@ -54,11 +54,17 @@ test('S5.2 — formBindings: a param_group drives order + label/widget/default (
         { param: 'frate', key: 'rate', label: 'Feed (custom)', widget: 'number', default: 200 },
     ]);
     expect(r.noSame, 'NO param_group → the bindings are returned UNCHANGED (same reference) → byte-identical form').toBe(true);
-    // t1632 — the real-twin claim FLIPPED with b95540d9 (t1111): every registered twin now carries a MATERIALIZED,
-    // populated param_group (that was the commit's whole point — no more empty forms in Blocks), so formBindings
-    // legitimately returns derived rows, not the same reference. The synthetic no-group case above still pins the
-    // untouched fallback; the real twin now pins the NEW world: rows drive, and nothing is dropped doing it.
-    expect(r.drillSame, 'a real registered twin is MATERIALIZED now (b95540d9) — rows drive, not the raw reference').toBe(false);
+    // t1632 — the real-twin claim FLIPPED with b95540d9 (t1111): every registered twin used to carry a
+    // materializeParamGroup-populated param_group (that commit's whole point — no more empty forms in Blocks).
+    // t2299 flips it AGAIN, for drill specifically: its param_group is now explicitly, richly authored (a real
+    // declared uiChildren tree, never empty), so materializeParamGroup's own idempotent guard
+    // (`existing.children.length > 0` → return def unchanged, userOps.js:528) correctly SKIPS it — there is
+    // nothing left to materialize. `drillSame` is back to `true`, the SAME shape the synthetic no-group case
+    // above already pins, and for the same underlying reason: drill's tree places its rows via `field_ref`
+    // nodes (t2299 — deliberately NOT `param_field`, which collides with the authored-block scan this same
+    // materialization path uses), so `paramFieldsFromStack(def.template)` finds zero `param_field` rows and
+    // formBindings' fallback (`!rows.length → return valueBindings`) returns the bindings UNCHANGED.
+    expect(r.drillSame, 'drill is now explicitly authored (t2299) — its param_group is never empty, so materializeParamGroup skips it and formBindings keeps the same reference').toBe(true);
 });
 
 test('S5.2 — editing a param_field (label/widget/default) is reflected by formBindings; reordering rows reorders the form', async ({ page }) => {

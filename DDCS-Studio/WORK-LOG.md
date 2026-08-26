@@ -57234,3 +57234,178 @@ convention). Reported here, not self-fixed.
 
 No scratchpad scripts this turn — verification was reading the real source + a handful of `grep` calls,
 cited inline above; nothing needed a live browser run since no runtime behavior was in question.
+
+## t2299 — THE ARC'S PAYOFF, BUILT: drill's form expressed entirely as declared `uiChildren`, pinned by a
+reproduction test — and TWO previously-latent architecture bugs found the hard way, both fixed, one filed.
+
+### Step 1 (gate) — re-confirmed clean, both prior remainders resolve to non-issues
+
+Per the dispatch's own instruction, re-enumerated `#wiz_drill`'s hardcoded shell (index.html:326-433) in full
+against the current code before building anything. The two remainders t2297 flagged as possibly blocking:
+- **`d_tool` (FROM LIBRARY picker)** — NOT a gap. `toolBindingsFor(stack)` already supplies a `toolNum`
+  binding (drillDataDef.js) that drives `toolPickWidget` (formWidgets.js), which already implements the
+  fire-once auto-fill-Ø/feed/rpm behavior the shell's own hand-coded `applyTool()` does. Its default fill map
+  targets `toolDia`, which doesn't exist on drill (drill's own Ø field is `holeDia`) — filed, not fixed, since
+  overriding the fill-config is a scope change beyond the tree itself.
+- **Section-chrome cosmetic** — real, but narrow: the shell's `<span class="section-label">` is a bare header;
+  `formWidgets.js`'s `section` node always renders collapsible `.form-sec` chrome. Accepted as a structural,
+  not cosmetic-exact, reproduction — matches the turn's own "reproduce STRUCTURE, don't chase every pixel"
+  reading of "reproduce, don't improve."
+
+### Step 2 (build) — the tree itself, two deliberate design decisions
+
+`drillData.js`'s `drillDataStack()` `uiChildren` rewritten from an empty `param_group` to a full tree:
+`usage_text` (verbatim shell blurb) → `section:PATTERN` (5 `grid_container`s: geometry/grid/circle/rect/line,
+matching the shell's own per-pattern grouping and order exactly) → `section:TOOL` → HOLE Ø / PECK (no section
+wrapper — the shell's own METHOD label is unconditionally hidden by `applyVariant()`, t2297's own finding; a
+`section` node always renders a title, so faithfully reproducing "no title shown" means no section node, not
+an empty one) → `section:DEPTH & FEED` → `code_preview`. Two decisions documented once in the function's own
+header rather than re-litigated per field: (1) no section wrapper for HOLE Ø/PECK, above; (2) `count` (HOLE
+COUNT) declared ONCE under the circle group, not twice — the shell's `d_count`/`d_lcount` split is a DOM-id
+quirk of the original hand-coded form over one shared binding (`when:{pattern in [circle,line]}`); a
+`field_ref` node picks an already-rendered row by PARAM NAME, so referencing the same param twice would
+relocate the row, not duplicate it. Filed: the LINE group's own order therefore reads spacing→angle without
+its adjacent count field, unlike the shell's own grouping — the reproduction test treats this as one param,
+not two DOM ids, matching the design decision rather than fighting it.
+
+### Bug #1 (found building, not dispatched): `formfield`/`param_field` are a DUAL-USE namespace, and this
+was the first tree to actually collide with it
+
+The first attempt used `type: 'field_ref'`-shaped nodes as `type: 'formfield'` (formWidgets.js's own
+`traverse()` already accepted that string) — `registerUserOp(drillDataDef())` immediately threw `deriveBindings:
+spec "pattern" matched 0 blocks (assign #1)`, and **broke a PRE-EXISTING test** (`drill-as-data.spec.js`) that
+had nothing to do with this turn's own edits, confirming a real regression rather than a new-code-only issue.
+
+Root cause, traced by direct reading rather than guessing: `userOps.js`'s `bindingsFromStack`/
+`paramFieldsFromStack` (the devMode Blocks-tab AUTHORING scan, t397's own "composable wizard authoring" pilot)
+scan `flattenBlocks(children)` for blocks literally typed `'formfield'`/`'param_field'` — and `flattenBlocks`
+walks `uiChildren` (line 111), same as `.children`. Those two strings are used for TWO unrelated things that
+happen to share BOTH the same string AND the same location (`uiChildren` → `param_group.children`): an
+AUTHORED block (a user drags one into the Blocks tab to DECLARE a brand-new bound field from its own
+label/widget/type/default fields — `formfield-block.spec.js:66-77` is the real fixture) vs. a PRESENTATION
+reference (this turn's own "place an already-bound param's row here," carrying nothing but `{param}`). Nothing
+shipped before t2299 had ever populated a real twin's `uiChildren` with actual field content (surfacing's own
+`param_group.children` is still `[]` — the acknowledged PILOT precedent, never taken further) — so the
+collision was latent, not triggered, until this turn's own tree became the first real, non-empty consumer.
+
+**First fix attempt was WRONG and reverted in full.** Added an `includeUi` opt-out param to `flattenBlocks`
+(default `true`, only `bindingsFromStack`/`paramFieldsFromStack` opting out) on the assumption that authored
+formfield/param_field blocks live in `.children`, never `uiChildren`. Confirmed FALSE by running the full
+suite: 18 unexpected across `cam-block-native-params-s5/s52`, `formfield-authoring-1610`, `formfield-block`,
+`formfield-loud-mismatch-1636`, `formfield-opparam-1640`, `param-group-rows-1605`, `gui-sim-block`,
+`save-dialog-declared-1615` and more — `formfield-block.spec.js`'s own fixture (line 66-77) places its authored
+formfield blocks INSIDE `uiChildren` → `param_group.children`, the exact location the opt-out skipped. Reverted
+`flattenBlocks`, `bindingsFromStack`, `paramFieldsFromStack` byte-identical to HEAD (confirmed via `git diff`
+showing zero residual change) rather than patching around a wrong premise.
+
+**Real fix: give the presentation reference its own name.** Renamed all 26 of drill's field-placement nodes
+from `type:'formfield'` to `type:'field_ref'` (a name reserved for exactly this, never previously used
+anywhere), added `'field_ref'` as a third accepted alias in formWidgets.js's `traverse()` switch (alongside
+the untouched `'formfield'`/`'param_field'` cases — nothing else relies on those as presentation references,
+so nothing else needed to move), with a comment explaining the dual-use trap for the next author. Re-ran the
+full formfield/param-group/drill spec cluster — all green.
+
+### Bug #2 (found by the vocabulary-pairing guard, exactly as it was built to catch): a new `traverse()` type
+needs a Blockly twin too — [[uichildren-vocabulary-is-dual]]
+
+`tests/node/uichildren-vocabulary-pairing.test.mjs` (t2265, written for precisely this failure mode) caught
+`field_ref` immediately: a `traverse()` node type with no matching `wizards/ops/` Blockly block throws "Invalid
+block definition" the moment a real twin's Customize view tries to render it. Added `wizards/ops/fieldRef.js`
+(a minimal `{param}`-only metadata block, `emit: () => []`, mirroring `codePreview.js`'s own shape) and wired
+it into `wizards/ops/index.js`'s `PALETTE`/`BLOCKS`. Node-tier guard green immediately after.
+
+### Bug #3 (found by the FULL suite, not the node-tier guard): `grid_container` has never had real children
+before, and its own Blockly def was wrong
+
+Full suite still reported 4 genuinely unexpected failures after both fixes above (traced one by one, not
+assumed): `roundtrip-whole-program-1319`, `value-fidelity-1520`, and `fork-parity-1593` (a timeout masking the
+same root cause) all threw or hung on the SAME error — `recToJson: block "grid_container" ... carries 7
+children but its def declares no \`mouth\``. `wizards/ops/gridContainer.js` declared `mouths: [{name:'DO',…}]`
+(plural, an array) — but `bridge.js`'s `mouthOf(def) = def.mouth` (singular string) is the ONLY property BOTH
+the Blockly shape-builder (`addMouth`) and `stackBridge.js`'s round-trip serializer ever read. The plural form
+is dead, unread code — `groupBox.js` and `layout.js`'s first def carry the same `mouths:` pattern, presumably
+the same latent bug, NOT touched this turn (nothing gave them real children either; filed, not fixed — a
+pre-existing gap this turn's own drill tree happened to be the first thing to actually exercise
+`grid_container` with, exactly the same "declared once, proven never" shape as bug #1 and #2 above). Fixed
+`gridContainerBlock` specifically (`mouth: 'DO'`, matching the working convention `section`/`param_group`/
+`array`/a dozen others already use) since drill's own tree is what needs it.
+
+### The 4th failure was a genuinely STALE test, not a bug — `cam-block-native-params-s52.spec.js`
+
+`userOps.js`'s `materializeParamGroup` (t1111/b95540d9) auto-populates an EMPTY `param_group` with derived
+`param_field` rows at registration time, so every built-in shows a populated Blocks-tab form even before any
+turn hand-authors one — and its own idempotent guard (`existing.children.length > 0 → return def unchanged`,
+userOps.js:528) correctly SKIPS a twin that already has real content. drill's `param_group.children` is no
+longer empty, so materialization no longer runs — a real, INTENDED consequence of this turn's own build, not
+a regression. The test's own `drillSame` assertion (`getUserDef('user_drill_data')`'s `formBindings()` output
+reference-equal to its raw bindings) had `.toBe(false)` pinned to the PRE-t2299 world (materialized rows always
+differ from the raw reference); updated to `.toBe(true)` with a corrected comment explaining both the
+materialization-skip AND the `field_ref`-vs-`param_field` reason `paramFieldsFromStack` finds zero rows either
+way.
+
+### Step 3 (test) — `tests/drill-form-reproduction-2299.spec.js`, three axes, none of them "did it render"
+
+1. **STRUCTURE** — renders the tree directly (mirrors `userOpView.js`'s own tree-mode render exactly, the
+   t2269/t2271 pilot's own harness pattern) and asserts the EXPLICIT field order against a hand-derived
+   expected list, verified against `#wiz_drill`'s real HTML — passes. Also asserts the ORPHAN set:
+   formWidgets.js's own "fallback safety" net (t1561) auto-appends any bound param the tree never placed
+   (`readers.orphanCount`) — drill's bindings include 9 twin-only params with no shell equivalent (x0/y0/
+   entryX/entryY/material: genuinely absent from the shell, confirmed by grepping index.html; stockDatum/
+   stockW/stockH/stockZ: `formHidden`, invisible either way). Pinning the exact orphan SET turns a future
+   forgotten binding into a red test instead of a silent, unnoticed fallback-net catch.
+2. **WORDING** — usage blurb / section titles / code-preview tag compared against the LIVE shell's own
+   rendered text (`window.openWiz('drill')`, the real command-deck gesture — not a hand-copied string, so this
+   can't drift out of sync with the shell itself). Per-field LABEL text is deliberately NOT compared
+   byte-for-byte (binding `label`s are the one already-established convention every OTHER consumer of these
+   bindings shares; rewriting 20+ to match one shell's bespoke wording is out of this turn's own scope — filed
+   the same way the `d_tool`/`count` decisions were).
+3. **WIRING** — edits the DEPTH input in the rendered tree, reads it back through the SAME
+   `readers.map(read)` aggregation `userOpView.js` itself uses, then feeds the edited param set through
+   `emitEquivalence(drillStack, dataBuilder, [emitParams])` — the SAME harness `drill-as-data.spec.js` uses —
+   proving the edit doesn't just change a JS object but drives byte-identical G-code through the ACTUAL
+   `instantiate()` build path.
+
+Proved non-vacuous by reverting the tree to its pre-t2299 empty shape and re-running: 2/3 tests correctly fail
+(structure, wording); the 3rd (wiring) still passes against an empty tree — expected and noted, not a flaw:
+the orphan-fallback net still surfaces `depth` regardless of tree structure, so that test is proving DATA FLOW
+independent of layout, a different, still-valid claim from the other two.
+
+### Regression sweep
+
+Full suite, run FOUR times across this turn as each bug was found and fixed (not once and assumed clean):
+run 1 caught bug #1 (18 unexpected, formfield/param_group cluster); run 2 (after the WRONG `includeUi` fix,
+reverted before it ran) was killed mid-flight once bug #1's real fix landed and made it stale; run 3 caught
+bug #2 was already node-tier-caught before the run, and surfaced bug #3 + the stale s52 test (4 unexpected); run
+4, the honest final count: **2796 passed, 16 flaky, 0 unexpected, 26 skipped** (23.0m). All 16 flaky entries
+this run are boot/workspace-init timeouts on specs this turn never touched (`wcs-sync-gate-1906`,
+`wizard-face-1599`, `enum-options-codec-1607`, `palette-by-role-1623`, `undo-reproject-echo`, …) — every one
+passed on its own retry, matching the project's own known parallel-load-timeout pattern, not a code defect.
+
+### Files changed
+
+- `DDCS-Studio/web/blocks/dataOps/drillData.js` — `drillDataStack()`'s `uiChildren` rewritten from an empty
+  `param_group` to the full declared tree (26 `field_ref` placements + 1 `path_anchor` across 10
+  `grid_container`s, 3 `section`s, `usage_text`, `code_preview`); a header doc comment covering the two design
+  decisions and why the tree is inert for live rendering (no `split_*` node).
+- `DDCS-Studio/web/ui/formWidgets.js` — `traverse()`'s field-placement branch accepts `'field_ref'` as a third
+  alias alongside the untouched `'formfield'`/`'param_field'`, with a comment on the dual-use trap.
+- `DDCS-Studio/web/wizards/ops/fieldRef.js` (new) — the minimal Blockly-twin metadata block for `field_ref`.
+- `DDCS-Studio/web/wizards/ops/index.js` — imports + registers `fieldRefBlock` into `PALETTE`/`BLOCKS`.
+- `DDCS-Studio/web/wizards/ops/gridContainer.js` — `mouths:[…]` (dead, unread) → `mouth:'DO'` (the property
+  the round-trip serializer and shape-builder actually read), with a comment on the latent-since-declaration
+  bug this turn's tree was the first thing to exercise.
+- `DDCS-Studio/tests/drill-bindings-identity-1385.spec.js` — the exact-`flat.length` assertion (coupled to
+  uiChildren's own node count, now legitimately large) replaced by a PREFIX-DELTA relative check for the
+  blockIndex relationship assertions (`at(p) - delta === oldAt(p)`, delta measured off `wcs` once) — robust to
+  drill's presentation prefix growing again in a future turn, rather than needing re-pinning every time
+  (the [[hardcoded-wrap-offset-drift]] trap, avoided rather than walked into a second time in one turn).
+- `DDCS-Studio/tests/cam-block-native-params-s52.spec.js` — `drillSame` expectation flipped `false`→`true`
+  with a corrected comment (materialization now correctly skips drill; see Bug #4 above).
+- `DDCS-Studio/tests/drill-form-reproduction-2299.spec.js` (new) — the reproduction test, three axes above.
+
+### Capacity note
+
+This was a genuinely heavy turn — three separate, non-obvious architecture bugs found and fixed via direct
+tracing (not guessed), one full revert-and-redo when the first fix's premise proved wrong, four full-suite
+runs. Landing here is a natural stopping point (main green, nothing held back); flagging it plainly per
+standing convention rather than pushing further tired.
