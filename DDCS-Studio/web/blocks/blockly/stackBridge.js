@@ -10,6 +10,7 @@ import { FN, fieldKind, fieldsOf, mouthOf, getBlockly, OP_BLOCKS } from './bridg
 import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
 import { regroupOps } from '../programModel.js';   // t1948 — collapse-on-delete: the SAME flatten-then-regroup pipeline addOperation grows a program with
 import { findStrayTopBlockIds } from '../programShape.js';   // t2281 — a block dragged from the toolbox and left unconnected is its own separate top-level chain; exclude it from the program entirely (see the function's own doc for how "the primary chain" is chosen)
+import { childrenOf } from '../userOps.js';   // t2319 — the ONE children/uiChildren shape normalization (t2315)
 
 const HAS_CUSTOM_OP = {};
 OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
@@ -382,15 +383,20 @@ function recToJson(rec) {
     for (const k of DURABLE_DATA_FIELDS) if (rec[k] !== undefined) extra[k] = rec[k];
     if (Object.keys(extra).length) node.data = JSON.stringify(extra);
     if (def.kind === 'user_root') {
-        if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
-        if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
+        // t2319 (BACKLOG #21's sweep) — was `.length` directly: undefined on a mouth-keyed OBJECT children value
+        // (split_horizontal's own LEFT/RIGHT), so a split node under uiChildren silently lost its own PRESENTATION
+        // round-trip here — a fourth silent-drop site, the same class this file's own t1638 comment (below) already
+        // named and refused for `children`. `childrenOf(...).length` reads true content regardless of shape;
+        // `chainToJson` itself now normalizes too, so passing the raw (possibly object-shaped) value still works.
+        if (childrenOf(rec.uiChildren).length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
+        if (childrenOf(rec.children).length) inputs.EXECUTION = { block: chainToJson(rec.children) };
     } else if (mouthOf(def)) {   // t1638 — every child-holding kind writes into its OWN declared mouth, one check
-        if (rec.children && rec.children.length) inputs[mouthOf(def)] = { block: chainToJson(rec.children) };
-    } else if (rec.children && rec.children.length) {
+        if (childrenOf(rec.children).length) inputs[mouthOf(def)] = { block: chainToJson(rec.children) };
+    } else if (childrenOf(rec.children).length) {
         // t1638 — THE DURABLE HALF: a record carrying children whose def declares no mouth would otherwise be
         // written CHILDLESS here with no error (t1069/t1093/t1595/t1627/t1636 — five silent losses this way).
         // FAIL LOUD instead: add `mouth: 'DO'` to the def in wizards/ops/*.js if this kind is meant to hold children.
-        throw new Error(`recToJson: block "${rec.type}" (kind "${def.kind}") carries ${rec.children.length} children but its def declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`);
+        throw new Error(`recToJson: block "${rec.type}" (kind "${def.kind}") carries ${childrenOf(rec.children).length} children but its def declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`);
     }
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;
@@ -400,10 +406,13 @@ function recToJson(rec) {
     return node;
 }
 
-/** A list of records → the first node, with `next` linking the statement chain (siblings). */
+/** A list of records → the first node, with `next` linking the statement chain (siblings). Accepts a mouth-keyed
+ *  OBJECT too (childrenOf normalizes) — flattened into one chain, which is correct HERE: this builds the single
+ *  PRESENTATION/EXECUTION/mouth INPUT this call site owns; a nested split_horizontal record's OWN LEFT/RIGHT
+ *  structure is preserved separately, by recToJson handling THAT record's own `.children` when its turn comes. */
 function chainToJson(records) {
     let head = null, tail = null;
-    for (const c of (records || [])) {
+    for (const c of childrenOf(records)) {
         const j = recToJson(c);
         if (head) tail.next = { block: j }; else head = j;
         tail = j;

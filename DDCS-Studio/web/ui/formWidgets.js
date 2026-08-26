@@ -1451,14 +1451,23 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             } else if (node.type === 'path_anchor') {
                 // t2271 (wizards-as-data E2 measurement, PILOT on Surfacing — the mill-op family that
                 // actually uses it; none of the 6 ATC ops have stock-attach geometry) — REPRODUCES
-                // ui/pathAnchorField.js's mountPathAnchor(prefix) faithfully, not a rewrite of it. That
-                // widget's own internal lookup is document.getElementById(prefix + field) — the OLD static
-                // shell's own per-field id convention (<input id="d_pathDatum" type="hidden">), not the
-                // data-param attribute every other declared field in this tree uses. Rather than teach
-                // pathAnchorField.js a second lookup path, this branch finds the ALREADY-RENDERED
-                // stockAttach/pathDatum rows (byParam — built the identical way every formfield row is) and
-                // stamps the id the widget expects directly onto their own <input>, so the widget's own code
-                // is untouched and keeps working exactly as it always has.
+                // ui/pathAnchorField.js's mountPathAnchor(prefix) faithfully, not a rewrite of it. This branch
+                // finds the ALREADY-RENDERED stockAttach/pathDatum rows (byParam — built the identical way
+                // every formfield row is) and hides them (the shell's own type="hidden" has no visible row at
+                // all), then mounts the picker scoped to THIS container.
+                // ⛔ t2319 (BACKLOG #21, closing the root cause) — this branch used to ALSO stamp
+                // `inp.id = prefix + key` ("d_pathDatum"/"d_stockAttach") onto the row's own input, to match
+                // the OLD static shell's per-field id convention (`<input id="d_pathDatum" type="hidden">`,
+                // index.html) — written before t2293 existed. That shell markup is ALWAYS present in the
+                // document (baked into index.html, `display:none` whether the classic wizard was ever opened
+                // or not) — stamping the SAME id here didn't reproduce the convention, it created a SECOND
+                // live element sharing it, confirmed live (t2317: `document.querySelectorAll('[id="d_
+                // pathDatum"]')` found two — the shell's own hidden input plus this one). NOW UNNECESSARY:
+                // `pathAnchorField.js`'s own `buildPicker` (t2293) already prefers a scoped `[data-param]`
+                // query over the id lookup whenever a non-document root is passed — which this branch already
+                // does two lines below (`mountPathAnchor(prefix, container)`) — and every row here already
+                // carries `data-param` (that's how it was found, on the line above). The id was never load-
+                // bearing for the SCOPED path; only the id ITSELF caused the collision. Removed, not replaced.
                 // ⚠ REPRODUCE, DON'T IMPROVE (t2271's own correction, echoing the emit-side byte-parity
                 // rule): stockAttach/pathDatum are ALSO independently declared as visible enum/dropdown
                 // bindings (surfacingData.js:87-88) — a real, useful keyboard-only fallback the shell never
@@ -1469,8 +1478,6 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 for (const key of ['stockAttach', 'pathDatum']) {
                     const entry = byParam[key];
                     if (!entry || !entry.row) continue;
-                    const inp = entry.row.matches && entry.row.matches('[data-param]') ? entry.row : entry.row.querySelector('[data-param]');
-                    if (inp) inp.id = prefix + key;
                     entry.row.style.display = 'none';   // the shell's own type="hidden" has no visible row at all
                     if (!container.contains(entry.row)) container.appendChild(entry.row);
                 }

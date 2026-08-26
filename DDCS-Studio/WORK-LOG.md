@@ -58281,3 +58281,113 @@ Full suite: **2817 passed, 0 failed, 18 flaky** (28.2m). No failure at all — e
 turn never touched, none in `blockEmitter.js`/`devMode.js`/`tokenGuard.js`/`blocksApp.js`/`panelTypes.js`'s
 own broad blast radius, recovering on retry. A real green run for changes to five separate, widely-imported
 files, none of which had a single test regress.
+
+## t2319 — FIX BACKLOG #21's REAL ROOT, found at t2317. Also closed `whenGuard.js`/`stackBridge.js` (both
+named found-not-fixed in t2317's own WORK-LOG) and found a THIRD, previously-missed consumer
+(`exposeClassifier.js`) by searching for what READS children rather than how it loops, per the dispatch's own
+correction. `drillData.js` untouched — vocabulary and machinery only, drill stays unflipped.
+
+### GATE — WHERE does the second d_pathDatum/d_stockAttach come from? OBSERVED, not assumed
+
+Re-applied t2317's own wrap to `drillData.js` (temporarily, for this investigation) and drove the REAL
+`wizardManager.open('user_drill_data')` path. Walked every element matching `[id="d_pathDatum"]` and printed
+its own ancestry chain directly, rather than guessing from the dispatch's own candidate list:
+
+```
+1) INPUT#d_pathDatum < DIV.grid-2 < DIV.wiz-controls < DIV.wiz-2pane < DIV#wiz_drill < ...   (hidden, display:none)
+2) SELECT#d_pathDatum < DIV < DIV < DIV.wiz-pane-body < DIV.form-sec < ... < DIV#wiz_user_form   (the tree's own render)
+```
+
+**Candidate 1 confirmed: the hardcoded `#wiz_drill` shell.** But NOT "the shell and tree render at once" (the
+dispatch's own STOP condition) — `#wiz_drill`'s `display` is `none`; its markup is simply ALWAYS PRESENT in
+the document (baked into index.html at page load, whether the classic wizard was ever opened or not), and its
+own static `<input id="d_pathDatum" type="hidden">` permanently occupies that id. `path_anchor`'s own
+formWidgets.js branch (written at t2271, before t2293 existed) stamped that SAME id onto its OWN tree-rendered
+row's input — `inp.id = prefix + key` — to "reproduce the shell's convention." That line is the actual cause:
+not two active renders colliding, one dormant static element and one active one sharing a hardcoded string.
+
+### THE FIX — the id was never load-bearing for the tree path; only stamping it was the hazard
+
+Read `pathAnchorField.js`'s own `buildPicker` (t2293) closely: `fld()` already prefers a scoped
+`root.querySelector('[data-param="'+field+'"]')` over `document.getElementById(id)` whenever a non-`document`
+root is passed — and `path_anchor`'s own call to `mountPathAnchor(prefix, container)` already passes its OWN
+container, not `document`. The row t2271's branch finds already carries `data-param` (that's how it was found
+in the first place). So the id-stamp was dead weight by the time t2293 shipped — REMOVED it (`inp.id = prefix
++ key`, and the now-unused `inp` lookup with it), not replaced with anything. Verified live: the picker still
+reads/writes the correct value after removal (`before:""` → `after:"nn"` on a real click), and a full-document
+duplicate-id sweep against the SAME live render came back empty.
+
+### ALSO IN SCOPE — the two t2317 named, now closed
+
+- **`whenGuard.js`'s `pruneGuards`** — genuinely different in kind from the other five turns' fixes: it
+  MUTATES via `splice`/index, so `childrenOf`'s flatten-and-return shape doesn't drop in (flattening an
+  object's LEFT/RIGHT arrays into one would lose which mouth each survivor belongs to, with nowhere correct to
+  splice a survivor back). Extended `pruneGuards` itself instead: an object-shaped `blocks` now recurses into
+  each of its OWN keys' arrays and prunes each IN PLACE, keeping the mouths separate. Confirmed safe for every
+  EXISTING caller: all nine external call sites pass a deep-cloned STACK (always a plain array) — the new
+  object branch is reached ONLY through the function's own internal `uiChildren`/`children` recursion, on the
+  shape a split node's own children actually carry.
+- **`stackBridge.js`'s `chainToJson`** — genuinely reachable this time (unlike the id-stamp, which was found
+  via a live app render): its own call site was gated on `.length`, `undefined` on an object and therefore
+  always falsy — meaning an object-shaped `uiChildren`/`children` was silently DROPPED from the Blockly-canvas
+  round-trip's own PRESENTATION/EXECUTION/mouth inputs, never reaching `chainToJson` at all. Fixed BOTH: the
+  `.length` guards (now `childrenOf(...).length`, true regardless of shape) and `chainToJson`'s own loop
+  (`childrenOf(records)`) — flattening is the right call here specifically: this builds ONE chain for the ONE
+  input slot this call site owns; a nested split node's own LEFT/RIGHT structure would be preserved
+  separately, by `recToJson` handling THAT node's own children when its turn comes (not exercised by this
+  turn's own tests, since the Blockly-canvas round-trip isn't what any current test drives a split node
+  through — closing the silent drop matches this file's own already-documented "FAIL LOUD, not silent" rule
+  for the sibling `children` case one branch below, so it's a correctness fix either way).
+
+### THE THIRD SWEEP, done the way the dispatch asked — by what READS children, not by loop syntax
+
+t2315's own sweep grepped `for...of`; t2317's own follow-up (after missing a `.forEach` case) still hadn't
+covered every shape. This turn: grepped bare `uiChildren` — every mention, not just loop patterns — across
+the whole `web/` tree (51 files). Filtered out the 32 `*Data.js` twins (declaration sites, not consumers) and
+every file already fixed across t2315/t2317. Three genuine hits remained:
+
+- **`data/exposeClassifier.js`'s `blockedIndices`** — a NEW find, not named by any prior turn. Its own comment
+  says it "walks the template in the SAME pre-order `flattenBlocks` uses... so `idx` stays aligned" with
+  `binding.blockIndex` — meaning this isn't just a crash risk, it's a SILENT MISALIGNMENT risk: now that
+  `flattenBlocks` numbers blocks through `childrenOf`, any parallel walker using the OLD array-only order would
+  desync from it the moment a split node is present, binding params to the WRONG block index. Fixed with the
+  same `childrenOf` import (already available from `userOps.js`, already imported for `flattenBlocks`).
+- **`data/opCamMap.js:683`, `blocks/userOps.js:558`, `wizards/ops/userRoot.js:21`** — all three read/spread a
+  `user_root` record's OWN TOP-LEVEL `.uiChildren`, which is always array-shaped (every twin declares it that
+  way; the object shape only ever appears NESTED inside a split node's own `.children`, never at a
+  `user_root`'s own top level). Confirmed safe, left alone — not a gap, a different (always-array) shape.
+- Every remaining `.children`-only match (no `.uiChildren`) across the codebase — `opSession.js`, `lint.js`,
+  `gcodeToStack.js`, etc. — is structurally safe by a different argument: these walkers never read
+  `.uiChildren` at all, so they never enter the subtree a split node actually lives in (drill's own real
+  `.children` — the G-code emission stack — is untouched by this arc; a split node is a PRESENTATION-only
+  concept, declared exclusively under `uiChildren`).
+
+### THE TEST — the guard the dispatch said would have caught this before a flip ever needed to
+
+`tests/no-duplicate-ids-tree-render-2319.spec.js`: builds a synthetic tree (`split_horizontal` wrapping a real
+`path_anchor` node, fed drill's own real bindings/byParam) and asserts zero duplicate ids anywhere in the
+document after rendering — no source-file flip needed to run it. Non-vacuous: temporarily restored the
+removed id-stamp line and re-ran — fails with the EXACT original duplicate pair (`d_pathDatum`/`d_stockAttach`,
+count 2 each). Restored, re-ran clean.
+
+### Files changed
+
+- `web/ui/formWidgets.js` — `path_anchor` branch: removed the id-stamp that caused the collision.
+- `web/blocks/whenGuard.js` — `pruneGuards` extended to recurse into an object-shaped `blocks` value in place.
+- `web/blocks/blockly/stackBridge.js` — `chainToJson` + its own 4 `.length` guards now `childrenOf`-aware.
+- `web/data/exposeClassifier.js` — `blockedIndices`'s own walk now `childrenOf`-aware (index-alignment fix,
+  not just a crash fix).
+- `tests/no-duplicate-ids-tree-render-2319.spec.js` (new) — the permanent guard, proven non-vacuous.
+- `drillData.js` — untouched (re-applied temporarily for the gate investigation, reverted before commit;
+  confirmed clean via `git diff --stat`).
+
+### Regression sweep
+
+Full suite: **2819 passed, 1 failed, 16 flaky** (32.0m). The 1 failure (`wizard-face-1599.spec.js`'s own
+CUSTOMIZE test) and several of the flaky entries were guard/pruneGuards-adjacent by name
+(`corner-wall-collapse-1664.spec.js`, `guard-roundtrip-1595.spec.js`, `hook-carry-1682.spec.js`) — given this
+turn's own `pruneGuards` change, re-ran that exact cluster in ISOLATION rather than trusting the full-suite
+result at face value: all 7 tests passed clean, including `guard-roundtrip-1595.spec.js`'s own comprehensive
+sweep ("flip every STRUCTURAL param on every guarded twin, byte-identically" — 152 structural flips across 14
+guarded twins, all byte-identical). Re-ran `wizard-face-1599.spec.js` alone too: 4/4 passed clean. Both match
+this project's own well-established boot-timing-under-parallel-load flake pattern, not this turn's changes.

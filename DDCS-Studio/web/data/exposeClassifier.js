@@ -13,7 +13,7 @@
  *
  *   exposable = (role === 'value') AND (no blocking fold above the socket) AND (no program-level transform present).
  */
-import { flattenBlocks, resolveArm } from '../blocks/userOps.js';   // t1410 — the SAME prune + binding re-derivation instantiate runs
+import { flattenBlocks, resolveArm, childrenOf } from '../blocks/userOps.js';   // t1410 — the SAME prune + binding re-derivation instantiate runs; t2319 — childrenOf: the ONE children/uiChildren shape normalization, required here so idx stays aligned with flattenBlocks' own (t2315-updated) order
 import { BLOCKS } from '../wizards/ops/index.js';
 import { paramRole } from './atomRoles.js';
 import { absorbingChild } from '../blocks/blockEmitter.js';   // t1389 — the EMITTER's own self-framing predicate; the relaxation must not re-derive it
@@ -41,7 +41,7 @@ export function blockedIndices(template) {
     const blocked = new Set();
     let idx = 0;
     const walk = (blocks, underFold) => {
-        for (const b of (blocks || [])) {
+        for (const b of childrenOf(blocks)) {
             if (!b) continue;                                   // flattenBlocks skips falsy the same way → indices align
             const myIndex = idx++;
             if (underFold) blocked.add(myIndex);

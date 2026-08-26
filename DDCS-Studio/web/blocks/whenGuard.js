@@ -34,21 +34,33 @@ export function getUserDeriveGuards(opType) { return USER_DERIVE_GUARDS.get(opTy
 
 /** Prune a block tree for a param state: DROP a `guard` subtree whose `when` is false; UNWRAP a surviving guard (splice
  *  its children up in place). Recurses children + uiChildren; mutates in place (the caller passes a deep clone). After
- *  prune, NO `guard` blocks remain — the tree is the concrete shape for `params`. Returns the same (mutated) array. */
+ *  prune, NO `guard` blocks remain — the tree is the concrete shape for `params`. Returns the same (mutated) array —
+ *  or, for a mouth-keyed OBJECT children value (t2319, BACKLOG #21's sweep: split_horizontal/tab_group's own shape),
+ *  the same (mutated-in-place, per-key) object. `childrenOf` (userOps.js) isn't the right tool here — it FLATTENS an
+ *  object into one array, which would lose the LEFT/RIGHT (or TABS) grouping this function would need to write back
+ *  into; every EXTERNAL caller only ever passes a plain array anyway (a deep-cloned stack), so this object branch is
+ *  reached exclusively through the function's OWN children/uiChildren recursion below, on the object shape a split
+ *  node's own children carry — pruning each of its mouth arrays in place, not merging them into one. */
 export function pruneGuards(blocks, params) {
-    if (!Array.isArray(blocks)) return blocks;
-    for (let i = 0; i < blocks.length; i++) {
-        const b = blocks[i];
-        if (!b) { blocks.splice(i, 1); i--; continue; }
-        if (b.type === 'guard') {
-            if (!whenOk(b.params && b.params.when, params)) { blocks.splice(i, 1); i--; continue; }   // falsified → drop the whole subtree
-            const kids = pruneGuards(b.children || [], params);   // satisfied → prune descendants first, then unwrap in place
-            blocks.splice(i, 1, ...kids);
-            i--;   // re-examine from the first spliced-in kid (a kid may itself be a guard — nested forks)
-            continue;
+    if (Array.isArray(blocks)) {
+        for (let i = 0; i < blocks.length; i++) {
+            const b = blocks[i];
+            if (!b) { blocks.splice(i, 1); i--; continue; }
+            if (b.type === 'guard') {
+                if (!whenOk(b.params && b.params.when, params)) { blocks.splice(i, 1); i--; continue; }   // falsified → drop the whole subtree
+                const kids = pruneGuards(b.children || [], params);   // satisfied → prune descendants first, then unwrap in place
+                blocks.splice(i, 1, ...kids);
+                i--;   // re-examine from the first spliced-in kid (a kid may itself be a guard — nested forks)
+                continue;
+            }
+            if (b.children) pruneGuards(b.children, params);
+            if (b.uiChildren) pruneGuards(b.uiChildren, params);
         }
-        if (b.children) pruneGuards(b.children, params);
-        if (b.uiChildren) pruneGuards(b.uiChildren, params);
+        return blocks;
+    }
+    if (blocks && typeof blocks === 'object') {
+        for (const key of Object.keys(blocks)) pruneGuards(blocks[key], params);   // each mouth's own array, pruned in place
+        return blocks;
     }
     return blocks;
 }
