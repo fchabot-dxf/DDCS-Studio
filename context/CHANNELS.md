@@ -35,9 +35,16 @@ own framing of the problem, worth keeping because it is exact:
 
 ```
 asked      2026-08-20
-promised   "about a week"  ⇒  ~2026-08-27
+promised   "about a week"                     ⇒  ~2026-08-27
+⚠ UPDATE  2026-08-26 — the vendor says he is looking at it NOW.
+           ⇒ realistically ANOTHER WEEK TO A MONTH. The original date is dead; do not plan against it.
 trigger    ⭐ INBOUND — "I'll keep you posted". Nothing to poll. The owner will know first.
 ```
+
+⚠ **Does the slip reopen the workaround hunt? No — but the margin is thinner.** The hunt was closed because
+reverse-engineering SMB files for progress competes with a first-class register arriving in days. **At a month
+that reasoning still holds** (the RE work is longer than a month and would be thrown away), but it no longer
+holds by a wide margin. ⇒ If this slips again, revisit rather than assume.
 
 ⇒ ⛔ **The progress-tracking workaround hunt is CLOSED, deliberately.** Reverse-engineering SMB files for
 progress (`.break*`, `processing`) competes with a first-class register arriving in days. ⚠ Fairy's open
