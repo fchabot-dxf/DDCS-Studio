@@ -26,17 +26,25 @@ completed plans are not kept — *"we can always plan again."*
 
 ## WHERE THINGS STAND — 2026-08-26
 
-**Branch `wizards-as-data-blocks`. Released V2026.08.26.1.**
+**Branch `wizards-as-data-blocks`. Released V2026.08.26.2.**
 
 The live arc is **wizards-as-data**: every built-in becomes a `{template, bindings}` definition, so a wizard
 can be reproduced from declared data alone. `drill` is the pilot.
 
 ```
-DONE   usage_text + path_anchor declared · guard/whenOk already covered structural forks
-       drill's holeDia + clearance bound (clearance's fan-out via postInstantiate)
-IN     t2297 — method as a STRUCTURAL binding (a translation of corner's shipped pattern, not new design)
-NEXT   ⭐ reproduce drill's form ENTIRELY from declared uiChildren + the reproduction test
-       — the arc's first end-to-end proof, and what the owner actually asked for
+DONE  usage_text + path_anchor declared · guard/whenOk already covered structural forks
+      drill's holeDia + clearance bound (fan-out via postInstantiate)
+      t2297 — method GATED OUT, correctly: t1385 had already merged drill|bore into ONE holecycle
+              block, so there was never a structural fork to bind
+      ⭐⭐ t2299 — THE ARC'S FIRST END-TO-END PROOF. drill's FORM is a declared uiChildren tree,
+              pinned by drill-form-reproduction-2299 on three independent axes
+IN    t2301 — pocket's form (it has a shape-type switch, so it exercises guard for LAYOUT,
+              which drill's tree never did) + drop `panel` from the remaining 23 dataOps defs
+NEXT  ⭐ THE FORK, once t2301 lands:
+        A  reproduce the remaining 4 mill forms (contour/slot/surfacing/text) — breadth
+        B  go to E2 and REGISTER the twins — depth. t2301's panel cleanup is its prerequisite.
+        advisor leans B: two reproductions prove the pattern; the value only lands when
+        something USES the twins, which is also where the next real defects surface.
 ```
 
 - **Corner is the gated pilot** — no wizard ports until corner is right.
@@ -53,11 +61,15 @@ vs the collapsible `.form-sec` the `section` node always renders).
    cannot be found by name any more, so there was nothing to merge). `SLAVE-CHANNEL-TESTS.md` is KEPT — it is
    the test plan for the reboot below, not dead. `parse-out-ghidra-guide.md` is KEPT pending that reboot: if
    the slave channel answers, it is unnecessary; if it does not, it is the fallback.
-2. **The WCS-zero tool-offset term** (`BACKLOG.md`) — ⛔ **not a go/no-go yet.** Its next action is a
-   READ-ONLY reproduce-or-refute, because a 68 mm Z error cannot hide and nobody has seen one.
-3. **Roles: the override's SHAPE.** Roles are automatic and derived from configuration; changing one must
+2. ✅ **The WCS-zero tool-offset term — OWNER-REFUTED 2026-08-26.** A non-zero tool offset is what a
+   tool-length offset IS. `BACKLOG.md` #27 is tagged; do not work it as written.
+3. **#23 — should an op's AUTHOR be able to declare a child SWITCHABLE?** The mechanism exists (structural
+   bindings + guards, shipped for corner). The question is whether a curated set of author-declared toggles
+   is the right feature, or whether nested disable simply does not apply to parametric ops and should SAY so
+   rather than forget silently.
+4. **Roles: the override's SHAPE.** Roles are automatic and derived from configuration; changing one must
    never destroy config. The override stays — its UI is undecided. (`ROLES-PLAN.md`)
-4. **The offline shop.** LAN serving is the only phone→machine path with no internet. Cloud cannot cover it;
+5. **The offline shop.** LAN serving is the only phone→machine path with no internet. Cloud cannot cover it;
    one-box cannot either. **Whether that case still matters decides whether LAN is ever deleted.**
 
 ---
