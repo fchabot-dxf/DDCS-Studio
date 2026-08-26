@@ -58391,3 +58391,97 @@ result at face value: all 7 tests passed clean, including `guard-roundtrip-1595.
 sweep ("flip every STRUCTURAL param on every guarded twin, byte-identically" — 152 structural flips across 14
 guarded twins, all byte-identical). Re-ran `wizard-face-1599.spec.js` alone too: 4/4 passed clean. Both match
 this project's own well-established boot-timing-under-parallel-load flake pattern, not this turn's changes.
+
+## t2321 — THE FLIP, attempt 5: every known blocker gone, gate passed, duplicate-id guard passed, and a NEW,
+more fundamental finding surfaced anyway — STOPPED and reverted. No code changed; `drillData.js` is back at
+HEAD. This is the first time in five attempts the finding wasn't a crash or a duplicate id; it's a genuinely
+broken feature the flip is the first thing to ever exercise.
+
+### GATE + the two guards — all passed cleanly
+
+Re-applied the exact wrap (identical to t2313/t2317). `drill-form-reproduction-2299.spec.js` (3/3) and
+`tests/no-duplicate-ids-tree-render-2319.spec.js` both passed against the REAL flipped tree. A live
+duplicate-id sweep against the real `wizardManager.open('user_drill_data')` render came back empty — t2301/
+BACKLOG #20 (the OTHER named dormant bug) did not resurface either. Zero page errors throughout.
+
+### THEN: the screenshot showed an empty VISUALIZATION panel — not a rendering artifact
+
+The 2-pane structure itself is correct (screenshot sent to the user — `t2321-drill-flipped.png`): PATTERN/
+TOOL/DEPTH & FEED sections in a fixed-width controls column, VISUALIZATION labeled on the right. But that
+right pane is solid black. Ruled out the obvious false leads before treating it as real, the same way the
+duplicate-id finding got confirmed by A/B rather than assumed:
+
+- **The 3D canvas being `0×0` is NOT this turn's bug** — the classic (unflipped) `drill` wizard's own 3D
+  canvas measures `0×0` in this SAME headless test harness (a pre-existing WebGL/headless limitation,
+  confirmed by opening `wizardManager.open('drill')` as a control and measuring the identical property).
+- **The 2D layout SVG is the real signal, and it IS different.** Classic drill's own layout SVG (excluding a
+  `.wiz-pane-chev` collapse icon that a naive `querySelector('svg')` picks up first) has a real, non-zero
+  bounding rect (`886×354`) with 3 children. The flipped tree's own equivalent SVG (`class="feature-canvas"`,
+  5 children — MORE content than the classic case, so the geometry itself IS being computed) has a
+  bounding rect of `0×0×0×0` — the content exists, nothing is laid out to show it.
+
+### ROOT CAUSE, traced to source, not guessed
+
+Walked the full ancestor chain from the `feature-canvas` SVG upward, printing each level's own
+`getBoundingClientRect()` and `getComputedStyle()`. `.wiz-2pane` itself measures `800×1314` — real, non-zero.
+Its own child — a `div.wiz-visual` (the SHELL's OWN native visualization pane, carrying the PLAIN,
+non-`_tree`-suffixed id `userVizContainer` that `feature-canvas` actually lives inside) — measures `0×0` with
+`computed display: none`.
+
+Confirmed at the SOURCE, not just in the DOM: `userOpView.js`'s own `render()` (lines 370-373) —
+
+```js
+const vis = host.closest('.wiz-2pane')?.querySelector('.wiz-visual');
+if (isTree) {
+    if (vis) vis.style.display = 'none';
+    if (controls) { controls.style.flex = '1 1 100%'; controls.style.maxWidth = 'none'; }
+```
+
+— DELIBERATELY hides the shell's own native `.wiz-visual` pane in tree mode and widens `.wiz-controls` to
+fill the whole modal, correctly anticipating that a tree with its own `sim` node provides its own
+visualization slot instead. But `update()` — the SAME file, the function that actually DRAWS the geometry —
+never got the memo: `mgr.preview3D`, `applySimIntent`, and every drag-handle/marker call
+(`elNS('userVizContainer')`, `id('userViz3dContainer')`, both PLAIN, non-`_tree` ids, confirmed by grep —
+9 call sites, none tree-mode-aware) still target the SAME fixed ids the FLAT-mode path always used. Those
+ids live inside the pane `render()` just hid. So the geometry code runs, computes real content (5 SVG
+children — the drag handles ARE being built), and draws it into a pane nobody will ever see, while `sim`'s
+own tree-rendered placeholder (the one actually visible, inside the widened `.wiz-controls`) never receives
+anything.
+
+### WHY THIS WASN'T FOUND BEFORE NOW
+
+`sim`'s own tree-mode branch (formWidgets.js) was built and structurally proven at t2299-t2319, but no op
+that ever exercised tree mode before drill needed REAL 2D geometry — the prior tree-mode consumer (ATC) is
+named in this arc's own comments as having "no param_field/block ever declares 2D geometry for it, so a
+layout2d pane was always empty dead weight." `render()`'s own hide-the-shell-pane logic and `update()`'s own
+geometry-targeting logic were written and tested independently, against different needs, and never
+cross-checked against each other because nothing before drill needed both halves working together. Drill is
+the first op to combine tree mode with a `previewGeometry`/drag-handle op — the FIRST real test of this
+seam — and it fails it.
+
+### Disposition — reverted, not patched, per the same standard every prior gate used
+
+This directly breaks the owner's own #1 verification priority ("DRAG a hole-pattern handle... THE ONE THAT
+MATTERS") — not a cosmetic rough edge, a dead interactive feature: no handle would ever be visible or
+draggable, because the canvas holding it is invisible. The actual fix (teaching `update()`'s geometry calls
+to target the tree's own `_tree`-suffixed ids when `isTree` is true, or having `sim`'s own tree branch reuse
+the shell's existing pane instead of building a parallel empty one) touches a different function in the same
+file, with its own 9 call sites, and needs its own verification that FLAT mode (which every other op still
+uses) stays byte-identical — a distinctly separate, larger piece of work than "wrap two nodes," matching the
+same "STOP AND REPORT, do not patch around it" standard t2313/t2317 already set for less severe findings.
+Reverted `drillData.js` to HEAD; confirmed clean.
+
+### Files changed
+
+None. `drillData.js` reverted (applied, gated, screenshotted, reverted — net zero diff). No machinery this
+turn needed touching; the gap found lives entirely in `userOpView.js`'s existing, uncommitted-to code.
+`scratchpad/t2321-drill-flipped.png` — the owner's-eyes screenshot, sent this turn, not kept in the repo.
+
+### The actionable fix, for whoever picks this up
+
+`userOpView.js`'s `update()` function needs an `isTree`-aware branch for its geometry-drawing calls (mirroring
+`render()`'s own `isTree` check at line 345), targeting `sim`'s own tree-rendered container ids instead of
+the flat-mode ones — OR `sim`'s own formWidgets.js branch needs to reuse/relocate the shell's EXISTING
+`.wiz-visual` pane (moving it into the tree's own layout) rather than building a second, parallel, never-
+populated one. Either way, FLAT mode's own 9 existing call sites must stay byte-identical — that's the real
+verification burden of this fix, not the tree-mode addition itself.
