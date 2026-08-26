@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 **Read the ROOT [`../AGENTS.md`](../AGENTS.md) first** — it is the canonical entry point for the repo, and
-it is NOT auto-loaded. Then [`RULES.md`](RULES.md) for this folder's own rules.
+it is NOT auto-loaded. Then [`controllers/README.md`](controllers/README.md) for the two-controller rule and the
+confidence tags, and [`../context/`](../context/) for where each seat is and the safety rules.
 
 Critical reminder, repeated here because it is the easiest mistake to make:
 

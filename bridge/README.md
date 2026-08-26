@@ -6,7 +6,9 @@ has no official PC API; this project synthesizes one from the interfaces the ven
 and accessories (SMB file share, serial keyboard/Modbus port, macro event-hooks, virtual buttons).
 
 > **Most work in this repo is done by AI agents.** If you are an agent, start with
-> **[`RULES.md`](RULES.md)**.
+> the **root [`../AGENTS.md`](../AGENTS.md)** (the repo's rules — ⚠ NOT auto-loaded), then
+> **[`../context/`](../context/)** (where each seat is, what is wired to what, ⛔ the safety rules), then
+> **[`controllers/README.md`](controllers/README.md)** (the two-controller rule + the confidence tags).
 
 ## Two controllers — don't mix them up
 | | DDCS **V4.1** (bench) | DDCS **Expert / M350** (target) |
@@ -19,7 +21,11 @@ matrix in **[`controllers/README.md`](controllers/README.md)** and never cross-a
 checking it.
 
 ## Map
-- **[`RULES.md`](RULES.md)** / [`CLAUDE.md`](CLAUDE.md) — this folder's rules + the two-controller rule.
+- [`CLAUDE.md`](CLAUDE.md) — the seat loader for this folder.
+- ⭐ **The two-controller rule and the confidence tags live in [`controllers/README.md`](controllers/README.md).**
+  ⛔ **Where each seat is, and the safety rules, live in [`../context/`](../context/)** — not here.
+- ⚠ **External, NOT part of this repo:** the installed **`ddcs-expert`** Claude skill — deep DDCS macro /
+  G-code knowledge (V1.22 verified). Reference only; do not edit it as part of this repo.
 - [`archive/`](archive/) — historical/superseded originals (DESIGN, EXPERIMENTS, RS232 probe notes,
   packaged skill). Context only — current truth lives under `controllers/`.
 - [`controllers/`](controllers/) — per-machine findings, build guides, and assets:

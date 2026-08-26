@@ -9,7 +9,7 @@
 > - **DDCS Expert / M350** — the real studio machine (`\\192.168.0.99\`, Modbus on COM6). The target.
 > - **DDCS V4.1** — bench sandbox (`10.0.0.50`), motorless. Hardening / dev rig only.
 >
-> Canonical: [`bridge/RULES.md`](../bridge/RULES.md) · Expert [`FINDINGS.md`](../bridge/controllers/expert-m350/FINDINGS.md)
+> Canonical: [`bridge/controllers/README.md`](../bridge/controllers/README.md) · Expert [`FINDINGS.md`](../bridge/controllers/expert-m350/FINDINGS.md)
 > · V4.1 [`FINDINGS.md`](../bridge/controllers/v4.1/FINDINGS.md) · [`bridge/ROADMAP.md`](../bridge/ROADMAP.md)
 > · system [`ddcs-studio-roadmap`](ddcs-studio-roadmap).
 >

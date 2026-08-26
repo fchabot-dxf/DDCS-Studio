@@ -10,7 +10,7 @@
 > [`FINDINGS.md`](FINDINGS.md) → "Profile I/O map". Only one differential toggle was needed (to pin the
 > active-level index `port+2`). The detail below is kept as the historical brief.
 
-> **Read [`../../RULES.md`](../../RULES.md) first.** This task is **DDCS Expert / M350 only** — the
+> **Read [`../README.md`](../README.md) first.** This task is **DDCS Expert / M350 only** — the
 > real machine at the studio (`\\192.168.0.99\`, Modbus on COM6). Do **not** cross-apply V4.1 findings.
 > Record everything you confirm in [`FINDINGS.md`](FINDINGS.md) with a confidence tag.
 

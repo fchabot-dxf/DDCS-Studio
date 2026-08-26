@@ -14,6 +14,14 @@ findings and assets separate so a fact proven on one is never silently assumed o
    re-confirmed on the one you're working with — **especially serial/Modbus and network direction.**
 4. Log new results in the correct `FINDINGS.md` with a confidence tag.
 
+### The confidence tags — used in every table below, defined here
+- `[CONFIRMED]` — verified on the named controller (bench test or firmware analysis).
+- `[TO TEST]` — a concrete, bench-testable open question.
+- `[HYPOTHESIS]` — best guess, unverified. Flag for human validation.
+
+⭐ **Tag everything.** A fact recorded without one reads as confirmed by default, which is how an inference
+becomes ground truth — the failure this repo keeps paying for.
+
 ## ⭐ Finding a parameter on the pendant — do NOT scroll to its number
 `eng`, which ships on the controller beside `setting`, is a complete machine-readable description of the
 parameter set: name, unit, range, edit permission, **and the Param List section** (`-m`). Two things follow:

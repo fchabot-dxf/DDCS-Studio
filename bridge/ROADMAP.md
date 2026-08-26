@@ -4,7 +4,7 @@ Forward-looking companion to [`README.md`](README.md) (which is "what is"). Last
 Goal: push G-code from anywhere, run it on the **DDCS Expert M350**, and read back how it went — without
 exposing the machine. Foundations are proven; the work now is assembling them into the **`bridge-app/`**.
 
-> Two controllers, never mixed — see [`RULES.md`](RULES.md). The bridge targets the **Expert** (studio).
+> Two controllers, never mixed — see [`controllers/README.md`](controllers/README.md). The bridge targets the **Expert** (studio).
 
 ---
 
