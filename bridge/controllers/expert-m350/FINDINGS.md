@@ -1045,8 +1045,9 @@ macro #N   →   setting f64 index (N − 500)   →   eng entry #(N − 500)
 parameter by its number. Full map: [`PARAM-PAGE-MAP.md`](PARAM-PAGE-MAP.md). `[§20]`
 
 #### 5. ⚠ Two traps for anything reading the controller
-* ⛔ **`SYSDISK/setting` is STALE relative to RAM.** A value written by a macro or the pendant may not appear
-  on disk at all. Everything the bridge pulls is decoded from that file. `[§19]`
+* ⭐ **`SYSDISK/setting` is NOT stale — it is trustworthy.** Both a pendant edit and a macro register write
+  reach the disk immediately (measured on `#131`, V19). ⛔ An earlier claim that it was stale is **WITHDRAWN**;
+  it came from comparing two different moments. `[§19]`
 * ⛔ **`SYSDISK/cmdstr` holds a shell command.** Read only, never write. `[§6]`
 * The Expert has `.break0`/`.break1`, **not** the V4.1's `.file`/`.break0-0`. `[§1]`
 
@@ -1066,7 +1067,7 @@ the selection before the dialog closes. Have the macro read and print it instead
 | question | needs |
 |---|---|
 | Does `H01` **attached to a Z move** bind without `G43`? (the exact posted form) | a real Z move, human present |
-| What triggers the parameter flush to disk? | unknown; blocks trusting any pull |
+| ~~What triggers the parameter flush?~~ | ⭐ **ANSWERED: writes flush immediately, from pendant AND macro. Not an open question.** |
 | Modbus position poll answers `0x00` | **a controller reboot**, then re-probe |
 | Do `.break*` / `processing` update DURING a run? | a program running, human present |
 
@@ -1479,7 +1480,20 @@ Running `G49` left the modal block reading `G43`. Both attested corpus forms exi
 ⛔ **But this proves nothing about cancelling an offset**: every `G49` run had `H00` selected, so there was
 never anything to cancel. `M30` is the only reset observed to work. `[G49 with a live offset: UNTESTED]`
 
-### 19. ⛔⛔ THE `setting` FILE ON SYSDISK IS STALE RELATIVE TO RAM
+### 19. ~~THE setting FILE IS STALE RELATIVE TO RAM~~ ⛔⛔ **WRONG — WITHDRAWN 2026-08-25. It is NOT stale.**
+> **Retested properly and the claim is false.** A pendant edit of `#131` reached the disk immediately, and a
+> MACRO write of the same parameter (`#631 = 4`, V19) reached it too — `setting[131]` read `4.0` while the
+> value was live. **Both writers flush. The file is trustworthy.**
+>
+> ⚠ **How I got it wrong, because the mistake is the lesson:** the original reading compared `setting[400]`
+> against "the macro read H01 back as 10.000" — but those were **not the same moment**. `V18b` had already
+> restored H01 to `0` before the disk was read, so `0.0` was simply CORRECT. One uncontrolled observation,
+> promoted to "an app-level hazard, bigger than the G43 question", and it propagated: RENDERRANCHY halted
+> work behind it (*"I am not building against a pull I cannot date"*).
+> ⛔ **The control that was missing cost nothing**: change ONE parameter, by ONE writer, and read it back
+> while it is still live. That is V19, and it is four lines.
+
+**The original claim, kept for the record:**
 A macro wrote `#900 = 10.0` and read it back as `10.000`. **`setting[400]` on disk still read `0.0`**, and a
 sha256 diff of **all 184 SYSDISK state files showed ZERO changes.** ⇒ the controller holds parameters in RAM
 and the file is a snapshot from some earlier flush.

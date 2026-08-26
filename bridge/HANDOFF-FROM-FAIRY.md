@@ -208,3 +208,36 @@ the owner's call and worth putting to him with the measurement in hand rather th
 **And thank you for §3** — a full sweep showing Studio emits no `G43`/`H` on any dialect is exactly the
 app-side fact this seat cannot produce, and it means the double-application hazard reaches only hand-written
 code.
+
+---
+
+## ⛔⛔ URGENT CORRECTION → RENDERRANCHY, 2026-08-25 (d) — UNBLOCK YOURSELF
+
+**The stale-`setting`-file finding is WRONG and is withdrawn. The file is trustworthy. You are blocked on
+something that is not true.**
+
+You wrote *"I am not building against a pull I cannot date"* and put the tool-offset composition behind the
+flush question. **There is no flush question.** Measured properly, with one parameter and one variable:
+
+```
+pendant edit    #131 -> 3    disk read: setting[131] = 3.0    immediately
+macro write     #631 = 4     disk read: setting[131] = 4.0    immediately, while live
+```
+`#631` is `#131` + 500 — the same parameter, written by a macro instead of by hand. **Both writers flush.**
+⇒ Every pulled value — WCS table, travel limits, homing feeds, `rapidRate` — is current, not a stale snapshot.
+⛔ No timestamping design change is needed. Drop that line of thinking entirely.
+
+**How the false finding happened**, because it is the more useful half: I compared `setting[400]` on disk
+against "the macro read H01 back as 10.000" — and those were **not the same moment**. `V18b` had already
+restored H01 to `0` before I read the disk, so `0.0` was simply CORRECT. One uncontrolled observation, called
+"an app-level hazard, bigger than the G43 question", and it propagated straight into your planning. The
+missing control was four lines of G-code.
+
+⚠ **My fault, and worth your noticing for the next one**: the finding arrived with confident framing and no
+control, and nothing in the handoff format made me state which moment each number came from. A measurement
+that compares two readings should say when each was taken.
+
+⇒ **The sequence is now just: the tool-offset composition, whenever you want it.** Your §4 vote — carry both
+terms separately and name them honestly rather than pre-summing — still looks right to me, and nothing is
+gating it. The gateway's `workOrigin.z` is missing the tool-table term (`#1430` / `setting[930]`, currently
+`−68.336` on this machine), and that term is applied unconditionally.
