@@ -2595,7 +2595,7 @@ a two-pointer/pinch path finds none → still real.
 
 ---
 
-### 33. ⛔ THE Ø HANDLE ROTATES THE WHOLE PATTERN — one handle drives two params, so neither is controllable
+### 33. [⭐ DESIGN DECIDED 2026-08-26 — option A, hole #1 is the rotate handle] ⛔ THE Ø HANDLE ROTATES THE WHOLE PATTERN — one handle drives two params, so neither is controllable
 
 *(reported by the owner from the drill wizard, 2026-08-26: "diameter marker moves position too, and that's
 not ok — it's impossible to control and keep the position")*
@@ -2638,13 +2638,43 @@ no way to isolate either.
 
 ```
 A ⭐ SPLIT IT — a radius-only Ø handle (omit fieldA) + a separate rotate handle for startAngle.
-     Honours the principle, each gesture controllable, costs one more marker on the canvas.
-B    MODE-DETECT — keep one handle; write the radius when the drag is mostly radial, the angle when
-     mostly tangential. Fewer markers, but a gesture whose meaning depends on direction is hard to
-     predict and harder to undo.
-C    RADIUS-ONLY — omit fieldA and drop the rotate gesture from this handle entirely.
-     Simplest, and startAngle stays editable as a form field.
+B    MODE-DETECT — one handle; radius when the drag is radial, angle when tangential.
+C    RADIUS-ONLY — omit fieldA, drop rotate from the canvas; startAngle stays a form field.
 ```
+
+#### ✅ DESIGN DECIDED WITH THE OWNER, 2026-08-26 — OPTION A, and the split is not two abstract levers
+
+⭐⭐ **THE IDEA: `startAngle` IS the position of the first hole — so make the first hole the handle.** Do not
+build a rotate lever; a lever is an abstraction you must learn and then map onto what moves. **Hole #1 is the
+referent itself** — you drag the thing you want moved, to where you want it, and never ask which way it turns.
+
+```
+        ◉ ← HOLE #1        a CIRCLE, on the ring, drags AROUND      → writes startAngle ONLY
+     ○     ○
+   ○    ·····◆  Ø 50.0   ← the Ø GRIP    a DIAMOND, on the circumference, drags IN/OUT → writes dia ONLY
+     ○     ○          └─ a dotted ARM runs centre → grip, carrying the Ø label
+        ○                  the arm is what makes it READ as a radius instead of "a dot"
+```
+
+**The three rules that make them unconfusable** — different shape, different axis of motion, different meaning:
+
+```
+SHAPE     Ø grip is a DIAMOND, never a circle. Circles are holes.
+MOTION    the grip slides ALONG the arm. Sideways does nothing.
+BEARING   the arm sits 90° FROM hole #1 — it still rotates WITH the pattern, so it reads as attached,
+          but it can never land on top of the rotation handle. ⛔ Do NOT draw it AT startAngle.
+```
+
+⭐ **And the crucial point, so nobody "fixes" this with a guard:** the arm may be drawn at ANY bearing without
+reintroducing the bug. The defect was never that the marker sits at an angle — it is that **the drag WRITES
+one**. Drop `fieldA` and the grip can be drawn anywhere; it will only ever write `dia`.
+
+⭐ **WHY IT GENERALISES**, which is what makes it worth building once rather than patching drill: for the
+**line** pattern the rotate handle is the **last point**; for any oriented feature, the handle is *the thing
+the param positions*. Same rule as the traverse targets — the control and the controlled are one object.
+
+⚠ **The one thing reasoning cannot settle:** whether the dotted arm reads as clutter on a phone at high hole
+counts. That is a look-at-it check once it exists, not a design question — build it, then look.
 
 ⚠ **Check the other fused handles before fixing just this one** — `fieldA` also appears in
 `wizards/ops/fillText.js` and `wizards/views/drillView.js`. If they share the shape, they share the defect.
