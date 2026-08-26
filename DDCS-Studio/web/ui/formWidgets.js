@@ -1285,6 +1285,25 @@ function allMouthChildren(obj) {
     return Object.values(obj).flatMap((v) => (Array.isArray(v) ? v : []));
 }
 
+// t2311 (BACKLOG #10 → t2309's own gate) — a split's `ratio` token was PROPORTIONAL-ONLY (two plain numbers,
+// e.g. '2:1'): the declared vocabulary had no way to express a FIXED-pixel pane beside one that fills the
+// rest, which is exactly `.wiz-2pane`'s own real shape (styles.css:2392-2402 — `.wiz-controls{flex:0 0 360px}`
+// + `.wiz-visual{flex:1 1 0}`), found missing while gating t2309's drill flip. Extended the SAME `ratio` string
+// rather than adding a second param: a `<n>px` token → that pane is FIXED (`flex:0 0 <n>px`, byte-identical to
+// the shell's own CSS shorthand); a `*` token → that pane FILLS (`flex:1 1 0`); anything else parses as a
+// plain number exactly as before (`Number(tok) || 1` — 0/NaN/missing all fall back to 1, unchanged). Every
+// existing value (the default '1:1', and '2:1'/'1:2' from `wizards/ops/layout.js`'s own authoring dropdown)
+// hits the plain-number branch and renders byte-identically to the old `parts[0]||1` parsing — verified in
+// `tests/split-node-ratio-2311.spec.js`, not just reasoned about.
+function paneFlexCss(token) {
+    const t = String(token == null ? '' : token).trim();
+    if (t === '*') return '1 1 0';                                    // fill whatever the fixed sibling leaves
+    const px = /^(\d+(?:\.\d+)?)px$/.exec(t);
+    if (px) return `0 0 ${px[1]}px`;                                  // fixed pixel width — matches .wiz-2pane's own shorthand
+    const n = Number(t);
+    return String(Number.isFinite(n) && n > 0 ? n : 1);               // proportional (unchanged default behavior)
+}
+
 // t2263 (wizards-as-data E2 measurement) — codeElId is OPTIONAL and additive: the ONE existing caller
 // (userOpView.js) can pass its own view.codeElId so a declared 'code_preview' node's <pre> gets populated by
 // the SAME update() mechanism that already writes into the static shell's own hardcoded preview-block — but
@@ -1303,9 +1322,9 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 const box = document.createElement('div');
                 box.style.cssText = `display:flex; flex-direction:${isHoriz ? 'row' : 'column'}; gap:16px; width:100%; height:100%; min-height:0;`;
                 const ratio = (node.params && node.params.ratio) || '1:1';
-                const parts = ratio.split(':').map(Number);
-                const flex1 = parts[0] || 1, flex2 = parts[1] || 1;
-                
+                const [tok1, tok2] = ratio.split(':');
+                const flex1 = paneFlexCss(tok1), flex2 = paneFlexCss(tok2);
+
                 const pane1 = document.createElement('div');
                 pane1.style.cssText = `flex: ${flex1}; display:flex; flex-direction:column; ${isHoriz ? 'min-width:0;' : 'min-height:0;'}`;
                 const pane2 = document.createElement('div');

@@ -57932,3 +57932,79 @@ the full suite were NOT run — there is no code change to verify.
   matter beyond drill.
 
 No code touched. Nothing to commit, nothing to revert.
+
+## t2311 — THE MISSING DECLARATION: teach the split node a FIXED-PIXEL pane (option A from t2309's own gate,
+owner-ruled by the north star's Declare-or-Hand-Roll gate; option B — a tuned proportional approximation —
+ruled OUT by principle 7, never compromise architecture for a quick win). Adds the vocabulary ONLY; does not
+flip drill (a later turn, once the vocabulary exists). `drillData.js` untouched, no split node added to any
+twin, per the dispatch's own explicit boundary.
+
+### THE SHAPE — extended the SAME `ratio` string, not a second param
+
+`formWidgets.js`'s `paneFlexCss(token)` (new, module-level pure function, right before `renderUiTree`): a
+`<n>px` token → that pane is FIXED (`flex:0 0 <n>px`, byte-identical to `.wiz-2pane`'s own CSS shorthand at
+styles.css:2392-2402); a `*` token → that pane FILLS the remainder (`flex:1 1 0`); anything else parses as a
+plain proportional number exactly as before (`Number.isFinite(n) && n>0 ? n : 1` — 0/NaN/missing all still
+fall back to 1, matching the old `parts[0]||1`). Chose to extend `ratio` rather than add a distinct param
+because the concept is singular — "how do these two panes share the row" — and a second param competing for
+the same question would need its own precedence rule against the first; one string with a richer grammar
+avoids that entirely, and every existing call site (the default, plus `layout.js`'s own `'2:1'`/`'1:2'`
+dropdown options) needed zero changes to keep working.
+
+### THE ORDERING QUESTION — verified already solved, no new vocabulary added
+
+The dispatch asked the split node be able to "express which pane goes where," reiterating t2309's own claim
+that `children:{LEFT:[...],RIGHT:[...]}` already does this. Rather than take that claim on faith a second
+time, verified it live (`tests/split-node-ratio-2311.spec.js`'s CONTROL test): a tree with `Controls` under
+`LEFT` and `Visual` under `RIGHT` renders `Controls` at a smaller `getBoundingClientRect().left` than
+`Visual`, unconditionally — `traverse()` appends pane1 (fed by `LEFT`) before pane2 (fed by `RIGHT`) into a
+`flex-direction:row` box with no `order` override anywhere, so whichever content an author assigns to `LEFT`
+renders physically left, full stop. No CSS-`order` trick, no DOM-vs-visual decoupling, is needed — the key
+NAME already IS the visual-placement declaration. Added no code for this; the "one more missing declaration"
+the dispatch anticipated turned out not to be missing once actually driven, and the test now pins that as a
+citable fact for whoever builds drill's own flip, rather than leaving it as an unverified claim in a WORK-LOG
+line.
+
+### Reached, additively: the authoring surface
+
+`wizards/ops/layout.js`'s `splitHorizontalBlock`/`splitVerticalBlock` (the Blocks-tab "Wizard Layout" category
+drag-block) had their own `ratio` field with a FIXED dropdown (`selects`) limited to `1:1`/`2:1`/`1:2` — the
+new grammar would have been parseable at runtime but unreachable from that authoring surface. Added
+`['360px:*', '360px + fill']` to both blocks' dropdowns so the new vocabulary is actually selectable, not just
+theoretically supported. Purely additive (a new option in an existing list); no existing option changed.
+
+### GATE — checked for an existing consumer before touching `ratio`'s grammar, per the dispatch's own condition
+
+Grepped the whole repo for `split_horizontal`/`split_vertical` before writing any code: 9 files matched, and
+every one was either a comment, a bare type-name presence check (`blocksApp.js:729`, `palette-by-role-
+1623.spec.js:59`), or the `layout.js` Blockly block registration itself (whose own dropdown is FIXED to three
+plain-number values — none of which collide with the new `<n>px`/`*` grammar, since none of those three
+strings match either new pattern). `drillData.js`'s own reference is a comment. No live consumer of a real
+`ratio` value beyond the default exists yet, matching the dispatch's own premise — extending was safe.
+
+### Non-vacuous, proven the same way as every prior gated turn
+
+Temporarily reverted `paneFlexCss` back to the exact pre-fix parsing (`ratio.split(':').map(Number)`,
+`parts[0]||1`) and re-ran: the new fixed-pixel test fails (`grow1` reads `'1'`, not `'0'` — a `'360px'` token
+parses as `NaN` and silently falls back to proportional `1`, exactly the t2309 finding), the backward-compat
+and LEFT/RIGHT tests still pass (neither depends on the fix — one is testing OLD behavior survives, the other
+was already true). Restored, re-ran clean.
+
+### Regression sweep
+
+Full suite: **2814 passed, 1 failed, 13 flaky** (24.8m). The 1 failure was `save-dialog-declared-1615.spec.js`'s
+own `honest wording` test — the SAME pre-existing load-timing flake already confirmed unrelated to this repo's
+own changes at t2307 (isolated re-run passed clean there; not re-investigated again here, since it's now a
+repeatedly-observed, well-established pattern rather than a fresh finding). `disable-guard-2307.spec.js`
+(t2307's own spec, untouched this turn) flaked once in the same batch — matching the identical boot-timing
+class already diagnosed twice this session, not this turn's changes. `split-node-ratio-2311.spec.js` (this
+turn's own new spec) appears in NEITHER the failed nor the flaky list — passed clean throughout. Every other
+flaky entry is a spec this turn never touched.
+
+### Files changed
+
+- `web/ui/formWidgets.js` — `paneFlexCss` (new), and the `ratio` parsing in `renderUiTree`'s split branch
+  extended to call it.
+- `web/wizards/ops/layout.js` — `'360px:*'` added to both split blocks' `ratio` dropdown (additive).
+- `tests/split-node-ratio-2311.spec.js` (new) — proportional backward-compat, the new fixed+fill behavior,
+  and the LEFT/RIGHT ordering control. Proven non-vacuous.
