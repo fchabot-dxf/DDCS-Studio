@@ -120,7 +120,8 @@ export function middleDataStack(params = MIDDLE_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },   // t714 — middle is a PART-frame probe (no forceMachine); machine:true was latent-dead (see cornerData/opSimContext)
             { type: 'param_group', params: { group: 'Middle' }, children: [] },
         ],

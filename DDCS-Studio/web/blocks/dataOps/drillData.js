@@ -268,7 +268,15 @@ function drillDataStack(p = DRILL_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the hole pattern + pos + pattern-size handles (previewGeometry)
+            // t2301 (BACKLOG 20) — 'panel' removed: formWidgets.js's `sim` and `panel` branches hardcode the
+            // SAME DOM ids for their own layout2d pane (userVizStatus_tree/userVizContainer_tree) — a real id
+            // collision wherever both are declared, not just cosmetic redundancy. `sim` renders everything
+            // `panel` did (t2257's own systemic-check comment, atcChangeData.js) PLUS the 3D pane; `panel`
+            // never even reads its own `params.panel` value ('form3d+2d' vs 'form3d' vs 'form' vs 'commscreen'
+            // all render byte-identically — confirmed by reading formWidgets.js's panel branch directly). Left
+            // AS-IS here (no `layout2d:false`): drill has real 2D content (previewGeometry, the hole-pattern
+            // handles), so sim's own default (2D pane included) is what this twin actually needs — unlike ATC,
+            // which had none.
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Drill' }, children: [
                 { type: 'usage_text', params: { text: 'Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.' } },

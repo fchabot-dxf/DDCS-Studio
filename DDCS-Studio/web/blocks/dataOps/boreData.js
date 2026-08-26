@@ -114,7 +114,8 @@ function boreDataStack(p = BORE_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the bore pattern + pos + pattern-size + Ø handles (previewGeometry)
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Bore' }, children: [] },
         ],

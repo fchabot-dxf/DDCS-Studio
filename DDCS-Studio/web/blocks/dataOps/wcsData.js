@@ -15,8 +15,11 @@ export const WCS_DEFAULTS = { sys: '0', axisX: true, axisY: true, axisZ: false, 
 const SYS_OPTIONS = [['Active WCS (Auto)', '0'], ['G54', '54'], ['G55', '55'], ['G56', '56'], ['G57', '57'], ['G58', '58'], ['G59', '59']];
 const SLAVE_OPTIONS = [['A', '3'], ['B', '4']];
 
-// wcsStack(DEFAULTS) = [wcszero]; pre-order flatten under the wrap: user_root(0) panel(1) sim(2) param_group(3) wcszero(4).
-const WRAP = 4;
+// wcsStack(DEFAULTS) = [wcszero]; pre-order flatten under the wrap: user_root(0) sim(1) param_group(2) wcszero(3).
+// t2301 — WRAP dropped from 4 to 3 ('panel' removed from uiChildren, BACKLOG 20). This is the EXACT hazard
+// t2257 caught the hard way on atcWarmupData.js (a hardcoded WRAP left stale after panel's removal broke
+// every binding); caught here BEFORE committing, not after, by reading this file's own comment before editing.
+const WRAP = 3;
 // t1704 — WCS is the "trivial ideal" case for token eligibility: wcsStack (wizards/wcsWizard.js) is a ONE-LINE
 // function that copies every param straight into the single wcszero atom's params object — zero JS arithmetic,
 // zero branching, at the wizard layer. All 6 are `tokenEligible`. (None render as a typed field today — every one
@@ -46,8 +49,12 @@ export function wcsDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form' } },   // form-only: WCS is a register-write macro (no motion / no preview)
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            // t2301 (BACKLOG 20) — 'panel' removed: the SAME id-collision fix as drillData.js's own comment
+            // (its sim/panel branches share DOM ids), first established for ATC at t2257. layout2d:false ADDED
+            // here (unlike drill/pocket): the removed panel's OWN comment already named this op's own 2D pane
+            // as permanently empty ("form-only: WCS is a register-write macro — no motion / no preview") — the
+            // exact reason ATC's own sim declarations carry layout2d:false, not a new judgment call.
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false, layout2d: false } },
             { type: 'param_group', params: { group: 'WCS' }, children: [] },
         ],
         children: exec,

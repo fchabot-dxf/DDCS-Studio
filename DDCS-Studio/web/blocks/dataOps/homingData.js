@@ -59,7 +59,8 @@ export function homingDataStack(params = HOMING_DEFAULTS) {
     return [{
         type: 'user_root', params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, magazine: false, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
 
             { type: 'param_group', params: { group: 'Homing' }, children: [] },

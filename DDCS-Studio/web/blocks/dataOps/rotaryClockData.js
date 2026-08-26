@@ -77,7 +77,8 @@ export function rotaryClockDataStack(params = ROTARY_CLOCK_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: true, machine: false, magazine: false, probeWcs: true } },   // t714 — the 4th-axis RIG frames the bar (rotary:true); no forceMachine envelope (machine:true was latent-dead)
             { type: 'param_group', params: { group: 'Rotary Clock' }, children: [] },
         ],

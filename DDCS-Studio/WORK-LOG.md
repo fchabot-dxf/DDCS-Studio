@@ -57409,3 +57409,158 @@ This was a genuinely heavy turn — three separate, non-obvious architecture bug
 tracing (not guessed), one full revert-and-redo when the first fix's premise proved wrong, four full-suite
 runs. Landing here is a natural stopping point (main green, nothing held back); flagging it plainly per
 standing convention rather than pushing further tired.
+
+## t2301 — TWO PARTS. PART 1 (arc): pocket's form built as declared uiChildren, SAME pattern as t2299 —
+gate found the dispatched guard/whenGuard mechanism unnecessary (a real finding, not a shortfall). PART 2
+(BACKLOG #20): the systemic 'panel' sweep across the remaining 24 dataOps files — which surfaced a real,
+confirmed live-app regression in the fork-a-built-in gesture, root-caused and fixed, not just tested around.
+
+### PART 1 — pocket's uiChildren tree
+
+Gate (Step 1) confirmed every field `#wiz_pocket`'s shell shows has a matching `POCKET_BINDING_SPECS` entry —
+no shell→binding gap. The dispatch's own premise — pocket's shape switch (rect/circle/polygon/ellipse) needs
+guard/whenGuard for form layout — does NOT hold: `POCKET_BINDING_SPECS` already carries a per-FIELD `when`
+clause for every shape-conditional param (`w`/`h`: `when:{shape in [rect,ellipse]}`; `dia`: `when:{shape in
+[circle,polygon]}`; `sides`: `when:{shape is polygon}`) — the EXACT mechanism drill's own pattern-switch
+groups already used (t2299), zero guard machinery involved. Filed as a real arc finding, mirroring t2297's
+own "the dispatched mechanism doesn't apply" shape — `guard`/`pruneGuards` is for STRUCTURAL forks in the
+block STACK (pocket's real ones: strategy/tooSmall/refuse/rest, resolved by `resolveArm` well before the form
+renders), a different layer from per-row visibility, which was never blocked here.
+
+Built `pocketDataStack`'s `uiChildren` as a full tree (`field_ref` placements — t2299's own naming, avoiding
+the formfield/param_field authoring-block collision from the start this time) reproducing the shell's own
+section order/grouping exactly, including one real divergence from drill's own layout worth naming: pocket's
+WCS field lives in DEPTH & FEED (not the SHAPE section drill's own WCS sits in) — reproduced as the shell
+actually has it, not normalized to match drill's convention. Orphan set (17 params, larger than drill's 9):
+confirmed by grepping index.html AND pocketView.js — zero hits either place — for the entire DEPTH ENTRY
+cluster (`direction`/`entry`/`rampAngle`/`helixDia`/`helixPitch`), the entire REST MACHINING cluster
+(`restTool`/`restDia`/`restStepover`), `confirmEvery`, `material`, `passes`, plus the same
+formHidden/twin-only params drill also had. These are real, well-documented bindings (t800/t804/t871 in
+`POCKET_BINDING_SPECS`) the shell was simply never updated to expose — a pre-existing shell feature gap, not
+a wiring gap, named explicitly rather than silently absorbed into the fallback net.
+
+Reproduction test `tests/pocket-form-reproduction-2301.spec.js` — same 3-axis shape as drill's own
+(structure+orphan set / live-shell wording / an edit reaching the real emit path via `emitEquivalence`
+against `pocketStack`). All 3 passed on the FIRST run (the field_ref-from-the-start choice paid for itself —
+zero rounds of the formfield/grid_container-mouth debugging t2299 needed). Proved non-vacuous the same way:
+reverted the tree to its pre-t2301 empty shape, 2 of 3 tests correctly failed (structure, wording); the 3rd
+(wiring) still passed against the empty tree — same documented, expected shape as drill's own case (the
+orphan-fallback net still surfaces `depth` regardless of tree structure — a DATA-FLOW claim, independent of
+layout).
+
+### PART 2 — BACKLOG #20, systemically: 'panel' dropped from the remaining 24 dataOps files
+
+t2257 fixed 6 ATC files; this turn's own dispatch named "23 remaining" (one word eaten by shell substitution
+in the original note, confirmed 'panel' by amendment) — the actual count, by direct grep, was 24 (drill and
+pocket both still carried `panel` going into this turn; t2299 built drill's tree CONTENT but never touched
+its panel/sim lines). All 24 fixed; the discrepancy is reported here rather than silently forced to match.
+
+**Not every file was "remove one line."** Systematic per-file verification (not assumed uniform) found:
+
+- **18 files** already declared BOTH `panel` and `sim` — mechanical: delete the `panel` line, `sim`'s own
+  existing declaration (rotary/machine/magazine, or `probeWcs:true` for the probe twins) already covers
+  everything `panel` did, per formWidgets.js's own `panel` branch (confirmed by direct reading: it never even
+  reads its own `params.panel` value — 'form3d+2d'/'form3d'/'form'/'commscreen' all render the identical
+  generic box — the SAME finding t2257's own systemic-check comment already reported).
+- **`cornerData.js`** — structurally different from every other twin: `panel` lived in a hand-authored
+  `sec('FORM', ..., [panel, paramGroup])` array (corner's OWN section-per-concern presentation layout, the
+  foundational "pilot" precedent), not co-located with `sim` the way every other twin declares them. Removed
+  from that array + the `const panel =` declaration; `sim` (in its own separate `sec('3D-SIM', ...)` section)
+  untouched. The id-collision concern applies identically regardless of which `section` nests the two blocks
+  (`traverse()` walks the whole tree into one DOM), so the fix is the same even though the SHAPE isn't.
+- **6 files declared `panel` with NO `sim` at all** — a materially bigger edit each:
+  - **`wcsData.js`** — the removed panel's OWN comment already named its 2D pane as permanently empty
+    ("form-only: WCS is a register-write macro — no motion / no preview"), so `layout2d:false` was added to
+    its existing `sim`, matching ATC's own precedent exactly (a named absence, not a guess).
+  - **`commData.js`** — 'commscreen' is a DIFFERENT visual concept (the DDCS-screen preview,
+    `generateScreenPreview`) from a toolpath preview — investigated before touching anything: confirmed
+    (`userOpView.js:768`) that the LIVE comm-screen preview reads a SEPARATE `userOpFromStack(...,
+    'commscreen', ...)` argument, untouched by this edit — the uiChildren `panel` NODE itself is exactly as
+    inert here as everywhere else. `sim` added with `layout2d:false` (comm is popup/status/input/beep/dwell —
+    no physical motion ever, same reasoning as wcs).
+  - **5 lathe cutting twins** (`centerDrillData`/`facingData`/`odTurnData`/`partingData`/`polygonData`) —
+    `sim` added with EMPTY params: no existing plain-lathe-cutting-twin precedent to match (the only two
+    lathe twins that already had `sim` — `odProbeData`/`faceProbeData` — are PROBES, carrying `probeWcs:true`,
+    which doesn't apply to an op that reads a WCS rather than producing one). Each twin's own `layout:
+    {kind:'lathe_profile'}` node (its REAL 2D content, the half-profile canvas) is confirmed unrelated either
+    way — `'layout'` has no case in formWidgets.js's `traverse()` switch at all, falls to the t1561
+    unwired-placeholder branch, same as before this turn.
+
+**A confirmed, live hazard, caught systematically rather than one file at a time:** re-swept ALL 24 files
+for a hardcoded wrap-offset constant AFTER the mechanical 16-file pass, not before — `wcsData.js`
+(`const WRAP = 4`), `contourData.js`/`tapData.js`/`textData.js` (`WRAP_PREFIX_COUNT = 4`) all still assumed
+`user_root+panel+sim+param_group`, now stale by one. Exactly the atcWarmupData class of regression t2257
+caught the hard way; caught here BEFORE committing by re-grepping every touched file for the pattern, not
+assumed absent because the other 20 files use identity-based `deriveBindingsFor`. All 4 fixed (dropped to
+3, comments updated). `boreData.js`/`cornerData.js`/`drillData.js`/`surfacingData.js` carry only HISTORICAL
+comments about this same mechanism already retired — confirmed, not just similarly-worded, before leaving
+them untouched.
+
+### THE REAL REGRESSION — found by hook-carry-1682.spec.js, root-caused, fixed in devMode.js
+
+Full suite after the mechanical sweep: 3 genuinely unexpected (not just flaky) failures, all traced to files
+this turn touched, none dismissed as "probably unrelated" without checking:
+
+1. **`cam-substack-save-fork.spec.js`** — a stale exact-position pin (`['user_root','panel','sim',...]`).
+   Mechanical fix, one fewer prefix row.
+2. **`save-dialog-declared-1615.spec.js`** — its OWN fixture was corner, specifically BECAUSE corner used to
+   be a convenient "a stack that declares panel" example — which this turn's own edit just made false for
+   EVERY shipped twin. Rewrote the fixture as a hand-built stack (`ddcsLoadBlockStack([{panel},{sim},{move}])`),
+   mirroring this same test file's own pre-existing "BARE stack" pattern — the DIALOG's read-the-declaration
+   mechanism is unchanged by BACKLOG #20 (it still reads whatever a stack happens to declare); the fixture
+   just needed a source that still declares something, since no shipped twin does any more.
+3. **`hook-carry-1682.spec.js`** — NOT a stale test. "fork surfacing through Customize → Save as new; the
+   fork's own rendered UI shows the depth ruler" — deterministic, reproduced in isolation (not a parallel-
+   load flake), confirmed to PASS against surfacing's pre-t2301 committed state (temporarily restored via
+   `git show HEAD:`, not assumed). Traced with a scratch debug script rather than guessed: the fork's own
+   `.panel` resolved to `'form3d'` instead of `'form3d+2d'` — losing the 2D pane the depth ruler mounts
+   beside, so `renderZRulerBeside`'s own `if (!c || !c.parentElement) return` guard silently ate it.
+   Root cause, in `devMode.js`'s `prepareCandidate`: `meta.panel = blkPanel || (editingDef &&
+   editingDef.panel) || 'form3d'` — `blkPanel` (scanned from the live workspace's OWN panel block) was the
+   thing ACTUALLY carrying a twin's real panel type through a "Customize a built-in → Save as new" fork,
+   not `editingDef.panel` (which reads back undefined in this specific gesture — a built-in being forked
+   directly, not a previously-user-saved wizard being re-edited — even though the SAME def's `.panel` is
+   correctly `'form3d+2d'` via `getUserDef`). Every twin carrying `panel:'form3d+2d'` masked this identically
+   before this turn — `blkPanel` always won first, so the broken second link never mattered. BACKLOG #20
+   removing that node from every twin is what turned a latent gap into an observable one.
+   **Fixed in `devMode.js`**: added `getUserDef(a.opRec.opType)` as a THIRD fallback source (before the
+   final hardcoded default) for both `meta.panel` and `meta.sim` — the ORIGINALLY-REGISTERED def, unaffected
+   by the live-editing session's own state, confirmed reliable where `editingDef.panel` was not. Verified via
+   the same scratch debug script before touching the real test: fork's `.panel` correctly reads `'form3d+2d'`
+   post-fix, `zRulerRow: 1`. `hook-carry-1682.spec.js` itself needed NO edit — it was testing the real
+   requirement correctly the whole time.
+   **Worth flagging forward**: this same latent gap plausibly existed since t2257's own ATC fix (no
+   `hook-carry`-style fork test exercises ATC's own gesture, so it was never caught there) — not investigated
+   further this turn (out of scope; found and fixed only because surfacing happens to have a covering test).
+
+### Regression sweep
+
+Full suite run FIVE times across this turn as work progressed (killing stale runs rather than trusting them
+once concurrent edits made their target state wrong, twice): run 1 (Part 1 only) caught nothing, was killed
+mid-Part-2-edit before it could report (target state changed under it); run 2 (Part 2 mechanical pass)
+surfaced the 3 genuine regressions above plus infra-load noise; run 3 (after the devMode.js + 2 test fixes)
+confirmed all 3 addressed. Final, honest count: **2800 passed, 15 flaky, 0 unexpected, 26 skipped** (21.5m).
+Every flaky entry this run is a boot/workspace-init timeout on a spec this turn never touched (`pull-v41-wcs`,
+`wcs-sync-gate-1906`, `save-dialog-declared-1615`'s own third test, …) — passed on retry, matching the
+project's own known parallel-load-timeout pattern, not a code defect.
+
+### Files changed
+
+**Part 1** (committed separately): `web/blocks/dataOps/pocketData.js` (`pocketDataStack`'s `uiChildren`
+built out — 22 `field_ref` placements + `path_anchor` across 5 `grid_container`s, 4 `section`s, `usage_text`,
+`code_preview`; a header doc comment covering the guard-finding and the two design decisions);
+`tests/pocket-form-reproduction-2301.spec.js` (new).
+
+**Part 2** (committed separately): `panel` removed from all 24 `web/blocks/dataOps/*Data.js` files listed
+above (drill, pocket, and the 22 others), each with its own comment explaining the removal and, where
+relevant, the `sim`-added/`layout2d:false`/`WRAP` fix specific to that file; `web/blocks/devMode.js` (the
+`getUserDef` fallback fix in `prepareCandidate`); `tests/cam-substack-save-fork.spec.js` (stale position pin
+updated); `tests/save-dialog-declared-1615.spec.js` (fixture rebuilt on a hand-built stack, corner no longer
+serving as the "declares panel" example).
+
+### Capacity note
+
+Another heavy turn immediately following t2299's own heavy one — Part 2 alone touched 24 files plus a live
+regression in shared authoring code, found and root-caused rather than tested around. Landing here: main
+green, both parts complete and about to commit separately as dispatched. Flagging plainly per standing
+convention.

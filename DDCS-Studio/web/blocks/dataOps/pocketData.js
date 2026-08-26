@@ -447,7 +447,10 @@ function pocketDataStack(defaults) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: same id-collision fix as drillData.js's own comment (its
+            // sim/panel branches share DOM ids), first established for ATC at t2257. Left as-is (no
+            // layout2d:false): pocket has real 2D content via previewGeometry, so sim's default (2D pane
+            // included) is correct.
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Pocket' }, children: [
                 { type: 'usage_text', params: { text: 'Clears a rectangular or circular pocket with an end mill in the active WCS. Drag the handles in the 2D layout (square = place, round = size); the 3D view verifies the cut. Walls are offset inward by the tool radius so the finished pocket matches the size you type. Spindle start + end-of-program come from Settings.' } },

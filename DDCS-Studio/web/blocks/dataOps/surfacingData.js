@@ -235,7 +235,8 @@ export function buildSurfacingTwinStack() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the face-area rect + pos/size handles (previewGeometry)
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             // t2271 (wizards-as-data E2 measurement, PILOT) — the dual stock-attach/path-datum corner picker.
             // surfacing's own static shell (index.html:754) mounts it at prefix "sf_" — copied verbatim, not

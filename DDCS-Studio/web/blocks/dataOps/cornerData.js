@@ -221,7 +221,12 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // a field, never emitted). VIEW family = a blue set (LAYOUT-2D / 3D-SIM / PROJECTED-GCODE read as related views);
     // STRUCTURAL / VARIABLES / FORM / G-CODE each a distinct hue. Palette is easily tweaked (the human can adjust).
     const sec = (title, color, children) => ({ type: 'section', params: { title, color }, children });
-    const panel = { type: 'panel', params: { panel: 'form3d+2d' } };   // B3d: the 3D probe sim + per-pass markers AND the 2D reposition drag canvas
+    // t2301 (BACKLOG 20) — 'panel' removed from the FORM section below: formWidgets.js's `sim` and `panel`
+    // branches hardcode the SAME DOM ids for their own layout2d pane, a real id collision wherever both are
+    // declared anywhere in ONE tree — regardless of which `section` nests them, since traverse() walks the
+    // whole tree into one DOM. `sim` (declared in the 3D-SIM section below) already renders everything panel
+    // did, per t2257's own systemic check (atcChangeData.js). See drillData.js's own t2301 comment for the
+    // fuller mechanism.
     const sim = { type: 'sim', params: { rotary: false, machine: false, magazine: false, probeWcs: true } };   // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock); machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent = no forceMachine.
     const paramGroup = { type: 'param_group', params: { group: 'Corner' }, children: [] };
     const simstarts = simStartsToBlocks(CORNER_SIM_STARTS);   // per-pass preview markers (canonical; SIM only, emit nothing)
@@ -248,7 +253,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     //     `modalPre`/`noSnap`/`mouth`) and the fifth this act's trace found.
     // Reported, not invented: no new block, no placeholder block. See WORK-LOG t1724.
     const uiChildren = [
-        sec('FORM', '#d946ef', [panel, paramGroup]),           // form input — magenta
+        sec('FORM', '#d946ef', [paramGroup]),                  // form input — magenta (panel removed, t2301 — see the const `sim`'s own comment above)
         sec('LAYOUT-2D', '#3b82f6', []),                       // view family — blue
         sec('3D-SIM', '#6366f1', [sim, ...simstarts]),         // view family — indigo
         sec('PROJECTED-GCODE', '#0ea5e9', []),                 // view family — sky

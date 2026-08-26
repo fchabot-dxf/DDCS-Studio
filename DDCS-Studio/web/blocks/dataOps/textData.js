@@ -117,7 +117,10 @@ const TEXT_EXEC_BINDINGS = [
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).
-const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+// t2301 (BACKLOG 20) — dropped from 4 to 3: 'panel' removed from uiChildren below (id-collided with sim's own
+// layout2d pane, see that node's own comment). Exactly the hazard t2257 caught on atcWarmupData.js — a stale
+// hardcoded wrap left after panel's removal breaks every binding — caught here before committing, not after.
+const WRAP_PREFIX_COUNT = 3;   // user_root + sim + param_group
 export const TEXT_BINDINGS = TEXT_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
 export const TEXT_DATA_OPTYPE = 'user_text_data';
@@ -129,7 +132,8 @@ export function textDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // t708 text arc — the 3D engraving trace/carve AND the FeatureCanvas 2D real-letter layout (via filltext.previewGeometry: real letters + pos/rotation handles)
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',

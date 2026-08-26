@@ -37,8 +37,18 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
     test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
     await bootBlocks(page);
-    await page.evaluate(() => window.ddcsLoadBlockStack([]));
-    await page.evaluate(() => window.ddcsEditWizardDef('user_corner_data'));
+    // t2301 (BACKLOG 20) — corner (this test's own original fixture) no longer declares a `panel` block: panel
+    // was removed from EVERY shipped twin's uiChildren (id-collided with sim's own layout2d pane, see
+    // drillData.js's own t2301 comment) — so no registered twin is left to exercise "a stack that declares
+    // panel" against. The DIALOG's own read-the-declaration mechanism is unchanged by that removal (it still
+    // reads whatever `panel`/`sim` blocks a stack happens to carry); a hand-built stack, mirroring this file's
+    // own "BARE stack" fixture below, proves that mechanism directly instead of leaning on a twin that no
+    // longer has anything to lean on.
+    await page.evaluate(() => window.ddcsLoadBlockStack([
+        { type: 'panel', params: { panel: 'form2d' } },
+        { type: 'sim', params: { rotary: true, machine: false, magazine: false } },
+        { type: 'move', params: { mode: 'cut', x: 10, y: 20, z: -3, feed: 500 } },
+    ]));
     await settle(page);
     // What the CANVAS declares — the one source every assertion below compares against.
     const decl = await page.evaluate(async () => {
@@ -49,7 +59,7 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
         const panelBlk = flat.find((b) => b && b.type === 'panel');
         return { panel: panelBlk && panelBlk.params && panelBlk.params.panel, sim: U.simIntentFromStack(op ? op.children : stack) };
     });
-    expect(decl.panel, 'the corner stack really does declare a panel').toBeTruthy();
+    expect(decl.panel, 'the hand-built stack really does declare a panel').toBeTruthy();
     expect(decl.sim, 'and a preview rig').not.toBeUndefined();
 
     await page.click('.blk-dev-savebtn');
@@ -62,7 +72,7 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
     // uneditable — no Panel/Preview-rig label at all in the dialog.
     await expect(page.locator('.blk-dev-savedlg', { hasText: 'Panel' }), 'no Panel row renders — declared, nothing left to say').toHaveCount(0);
     await expect(page.locator('.blk-dev-savedlg', { hasText: 'Preview rig' }), 'no Preview rig row renders').toHaveCount(0);
-    // The NAME is still asked — fill it and save (corner is maintained-as-data → "Save as new" is the path).
+    // The NAME is still asked — fill it and save.
     await page.fill('.blk-dev-savedlg .blk-dev-opname', 'decl reader probe');
     await page.click('.blk-dev-savedlg .blk-dev-save');
     await page.waitForFunction(() => {

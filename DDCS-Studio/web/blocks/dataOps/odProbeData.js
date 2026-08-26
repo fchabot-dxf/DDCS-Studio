@@ -71,8 +71,9 @@ function odProbeDataStack(p = OD_PROBE_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { probeWcs: true } },   // this op PRODUCES the WCS — never render through the table
             // t1301 — WHERE THE OPERATOR PUT THE STYLUS: just outside the bar, a little back along the round and
             // clear of the chuck, which is word for word what this op's prompt asks them to do.

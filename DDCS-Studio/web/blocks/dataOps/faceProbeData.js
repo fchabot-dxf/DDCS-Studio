@@ -69,10 +69,11 @@ function faceProbeDataStack(p = FACE_PROBE_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             // IRON RULE 2, declared to the preview: this op PRODUCES the WCS, so the picture must never be mapped
             // through the declared WCS table — that table describes a previous setup, not the one being measured.
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { probeWcs: true } },
             // t1301 — WHERE THE OPERATOR PUT THE STYLUS. The op's own prompt asks them to jog just clear of the face,
             // so the preview starts there: a negative `out` places it INSIDE the bar's radius (it touches the FACE,

@@ -46,7 +46,15 @@ function cdrillDataStack(p = CDRILL_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED (this twin never had one): id-collision fix, same
+            // as drillData.js's own t2301 comment. Empty params — no existing lathe-cutting-twin precedent to
+            // match (mill's rotary/machine/magazine trio doesn't map to a lathe rig; the two lathe PROBE twins
+            // that already had sim, odProbeData.js/faceProbeData.js, carry probeWcs:true instead, which doesn't
+            // apply here either — this op reads a WCS, it doesn't produce one). The `layout` node below is this
+            // twin's OWN real 2D content (the half-profile canvas) — a separate, currently-unwired node type
+            // (confirmed: 'layout' has no case in formWidgets.js's traverse() switch, falls to the t1561
+            // unwired-placeholder branch), unrelated to sim's own generic layout2d pane either way.
+            { type: 'sim', params: {} },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'param_group', params: { group: 'Centre Drill' }, children: [] },
         ],

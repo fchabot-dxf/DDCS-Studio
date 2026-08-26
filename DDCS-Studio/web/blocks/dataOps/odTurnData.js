@@ -97,7 +97,9 @@ function odDataStack(p = OD_DEFAULTS) {
         params: {},
         uiChildren: [
             // form2d: the form on the left, the half-profile canvas on the right — the pilot's layout
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
+            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
+            { type: 'sim', params: {} },
             { type: 'layout', params: { kind: 'lathe_profile' } },   // the half-profile, not the mill's XY stock
             { type: 'param_group', params: { group: 'OD Turn' }, children: [] },
         ],

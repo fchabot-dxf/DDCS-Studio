@@ -79,7 +79,9 @@ export function alignmentDataStack(params = ALIGNMENT_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane, the same
+            // class t2257 already fixed for the six ATC ops (see gridContainer.js/drillData.js's own t2299/
+            // t2301 comments, and t2257's own atcChangeData.js, for the fuller mechanism).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false, seatStart: true, probeWcs: true } },   // t570 — SEAT the trace/engine start at marker A (AUTO probes A in place) so the drawn path begins at A, not origin; a drag re-seats + re-runs. t714 — machine:false (part-frame probe; the SEAT is the intent, not forceMachine — machine:true was latent-dead)
             { type: 'param_group', params: { group: 'Alignment' }, children: [] },
         ],

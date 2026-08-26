@@ -51,7 +51,9 @@ function facingDataStack(p = FACING_DEFAULTS) {
         uiChildren: [
             // t1281 — form3d+2d: the 3D BAR and the half-profile, both. It was form2d, which is why a lathe
             // wizard had no 3D pane at all — the op could not show the bar because it never declared a place to.
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
+            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
+            { type: 'sim', params: {} },
             { type: 'layout', params: { kind: 'lathe_profile' } },   // t1273 — the half-profile, not the mill's XY stock
             {
                 type: 'param_group',

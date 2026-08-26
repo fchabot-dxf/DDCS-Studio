@@ -54,7 +54,9 @@ function polyDataStack(p = POLY_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },
+            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
+            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
+            { type: 'sim', params: {} },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'param_group', params: { group: 'Polygon' }, children: [] },
         ],

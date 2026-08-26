@@ -79,7 +79,14 @@ export function commDataStack(params = SUPERSET_PARAMS) {
     return [{
         type: 'user_root', params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'commscreen' } },   // the DDCS-screen preview panel (generateScreenPreview)
+            // t2301 (BACKLOG 20) — uiChildren's 'panel' NODE removed: id-collided with sim's own layout2d pane
+            // (see drillData.js's own t2301 comment for the mechanism, first fixed for ATC at t2257). This is
+            // NOT the live comm-screen preview (generateScreenPreview) — that reads the SEPARATE 'commscreen'
+            // argument on the userOpFromStack(...) call below, untouched here; confirmed by reading
+            // userOpView.js:768's own live consumer before editing, not assumed. layout2d:false ADDED (unlike
+            // drill/pocket): comm is popup/status/input/beep/dwell — no physical motion/geometry ever, so a 2D
+            // layout pane would be permanently empty, the same reasoning wcsData.js's own comment gives.
+            { type: 'sim', params: { layout2d: false } },
             { type: 'param_group', params: { group: 'Communication' }, children: [] },
         ],
         children: exec,

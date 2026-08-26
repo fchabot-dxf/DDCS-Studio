@@ -875,6 +875,17 @@ function prepareCandidate(a) {
     // workspace is not the wizard being edited, even while _editingWizard is still set.
     const editingDef = (_editingWizard && a.opRec.opType === _editingWizard) ? listUserOps().find((d) => d.opType === _editingWizard) : null;
     const lockUpdate = isMaintainedAsData(editingDef);   // a maintained-as-data def refuses the visual Update (see isMaintainedAsData)
+    // t2301 — a THIRD source for the source op's own declared panel type, found live: Customize-ing a BUILT-IN
+    // (not a previously user-saved wizard) leaves `editingDef` correctly scoped but its own `.panel` can read back
+    // undefined here (the live-editing session's own def re-resolution, separate from registration) — previously
+    // masked because every twin ALSO carried a `panel` block in its template, so `blkPanel` (the workspace scan
+    // just above) always won first. Once BACKLOG 20 removed that block (t2257 for ATC, t2301 for the rest),
+    // `blkPanel` is null for every one of them and this fallback chain's SECOND link was the only thing standing
+    // between the real panel type and the hardcoded default — caught by hook-carry-1682.spec.js's own fork
+    // gesture on surfacing (form3d+2d silently became form3d, losing the 2D pane the depth ruler mounts beside).
+    // `getUserDef` is the ORIGINALLY-REGISTERED def, by the op's own opType, unaffected by the live-editing
+    // session's own state — confirmed reliable where `editingDef.panel` was not.
+    const registeredDef = getUserDef(a.opRec.opType);
 
     // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
     // has one to form2d, else the feature is silently hidden behind the form3d default. Still a DECLARATION: a `panel`
@@ -885,8 +896,8 @@ function prepareCandidate(a) {
         ok: true, a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate,
         meta: {
             name: editingDef ? (editingDef.label || '') : '',
-            panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
-            sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
+            panel: blkPanel || (editingDef && editingDef.panel) || (registeredDef && registeredDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
+            sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || (registeredDef && registeredDef.sim) || null),
             // t1615 — the STACK's own declarations (a panel block / a sim block): when present the dialog does not
             // ask, it shows them read-only and commits them. Blocks always win; a bare stack falls back to asking.
             declPanel: blkPanel,
