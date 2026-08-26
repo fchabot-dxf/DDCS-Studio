@@ -86,6 +86,23 @@ boot — read it fresh.)*
 ⚠ **Fairy's own editor setup is UNCONFIRMED** — this section is written from Ranchy. If it differs there,
 correct it here rather than keeping a second copy.
 
+## ⚠ WHAT THE TOOL ACTUALLY AUTO-LOADS — measured, not assumed
+
+**Tested 2026-08-25** with a canary line in `AGENTS.md` and a fresh session asked, *without reading or
+searching anything*, which files were already in its context:
+
+```
+CLAUDE.md    ✅ auto-loaded          (root, and it walks up from a subdirectory)
+AGENTS.md    ⛔ NOT auto-loaded      — the canary never arrived
+```
+
+⇒ ⚠ **`AGENTS.md` is the repo's canonical, tool-neutral entry point AND it has no delivery mechanism.** It
+holds the rules that exist *"because breaking it has already cost real time or shipped a real bug"* — and a
+seat only sees them if something points there. `CLAUDE.md` now does, at the top.
+
+⭐ **Which is why content stays out of the branded file**: `CLAUDE.md` is a LOADER, not a home. The substance
+lives in `AGENTS.md` and `context/`, so another tool, another agent, or a human loses nothing by ignoring it.
+
 ## VOCABULARY
 
 - **Fairy** / CNC Fairy · **Ranchy** = RenderRanchy · **the studio** = the owner's **artist studio**, where the CNC is

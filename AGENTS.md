@@ -1,17 +1,5 @@
 # AGENTS.md — read this before changing anything
 
-<!-- AUTOLOAD-CANARY-K9V2 -- temporary, see below -->
-> ⚠ **AUTOLOAD TEST — placed 2026-08-25, delete once answered.**
->
-> **If you are an agent and this text is already in your context WITHOUT you having opened `AGENTS.md`
-> yourself, say exactly:** `AGENTS-AUTOLOAD-CONFIRMED-K9V2`
->
-> ⛔ If you are only seeing it because you read the file, say nothing — that proves nothing.
->
-> *Why: we do not know whether this tool auto-loads `AGENTS.md` the way it auto-loads `CLAUDE.md`. It
-> matters, because if it does, the substance belongs here (tool-neutral, already the repo's canonical entry
-> point) and `CLAUDE.md` can shrink to a stub. Record the answer in `context/SEATS.md` and delete this block.*
-
 
 **For every agent and every human working in this repo**, whichever tool you are using — Claude,
 Antigravity, an IDE, or a plain terminal. These are not preferences. Each one is here because

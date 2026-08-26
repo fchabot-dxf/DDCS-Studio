@@ -4,6 +4,19 @@
 surfaces on its own — repo documents have no delivery mechanism, and this is the one file every seat loads
 automatically. So it stays **thin**: pointers, plus the few things that must be read every single time.
 
+## ⛔ FIRST: READ [`AGENTS.md`](AGENTS.md)
+
+**It holds the rules**, and its own header says why: *"Each one is here because breaking it has already cost
+real time or shipped a real bug."*
+
+⚠⚠ **It is NOT auto-loaded — MEASURED, 2026-08-25.** A fresh session at the repo root was asked, without
+reading or searching anything, which files were already in its context. `AGENTS.md` was not among them. Only
+`CLAUDE.md` is delivered automatically.
+
+⇒ **So the repo's canonical rules file reaches nobody unless someone opens it**, and this line is the only
+thing that makes that happen. ⭐ That is the same defect `MEMORY-PROTOCOL.md` §1 names: a repo document has no
+delivery mechanism. **Open it now.**
+
 ## THE CONTEXT FILES — the operating context, shared by every seat
 
 | file | answers |
