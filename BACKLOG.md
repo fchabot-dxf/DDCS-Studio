@@ -2187,3 +2187,31 @@ evidence of a ceiling.**
 
 ⛔ **Still needs a ruling, and still not something to "just try"** — the failure mode is a CAM entry the
 controller does not surface, on a machine in production.
+
+---
+
+### 30. THE PULL OVERWRITES THE USER'S DECLARED ENVELOPE — it should not derive one at all
+
+⭐⭐ **OWNER RULING, 2026-08-26: *"let users manage their envelope themselves, stop trying to babysit."***
+
+⇒ **The envelope is the USER'S.** Studio must not infer it, correct it, or overwrite it from a pull.
+
+**What to do:** `ui/settingsPanel.js:2283-2288` overwrites `m.x`/`m.y`/`m.z` from `p.geometry.travel` on every
+profile pull. **Stop writing the envelope.** Keep mirroring the soft-limits **flag** (`#655`) — that is a real
+controller state and the checkbox already says Studio never writes it — but the travel numbers stay whatever
+the user typed.
+
+⚠ **This is why it matters, so nobody re-derives it:** `far_reach()` (`bridge/bridge-app/fairy/ops.py`) treats
+the non-sentinel end of a one-sided soft limit as the axis's far reach. On this machine Z travels NEGATIVE and
+the only fenced end is `#168 = +1` (a correct fence on the UP direction), so the pull derives **Z travel =
+1 mm** and the `> 0` guard passes it straight through. The declared 150 mm envelope is replaced with 1 mm,
+the sim box becomes 1 mm tall, and envelope checks flag ordinary moves.
+
+⛔ **Do NOT "fix" this by teaching `far_reach()` about larger magnitudes.** ⭐ A soft limit is a POLICY (what
+the controller refuses); an envelope is a FACT (how far the machine goes). They coincide only when limits are
+set generously on every axis, and the owner has deliberately left `Z−` unset because its correct value changes
+per job. **Deriving the fact from the policy is the category error — deleting the derivation is the fix.**
+
+⭐ The rest of the app already gets this right: the settings panel keeps `machine:{x,y,z}` (the envelope) and
+`softLimits` (the policy) as separate things, and its own tooltip says Studio never writes `#655`. **Only the
+pull violates the model.**
