@@ -1518,3 +1518,51 @@ measurement, not a blind instrument. And it establishes the pattern for every fu
 ⛔ Worth preferring over reading the pendant: the message box sits over the Z row for exactly the window in
 which a modal offset is live, and `M30` resets the selection before the dialog clears — which is why three
 earlier attempts at this question came back ambiguous.
+
+### 24. ⭐⭐ WHO USES THE H TABLE, THEN? — the V4.1's ATC does, the Expert's does not
+*(Owner's question: "so other users might use it though right, its for atc?" Answered from the vendor's own
+macros rather than reasoning, and the answer differs per controller — which is the whole point of this folder.)*
+
+| | how a tool length offset is STORED | how it is APPLIED |
+|---|---|---|
+| **Expert M350** | native tool table `#1430+` = `setting[930+]`, written by the probe | ⭐ **unconditionally** — no `G43`, no `H` word (§15) |
+| **V4.1** | ⭐ **the H table** `#764+` = `eng #264+` "H01 tool length" | ⭐ **`G43 H#17`** — the vendor's own factory M6 |
+
+**The V4.1's factory `M6`, extracted from the manufacturer dump** (`FACTORY_MACROS['ddcs-v41']`):
+```gcode
+IF#1405==0GOTO3
+G0G53Z#1302
+G0G53X#1300Y#1301
+MarcoDialog "M6.rc"
+G43H#17                        <- applies the offset through G43/H
+...
+#[764+#1824-1]=#[1560+#1824]   <- writes the probed result INTO the H table
+```
+`#764` is the V4.1's H01: its `eng` names `#264` "H01 tool length", and `#264 + 500 = #764` by the same macro
+rule as everywhere else (§11). ⇒ **On a V4.1 the probe result lands in the H table and is applied by `G43`.
+On the Expert it lands in the native tool table and is applied always.** `[CONFIRMED — vendor macro + eng]`
+
+⇒ **So yes, `G43`/`H` is a real, used mechanism** — just not this controller's. The Expert implements it
+correctly (§21) and simply does not use it for its own ATC. Anyone posting Fanuc-style G-code, or coming from
+a V4.1, will exercise it.
+
+### 25. ⛔⛔ THE DOUBLE-OFFSET HAZARD — the one that IS real on the Expert
+§17's posted-program alarm was withdrawn (§22). **This is the hazard that survives, and it is sharper:**
+
+On the Expert the three terms **stack** (§15) — and the tool-table term is applied whether you ask for it or
+not. So a program that ALSO carries `G43 H<n>`, with a value in the H table, applies the tool length **twice**:
+
+```
+work Z = machine Z − ( WCS Z  +  tool-table Z  +  H offset )
+                                 ^ probe-written    ^ posted G43
+                                 always on          added on top
+```
+That is exactly the `−104.844 → −94.844` measured in §21: the H term added to a tool-table term that was
+already there. ⚠ **A V4.1 user's habits, or a Fanuc-style post, would produce precisely this** — and on a
+machine where **G54 Z0 = the spoilboard is SACRED**, a doubled tool length is a tool into the table.
+
+⇒ ⛔ **On an Expert, use ONE mechanism, never both.** The native tool table is the one the probe and the ATC
+workflow already use, so the H table stays at zero. `[app-side: Studio must not emit G43/H for an Expert
+profile — RENDERRANCHY's call, flagged not built]`
+⭐ Note Studio does not emit `G43` today: the only occurrence in `web/` is inside the V4.1's *extracted vendor*
+macro, never in an emit path.
