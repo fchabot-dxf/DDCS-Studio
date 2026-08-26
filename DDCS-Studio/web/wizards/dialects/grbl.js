@@ -11,6 +11,8 @@
  * G43.1/G49, G10 L2/L20; M0 M1 M2 M30 M3 M4 M5 M7 M8 M9. `g53NeedsVar:false` → G53 takes a literal (cuttingBlocks).
  * grblHAL (with SD O-word flow) is the `rs274ngc` post instead; this is plain grbl.
  */
+import { stripCommentParens } from '../ops/comment.js';   // t2291 (BACKLOG #22) — hmiToast's msg is user-typed operator-message text; ONE declared "safe inside ( )" rule, not a hand-rolled one here
+
 const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
 export const dialect = {
@@ -49,7 +51,7 @@ export const dialect = {
     spindleOff: () => ['M5'],
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 also supported)
     hmiPrompt: () => [],            // [] — no blocking prompt (host UI)
-    hmiToast: (msg) => [`(${msg})`],   // grbl ignores ( ) comments; host may surface them
+    hmiToast: (msg) => [`(${stripCommentParens(msg)})`],   // grbl ignores ( ) comments; host may surface them. t2291 (BACKLOG #22) — msg is user-typed operator-message text; a `)` in it would close the comment early
     hmiInput: () => [],
 
     // recognize(line): grbl-specific emit is just probe / WCS / message (no #var or flow lines to fold back).

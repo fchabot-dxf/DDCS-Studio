@@ -17,9 +17,24 @@
  * were confirmed emitting (this same turn) — removing the palette entry first would have left a window with
  * no way to add a comment at all.
  */
+/**
+ * t2291 (BACKLOG #22) — THE ONE declared "make text safe inside a G-code paren comment" rule, so `emit` below and
+ * every OTHER site that interpolates text into `( … )` (atcInterpreter.js's inline tool-change header,
+ * dialects/grbl.js's hmiToast, editorManager.js's exported-program title) share ONE implementation instead of
+ * four independently hand-rolled ones — a `)` in the text closes the comment early and the remainder becomes
+ * live G-code, on every one of those paths identically.
+ *
+ * MEASURED, not assumed (`bridge/controllers/COMMENT-CHARACTERS.md`, derived from 2,248 real vendor comments
+ * across 3 DDCS controllers + 4,656 LinuxCNC ones): the governing constraint is NESTING, not the character set —
+ * no vendor dialect ever nests parens, so stripping them is the correct, sufficient treatment. Do NOT extend
+ * this to `[` `]` `#` (that document rules them OUT — they read as expressions/variables at the controller) or
+ * to `%` (flagged context-dependent) without new, equally measured evidence.
+ */
+export const stripCommentParens = (text) => String(text ?? '').replace(/[()]/g, '');
+
 export const commentBlock = {
     type: 'comment', label: 'Comment', kind: 'leaf', category: 'Mark Up', hidden: true,
     defaults: { text: 'note' },
     fields: ['text'],
-    emit: (p) => [`( ${String(p.text ?? '').replace(/[()]/g, '')} )`],   // strip parens so the comment can't break the file
+    emit: (p) => [`( ${stripCommentParens(p.text)} )`],   // t2291 — the rule now lives in ONE place (stripCommentParens); this call's own OUTPUT is unchanged (same regex, same String(x ?? '') coercion) — a refactor to one source, not a behaviour change, per the owner's own ruling that this emitter stays as it is
 };

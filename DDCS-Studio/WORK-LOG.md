@@ -56669,3 +56669,125 @@ overlap) — pre-existing test-infra noise, none touching this turn's files (`st
   `KNOWN_LEAF_RECORD_FIELDS` literal.
 - `ARCHITECTURE.md` — 3 line-number citations corrected (registries table, INV1, INV2).
 - Verification scripts in gitignored `scratchpad/t2289-*.mjs` (kept, not committed).
+
+## t2291 — PART 1 GATED OUT AT STEP 1 (real finding, nothing built) + PART 2 BUILT (BACKLOG #22). Two commits.
+
+### PART 1 — THE GATE: `drill` is NOT fully expressible via declared `uiChildren`. STOPPED per the dispatch's own explicit instruction.
+
+**The claim under test:** t2267's own survey inferred `drill` should now reproduce cleanly (its listed frontier
+items — `usage_text`, the Path Anchor picker, conditional sub-panels, `form_action_btn` — are all ✅ in shells
+`drill` isn't one of). The dispatch itself flagged this as an INFERENCE, not an observation, and asked for it
+to be established by actually reading the shell. It does not hold.
+
+**What I read, OBSERVED (not inferred):**
+- `web/index.html:326-433` — `#wiz_drill`'s full hardcoded shell, both halves (`.wiz-visual` + `.wiz-controls`).
+- `web/blocks/dataOps/drillData.js` in full — `DRILL_BINDING_SPECS` (27 bindings total, including the separate
+  `MATERIAL_BINDING`) and `drillDataStack`'s own `uiChildren` (currently `[panel, sim, param_group{children:[]}]`).
+- `web/ui/formWidgets.js:1290-1520` — `renderUiTree`'s full `traverse()` switch (every node type it handles:
+  `split_horizontal`/`split_vertical`, `section`, `formfield`/`param_field`, `sim`, `panel`, `code_preview`,
+  `usage_text`, `path_anchor`, `param_group`, `group_box`, `grid_container`, `tab_group`) and `renderOpForm`'s
+  own auto-sectioning (`sectionOf`, a hardcoded `SECTION_RANK`, a row-count/section-count fold threshold).
+- `web/wizards/views/userOpView.js:106-122, 341-391` — `hasTreeLayout()` (only a `split_horizontal`/
+  `split_vertical` node anywhere in `uiChildren` flips a twin into tree mode) and `render()`'s own branch on it.
+- `web/blocks/dataOps/atcCheckData.js` — the t2269/t2263 "pilot," read to confirm the reproduction PATTERN.
+
+**GAP FOUND, and it is a coverage gap, not a vocabulary gap — a genuinely different, more fundamental class
+than what t2267's survey measured.** `DRILL_BINDING_SPECS` has NO binding at all (confirmed by listing every
+`param:` key in the file — 27 entries, exhaustively) for: **`method`** (the PECK/BORE dropdown itself),
+**`holeDia`** (Hole Ø), **`clearance`** (Clearance Z — explicitly documented in the file's own header as
+"held at its default" — frontier #3, already known before this turn), and the entire bore-only sub-form
+**`toolDia`/`pitch`/`ramp`**. The file's OWN doc comment already names two of these as open frontier items
+(`method`/`clearance`) — this isn't a new discovery so much as a pre-existing, already-written-down limit that
+t2267's own survey didn't cross-reference against this specific file before concluding `drill` was clear.
+
+**Why this actually gates, not just "some fields missing":** a `formfield` node can only place a row that
+`byParam[paramName]` already has — and `byParam` is built from `DRILL_BINDING_SPECS` itself. There is no
+declared NODE that could express these fields even in principle; the param was never wired to a socket at
+all. Reproducing the METHOD section, and the bore/helical half of the form the METHOD dropdown gates, is not
+possible without a binding to hang a `formfield` on — a vocabulary gap I could work around by naming it; this
+is a wiring gap I cannot.
+
+**Two smaller, noted-not-gating observations** (filed, not fixed, per Step 2's own "you WILL see things worth
+improving — file them" instruction, even though Step 2 was never reached):
+- The `d_tool` library-picker (a fire-once "apply Ø/feed/rpm to other fields" convenience, not itself a stored
+  param) has no declared node OR binding pattern that covers it — unclear whether it's in the arc's scope at
+  all, since it isn't really a form FIELD in the sense the other 26 are.
+- The `section` node type (`traverse()`) always renders a COLLAPSIBLE `.form-sec` with a fold chevron;
+  `#wiz_drill`'s own `<span class="section-label">…</span>` headers are bare, non-interactive, never fold.
+  `group_box{collapsible:false}` gets closer (no chevron) but still wraps in a `.form-sec`/`.form-sec-title`
+  shell, not a bare span. This wouldn't have failed Step 3's own comparison axis (field set/order/labels), so
+  it's a cosmetic divergence worth a name, not a gate by itself — recorded here in case a future attempt
+  reaches Step 2 and needs it.
+
+**STOPPED. Nothing built for Part 1** — no `uiChildren` tree, no reproduction test, per the dispatch's own
+explicit instruction ("Any gap ⇒ STOP, report it, build nothing... do not stub it, do not pick a different
+shell"). Closing this gap (binding `method`/`holeDia`/`clearance`/`toolDia`/`pitch`/`ramp`) is real, scoped,
+separate work — likely non-trivial for `method` specifically, since `instantiate()` substitutes VALUES, never
+a block TYPE, and `method==='helical'` currently makes `drillStack` build a structurally different `bore`
+child (own doc comment, `drillData.js:25-26`) — this is Stage 5's own "REMAINING FRONTIER," not a quick add.
+
+### PART 2 — BACKLOG #22, built: paren-comment injection, one declared rule instead of five hand-rolled ones
+
+Three sites named + two more found by the dispatch's own prescribed verification search, all fixed the same
+way: `wizards/atcInterpreter.js` (both the `body` and standalone tool-change headers), `wizards/dialects/
+grbl.js`'s `hmiToast`, `ui/editorManager.js`'s exported-program title (which already had its OWN hand-rolled,
+slightly different fix for this exact bug class — `917f8856`, the ROADMAP-documented `g90_absolute.nc` fix —
+now the fourth thing this rule was implemented four separate times as, not three).
+
+**Found two more of the SAME function during the dispatch's own prescribed search** (`grep` for a
+backtick-paren-dollar-brace interpolation): `wizards/dialects/ddcs-expert-m350.js` and `wizards/dialects/
+rs274ngc.js` both have their OWN `hmiToast(msg) => [...(${msg})...]` — literally the same function name,
+same risk (user-typed operator-message text), same fix, on TWO MORE dialects — one of them the reference-anchor
+Expert/M350 target this whole project centers on. Fixed both, staying within the same bounded scope as the
+named sites (same function across dialect siblings) — NOT extended further to `hmiPrompt`/`hmiInput` (both
+dialects have the identical `(${msg})`/`(${prompt})` pattern too) or the many other paren-wrapped interpolations
+the broad grep also turned up (`wizards/ops/hmi.js`, `cnc.js`, etc.) — those interpolate mostly app-authored,
+closed-enum, or numeric text (dialect names, computed labels), a different and much lower-risk class, and
+fixing them would be real scope creep beyond what was asked. **Named here as a real, adjacent, NOT-fixed
+finding** (`hmiPrompt`/`hmiInput` specifically, both dialects) — worth its own small backlog item, not built.
+
+**`wizards/ops/comment.js` — the ONE exported helper**, `stripCommentParens(text)`, factored out of
+`commentBlock.emit`'s own existing regex (`String(text ?? '').replace(/[()]/g, '')`) — same string in, same
+string out, confirmed by re-reading the diff: the ONLY change to `emit` itself is calling the extracted
+function instead of inlining the regex. Verified live (not just by inspection):
+`m.commentBlock.emit({text:'note)( M30 ; bad'})` → `["( note M30 ; bad )"]`, matching the pre-existing shape
+exactly, parens gone, nothing else touched.
+
+**Every fixed site verified live**, not just read: fed each a message containing `)( M30 ; malicious` and
+confirmed the emitted line never re-opens as live G-code —
+`ddcs-expert-m350`: `#1505=-5000(tool broken M30 ; malicious)`; `grbl`: `(tool broken M30 ; malicious)`;
+`rs274ngc`: `(MSG,tool broken M30 ; malicious)`; `atcInterpreter` (both the inlined-body and standalone-macro
+branches) similarly clean. The dispatch's own "STILL REAL IF" search (backtick-paren-dollar-brace) re-run
+after the fix returns only the two DELIBERATELY-untouched `hmiPrompt` sites (named above) plus
+`editorManager.js`'s own `` `(${title})` `` — which is safe: `title` has already been through
+`stripCommentParens` several lines earlier at that point, unchanged from before this turn's edit.
+
+**`editorManager.js`'s own additional whitespace-collapse is preserved, deliberately, not folded into the
+shared helper.** Its OLD code replaced each paren with a SPACE (word-separating) then collapsed repeats;
+`stripCommentParens` removes to EMPTY (no separator). For the realistic input this code's own comment names
+(`G90 ( absolute )`, spaces already flanking the parens) both produce the IDENTICAL result — verified live:
+`"G90 absolute"` either way. For a purely theoretical adjacent-no-space input (`G90(absolute)`, never
+observed in this codebase's actual titles), the result now differs (`"G90absolute"` vs the old `"G90
+absolute"`) — noted honestly rather than claimed byte-identical for a case it isn't; the full suite is the
+check for whether any real fixture exercises it.
+
+### Regression sweep — genuinely green
+
+Node tier: 228/228. Full suite (`npm test`) — touches 5 dialect files + `comment.js` + `atcInterpreter.js` +
+`editorManager.js`, all shared/heavily-tested surfaces. e2e tier: **2796 passed, 13 flaky, 0 unexpected, 26
+skipped** (~26.5 min). `unexpected` is zero — including no fallout from `editorManager.js`'s own
+whitespace-behavior note above: no existing fixture exercises the theoretical no-space-adjacent-parens title
+case, so that honest caveat stays theoretical, not a live regression. The flaky set is pre-existing noise, none
+touching this turn's files.
+
+### Files changed (Part 2 only — Part 1 built nothing, commits kept separate per the dispatch's own instruction)
+
+- `DDCS-Studio/web/wizards/ops/comment.js` — new exported `stripCommentParens(text)`; `emit` now calls it
+  (output unchanged).
+- `DDCS-Studio/web/wizards/atcInterpreter.js` — both tool-change header lines wrapped.
+- `DDCS-Studio/web/wizards/dialects/grbl.js` — `hmiToast` wrapped (the dispatch's own named site).
+- `DDCS-Studio/web/wizards/dialects/ddcs-expert-m350.js` — `hmiToast` wrapped (found via the dispatch's own
+  verification search, same function/risk as the named grbl site).
+- `DDCS-Studio/web/wizards/dialects/rs274ngc.js` — `hmiToast` wrapped (same).
+- `DDCS-Studio/web/ui/editorManager.js` — title derivation now calls the shared helper; own whitespace-collapse
+  preserved as a separate, subsequent step.

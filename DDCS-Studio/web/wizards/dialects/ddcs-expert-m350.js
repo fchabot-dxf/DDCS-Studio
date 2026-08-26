@@ -5,6 +5,8 @@
  * (tools/appcode/{words,snippets}.nc + assets/capture/.../SYSDISK/slib-*.nc + CNCDISK/*.nc). See SCHEMA.md
  * for the contract; other dialects mirror this exact shape. file:line citations inline where non-obvious.
  */
+import { stripCommentParens } from '../ops/comment.js';   // t2291 (BACKLOG #22) — hmiToast's msg is user-typed operator-message text; ONE declared "safe inside ( )" rule, not a hand-rolled one here
+
 const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
 export const dialect = {
@@ -154,7 +156,7 @@ export const dialect = {
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 not present in dump)
     hmiPrompt: (msg, mode = 1) => [`#1505=${mode}(${msg})`],   // blocking dialog; #1505=<mode> 1=OK/Cancel, 3=binary (appcode/communicationWizard.nc:7,15); ESC sets #1505=0
     hmiCancelVar: '#1505',                        // the prompt's cancel signal — ESC sets it to 0 (confirmBlock bails on it)
-    hmiToast: (msg) => [`#1505=-5000(${msg})`],   // display-only banner
+    hmiToast: (msg) => [`#1505=-5000(${stripCommentParens(msg)})`],   // display-only banner. t2291 (BACKLOG #22) — msg is user-typed operator-message text; a `)` in it would close the comment early and the remainder becomes live G-code
     hmiInput: (varName, prompt) => [`#2070=${String(varName).replace('#', '')}(${prompt})`],   // blocking numeric input
     // hmiStatus — the status-bar idiom (comm's status arm): #2039 colour set (BGR) + #1503=<mode>(<line>) + #2039 restore + an
     // optional visibility dwell. Byte-identical to comm's old assign/RAW sequence. Off-HMI posts have no hmiStatus → the atom

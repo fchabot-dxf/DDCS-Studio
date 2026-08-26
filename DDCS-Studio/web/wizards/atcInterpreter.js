@@ -10,6 +10,7 @@
  * shipped presets keep their existing played-inline sim (byte + sim identical); the interpreter drives NEW combos only.
  */
 import { num } from './ops/util.js';
+import { stripCommentParens } from './ops/comment.js';   // t2291 (BACKLOG #22) — combo.gripKind/motionKind are APP-declared today, but a raw `)` inside would close the comment early and the remainder becomes live G-code; ONE declared rule, not a hand-rolled one here
 
 const r = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
 
@@ -117,9 +118,9 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     const body = !!opts.body;   // INC-B2: emit the executable BODY only (no O-header, no trailing M99) for inlining
     const L = []; const w = (s) => L.push(s);
     if (body) {
-        w(`(${combo.gripKind} x ${combo.motionKind} tool-change - INLINED from your ATC config; codes from Settings -> ATC I/O)`);
+        w(`(${stripCommentParens(`${combo.gripKind} x ${combo.motionKind} tool-change - INLINED from your ATC config; codes from Settings -> ATC I/O`)})`);
     } else {
-        w(`O${oNum} (${combo.gripKind} x ${combo.motionKind} tool-change macro - DDCS Studio)`);
+        w(`O${oNum} (${stripCommentParens(`${combo.gripKind} x ${combo.motionKind} tool-change macro - DDCS Studio`)})`);
         w('(GENERATED from the composable ATC config - review every line + dry-run before cutting. NOT validated on a live ATC.)');
         w(`(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  ${mag.length} docks)`);
     }

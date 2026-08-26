@@ -9,6 +9,8 @@
  *   bridge/controllers/linuxcnc/assets/linuxcnc-src/nc_files/  (gridprobe.ngc, macros/lathe/probe-hole.ngc)
  * file:line citations inline. THE KEY STRUCTURAL DIFFERENCE: flow is STRUCTURED O-WORDS, not IF…GOTO (see notes).
  */
+import { stripCommentParens } from '../ops/comment.js';   // t2291 (BACKLOG #22) — hmiToast's msg is user-typed operator-message text; ONE declared "safe inside ( )" rule, not a hand-rolled one here
+
 const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
 // GOTO-to-label SKIPS the guarded body; the equivalent O-word `if` RUNS its body — so ifGoto maps to an
@@ -61,7 +63,7 @@ export const dialect = {
     spindleOff: () => ['M5'],
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 also standard)
     hmiPrompt: (msg) => [`(MSG,${msg})`, 'M0'],   // operator confirm = on-screen message + M0 program pause (resume on Cycle Start); no cancel signal
-    hmiToast: (msg) => [`(MSG,${msg})`],   // operator-message comment (probe-hole.ngc:84 uses (debug,…))
+    hmiToast: (msg) => [`(MSG,${stripCommentParens(msg)})`],   // operator-message comment (probe-hole.ngc:84 uses (debug,…)). t2291 (BACKLOG #22) — msg is user-typed operator-message text; a `)` in it would close the comment early
     hmiInput: () => [],    // [] — no blocking numeric input in stream mode
 
     // recognize(line): parse inverse of the RS274NGC-specific emit. Flow is STRUCTURED O-WORDS: ifGoto emits

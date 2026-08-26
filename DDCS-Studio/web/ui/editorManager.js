@@ -8,6 +8,7 @@ import { SNIPPETS } from '../data/snippets.js';
 import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clean export title from the op model (fixes g90_absolute.nc)
 import { confirmDestructiveLoad } from '../blocks/saveStates.js';   // t1938 — the ONE destructive-load seam Clear routes through
 import { flattenOps } from '../blocks/programModel.js';   // t1978 — the one declared op enumeration
+import { stripCommentParens } from '../wizards/ops/comment.js';   // t2291 (BACKLOG #22) — the ONE declared "safe inside ( )" rule, not a hand-rolled one here
 
 export class EditorManager {
     constructor() {
@@ -233,7 +234,10 @@ export class EditorManager {
         // A G-code comment cannot contain parentheses — DDCS flags a nested ( … ( … ) ) as
         // "Unrecognized characters:L1[]" and refuses the line. The title is wrapped in (…) below and
         // may have been taken from a raw code line like `G90 ( absolute )`, so strip any parens first.
-        title = title.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim() || 'Program';
+        // t2291 (BACKLOG #22) — stripCommentParens is the ONE declared rule (comment.js), reused here rather
+        // than hand-rolled; the whitespace-collapse stays local (cosmetic title cleanup, not part of the shared
+        // "safe inside a paren comment" contract, which only ever removed parens — never inserted a separator).
+        title = stripCommentParens(title).replace(/\s+/g, ' ').trim() || 'Program';
 
         // Body: emit self-describing op markers ( @DDCS:1 {…} ) when the editor matches the model (a clean,
         // model-tracked program). If it's been hand-edited beyond the model, export the raw text as-is.
