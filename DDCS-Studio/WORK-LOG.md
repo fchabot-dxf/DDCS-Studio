@@ -58008,3 +58008,76 @@ flaky entry is a spec this turn never touched.
 - `web/wizards/ops/layout.js` — `'360px:*'` added to both split blocks' `ratio` dropdown (additive).
 - `tests/split-node-ratio-2311.spec.js` (new) — proportional backward-compat, the new fixed+fill behavior,
   and the LEFT/RIGHT ordering control. Proven non-vacuous.
+
+## t2313 — THE FLIP, retry: GATE PASSED on layout, then FAILED on a THIRD dormant bug — STOPPED before
+committing. No code changed; drillData.js was edited, gate-checked, found broken, and reverted to HEAD.
+
+### THE LAYOUT GATE — PASSED, OBSERVED live, not assumed from t2311's own tests
+
+Before touching `drillData.js`, built the proposed wrap in memory (`scratchpad/t2313-flip-gate-check.mjs`,
+not kept) and rendered it through the REAL `renderUiTree` with a REAL `byParam` built the same way
+`drill-form-reproduction-2299.spec.js` already does (`formBindings(def)` + `renderOpForm` into a scratch
+host), then measured it side-by-side against the REAL `#wiz_drill` shell (`window.openWiz('drill')`) on the
+same page:
+
+```
+                  SHELL (#wiz_drill)     WRAPPED TREE (split_horizontal, ratio '360px:*')
+controls width    360px                  360px            <- EXACT MATCH
+controls left-of visual                  yes                                 <- MATCH
+visual width      fills remaining        fills remaining (1024px of a 1400px host)  <- MATCH (behavior, not px — different host widths)
+fields in pane    (n/a)                  28, all landing inside the controls pane
+```
+
+Fixed pane width matches exactly; fill behavior matches; LEFT/RIGHT ordering matches. This gate PASSED —
+the layout question t2309 raised and t2311 answered is genuinely closed.
+
+### THE EDIT — applied, then immediately broke module load
+
+Wrapped drill's two uiChildren nodes in `split_horizontal` (`ratio:'360px:*'`, `children:{LEFT:[param_group],
+RIGHT:[sim]}`), matching the gate-checked shape exactly. Ran the existing `drill-form-reproduction-2299.spec.js`
+immediately after (per "GATE AGAIN... before building, confirm... If anything still differs structurally,
+STOP AND REPORT") — all 3 tests failed:
+
+```
+TypeError: (blocks || []) is not iterable
+    at flattenBlocks (userOps.js:105:29)
+    at flattenBlocks (userOps.js:112:25)          <- if (b.children) flattenBlocks(b.children, out, g)
+    at deriveBindingsFor (dataOps/deriveBindings.js:116:27)
+    at drillData.js:311:31                         <- export const DRILL_BINDINGS = deriveBindingsFor(...)
+```
+
+`flattenBlocks` (userOps.js:104) does `for (const b of (blocks || []))` — a plain-array assumption. The
+split node's `children` is `{LEFT:[...], RIGHT:[...]}`, an OBJECT — `for...of` on a plain object throws.
+This fires at MODULE LOAD TIME (`DRILL_BINDINGS` is computed as a top-level `export const`, drillData.js:297),
+so the entire module fails to evaluate — not a rendering nuance, a hard crash. The reproduction test's OWN
+2nd assertion (`window.openWiz is not a function`) confirms the blast radius reaches past drill's own twin:
+with the edit applied, a global the rest of the app depends on was UNDEFINED, meaning some import chain
+upstream of app boot itself failed to complete. Reverted (`git checkout HEAD -- drillData.js`) and re-ran the
+same spec clean (3/3 passed, `openWiz` present) — confirming the crash is caused by the edit, not pre-existing.
+
+### WHY THIS IS A THIRD DORMANT BUG, not the two named ones — and why it's not patched here
+
+Neither t2293/BACKLOG #21 (pathAnchorField's id lookup) nor t2301/BACKLOG #20 (sim/panel's duplicate hardcoded
+ids) resurfaced — the crash pre-empts even reaching a live render, so those two never got exercised at all
+this turn. This is a THIRD, different, more fundamental one: `hasTreeLayout`'s own `checkNodes` (userOpView.js)
+ALREADY normalizes an object-shaped children (`Array.isArray(nodes) ? nodes : Object.values(nodes).flat()`),
+but `flattenBlocks` — used by `deriveBindingsFor` for EVERY data-op twin's binding derivation, not just
+drill's — never got the same treatment. It isn't drill-specific: `split_horizontal`/`split_vertical`'s own
+declared `children` shape (LEFT/RIGHT/TOP/BOTTOM-keyed object, unchanged since the node's introduction) was
+never actually compatible with `flattenBlocks`'s generic recursive walk — nothing caught it until now because
+this is the FIRST real op to ever place a split node in a live `uiChildren` tree. `hasTreeLayout` handling it
+correctly while `flattenBlocks` doesn't is itself the finding: two walkers of the same tree shape, one
+already normalized, one not.
+
+The fix (mirroring `hasTreeLayout`'s own normalization into `flattenBlocks`) is mechanically small, but
+`flattenBlocks` is foundational, shared machinery — every data-op twin's `deriveBindingsFor` call runs through
+it, not just drill's. Per the dispatch's own precedent for the two anticipated bugs ("if either resurfaces,
+that is the finding of the turn — report it, do not patch around it") and its own scope boundary ("ONE
+COMMIT, REVERTIBLE ALONE... no cleanup, no adjacent fix, nothing else bundled"), fixing `userOps.js` is a
+broader-blast-radius change this dispatch never scoped a judgment call for — reported, not patched.
+
+### NOT reached
+
+Owner's-eyes verification, screenshots, `drill-form-reproduction-2299.spec.js` against the actual flipped
+tree (it failed, see above), and the full suite were not meaningfully run against the flip itself — there is
+no flip standing to verify. `drillData.js` is back at HEAD; nothing to commit, nothing to revert.
