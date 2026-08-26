@@ -42,12 +42,18 @@ document, again.**
 **Z has no negative soft limit** — `#163` reads `−9999`, the parameter's floor, i.e. never configured,
 while `#155` says soft limits are ON and X and Y are fenced.
 
-⭐ **RULED BY THE OWNER, 2026-08-26 — this is NORMAL, not a finding: *"soft limits are optional though."***
+⭐ **RULED BY THE OWNER, 2026-08-26 — NORMAL, not a finding:** *"soft limits are optional though"* —
+⚠ *"the negative one at least."*
 
-⛔ **Do not re-raise it, and do not "fix" it.** A soft limit is an opt-in fence, not a safety feature the
-machine is missing. On a router where `G54 Z0` is the spoilboard and every cut goes INTO the stock, a
-negative Z limit would have to sit below the deepest legitimate cut — set it wrong and it **stops
-production** rather than protecting anything. Leaving it unset is a normal choice.
+⛔ **Do not re-raise it, and do not "fix" it.** ⭐ **And note how narrow the ruling is: the NEGATIVE Z limit
+specifically.** It is not a blanket "soft limits do not matter" — X and Y are fenced on this machine and Z
+positive is set. **Exactly one limit is unset, and it is the one that is impractical to set.**
+
+**Why that one:** every other bound is a fixed property of the machine — the table's reach in X and Y, the
+mechanical ceiling in Z+. The Z− bound is the only one whose correct value **changes per job**: it would
+have to sit below the deepest legitimate cut, and `G54 Z0` is the spoilboard. Set it wrong and it **stops
+production** rather than protecting anything. ⇒ Leaving it unset is a normal choice, and it does not
+generalise to the others.
 
 ⚠ It was written up here as *"the axis that carries the tool toward the spoilboard is the one the controller
 is not fencing"* — true as a sentence, and misleading as a framing. **The second time in one day that a
