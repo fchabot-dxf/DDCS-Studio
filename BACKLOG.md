@@ -1850,7 +1850,37 @@ assume inert because ATC's symptom was an id collision — establish it per file
 branch genuinely cannot fire, before E2 registers anything beyond ATC.
 
 **STILL REAL IF (systemic half):** `grep -l "panel" DDCS-Studio/web/blocks/dataOps/*Data.js | wc -l`
-→ **any count above 6 means the systemic half is STILL REAL.**
+→ **any count above 6 means the systemic half is STILL REAL.** ⚠ Reads **24** at 2026-08-26.
+
+#### ✅ ADVISOR, 2026-08-26 — SETTLED BY READING THE BRANCH: the other 23 are UN-TRIGGERED, not inert
+
+The entry offered a cheaper route than checking 23 files — *"establish that the panel branch genuinely cannot
+fire"*. It fires, and the reason is decisive: **both branches hardcode the SAME ids.**
+
+```
+formWidgets.js:1370  sim   →  <div data-viz-pane="layout2d">  id="userVizStatus_tree"  id="userVizContainer_tree"
+formWidgets.js:1393  panel →  <div data-viz-pane="layout2d">  id="userVizStatus_tree"  id="userVizContainer_tree"
+```
+
+⭐⭐ **Those ids are CONSTANTS in the shared branch, not derived per def.** So nothing about the collision is
+ATC-specific — **any** def declaring both nodes yields two stacked `layout2d` panes and a duplicate id pair.
+ATC was simply the first one anyone rendered. ⇒ **The 23 are not inert; they are waiting.**
+
+⚠ **Which also makes it the same defect class as #21** (`pathAnchorField`): two elements legally sharing an
+id, and a document-order lookup silently resolving to the wrong one. Different widget, identical failure —
+and #21's fix (scope the lookup to a root, prefer `[data-param]` over an id) is the precedent for what a real
+fix looks like here.
+
+⇒ **THE RULING THE ENTRY ASKED FOR — `sim` survives, `panel` goes:**
+- `sim` already carries everything `panel` renders (the `layout2d` pane, same ids) **plus** the 3D pane, and
+  since t2257 it can opt out of 2D via `layout2d: false`. **`panel` carries nothing `sim` lacks.**
+- ⭐ The cheap, additive step is the one t2257 already proved on ATC: **drop `panel` from the remaining 23
+  defs**, exactly as it was dropped from the six `atc*Data.js`. Declaration-only, no branch changes.
+- ⛔ **Do NOT delete the `panel` branch from `formWidgets.js`** in the same move — establish first that no
+  hand-written shell reaches it. Removing the data declarations is reversible; removing the branch is not.
+
+⚠ **Still gated on E2 timing**, as the entry says: fix it BEFORE anything beyond ATC is registered, not while
+migrating.
 
 ### 21. [✅ SHIPPED t2293] `ui/pathAnchorField.js` looks up its own mount point GLOBALLY — latent, currently dormant, found t2271
 
