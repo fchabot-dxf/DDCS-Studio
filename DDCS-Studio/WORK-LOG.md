@@ -57743,3 +57743,108 @@ touched, passed on retry, the same parallel-load-timeout pattern this project's 
   the new, valid header text.
 - `tests/fixtures/pocket-golden.json` — **unchanged**, confirmed correctly so (see above), not silently
   skipped.
+
+## t2307 — TWO PARTS, commit separately. PART 1 (BACKLOG #23, owner-ruled): build ONLY the refusal mechanism
+— a user cannot disable a child block inside a parametric op (its generator regenerates children fresh from
+params, silently dropping the disabled state). PART 2 (BACKLOG #10): investigate whether the whole-program
+preview context can be built for a NOT-YET-COMMITTED new op — build if representable, else STOP and report.
+
+### PART 1 — `web/blocks/blockly/disableGuard.js` (new), mirroring `tokenGuard.js`'s own shape
+
+Confirmed the hazard by direct reproduction before building anything (`scratchpad/t2307-disable-repro.mjs`):
+built a real `drill` op via `makeOp`, manually disabled its first child, ran it through
+`serializeWithMarkers()` — the exported marker never writes a child's disabled state at all (only
+`op.disabled`, the WHOLE-OP flag, rides it), and `opFromMarker`'s reconstruction came back with the child
+enabled. State is lost at EXPORT, not merely reimport — disabling a child inside a parametric op creates
+state that was never going to survive, from the moment it happens. The owner's own follow-up ruling named
+the choice directly: "silently accepting a disable it cannot keep is the worst of the three options... do
+the refusal first if only one gets built." Chose REFUSE over a session-only marking (considered and
+rejected): a marking still lets the doomed state form and still vanishes invisibly on export/reimport, with
+no signal at that later point — refusing at the gesture means the state never exists at all.
+
+`installDisableGuard(ws)` listens for `BLOCK_CHANGE`/`element:'disabled'`/`newValue:true` — confirmed by
+reading `blockly.min.js` directly that this is the exact event Blockly's own native "Disable Block"
+context-menu item fires internally, so the guard exercises the real gesture, not a synthetic shortcut. On a
+hit: walks up via `getSurroundParent()` to the enclosing `op`-typed block (mirroring blocksApp.js's own
+field-edit walk, not a second implementation), checks `builderOf(meta.opType)` — confirmed by reading
+`registerUserBuilder`/`registerUserOp` that this covers built-in wizards AND every registered data-op twin
+uniformly, not a hand-picked list. A hit reverts (`setDisabledReason(false, ...)`), toasts why, sfx('error'),
+and flashes the enclosing op. Whole-op disables and hand-built (non-generator) stacks are explicitly out of
+scope and left untouched (BACKLOG #23: "a whole-op disable round-trips correctly").
+
+**Two real bugs found and fixed while getting the new spec green — neither in the guard itself:**
+
+1. **The boot() readiness gate raced `window.showApp`.** `tests/disable-guard-2307.spec.js`'s boot() gated on
+   `window.ddcsGetBlockProgram && window.ddcsLoadBlockStack` before calling `showApp('blocks')` — both set
+   SYNCHRONOUSLY early in app.js's own load. `window.showApp` itself is assigned via an async
+   `import(...).then(...)` chain and can still be undefined at that point, so `window.showApp && ...` silently
+   no-op'd (no throw, no console line — confirmed by instrumenting `buildWorkspace()` directly: it was never
+   entered at all). The next wait then spun its full budget waiting for a build that never started. Root-caused
+   by a bisection any other explanation had already survived: reverting my own `blocksApp.js`/`disableGuard.js`
+   changes back to HEAD reproduced the IDENTICAL failure, ruling out the guard before spending more time on it.
+   Fixed by gating on `ddcsGetBlockProgram && ddcsEditWizardDef` instead — `save-dialog-declared-1615.spec.js`'s
+   own boot() already uses exactly this gate (same async chain as `showApp`, both land via devMode.js's dynamic
+   import), so mirrored rather than re-derived.
+2. **The read-back raced the guard's own listener.** Blockly's `BLOCK_CHANGE` dispatch is QUEUED, not
+   synchronous within the triggering call (confirmed live: instrumenting the guard showed its own revert event
+   landing on a LATER tick, after an intervening `viewport_change`) — so a single `page.evaluate()` that both
+   disables the child AND reads `hasDisabledReason` back in the same tick always sees the pre-revert state.
+   Split into two evaluates with a `page.waitForFunction` poll between them.
+
+Proved non-vacuous the direct way: temporarily commented out the `installDisableGuard(ws)` call site (not the
+whole file) and re-ran — the primary test fails (`TimeoutError`, the guard never fires), both CONTROLs still
+pass (they don't depend on the guard existing). Restored, re-ran clean.
+
+### PART 2 — `wizardManager.js`'s `_contextGcode` (t2176)
+
+The existing doc comment claimed a brand-new (not-yet-committed) op "has no position in the program to show
+yet." Investigated rather than taken at face value: it DOES have a representable position — `insert()`'s own
+default commit choice on a non-empty canvas, "+ Add as a 2nd operation" (`wizardManager.js`, the PRIMARY
+button — `ops.addActiveOp()`), appends the new op to the END of the current program. Previewing "as if
+appended" isn't an invented behavior; it's literally what the user's own default next action would produce.
+Every wizard view already passes `wholeProgramCtx` unconditionally regardless of editing state — the gate
+lived entirely inside `_contextGcode` itself (`if (!wholeProgramCtx || !this.editingOpId) return null;`), so
+the fix is scoped to one function: editing (`editingOpId` set) still splices by id via `replaceOpById`
+(unchanged); not-editing now appends the draft to `getStack()` instead of short-circuiting to null. On an
+empty canvas this degenerates harmlessly to the single-op preview (append to `[]`).
+
+Updated the 6 call-site comments (`textView.js`, `surfacingView.js`, `slotView.js`, `pocketView.js`,
+`drillView.js`, `contourView.js`) that each still said "whole-program context when editing an existing op" —
+now stale claims about the function they're annotating, not just adjacent decoration.
+
+**Found the existing t2176 regression spec pinned the OLD behavior as golden** — `tests/wizard-multiop-
+context-2176.spec.js`'s third test asserted `context` must be `null` for a brand-new op, titled "no
+whole-program splice attempted." This is the same shape as t2305's stale-golden pattern: a prior test
+correctly captured behavior that this turn deliberately supersedes. Updated that test in place (renamed to
+match, asserts the context IS built and is longer than the isolated op alone) rather than adding a parallel
+spec — a scratch spec I'd built first to prove the mechanism directly (`_contextGcode` called standalone) was
+retired once this existing, more authoritative real-UI-path test covered the identical ground.
+
+Non-vacuous, proven the same way as Part 1: temporarily short-circuited the new append branch back to
+`return null` for the not-editing case, re-ran — the new-op test fails, the editing CONTROL still passes.
+Restored.
+
+### Regression sweep
+
+Full suite run TWICE (this repo's suite is large — ~2800 tests, ~25-30m each): run 1 after Part 1 alone —
+**2807 passed, 1 failed, 17 flaky** (29.4m); the 1 failure was `save-dialog-declared-1615.spec.js`'s own
+`honest wording` test, a file this turn never touched — confirmed pre-existing by re-running it alone (passed
+clean, 1.2s), matching that file's own t2206 comment documenting this exact wait as a measured load-timing
+flake. Run 2 after both parts — **2810 passed, 1 failed, 14 flaky** (24.6m); this time the 1 failure was my
+OWN `disable-guard-2307.spec.js` primary test, timing out at its 100s boot wait three times running under
+full-suite parallel load (the two CONTROLs in the same file passed fine in the same run) — confirmed as the
+same load-timing class, not a logic regression, by re-running the whole file alone immediately after: 3/3
+passed clean in 9.9s. Every other flaky entry across both runs, in both files, is a spec this turn never
+touched, all boot/workspace-init timeouts under parallel load — the pattern this project's own memory already
+names.
+
+### Files changed
+
+- `web/blocks/blockly/disableGuard.js` (new) — Part 1's refusal mechanism.
+- `web/blocks/blocksApp.js` — 2-line wiring (import + `installDisableGuard(ws)` call).
+- `tests/disable-guard-2307.spec.js` (new) — Part 1's spec, proven non-vacuous.
+- `web/wizardManager.js` — Part 2's `_contextGcode` extension.
+- `web/wizards/views/{text,surfacing,slot,pocket,drill,contour}View.js` — stale comment fix (6 files, comment
+  only, no behavior change).
+- `tests/wizard-multiop-context-2176.spec.js` — Part 2's third test updated to assert the new behavior,
+  proven non-vacuous.
