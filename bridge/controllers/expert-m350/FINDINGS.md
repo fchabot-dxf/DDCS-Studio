@@ -1002,6 +1002,74 @@ The Expert-specific results, in one paragraph so this file is not a second copy 
 *(CNC-FAIRY, controller powered and reachable at 192.168.0.99. **Read-only throughout** — `os.listdir` and
 file reads over SMB. Nothing was written to the controller; no G-code ran; no axis moved.)*
 
+### ⭐ RESULTS — read this, not the trail below
+*(The numbered sections that follow are the investigation in the order it happened, corrections included:
+§5 was refuted, §12 amended, §17 withdrawn, §18 superseded. **Nothing below is needed to use the results.**
+It is kept for provenance — so a claim can be traced to the measurement that produced it, and so the wrong
+turns stay visible. This block is what is TRUE as of 2026-08-25.)*
+
+#### 1. The Z offset is three terms, added
+```
+work Z = machine Z − ( WCS Z + tool-table Z + H offset )
+```
+| term | macro | file slot | when it applies |
+|---|---|---|---|
+| WCS | `#[800 + n*5]`, n = 1..7 | `setting[300 + n*5]` | always |
+| tool-table Z | `#1430` (active tool) | `setting[930]` | **always** — written by the probe, cannot be switched off |
+| H offset | `#900` | `setting[400]` | only after `G43 H01`; cleared by `G49` or `M30` |
+
+Measured: `−104.844` with no H selected, `−94.844` with `G43 H01` and H01 = 10, back to `−104.844` after
+`G49`. `[§15, §21]`
+
+#### 2. Rules for writing G-code for this controller
+* ⛔ **The `H` word needs TWO digits.** `H1` is accepted, does nothing, and reports nothing. `[§16]`
+* ⛔ **A bare `H01` does not bind** — `G43` is required to arm it. `[§22]`
+* ⛔ **Never use `G43`/`H` on an Expert.** Its tool offset is already applied from the tool table, so adding
+  the H term applies the tool length **twice**. Use one mechanism. `[§25]`
+* ⚠ The V4.1 is the opposite: its factory ATC *does* use `G43 H`, because it has no native tool table. `[§24]`
+* ⭐ Use the vendor's own WCS form `#[800 + n*5]`, not `#[805 + (n−1)*5]` — identical, but it carries the
+  firmware's own guard and cannot be "simplified" into an off-by-one. `[§13]`
+* ⛔ `_WCS_BASE = 305` in the app is **CORRECT**. Panel-verified on all six systems. Do not change it. `[§10]`
+
+#### 3. Addressing — one rule
+```
+macro #N   →   setting f64 index (N − 500)   →   eng entry #(N − 500)
+```
+`eng` is the 1:1 name table for `setting`, so **any slot can be named rather than guessed**. `[§11]`
+
+#### 4. Finding a parameter on the pendant
+`eng`'s `-m` tag is the Param List **section**; `-p` is the **edit permission** (everything is readable).
+⛔ Sections gather **scattered** number ranges — Backlash holds `#190-200` *and* `#400-415`. Never look for a
+parameter by its number. Full map: [`PARAM-PAGE-MAP.md`](PARAM-PAGE-MAP.md). `[§20]`
+
+#### 5. ⚠ Two traps for anything reading the controller
+* ⛔ **`SYSDISK/setting` is STALE relative to RAM.** A value written by a macro or the pendant may not appear
+  on disk at all. Everything the bridge pulls is decoded from that file. `[§19]`
+* ⛔ **`SYSDISK/cmdstr` holds a shell command.** Read only, never write. `[§6]`
+* The Expert has `.break0`/`.break1`, **not** the V4.1's `.file`/`.break0-0`. `[§1]`
+
+#### 6. How to measure an offset here — do not use the screen
+The message dialog covers the Z row for exactly the window in which a modal offset is live, and `M30` clears
+the selection before the dialog closes. Have the macro read and print it instead: `[§23]`
+```gcode
+#111 = [#882 - #792]      ( machine Z minus workpiece Z = the applied offset )
+<the instruction under test>
+#112 = [#882 - #792]
+#1510 = #111
+#1511 = #112
+#1505 = -5000(before=%.3f after=%.3f)
+```
+
+#### 7. ⚠ STILL OPEN — with what each one needs
+| question | needs |
+|---|---|
+| Does `H01` **attached to a Z move** bind without `G43`? (the exact posted form) | a real Z move, human present |
+| What triggers the parameter flush to disk? | unknown; blocks trusting any pull |
+| Modbus position poll answers `0x00` | **a controller reboot**, then re-probe |
+| Do `.break*` / `processing` update DURING a run? | a program running, human present |
+
+---
+
 ### 1. ⛔ THE V4.1 SMB PROGRESS FINDING DOES NOT TRANSFER — the Expert's layout is different
 The 2026-08-20 note (`.file` + `.break0-0`, read on a V4.1) named "the Expert" as unverified. Now verified,
 and it is **not the same**:
