@@ -2127,9 +2127,57 @@ checking whether the symptom exists — the same error as promoting the other se
 to a product direction hours earlier the same day. **A confidently-worded backlog entry is a CLAIM, and the
 question "which moment did that number come from?" applies to it exactly as it does to a measurement.**
 
-### 28. HELD — `T.nc` OVERWRITES THE ATC DISPATCHER (needs a design ruling, not a patch)
+### 28. HELD — `T.nc` OVERWRITES THE ATC DISPATCHER [⭐ ADVISOR ANALYSIS 2026-08-26 — options below, owner's ruling still needed]
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H1 — the plan's own file is deleted, t2295.)*
+
+#### ⭐ ADVISOR, 2026-08-26 — measured against the vendor payloads. The two are for DIFFERENT MACHINES.
+
+**OBSERVED, from the vendor's own install payloads (V1 and V2 model trees) and the owner's captured SYSDISK:**
+
+```
+vendor T.nc  =  T#1504          ← ONE LINE. the whole file. dispatches into the firmware's O20000
+owner's machine, 2026-06-10 capture: T#1504    ✅ still the vendor one-liner — NOT overwritten
+```
+
+⭐⭐ **The key finding: these two are not competing implementations of the same thing.**
+
+| | what it drives |
+|---|---|
+| **`O20000`** (firmware) | a real vendor **MAGAZINE**: `#1302` dispatch, dust cover, magazine open/close, per-tool Z, auto tool-setting, position restore |
+| **`generateToolChangeNc`** | a **straight/linear changer**: move to the pocket's park XYZ, run the drawbar dance (`M154`/`M155`), dwell |
+
+⇒ **Studio's generator targets a machine that has no `O20000` magazine at all.** Its own header says so:
+*"This emits a STRAIGHT / linear changer"* and *"NOT validated on a live ATC."* **The defect is not that it is
+wrong — it is that nothing distinguishes the two machine types, so it is written to both.**
+
+⚠ **Blast radius, precisely:** a user with the vendor magazine gets their firmware state machine replaced by
+a generator built for a different changer. ⭐ **NOT the owner** — their workflow is *NO ATC, manual change,
+single slot T1* (`ROADMAP.md`), and their `T.nc` is still the vendor one-liner. This is a defect for the
+magazine-owning part of the user base.
+
+#### THE OPTIONS
+
+```
+A  DETECT AND REFUSE   if the existing T.nc is the vendor dispatcher (`T#1504`), do not overwrite.
+                       ⭐ the signal is ONE LINE and unambiguous — the firmware ATC is in charge.
+B  WRITE ELSEWHERE     cooperate: put the generated body into slib-g.nc / O20000 instead of T.nc.
+C  WARN LOUDLY         overwrite, but name what is being replaced and require a confirmation.
+D  LEAVE AS-IS         accept it; the generator is for changers that have no O20000.
+```
+
+⭐ **Advisor recommendation: A**, and it is nearly free. The detection is a one-line file comparison against
+a known constant, and refusing is the safe direction — a user whose magazine works keeps working, and a user
+with a straight changer is unaffected because their `T.nc` is not the vendor dispatcher.
+
+⛔ **B is the tempting one and I would not start there:** writing into the firmware's own macro means owning
+the vendor's state machine across firmware revisions, and `FINDINGS.md` already shows those revisions move.
+⚠ **C alone is not enough** — a warning at generation time is read once; the file it damaged stays damaged.
+
+⚠ **Still needs the owner**, because A changes what an existing button does for magazine users, and none of
+this is validated on a live ATC — by the generator's own admission.
+
+---
 
 `atcGenerator.generateToolChangeNc` (`controllerFiles.js:33`) replaces the one-line dispatcher `T#1504`,
 bypassing `O20000`'s whole magazine state machine (`#1302` dispatch, dust cover, magazine open/close, per-tool
