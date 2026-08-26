@@ -56944,3 +56944,201 @@ a fluke of the isolated re-run.
 - `DDCS-Studio/web/ui/formWidgets.js` — `path_anchor` branch passes its own `container` as the root.
 
 Verification scripts in gitignored `scratchpad/t2293-*.mjs` (kept, not committed).
+
+## t2295 — THE DOC CLEANING. 17 docs deleted (one restored after the full suite caught a real misverdict),
+5 held despite a delete verdict (live citations), 3 listed for the owner (NEVER-STARTED, not deleted), 3
+undone items carried into BACKLOG.md, 2 dangling citations fixed, AGENTS.md rule 6 added. Five commits, kept
+separate per the dispatch's own rule.
+
+### Method — git for triage, reading for verdicts, exactly as prescribed
+
+Every candidate got `git log --diff-filter=A --format=%cs -- <f> | tail -1` (birth) and `git log --oneline --
+<f> | wc -l` (edit count) — mechanical, vocabulary-independent. The VERDICT for each came from actually
+reading the doc, extracting ITS OWN specific claims/terms, then grepping the real codebase for those terms —
+never a guessed vocabulary (the dispatch's own named failure mode: two false negatives from guessing
+`playTone`/`soundEnabled`/`audioCtx` for SOUND when the real terms were `EVENT`/`ACTION`/`sfx`). ~70 in-scope
+docs (root, `docs/`, `docs/specs/`, `context/`, `bridge/` — vendored third-party source under any `/assets/`
+path and `bridge/archive/` excluded, matching `docs/archive/`'s own established exclusion) — delegated the
+git-triage + first-pass read-and-grep to 6 parallel research agents, batched by directory, each given the
+SAME method and the SAME false-negative warning; every DELETE-shaped verdict was then independently re-checked
+by me (grep the repo for the exact filename, read the actual citing context) before anything was touched —
+the dispatch's own instruction, not skipped for scale. **That second pass changed real outcomes** — see below.
+
+### THE FULL VERDICT TABLE — every doc, one verdict, its evidence
+
+**Legend:** 🗑 DELETED this turn · 🛑 HELD (verdict stands, not deleted — a live citation would dangle) ·
+📋 NEVER-STARTED (not deleted, listed for the owner) · ✅ LIVE · ⛔ DO NOT TOUCH (dispatch's own list)
+
+#### Root
+
+| Doc | Birth | Edits | Verdict |
+|---|---|---|---|
+| ADVISOR-TRANSFER.md | 2026-08-08 | 3 | STALE, but 🛑 **HELD** — `NEXT-SESSION.md` (⛔ do-not-touch) has an active section, "ACT 8 — THE §3 TAIL (ADVISOR-TRANSFER.md items 2-6)", structurally naming its own numbered items; deleting would strand that reference in a file I cannot edit |
+| AGENTS.md | — | — | ⛔ (rule 6 added, own commit) |
+| ANALYTICS-BOT-DETECTION.md | — | — | ⛔ |
+| ARCHITECTURE.md | — | — | ⛔ |
+| BACKLOG.md | 2026-08-19 | 58→61 | ✅ LIVE — self-maintaining, edited today; gained items 27-29 this turn |
+| BOOT-SPLASH-PLAN.md | 2026-08-21 | 1 | DONE 🗑 — every claim (inline theme script, symbol-defs order, `.ddcs-busy-*` CSS var derivation) verbatim in `index.html`/`styles.css`, comments cite the plan by name |
+| CLAUDE.md | 2026-08-25 | 3 | ✅ LIVE — brand new, every pointer it makes resolves |
+| HANDOFF.md | — | — | ⛔ |
+| JOB-PROGRESS-PLAN.md | — | — | ⛔ |
+| M350-MODBUS-REFERENCE.md | 2026-08-13 | 1 | STALE (its premise — a readable M350 slave register map — is refuted by `expert-m350/FINDINGS.md`'s own later hardware probe + vendor confirmation "there is no slave"), but 🛑 **HELD** — cited substantively from `JOB-PROGRESS-PLAN.md` (⛔) and `NEXT-SESSION.md` (⛔, 3 separate references) AND from live Python (`bridge/bridge-app/fairy/master.py`) |
+| MACHINE-DAY.md | 2026-07-31 | 1 | STALE 🗑 — a dated day-trip checklist; its restore action was superseded by a different mechanism (`context/FAIRY-MEMORY-DUMP.md`'s own record), its Modbus premise refuted same as above; its one `NEXT-SESSION.md` mention is a passing list item in a "docs I forgot to open" note, not load-bearing |
+| MEMORY-PROTOCOL.md | 2026-08-25 | 4 | ✅ LIVE |
+| NEXT-SESSION.md | — | — | ⛔ |
+| ORGANIC-TREE-PLAN.md | 2026-08-21 | 1 | DONE 🗑 — every token value (`--band-bg`, `--accent`, `--edit-glow-rgb`) verbatim in `styles.css`, comments cite the plan |
+| PORTING.md | 2026-08-02 | 11 | ✅ LIVE — the canonical porting-arc ledger, `ROADMAP.md` itself names it as such |
+| PREVIEW-AS-DATA.md | 2026-08-10 | 1 | DONE 🗑 — a read-only survey; its own flagged bugs are fixed in code (`middleData.js`'s `simStock`, `userOpView.js`'s `_tbl.kind`); `ARCHITECTURE.md` itself already calls it "historical — the code it describes is gone"; its other citations (3 source-file comments, 1 test) are all historical attribution ("PREVIEW-AS-DATA.md Tier 1 #7's surviving copy"), not live pointers |
+| README.md | — | — | ⛔ |
+| ROADMAP.md | — | — | ⛔ |
+| ROLES-PLAN.md | — | — | ⛔ (LIVE) |
+| SLAVE-CHANNEL-TESTS.md | 2026-07-31 | 3 | 📋 **NEVER-STARTED** — a 5-tier at-machine test matrix, no item executed; ALSO flagging its premise (a pollable Modbus slave mode) is the same one `FINDINGS.md` has since refuted, so most of Tier 1 would be dead on arrival even if worked from as written — the owner's call, not deleted |
+| SOUND-PLAN.md | 2026-08-21 | 1 | DONE 🗑 — the declared `EVENT`/`THEME`/`ACTION` architecture, the `sfx()` entry point, the job-vs-UI sound split all shipped in `ui/sound.js`; the ~10 citations across `bridge.py`/`config.py`/`JOB-RULES.md`/test files are all historical attribution ("t2125, SOUND-PLAN.md" / "SOUND-PLAN.md's ruling was...") describing what the plan said, not live pointers |
+| VENDOR-PACK-FIXES-PLAN.md | 2026-08-21 | 1 | DONE 🗑 for Stages A-C (every T1-T8 item verbatim in `tap.js`/`cnc.js`/`macrosApp.js`/`slotPack.js`/`probeBlocks.js`/`editorAutocomplete.js`, comments cite the plan) — Stage D (T9, the WCS-write formula) and HELD items H1/H2 were genuinely never built (confirmed: `ddcs-expert-m350.js`'s `wcsZeroAtCurrent` still reduces to the single-term `#807=#882` the plan itself names as wrong) — **moved to `BACKLOG.md` #27-29 before deletion**, not lost |
+| "wizard manager and entry points implementation_plan.md" | 2026-08-21 | 1 | 📋 **NEVER-STARTED** — every specific claim (700px dialog, embedded Library Shelf, "Save & Export" button, renamed/unified `＋Make▾` menu) is contradicted by the CURRENT code, which still matches the "before" state the doc describes replacing — not deleted, listed for the owner |
+| wizards_as_data_transition_plan.md | 2026-08-21 | 4 | ✅ LIVE — the actively-maintained north-star status doc for the in-progress arc this whole branch is named after |
+
+#### `docs/` and `docs/specs/`
+
+| Doc | Birth | Edits | Verdict |
+|---|---|---|---|
+| docs/REPO-SANITATION-PLAN.md | 2026-07-29 | 1 | ✅ LIVE — Tier 1/2 done, but Tier 0 (the "stop the bleeding" PNG-artifact hygiene item) is genuinely unbuilt: `git ls-files "**/*.png" \| wc -l` = 827, UP from the plan's own 534 baseline |
+| docs/USER-TASK-LIST.md | 2026-07-29 | 1 | ✅ LIVE (mixed) — 2-3 of 6 items shipped incidentally (view-cube robustness, wizard templates), 2-3 remain genuinely open (drill/bore pecking stepdown, click-in-code→preview-cursor) |
+| docs/specs/FEATURE-CANVAS-PROBE-SCOPE.md | 2026-07-29 | 1 | DONE 🗑 — `middleView.js`/`renderStartCanvas` (the doc's own named files) are deleted; the design's intent shipped through later work (`gcodeViz3d.js`'s glyph resolver, t1688); `portingArc.js` independently confirms this doc as one of "6 design docs... conclusions now live as project memories" |
+| docs/specs/MIDDLE-PROBE-BACKLOG.md | 2026-07-29 | 1 | DONE 🗑 — INC1-4 all shipped (commits cited), the probe-surface migration it called for is complete across edge/corner/rotary/middle; `portingArc.js` independently confirms |
+| docs/specs/PARAM-WRITE-STRATEGY.md | 2026-07-29 | 1 | ✅ LIVE — only the narrowest "#520 Apply-Now" slice shipped; the Params sub-tab, staged basket, and strategy picker it designs are all unbuilt |
+| docs/specs/RIG-EXPERIMENTS.md | 2026-07-29 | 1 | ✅ LIVE — a genuinely paused, never-resumed hardware session (the resume-here state is still pinned, no later commit ever references resuming it) — the gate for PARAM-WRITE-STRATEGY.md above |
+| docs/specs/SIM-BLOCK-STACK-BACKLOG.md | 2026-07-29 | 1 | DONE 🗑 — B0-B4 all shipped (`simStart.js`, `opSimStarts.js`, the GCODE/SIM mouth pair in `bridge.js`); B5 (shared Stock/Magazine block) was the doc's own "bigger/later" item, still open but not this doc's to track alone |
+| docs/specs/SPATIAL-MODEL-SPEC.md | 2026-07-29 | 1 | DONE 🗑 — both committed increments (1a safe-Z FRAME, 1c rollout, inc2 rotary bar) shipped exactly as designed, commits cited; `safeZframe.js` itself carries a `(SPATIAL-MODEL-SPEC.md §A)` attribution comment (historical, safe); `portingArc.js` independently confirms |
+| docs/specs/TAPPING-CAPABILITY.md | 2026-07-29 | 1 | DONE 🗑 — `tapWizard.js`/`ops/tap.js`/`dataOps/tapData.js` all exist, ship commit cited |
+| docs/specs/TOOL-SETTER.md | 2026-07-29 | 1 | DUPLICATE (superseded by `bridge/.../RESTORE-CUSTOM-MACROS/README.md`'s later, correct diagnosis), but 🛑 **HELD** — `ROADMAP.md` (⛔) has a direct markdown link to it (`[TOOL-SETTER.md](docs/specs/TOOL-SETTER.md)`), which I cannot fix |
+| docs/specs/TRAVEL-START-SPEC.md | 2026-07-29 | 1 | ✅ LIVE — inc1 + inc2a shipped (commits cited), inc2(rest)/3/4 genuinely open; own 2 citations to FEATURE-CANVAS-PROBE-SCOPE.md/MIDDLE-PROBE-BACKLOG.md updated ahead of their deletion (own commit, `72a8ca2e`) |
+| docs/specs/WIZARD-PORTING-MAP.md | 2026-07-29 | 1 | DONE 🗑 — every row it marks "⬜ not ported" now has a `dataOps/*.js` twin; the per-kind renderer-dispatch plan it sketches was superseded by ONE universal `renderLayout2D`; `portingArc.js` (a SOURCE FILE, not just docs) independently and explicitly confirms: "every one of the 11 wizards WIZARD-PORTING-MAP.md lists... now has a data twin on main" |
+
+#### `context/` (all born 2026-08-25, cross-seat Fairy/Ranchy coordination)
+
+| Doc | Edits | Verdict |
+|---|---|---|
+| CHANNELS.md | 1 | ✅ LIVE — an open, unexpired vendor commitment (~2026-08-27) |
+| FAIRY-MEMORY-DUMP-INSTRUCTION.md | 3 | DONE 🗑 — a one-time task spec, its own output (`FAIRY-MEMORY-DUMP.md`) already produced |
+| FAIRY-MEMORY-DUMP.md | 2 | DONE 🗑 — a dated, consumed snapshot; its purpose (feeding `MEMORY-CROSS-SEAT-ANALYSIS.md`) fulfilled, its load-bearing facts already live independently in `WORK-LOG.md`/`docs/specs/TOOL-SETTER.md`'s survivor/`VENDOR-PACK-SWEEP.md`; its one citation (`HANDOFF-FROM-FAIRY.md`'s own changelog line, "Documents added: ... FAIRY-MEMORY-DUMP.md") is a historical log entry, not a live pointer |
+| HANDOFF-FROM-FAIRY.md | 9 | ✅ LIVE — reusable protocol header + 2 genuinely open items (Modbus reboot+re-probe, `.break*` file behavior); most of the dated body below the header is consumed, a future trim candidate once those resolve |
+| HANDOFF-TO-FAIRY.md | 10 | ✅ LIVE — a real, unfinished build brief (transport fan-out, the `workOrigin.z` tool-offset fix), both confirmed still unbuilt in `bridge-app/fairy/config.py`/`ops.py` |
+| MEMORY-CROSS-SEAT-ANALYSIS.md | 3 | ✅ LIVE — a 4-item action list, 1 of 4 done (confirmed: `ROADMAP.md`'s own scope-ceiling convention, commit `76870833`), 2 still open |
+| SEATS.md | 3 | ✅ LIVE — accurate; one stale internal aside (AGENTS.md→RULES.md, both now gone) not worth a deletion |
+| SETUP.md | 1 | ✅ LIVE — cross-referenced with, not duplicating, SEATS.md (physical setup+safety vs authority routing) |
+
+#### `bridge/` (own docs only — vendored `assets/` source trees and `bridge/archive/` out of scope)
+
+| Doc | Verdict |
+|---|---|
+| bridge/README.md, TRANSPORT.md | ✅ LIVE |
+| bridge-app/ARCHITECTURE.md | ✅ LIVE (one stale sub-detail: still describes a `web/worker/` dir; the real Phase 3 shipped as Cloudflare Pages Functions instead — `DEPLOY.md` has the accurate version) |
+| bridge-app/CONFIGS.md, JOB-RULES.md, README.md, ROADMAP.md, fairy/README.md, shared/PROTOCOL.md, web/DEPLOY.md | ✅ LIVE |
+| bridge-app/web/README.md | ✅ LIVE (its own Structure section is stale — `client.js`/`instrument/`/`worker/` moved to `DDCS-Studio/web/shared/js/` back on 2026-06-10 — not a deletion case, the app it describes is real and still maintained) |
+| controllers/COMMENT-CHARACTERS.md, ENVIRONMENTS.md, MACHINE-PRIMITIVES-MAP.md, PORTING-GRBL-MACH3.md, README.md | ✅ LIVE |
+| controllers/centroid/FINDINGS.md, dm500/FINDINGS.md, grbl/FINDINGS.md, mach3/FINDINGS.md, shared/ARCHITECTURE.md | ✅ LIVE — factual hardware records, not plans; still cross-referenced, no staleness markers |
+| controllers/v4.1/DDCS_PC_BUILD_setup.md, ETHERNET_TESTS.md, FINDINGS.md | ✅ LIVE |
+| controllers/v4.1/dispatcher/README.md | ✅ LIVE — the specific dispatcher design it prototypes wasn't the one that shipped, but is kept deliberately as provenance for mechanics (M47 file-reload, uservar sentinel) that DID ground the real product and are still cited from `FINDINGS.md` |
+| controllers/v4.1/verify/README.md | ✅ LIVE — **verdict CORRECTED after the full suite caught a real regression** (see "What the full suite caught" below); originally misverdicted DONE |
+| expert-m350/BENCH-CHECKLIST.md, bench/01,02,03*.md | ✅ LIVE — reusable checklists, genuinely worked from (bench/03's position-poll task confirmed executed 2026-08-20, results landed in FINDINGS.md); one version-pin needs a refresh, not a deletion case |
+| expert-m350/CONFORMANCE_CORPUS.md | STALE (the specific corpus/fixture-replay mechanism was never built, superseded in practice by the verify/+FINDINGS.md workflow that actually took hold), but 🛑 **HELD** — `ROADMAP.md` (⛔) has an active, unchecked checklist item pointing to it |
+| expert-m350/DDCS-ATC-WORKFLOW.md | ✅ LIVE — directly cited from shipped code, `web/data/atcGenerator.js:7` |
+| expert-m350/DDCS_Expert_BUILD_setup.md | DUPLICATE 🗑 — superseded by `FINDINGS.md` (confirmed values) + `tools/README.md` (condensed procedure); `ENVIRONMENTS.md`'s own pointer updated ahead of deletion (own commit, `72a8ca2e`) |
+| expert-m350/FINDINGS.md, PARAM-PAGE-MAP.md | ✅ LIVE — the project's living ground-truth log, edited yesterday/today |
+| expert-m350/PROFILE_BUILD_TASK.md | DONE (its own header says "✅ COMPLETE — 2026-06-10", findings absorbed into FINDINGS.md/PARAM-PAGE-MAP.md), but 🛑 **HELD** — pointed to from 2 live Python tool comments (`tools/capture_controller.py`, `tools/diff_setting.py`, "see ../PROFILE_BUILD_TASK.md"); fixing those is a `.py` edit outside this turn's natural (`.md`-only) blast radius, left for a follow-up rather than editing source files during a doc-cleaning turn |
+| expert-m350/T2118-REVIEW.md | DONE 🗑 — its one blocker (rigid-tap's missing emit-time spindle attestation) is fixed in `tap.js`, comments cite "t2118"/"t2121"/"t2123" by name |
+| expert-m350/T2128-SOUND-REVIEW.md | DONE 🗑 — both its blockers (Blocks-tab mute not silencing the error beep; sound-sync bypassing the gateway resolver) are fixed, comments cite "t2129" |
+| expert-m350/VENDOR-PACK-SWEEP.md | ✅ LIVE — a working recommendations backlog, partially acted on (§1.3 rigid-tap → the T2118 fix chain) but substantially still-unbuilt (§1.1's G52/H-offset engine gap is real and independently confirmed by a later, separate FINDINGS.md bench session) |
+| expert-m350/parse-out-ghidra-guide.md | 📋 **NEVER-STARTED** — the Ghidra decompilation it lays out was never performed; the underlying need was largely overtaken by two easier channels (the vendor manual read, the vendor's own direct answer) — not deleted, its target list would still be useful if the vendor's answer doesn't pan out |
+| expert-m350/tools/README.md | ✅ LIVE |
+| expert-m350/verify/HANDOFF.md | ✅ LIVE — flagged: its own "Last worked" date and test roster are one generation behind FINDINGS.md's later V18/V19 series; worth a refresh, not a deletion case |
+
+### What the second pass (grep-before-delete) actually changed
+
+The dispatch's own instruction — grep a doc's filename before deleting it — was not a formality. Cross-checking
+EVERY delete-shaped verdict against the WHOLE repo (not just each research batch's own narrower check) found
+real citations that moved 5 files from DELETE to HELD:
+
+- **ADVISOR-TRANSFER.md** — self-marked "delete once oriented," but `NEXT-SESSION.md` (⛔ do-not-touch) has a
+  whole active section whose own structure names its numbered items ("ACT 8 — THE §3 TAIL (ADVISOR-TRANSFER.md
+  items 2-6)"). Would have deleted a doc a live task queue still structurally depends on.
+- **M350-MODBUS-REFERENCE.md** — refuted by later hardware evidence, but cited substantively from TWO
+  do-not-touch docs AND live Python (`master.py`).
+- **docs/specs/TOOL-SETTER.md**, **expert-m350/CONFORMANCE_CORPUS.md** — both directly linked from `ROADMAP.md`
+  (one a markdown link, one an active unchecked checklist item).
+- **expert-m350/PROFILE_BUILD_TASK.md** — pointed to from live Python tooling comments; fixing those is a `.py`
+  edit outside a doc-cleaning turn's natural scope, deferred rather than rushed.
+
+Two more citations were real but fixable within scope, so they got companion edits instead of blocking the
+deletion (own commit, `72a8ca2e`, ahead of the deletions): `ENVIRONMENTS.md`'s setup-guide pointer (now names
+the survivor), `TRAVEL-START-SPEC.md`'s two origin references (now note the deletion + point at this entry).
+
+All five HELD cases are reported here for the owner rather than resolved unilaterally — each needs either a
+NEXT-SESSION.md/JOB-PROGRESS-PLAN.md/ROADMAP.md edit (outside this turn's do-not-touch boundary) or a `.py`
+comment fix (outside a `.md`-cleaning turn's natural scope) before the underlying doc can safely go.
+
+### The standing rule — `AGENTS.md` rule 6, own commit (`ce3d82b3`)
+
+"A plan lives at the repo root while it is being built, and is DELETED the day it ships" — the exact wording
+the dispatch specified, in the file's own numbered-rule style, with the same evidence-with-a-cost pattern
+every other rule in that file uses (the prior sweep's 18→7 root files, regrown to +7 `*-PLAN.md` in 4 weeks).
+
+### Duplicates found across the whole set
+
+One confirmed: `docs/specs/TOOL-SETTER.md` superseded by `bridge/controllers/expert-m350/assets/community/
+modbus-slave-2025-12-11/RESTORE-CUSTOM-MACROS/README.md` (a later, CORRECT diagnosis — the doc's own root-cause
+guess, an `O502` port-config fix, was wrong; the real bug was a rapid descent ignoring the probe input) — HELD
+per above, not deleted, but the DUPLICATE verdict + survivor stands. `bridge/AGENTS.md` (the dispatch's own
+named example, "mostly a thinner copy of context/ + README") was already dissolved before this turn started
+(commit `e69cc899`) — confirmed gone, nothing to do.
+
+### Regression sweep — the full suite caught a real miss my own citation grep didn't
+
+Node tier: 228/228, including `architecture-map-1698.test.mjs` (AGENTS.md's own substring citations to rules
+4/5 are unaffected by rule 6 landing between rule 5 and the section break). Full suite run (AGENTS.md is one
+of the dispatch's own cited-docs, so full tier per its own testing rule, even though this turn is otherwise
+doc-only): **2 unexpected failures, both `v41-bench-kit-nomotion-1538.spec.js`.**
+
+**What happened, honestly:** my own "grep the repo before deleting" pass for `bridge/controllers/v4.1/
+verify/README.md` was scoped to `grep -rl "verify/README" bridge/` — inside `bridge/` only. That test lives
+in `DDCS-Studio/tests/`, entirely outside that scope, and it does two things a pure-attribution comment never
+would: `expect(files).toContain('README.md')` (the directory must literally contain it) and asserts the
+README's own EXACT WORDING (`\\10.0.0.50\cncdisk`, `uservar`, the "syntax error is a usable answer" phrasing).
+This is a permanently-enforced, live asset — the S5 bench kit + its README are re-checked by this test on
+every run, not a one-time artifact whose purpose was fulfilled and forgotten. My DONE verdict (§ table above)
+was wrong; the doc's own "no verdict gets made from this kit; it only measures" framing describes what the
+BENCH SESSION concluded, not what the KIT ITSELF is for going forward — it stays the kit's own permanent
+correctness check.
+
+**Fixed immediately:** restored the file verbatim from `40786620~1` (the commit before its deletion), own
+commit (`56259789`). Re-ran the specific test (8/8 pass) and then, since a NEW change deserves its own clean
+verification rather than trusting the restore blindly, re-ran the full suite once more (below). Also re-swept
+the WHOLE REPO (not scoped to any one directory) for every OTHER deleted file's filename against every
+`*.spec.js`/`*.test.mjs` — found citations in several (BOOT-SPLASH-PLAN.md, SOUND-PLAN.md, VENDOR-PACK-FIXES-
+PLAN.md, PREVIEW-AS-DATA.md, WIZARD-PORTING-MAP.md), but the full suite's own clean pass on all of THOSE
+(only the bench-kit README failed) confirms those remaining citations really are the attribution-comment
+class my earlier reading found them to be, not a second miss of the same shape.
+
+**Full suite run #2** (after the restore): node 228/228. e2e: **2794 passed, 14 flaky, 1 unexpected, 26
+skipped** (~23.1min). The one unexpected (`wcs-sync-gate-1906.spec.js`) is unrelated to this turn (no code
+touched, only docs) — re-ran in isolation, all 4 of its own tests passed clean, confirming a pre-existing
+flake rather than a regression. Genuinely green.
+
+### Files changed
+
+**Commit 1** (`72a8ca2e`, content edits, no deletions):
+- `BACKLOG.md` — items 27-29 (VENDOR-PACK-FIXES-PLAN.md's T9/H1/H2, carried forward before its deletion).
+- `bridge/controllers/ENVIRONMENTS.md` — setup-guide pointer updated (survivor named).
+- `docs/specs/TRAVEL-START-SPEC.md` — 2 origin references updated (both cited docs about to be deleted).
+
+**Commit 2** (`40786620`, pure `git rm`, 18 files, 2685 lines) — see the verdict table above for the full list
+(**17 files**, not 18 — `bridge/controllers/v4.1/verify/README.md` restored, see Commit 4).
+
+**Commit 3** (`ce3d82b3`, own commit): `AGENTS.md` — rule 6 added.
+
+**Commit 4** (`56259789`, correction): `bridge/controllers/v4.1/verify/README.md` restored — the full suite's
+own catch, see "Regression sweep" above.
+
+Verification: no scratchpad scripts this turn (a doc-audit turn, not a build) — verification was reading +
+grepping the real repo directly, cited inline above.
