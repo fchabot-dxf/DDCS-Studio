@@ -1358,3 +1358,85 @@ envelope, tool table and probe params. Back up at the pendant first.
 ⚠ **And re-run the §13 name-resolution sweep afterwards.** §13 proved the parameter indices are stable across
 four dumps *of firmwares up to 2026-04-10*. A release that reorganises a memory map is exactly the event that
 could break that, and `eng` ships inside the update — so the check costs one pass over the new `eng`.
+
+### 15. ⭐⭐⭐ THE Z OFFSET IS THREE ADDITIVE TERMS — measured on the machine `[CONFIRMED 2026-08-25]`
+*(Bench session with the owner at the pendant. Macros V18a-V18e, all motion-free; the only movement was a
+0.01 mm jog. No WCS was written. §9's "unidentified extra row" and §12's hedge are both settled here.)*
+
+```
+work Z = machine Z − ( WCS Z  +  tool-table Z  +  H offset )
+```
+
+| term | macro addr | file | applied |
+|---|---|---|---|
+| **WCS Z** (active system) | `#[800+n*5+2]` | `setting[300+n*5+2]` | always |
+| **tool-table Z** (active tool) | `#1430` | `setting[930]`, live copy at `setting[342]` | ⭐ **always** — written by the probe |
+| **H offset** | `#900` | `setting[400]` | only while selected by `G43 H01`; **`M30` resets it** |
+
+**The measurement.** With G54 active, tool T1, machine Z `−5.003`:
+```
+H not selected   work Z = 99.841   ⇒ offset −104.844  =  −36.508 + −68.336
+G43 H01, H01=10  work Z = 89.841   ⇒ offset  −94.844  =  −36.508 + −68.336 + 10
+M30              work Z = 99.841   ⇒ offset −104.844   (H reset to H00)
+```
+The 10.000 appears and disappears exactly. `[CONFIRMED — owner observed the DRO change and revert]`
+
+### 16. ⛔⛔ THE H WORD NEEDS TWO DIGITS — `H1` IS SILENTLY IGNORED
+`G43 H1` and `G43 H01` differ only in the digit count. The first leaves the modal H field at **`H00`**; the
+second sets it to **`H01`**. **No error, no alarm, nothing in the system log** — the one-digit form is simply
+discarded, and `G43` still latches, so it *looks* like it worked.
+
+⇒ ⛔ **Always emit two digits.** This is the silent-failure class: a program asking for a tool offset and
+receiving none, with every indication of success. It cost most of this bench session to find.
+
+### 17. ⚠⚠ EVERY POSTED PROGRAM ON THIS MACHINE CARRIES `H01`, AND IT BINDS
+The Fusion post writes it on the first Z move, unprompted — the owner confirmed it is not a deliberate choice:
+```
+G00X405.724Y60.991
+Z15.24H01        <- the post's own output; the file contains NO G43 at all
+```
+That form is the one that **works** (§16). ⇒ **The only thing keeping this harmless is that the H table has
+always been zeros.** Put a value in `#400` and every posted program silently shifts Z by it, from its first Z
+move until `M30`. On a machine where **G54 Z0 = the spoilboard is SACRED**, that is a tool through the table.
+
+⚠ Note the asymmetry that makes it worse: the post emits `H01` but no `G43`, and `H01` alone was NOT observed
+to bind — only `G43 H01` was tested. **Whether the bare `H01` on a Z move applies the offset is UNTESTED**,
+and it is the case that actually matters for real programs. ⇒ Next bench item.
+
+### 18. ⚠ `G49` DOES NOT CLEAR A LATCHED `G43` — and its real behaviour is still unknown
+Running `G49` left the modal block reading `G43`. Both attested corpus forms exist (standalone ×4, and
+`G90 G17 G80 G49 M05 M09` ×14), so this is not a syntax error.
+⛔ **But this proves nothing about cancelling an offset**: every `G49` run had `H00` selected, so there was
+never anything to cancel. `M30` is the only reset observed to work. `[G49 with a live offset: UNTESTED]`
+
+### 19. ⛔⛔ THE `setting` FILE ON SYSDISK IS STALE RELATIVE TO RAM
+A macro wrote `#900 = 10.0` and read it back as `10.000`. **`setting[400]` on disk still read `0.0`**, and a
+sha256 diff of **all 184 SYSDISK state files showed ZERO changes.** ⇒ the controller holds parameters in RAM
+and the file is a snapshot from some earlier flush.
+
+⇒ ⚠ **This is an app-level hazard, not a curiosity.** Everything the bridge pulls — WCS, tool table, geometry
+— is decoded from this file. A value changed at the pendant or by a macro can be invisible to a pull until
+whatever triggers a flush happens. **What triggers the flush is UNKNOWN and is the next thing to establish.**
+Baselines for the diff: `bench/g49-before.json`, `bench/sysdisk-baseline-2026-08-25.json`.
+
+### 20. ⭐ `eng` ENCODES THE PANEL LAYOUT — `-m` is the Param-page SECTION
+Verified against photographs of the pendant:
+
+| tag | section | evidence |
+|---|---|---|
+| `-m13` | **Backlash** | holds `#195-200` **and** `#400-415` — which is why "H01 tool length offset" is found under *Backlash*, a grouping no one would guess |
+| `-m8` | **Probe** | `#128`/`#129` (the `THK Of Probe 5.000` on screen), `#135-137` fixed-probe positions |
+| `-m15` | **System** | `#266`/`#267` baud, `#279` Modbus, `#284` net boot, `#296`/`#297` |
+
+Panel section list, in order: Machine · Manual · Process · Spindle · IO · Home · Probe · Hard Limit ·
+Software limit · MPG · Backlash · Tools · System.
+
+⇒ **Any parameter can now be located on the pendant from `eng` alone** — section, name, range and units — with
+no hunting. ⭐ Combined with §11 (`eng` index == `setting` index) and the `−500` macro rule, one file answers
+*what a slot means*, *where it is on screen*, and *how a macro addresses it*.
+
+**`-p` is a PRIVILEGE LEVEL, not visibility.** All 38 `-p1` entries are machine-definition (machine type,
+RTCP, axis names/types/vectors, kinematics, comms, home mode); the other 539 are operator-level. 13 of the 38
+say *"Restart takes effect"*; **zero** `-p0` entries do. The pendant footer carries a matching `User:` field
+(`#199` showed `Operator`). ⚠ `[HYPOTHESIS — the mapping to the footer's User field is not yet read off the
+screen for a `-p1` param]`
