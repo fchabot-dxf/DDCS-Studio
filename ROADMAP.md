@@ -852,3 +852,33 @@ five came back answered — and **not built**.
 ## 🌱 Later / maybe
 - Pre-load multiple jobs on the controller (job tag in a second register) — out of scope until needed.
 - Live low-latency jog/control (separate app, hard real-time, hardware-safety-gated).
+
+### ⭐ CONVENTION — a scope ceiling is a CEILING, not an invitation
+
+**From Fairy's own memory store, surfaced by the 2026-08-25 cross-seat comparison** — a rule about the OWNER,
+so it belongs here where every seat reads it rather than in one machine's private memory:
+
+> *"When the user says something 'doesn't really matter' / 'just make it an honest stub' … treat that as a
+> real scope ceiling — not an invitation to fully investigate and build a feature around it. A big,
+> well-tested change for a thing they called minor reads as ignoring their signal, not as thoroughness."*
+
+⛔ **The tell is that it never feels like over-building at the time** — it feels like doing the job properly.
+The signal is in what they SAID, not in how much work the problem seems to deserve.
+
+**Phrases that are ceilings**, each observed: *"keep it as it is"* · *"forget that"* · *"just signal it and
+nothing else special"* · *"whatever, you decide"* · *"don't worry about that"* · *"it's fine"* ·
+⭐ *"no all I meant was context"* — a fact offered as background is NOT a work item.
+
+**What it cost on the day it was written down** (all 2026-08-25, all after the rule existed on the other seat):
+- comment sanitisation designed across **four dispatched amendments**, each cut back by the owner, then
+  withdrawn entirely — the answer was already one line in `comment.js`
+- **six measurements** hunting a dirty-dot bug that did not exist
+- a remark about how the owner's machines are set up answered by **editing two handoff documents**, unasked
+  and reverted
+
+⇒ **When a ceiling is stated, the correct move is the smallest thing that satisfies it, then STOP and say
+what you did not do.** Offering the larger version costs one sentence; building it costs a turn and reads as
+not listening.
+
+⚠ Related: [`MEMORY-PROTOCOL.md`](MEMORY-PROTOCOL.md) §2 — *"how the owner likes to work is NOT seat-local"*.
+This entry is that rule applied to itself.
