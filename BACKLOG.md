@@ -2554,3 +2554,41 @@ and guarded (`comment-nesting-guard-2305.spec.js`).
 
 **STILL REAL IF:** `grep -c "| " DDCS-Studio/web/wizards/ops/probe_titles.js` → any hit means the pipe is
 still in the emitted titles.
+
+---
+
+### 32. NO PINCH-TO-ZOOM ON ANY FEATURE CANVAS — mobile has no zoom at all
+
+*(reported by the owner from a phone, 2026-08-26, while reviewing drill's wizard preview)*
+
+**OBSERVED, not inferred** — `viz/featureCanvas.js`'s `_bind()` binds exactly these:
+
+```
+:121  pointerdown   hit-test a handle, begin a drag
+:145  pointermove   drag
+:211  pointerup     end
+:215  wheel         ⭐ ZOOM — desktop only
+```
+
+⇒ **There is no two-pointer handler anywhere.** So this is not "pinch is being swallowed" — **pinch was never
+implemented.** Desktop got zoom through the wheel and mobile got nothing. The transform machinery it would
+drive already exists (`_tf`, `_userAdjusted`, `scale`, double-click re-fit) — only the gesture is missing.
+
+⚠ **It affects EVERY feature canvas**, not just drill: `featureCanvas` is the one component all the
+parameter-driven 2D views use.
+
+⚠ **The conflict that makes this non-trivial**, and why it should not be a reflex `touch-action` change: the
+same surface must support **dragging a handle with one finger** and **pinching with two**. A blanket
+`touch-action: none` (used elsewhere in `styles.css` for exactly the drag reason) kills pinch; a blanket
+`pinch-zoom` makes handle drags fight the browser's own panning.
+
+**Sketch of the fix, not a prescription:** track pointers in a map on `pointerdown`; **one** pointer keeps
+today's drag path unchanged, **two** switches to pinch — midpoint drives pan, distance ratio drives
+`scale` — and the existing wheel path already shows what to call. ⭐ Set `_userAdjusted` so the auto-fit stops
+fighting the user, exactly as the wheel path does.
+
+⛔ **Do not regress the handle drag.** It is the primary gesture on this surface, it is what the whole
+parameter-driven canvas exists for, and it works today.
+
+**STILL REAL IF:** `grep -c "pointerdown" DDCS-Studio/web/viz/featureCanvas.js` returns hits but a search for
+a two-pointer/pinch path finds none → still real.
