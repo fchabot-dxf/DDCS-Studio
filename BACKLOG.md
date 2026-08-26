@@ -2190,28 +2190,31 @@ controller does not surface, on a machine in production.
 
 ---
 
-### 30. THE PULL OVERWRITES THE USER'S DECLARED ENVELOPE — it should not derive one at all
+### 30. `far_reach()` PICKS THE WRONG END OF A ONE-SIDED SOFT LIMIT
 
-⭐⭐ **OWNER RULING, 2026-08-26: *"let users manage their envelope themselves, stop trying to babysit."***
+⭐⭐ **OWNER RULING, 2026-08-26 — read this before touching anything here:**
+*"pull writes it, it's the user's responsibility to set it right, don't correct it."*
 
-⇒ **The envelope is the USER'S.** Studio must not infer it, correct it, or overwrite it from a pull.
+⇒ **The pull SHOULD write the envelope. That is intended.** The machine's configuration is the user's, and
+if it is set wrong that is theirs to fix. ⛔ **Do NOT add validation, clamps, sanity guards, warnings or
+"are you sure" prompts.** Studio mirrors the machine; it does not supervise it.
 
-**What to do:** `ui/settingsPanel.js:2283-2288` overwrites `m.x`/`m.y`/`m.z` from `p.geometry.travel` on every
-profile pull. **Stop writing the envelope.** Keep mirroring the soft-limits **flag** (`#655`) — that is a real
-controller state and the checkbox already says Studio never writes it — but the travel numbers stay whatever
-the user typed.
+**The bug is narrower than that: a plain misread.** `far_reach()` (`bridge/bridge-app/fairy/ops.py`) resolves
+a one-sided soft limit by returning the non-sentinel end — assuming it is the FAR end. On an axis that
+travels negative it is the HOME end:
 
-⚠ **This is why it matters, so nobody re-derives it:** `far_reach()` (`bridge/bridge-app/fairy/ops.py`) treats
-the non-sentinel end of a one-sided soft limit as the axis's far reach. On this machine Z travels NEGATIVE and
-the only fenced end is `#168 = +1` (a correct fence on the UP direction), so the pull derives **Z travel =
-1 mm** and the `> 0` guard passes it straight through. The declared 150 mm envelope is replaced with 1 mm,
-the sim box becomes 1 mm tall, and envelope checks flag ordinary moves.
+```
+Z− unset (−9999 sentinel) · Z+ = +1  ← a CORRECT fence on the up side; Z travels negative
+far_reach()  →  "if neg_sent: return pos"  →  +1        ⛔ that is the home end, not the reach
+```
 
-⛔ **Do NOT "fix" this by teaching `far_reach()` about larger magnitudes.** ⭐ A soft limit is a POLICY (what
-the controller refuses); an envelope is a FACT (how far the machine goes). They coincide only when limits are
-set generously on every axis, and the owner has deliberately left `Z−` unset because its correct value changes
-per job. **Deriving the fact from the policy is the category error — deleting the derivation is the fix.**
+⭐ **The function already knows better in its other branch** — with both ends real it takes the
+larger-magnitude end and its own docstring spells it out for Y (*"neg=−776, pos=+5 → the home end is ~+5, the
+far reach is −776"*). The one-sided branch simply skips that reasoning. **Fix is to apply it there too.**
 
-⭐ The rest of the app already gets this right: the settings panel keeps `machine:{x,y,z}` (the envelope) and
-`softLimits` (the policy) as separate things, and its own tooltip says Studio never writes `#655`. **Only the
-pull violates the model.**
+⚠ **Latent, and only reachable recently:** while both Z ends were sentinels `far_reach` returned `None` and
+nothing was written. `#168` moved `9999 → 1` between two captures, which made the branch reachable.
+
+⛔ **Not in scope, explicitly:** the `> 0` guard at `ui/settingsPanel.js:2285-2287`, soft-limit validation,
+or anything that inspects a pulled value and decides it looks wrong. Per the ruling above — fix the read,
+not the user.
