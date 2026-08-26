@@ -57142,3 +57142,95 @@ own catch, see "Regression sweep" above.
 
 Verification: no scratchpad scripts this turn (a doc-audit turn, not a build) — verification was reading +
 grepping the real repo directly, cited inline above.
+
+## t2297 — THE GATE FAILS, but not the way the dispatch expected: `method` was never a wiring gap to begin
+with. NOTHING BUILT. Two stale comments corrected instead (drillData.js's own header + drill-as-data.spec.js).
+
+### The dispatch's own proposed mechanism, read against the actual code — does NOT apply
+
+The dispatch asked for `method` to become a structural (guard/pruneGuards) binding, translating corner's own
+shipped pattern (`whenGuard.js`, `userOps.js:743-796`, `cornerData.js`'s 8-way corner×probeSeq guard) — cited,
+all confirmed to work exactly as described, read directly rather than re-derived. **But the pattern's own
+PRECONDITION doesn't hold for drill:** `pruneGuards`/the guard mechanism exists to let a template carry TWO
+STRUCTURALLY DIFFERENT block arrangements (different literal-valued blocks per arm) and collapse to one at
+build. Drill has no such fork to collapse — **`t1385` (a much earlier switch, landed before either t2291's
+own gate or this one) already merged `array{drill|bore}` into ONE `holecycle` block.** Confirmed by direct
+grep, not inference: zero hits repo-wide for a `bore` block TYPE anywhere in `drillWizard.js`, `holecycle.js`,
+or `boreData.js` itself. `cycle` (`peck`/`bore-step`/`bore-helix`) is a plain STRING PARAM on that one block —
+`holeCycleLines` branches on it INTERNALLY (`peckCycle`/`boreStepCycle`/`boreHelixCycle`), exactly the same
+shape `pattern` already uses (an enum on the SAME block driving hugely different emitted shapes, already bound
+as an ordinary value binding, no guard needed). There is no block-type fork here for a guard to prune between.
+
+### The deeper finding: there was never a gap to close, by the wizard's own design
+
+Even setting the mechanism question aside, `method` fails t2293's own established Step 1 gate ("does the
+shell EXPOSE this field to a human?") — and the answer, confirmed by reading, not assumed, is **no, never, in
+any mode**: `drillView.js`'s own `applyVariant()` — called on EVERY wizard open per `wizardManager.js:292`'s
+own comment ("the menu choice fixes the identity") — unconditionally hides the method selector at its own
+end, regardless of whether a variant was passed (new-drill, new-bore, or edit-existing-op all hide it). Drill
+and Bore are two PERMANENTLY IDENTITY-LOCKED menu entries by deliberate design, never a live toggle — and
+`boreData.js` (the sibling twin) already, correctly, binds `holeDia`/`toolDia`/`pitch`/`ramp` completely on
+its OWN side (`ramp`'s own binding maps straight into the same `cycle` socket via
+`cycleForMethod('helical', ramp)`, since `method` is ALSO permanently baked there, at 'helical'). The
+architecture already mirrors the wizard's own two-locked-identities design correctly, end to end — `drillData.js`
+and `boreData.js` are complete, correct, separate twins, each fully bound for its own identity. Binding a live
+`method` toggle on drill's twin would ADD an ability the shipped wizard deliberately never had — the exact
+"feature, not a reproduction" line t2293's own discipline exists to catch, now caught before being built
+rather than after.
+
+### Why this makes t2291's own original framing (and this turn's dispatch) a shared misdiagnosis, not just a stale comment
+
+`drillData.js`'s own header called this "REMAINING FRONTIER... instantiate substitutes VALUES, never a block
+TYPE" — a claim describing the PRE-t1385 shape, apparently never revisited after that switch landed, and t2291
+inherited it without independently re-checking (its own gate work correctly found `toolDia`/`pitch`/`ramp`
+unbound and correctly declined to bind them as "entangled with method," but did not go the one step further to
+ask whether `method` itself was actually blocked by anything real). This turn's own dispatch inherited the same
+premise a second time, framing it as needing corner's guard machinery. Both readings shared the same root
+cause: nobody had re-read `drillWizard.js`'s own current builder (post-t1385) or `wizardManager.js`'s own
+variant-locking comment against the CURRENT code before writing the "method is unsolved" claim down. This
+turn's gate step did exactly that, and the premise doesn't survive it.
+
+### Corrected in place, per the dispatch's own explicit instruction to fix the stale header regardless
+
+- `web/blocks/dataOps/drillData.js` — the header's "REMAINING FRONTIER" section rewritten: clearance's fan-out
+  promoted to a "✅ SOLVED, t2293" callout (matching frontier #2's own established convention, previously never
+  updated after t2293 shipped); "METHOD SWAP" replaced with a "✅ CLOSED, t2297" account of the actual finding
+  above, including the `boreData.js` cross-reference.
+- `tests/drill-as-data.spec.js` — my OWN t2293 comment ("method swap... a structural block-TYPE change
+  instantiate() cannot express") was itself repeating the same stale premise; corrected to name the real
+  reason (deliberately baked, not a technical limit), plus the test's own assertion message updated to match.
+  **The assertion's own LOGIC is unchanged** — `method` still, correctly, diverges when varied (it's baked,
+  not bound) — only the explanatory text was wrong, not the test's own behavior.
+
+### A parallel, smaller, NOT-acted-on finding worth naming
+
+`boreData.js`'s own header still carries `clearance NOT bound — frontier #3 fan-out...` — the SAME shape t2293
+already solved on drill's side, now stale on bore's. Not touched this turn (out of scope — the dispatch was
+specifically about drill's `method`, and mirroring t2293's fix onto bore's own clearance is separate, small,
+scoped work) — named here rather than silently noticed and dropped.
+
+### Regression sweep — 4 unexpected, all pre-existing, none mine to fix
+
+Both changed files are comment/message-string only — no functional code changed, verified by re-reading the
+diff before running anything. Node tier: 228/228. The two directly-touched tests
+(`drill-as-data.spec.js`/`drill-bindings-identity-1385.spec.js`) re-run green, confirming the assertion LOGIC
+truly didn't move. Full suite run per the dispatch's own explicit instruction (shared `instantiate` path) even
+though nothing functional changed: **2792 passed, 13 flaky, 4 unexpected, 26 skipped** — all 4 unexpected are
+`version-sync-1311.spec.js`, re-ran in isolation (not a flake — fails consistently, every retry): `web/
+version.json` and `index.html`'s own title/chip both read `2026.08.26.1`, but `package.json`'s `version` field
+still reads `2026.8.25` — a real, standing desync. `git log` confirms this landed via the advisor's own
+release commit (`cb8fb27e release: V2026.08.26.1 — the docs stop lying about what is still to build`, made
+while this turn was in progress, along with `efec36dc docs: delete TOOL-SETTER.md and CONFORMANCE_CORPUS.md
+-- their citations are repointed` — the advisor acting on t2295's own HELD report) — not caused by anything
+this turn touched, and not a worker's call to fix (version bumps are the advisor's own domain per standing
+convention). Reported here, not self-fixed.
+
+### Files changed
+
+- `DDCS-Studio/web/blocks/dataOps/drillData.js` — header comment corrected (2 callouts: clearance promoted to
+  SOLVED, method reframed from "unsolved frontier" to "closed, by design, t2297").
+- `DDCS-Studio/tests/drill-as-data.spec.js` — comment + assertion message corrected to match; assertion logic
+  unchanged.
+
+No scratchpad scripts this turn — verification was reading the real source + a handful of `grep` calls,
+cited inline above; nothing needed a live browser run since no runtime behavior was in question.

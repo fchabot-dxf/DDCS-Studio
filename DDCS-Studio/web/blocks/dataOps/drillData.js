@@ -21,11 +21,30 @@
  * the placement tracks the pattern (ONE source of truth, declared not inferred-from-motion), and this def is now FULLY
  * placement-portable: x0/y0 offsets, circle/line/rect shapes, AND stock-attach all emit byte-identical to drillStack.
  *
- * REMAINING FRONTIER (the vocabulary Stage 5 must still grow, each an executable divergence tripwire in the spec):
- *   1. METHOD SWAP — params.method==='helical' makes drillStack build a `bore` child (different block TYPE + key
- *      set) instead of `drill`. instantiate substitutes VALUES, never a block type. → this def covers the peck path.
- *   3. FAN-OUT PARAM — `clearance` feeds TWO sockets (progstart + the drill leaf); a binding is 1 param → 1 socket,
- *      and duplicate param names are rejected. → clearance is held at its default here.
+ * ✅ FRONTIER #3 (clearance fan-out) — SOLVED in t2293 (closing t2291's own wiring-gap gate). `clearance` binds the
+ * holecycle leaf normally (matching depth/peck/feed); a `postInstantiate` hook copies the SAME resolved value onto the
+ * framing progstart's own copy — the identical pattern pocketData.js already used for its own derived-socket rewrites
+ * ("one source, no fan-out bindings"), not a new mechanism. `deriveBindings`/`instantiate` still write ONE
+ * (blockIndex,key) per binding row; the fan-out is closed by postInstantiate, not by teaching that a second row.
+ *
+ * ✅ "METHOD SWAP" — CLOSED, t2297, and it was never actually an unsolved frontier: t1385 (already landed when this
+ * comment was FIRST written, but not accounted for here until now) collapsed `array{drill|bore}` into ONE `holecycle`
+ * block — there is no `bore` child block TYPE anywhere in this pipeline any more (confirmed: zero hits repo-wide for
+ * a 'bore' block type). `cycle` (peck / bore-step / bore-helix) is a plain STRING PARAM on that ONE block, exactly
+ * like `pattern` already is — internally branching the emit (holeCycleLines), never the model shape. So there was
+ * never a block-type fork for a guard/pruneGuards mechanism (corner's probeZFirst/corner×probeSeq pattern) to close.
+ *
+ * AND the deeper reason `method` is correctly left unbound HERE is not a mechanism gap at all: `drillView.js`'s own
+ * `applyVariant()` — called on EVERY wizard open, per `wizardManager.js`'s own comment "the menu choice fixes the
+ * identity" — ALWAYS hides the method selector, in every mode (new-drill, new-bore, or edit). The shell never shows
+ * this field to a human; Drill and Bore are two permanently identity-locked menu entries, not one form with a live
+ * toggle. Mirroring that BY DESIGN, not by omission, drill and bore are two separate twins here — `DRILL_DATA_OPTYPE`
+ * baked at method='peck', `BORE_DATA_OPTYPE` (boreData.js) baked at method='helical' — and `boreData.js` ALREADY
+ * binds `holeDia`/`toolDia`/`pitch`/`ramp` completely on its own side (`ramp`'s own binding maps straight into the
+ * SAME `cycle` socket via `cycleForMethod('helical', ramp)`, since method is fixed there too). Those three fields
+ * were correctly left off THIS twin (t2293) because they are bore-only concepts that already have a home — not
+ * because drill's twin is missing them. Binding a live `method` toggle here would ADD an ability the shipped wizard
+ * deliberately never had, the exact "feature, not a reproduction" line t2293's own Step 1 discipline exists to catch.
  *
  * Scope note: the template is SEEDED from drillStack(DRILL_DEFAULTS) (== "BUILDERS(defaults)", the canonical
  * valid-by-construction template). The INDEPENDENT artifact under test is the hand-authored BINDINGS map below, proven
@@ -34,7 +53,7 @@
  *     shapes, stock-attach placement, cut params, skip + wcs (frontier #2 solved → the bbox tracks the pattern live).
  *   • WIRING (structural, all bindings) — set one param to a sentinel and assert BOTH instantiate AND drillStack land
  *     it in the binding's (blockIndex,key); a wrong/dropped/swapped key fails. Belt-and-suspenders alongside the emit
- *     sweep (it also covers the unbound method/clearance sockets staying put).
+ *     sweep (it also covers `method`, permanently baked rather than a socket to wire).
  * Stage 6 authors the template independently too (then the builder can be deleted); that's the self-host step, not this one.
  */
 import { drillStack } from '../../wizards/stacks/drillWizard.js';

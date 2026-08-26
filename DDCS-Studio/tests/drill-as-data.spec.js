@@ -11,7 +11,14 @@ import { test, expect } from '@playwright/test';
  * one, the matching divergence test fails and flags the win, exactly as it did for live bbox — t-numbered below
  * — and for clearance's own fan-out, t2293: an ordinary binding on the primary socket plus a postInstantiate
  * copy onto the second, the SAME pattern pocketData.js already used for its own derived-socket rewrites).
- * STILL OPEN: method swap (peck→bore is a structural block-TYPE change instantiate() cannot express).
+ * method stays permanently baked here, DELIBERATELY, not as an unsolved limit (t2297 corrected this comment's
+ * own earlier, wrong framing: t1385 already unified drill+bore into ONE `holecycle` block, so there is no
+ * block-TYPE fork for instantiate() to fail at). `drillView.js`'s own `applyVariant()` — called on every
+ * wizard open — ALWAYS hides the method selector; Drill and Bore are two permanently identity-locked menu
+ * entries, never a live toggle, and `boreData.js` already owns the bore-side bindings (holeDia/toolDia/pitch/
+ * ramp) completely, on its own separately-baked twin. Binding method HERE would add a capability the shipped
+ * wizard never had — this divergence assertion stays correct, but for the real reason, see drillData.js's
+ * own header.
  */
 test('drill-as-data: the data def emits byte-identical G-code to drillStack across a param sweep', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -147,7 +154,7 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
   expect(r.bboxOffsetPass, 'frontier #2 SOLVED: an x0/y0 offset now emits byte-identical (live bbox)').toBe(true);
   expect(r.bboxShapePass, 'frontier #2 SOLVED: a circle pattern now emits byte-identical (live bbox)').toBe(true);
   // STILL-OPEN — MUST currently diverge (what the {template,bindings} format cannot yet express).
-  expect(r.helicalPass, 'frontier #1: a pure data def cannot swap the drill→bore child (helical diverges)').toBe(false);
+  expect(r.helicalPass, 'method stays deliberately baked (Drill/Bore are permanently identity-locked twins, not a live toggle — see drillData.js\'s own header) — helical diverges here by design, not by limitation').toBe(false);
   // t2293 — FRONTIER #3 SOLVED: clearance's fan-out (progstart + the holecycle leaf) is now bound; varying it
   // must CONVERGE, same as frontier #2 did above.
   expect(r.clearancePass, 'frontier #3 SOLVED: clearance now emits byte-identical (fan-out bound via postInstantiate)').toBe(true);
