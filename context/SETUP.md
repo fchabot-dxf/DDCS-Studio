@@ -16,7 +16,21 @@ the two have different networks, different hardware, and different rules.
 
 ## THE STUDIO
 
-- **DDCS Expert / M350** — the real machine. Motors, tools, a table. ⛔ **`G54 Z0` = the spoilboard is SACRED.**
+- **The machine: an ULTIMATE BEE** (the owner's words) driven by a **DDCS Expert / M350**. Motors, tools,
+  a table. ⛔ **`G54 Z0` = the spoilboard is SACRED.**
+- ⭐⭐ **IT WORKS, AND IT IS IN PRODUCTION.** Owner, 2026-08-26: *"the expert and ultimate bee are mostly
+  working, ive been able to run parts and 2 sided jobs for a while."*
+
+  ⇒ **This is not a bench rig — real parts come off it.** Two consequences worth holding:
+
+  1. ⛔ **Anything touching EMIT is production-risk.** A wrong line does not fail a test, it ruins stock or
+     drives a tool into the table. Weigh emit changes accordingly.
+  2. ⭐ **A large, systematic error is ALREADY REFUTED by the parts.** Months of successful cuts are
+     evidence, and stronger than most tests. When a written claim says something big is silently wrong
+     — a WCS off by 68 mm, say — **the missing symptom is data**: either the path is not hit, or the
+     analysis is incomplete. Ask which before escalating it.
+
+  ⚠ **Two-sided work is done in FUSION**, not Studio — CAM territory, deliberately deprioritised.
 - **Fairy** is wired to it and runs the **gateway**: SMB `\192.168.0.99\`, Modbus on **COM6** *(on-site only)*.
 - **ASUS TUF** — a laptop on the same WiFi, metres from Fairy. Not on the controller.
 - ⚠ **The WiFi is not the owner's to administer**, and the phone↔PC path has failed there before. ⛔ **This is
