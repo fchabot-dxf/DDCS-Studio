@@ -40,7 +40,7 @@ Vocabulary: **Console** (web app) ↔ **Gateway** (fairy) ↔ **Rendezvous** (R2
 
 ## Why this shape (decisions on record)
 - Transport = **cloud-poll via R2**, chosen over an exposed token endpoint to keep the CNC machine
-  un-exposed. Full argument: [`../TRANSPORT_DECISION.md`](../TRANSPORT_DECISION.md).
+  un-exposed. Full argument: [`../TRANSPORT_DECISION.md`](../archive/TRANSPORT_DECISION.md).
 - The **transfer to the Expert is a plain SMB file copy** to `\\192.168.0.99\CNCDISK` (confirmed R/W
   2026-06-06). The cloud hop only gets bytes *to* CNC-FAIRY across the isolating guest WiFi.
 - **Beacons** = `MSETDATA` progress pushes (proven wedge-free); the slave counts them → `%`, op, line, ETA.

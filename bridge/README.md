@@ -21,8 +21,7 @@ matrix in **[`controllers/README.md`](controllers/README.md)** and never cross-a
 checking it.
 
 ## Map
-- [`CLAUDE.md`](CLAUDE.md) — the seat loader for this folder.
-- ⭐ **The two-controller rule and the confidence tags live in [`controllers/README.md`](controllers/README.md).**
+- - ⭐ **The two-controller rule and the confidence tags live in [`controllers/README.md`](controllers/README.md).**
   ⛔ **Where each seat is, and the safety rules, live in [`../context/`](../context/)** — not here.
 - ⚠ **External, NOT part of this repo:** the installed **`ddcs-expert`** Claude skill — deep DDCS macro /
   G-code knowledge (V1.22 verified). Reference only; do not edit it as part of this repo.

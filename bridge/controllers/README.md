@@ -22,6 +22,21 @@ findings and assets separate so a fact proven on one is never silently assumed o
 ⭐ **Tag everything.** A fact recorded without one reads as confirmed by default, which is how an inference
 becomes ground truth — the failure this repo keeps paying for.
 
+## ⭐ PREFER A `FINDINGS.md` OVER A MEMORY, FOR ANYTHING ABOUT A CONTROLLER
+`controllers/<name>/FINDINGS.md` with a confidence tag beats a local memory for every hardware fact: it lives
+in the repo, it travels to every seat, and it **records confidence** — which a memory structurally cannot.
+A memory asserts; `[TO TEST]` admits. ⇒ Write the fact here and keep only a pointer in memory
+([`../../MEMORY-PROTOCOL.md`](../../MEMORY-PROTOCOL.md)).
+
+## ⭐ THE EXPERT'S CROSS-CUTTING DOCS
+- [`expert-m350/PARAM-PAGE-MAP.md`](expert-m350/PARAM-PAGE-MAP.md) — every pendant section and the parameters
+  it holds. ⛔ Sections gather **scattered** number ranges, so never search by parameter number — and when
+  asking a human to change one, give **Param page → section → `#nnn` name**, never a bare number.
+- [`COMMENT-CHARACTERS.md`](COMMENT-CHARACTERS.md) — what may appear inside a `(comment)`, derived from the
+  vendor dumps. The governing constraint is **nesting**, not the character set.
+- [`expert-m350/FINDINGS.md`](expert-m350/FINDINGS.md) — ⭐ read **the RESULTS block at the top**; the
+  numbered sections below are the investigation in order, corrections included, provenance only.
+
 ## ⭐ Finding a parameter on the pendant — do NOT scroll to its number
 `eng`, which ships on the controller beside `setting`, is a complete machine-readable description of the
 parameter set: name, unit, range, edit permission, **and the Param List section** (`-m`). Two things follow:

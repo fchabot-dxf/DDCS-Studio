@@ -29,6 +29,13 @@ delivery mechanism. **Open it now.**
 hardware, with whom. The project itself is documented in `ROADMAP.md`, `ARCHITECTURE.md`, `BACKLOG.md`, and
 `bridge/controllers/*/FINDINGS.md`.
 
+## ⏸ CURRENT SESSION STATE
+
+⭐ **[`context/HANDOFF-FROM-FAIRY.md`](context/HANDOFF-FROM-FAIRY.md) → the PAUSE STATE block at the bottom.**
+Whichever seat you are, that is what a returning session should open first: the machine's state, the single
+next action, and what the last session settled or got wrong. The outbound half is
+[`context/HANDOFF-TO-FAIRY.md`](context/HANDOFF-TO-FAIRY.md).
+
 ## ⛔ THE THREE THAT MUST BE READ EVERY TIME
 
 1. **TWO CONTROLLERS, and they behave differently** — the **DDCS V4.1** (bench, at home, motorless) and the

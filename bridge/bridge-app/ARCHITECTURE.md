@@ -5,7 +5,7 @@ Extensive, module-by-module design for the DDCS Expert job bridge. The system is
 **where it runs**, and **what it does**. Code should follow this structure.
 
 - The contract between the apps: [`shared/PROTOCOL.md`](shared/PROTOCOL.md)
-- Why cloud-poll (not an exposed endpoint): [`../TRANSPORT_DECISION.md`](../TRANSPORT_DECISION.md)
+- Why cloud-poll (not an exposed endpoint): [`../TRANSPORT_DECISION.md`](../archive/TRANSPORT_DECISION.md)
 - The confirmed facts this is built on: [`../controllers/expert-m350/FINDINGS.md`](../controllers/expert-m350/FINDINGS.md)
 
 ---
