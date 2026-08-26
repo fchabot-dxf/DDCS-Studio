@@ -1435,8 +1435,28 @@ Software limit · MPG · Backlash · Tools · System.
 no hunting. ⭐ Combined with §11 (`eng` index == `setting` index) and the `−500` macro rule, one file answers
 *what a slot means*, *where it is on screen*, and *how a macro addresses it*.
 
-**`-p` is a PRIVILEGE LEVEL, not visibility.** All 38 `-p1` entries are machine-definition (machine type,
-RTCP, axis names/types/vectors, kinematics, comms, home mode); the other 539 are operator-level. 13 of the 38
-say *"Restart takes effect"*; **zero** `-p0` entries do. The pendant footer carries a matching `User:` field
-(`#199` showed `Operator`). ⚠ `[HYPOTHESIS — the mapping to the footer's User field is not yet read off the
-screen for a `-p1` param]`
+⛔ **SECTIONS GATHER SCATTERED RANGES — the numbering has NOTHING to do with the grouping.** Confirmed on a
+second section: **Home** (`-m7`) holds `#100-118`, `#122-127` **and** `#235-239`; **Probe** (`-m8`) holds
+`#128-132` and `#135-141` — so `#127` and `#128` sit in different sections while `#127` and `#235` share one.
+⇒ ⚠ **Never look for a parameter by scrolling to its number.** That is why `#400` could not be found: it is
+numerically far from everything around it on screen, and only `-m13` locates it.
+
+**The section map, straight out of `eng`** (`-m` ⇒ the ranges it gathers):
+```
+-m7  Home           100-118  122-127  235-239        [CONFIRMED against the pendant]
+-m8  Probe          128-132  135-141                 [CONFIRMED]
+-m13 Backlash       190-200  400-415  420-435        [CONFIRMED]
+-m14 Tools          800-803 805-827 830-945 973-992 999   (144 params)
+-m15 System         240-248 266-269 278-279 284 296-297
+-m9  150-154   -m10 155-170   -m11 171-185           [Hard Limit / Software limit / MPG — inferred from
+                                                      #155 "Enable software limits" landing in -m10]
+-m0..-m6   the first five sections (Machine/Manual/Process/Spindle/IO), boundaries not yet read off screen
+-m16..-m31 ranges 500-1105, beyond the 13-entry Param List — other screens
+```
+
+**`-p` gates EDITING, not visibility.** ⭐ Corrected by the owner: *"we can see all the param no matter our
+privilege but edit may be gated."* So the pendant's footer `User:` field states the level required to CHANGE
+that parameter, and every parameter is readable at any level. All 38 `-p1` entries are machine-definition
+(machine type, RTCP, axis names/types/vectors, kinematics, comms, home mode); the other 539 are
+operator-editable. 13 of the 38 also say *"Restart takes effect"*; **zero** `-p0` entries do.
+⇒ ⛔ This also means a `-p1` parameter can be READ by anything at any time — the gate is on writes only.
