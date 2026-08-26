@@ -57,6 +57,27 @@ WORK-LOG.md`). When a plan ships: delete it in its own commit (`git rm`, no cont
 carrying forward only what is still genuinely undone (to `BACKLOG.md` or a fresh, scoped doc) — never
 archive a finished plan "just in case."
 
+
+### 7. Bump the version with the SCRIPT, never by hand
+
+```bash
+cd DDCS-Studio && npm run bump-version
+```
+
+It writes **all three** places a version lives — the `.ver` chip **and** the `<title>` in `web/index.html`,
+`package.json`, and `web/version.json` — from one source of truth. `tests/version-sync-1311.spec.js` fails
+if they disagree.
+
+⛔ **Do not `sed` them.** On 2026-08-26 nine releases were cut by hand-editing `version.json` and
+`index.html` only. `package.json` sat on the previous day's date for all nine, and **the suite stayed green
+the entire time** — the spec compares a date relationship, so a stale `package.json` only became visible when
+the date rolled over at midnight.
+
+⭐ **The general form, and it is why this is a rule and not a note:** when a routine already exists as a
+SCRIPT, restating its steps in prose — in a doc, a memory, or a commit message — creates a second copy that
+drifts. **Run the script; point at it.** This script's own header records that its predecessor had already
+drifted the same way once.
+
 ---
 
 ## ⚠ Load-bearing code — do not remove
