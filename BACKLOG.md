@@ -2096,6 +2096,40 @@ communicating badly, whatever its logic says.
 ⛔ **Do not "fix" this by hiding the dot when unsaved** — that would be worse: it would say "no problem" to the
 person with no backup at all.
 
+#### ⭐ ADVISOR, 2026-08-26 — IT IS ONE LINE, AND BOTH FACTS ARE ALREADY IN SCOPE THERE
+
+`workspaceManager.js:498`:
+
+```js
+class="wsm-state ${dirty || !everSaved ? 'is-dirty' : 'is-saved'}"
+                   ^^^^^^^^^^^^^^^^^^^  two different facts OR'd into ONE visual state
+```
+
+⇒ **`dirty` and `everSaved` are separate variables on the same line.** The information is not merely
+"available elsewhere" — it is already in hand at the point of render. This is a three-state class where a
+two-state one is written, not a redesign.
+
+**PROPOSED TREATMENT** — the two problem states differ in KIND, not degree, so they should differ in SHAPE and
+not only in colour:
+
+```
+  ●   SAVED             a file exists and matches
+  ●   STALE             a file exists and is out of date      → "your backup is old"
+  ○   NO FILE AT ALL    this exists only in this browser      → "you have NO backup"
+      ↑ HOLLOW. a colour ramp reads as "worse"; a different shape reads as "different problem".
+```
+
+⭐ **Why no-file is the more urgent of the two**, and it is a standing principle here, not a judgement call:
+`localStorage` is TEMPORARY and is never "Saved" — the user-owned FILE is the only persistence. A workspace
+with no file is one cleared cache from gone; a stale file is merely behind.
+
+⚠ **The tooltip/state line already says the right words** ("Never saved to a file" vs "Unsaved changes") —
+`:484-486` computes both. **Only the header glyph collapses them.** ⇒ Whatever is chosen, the glyph and the
+state line must agree; today they disagree, which is why both the owner AND the advisor misread the same dot.
+
+⛔ **Not a ruling I should make alone** — it is a visible change to the one indicator the owner looks at
+most, and they have already been misled by it once.
+
 ⇒ Cheapest honest fix is probably the TOOLTIP, which can differ without touching the visual language. A second
 dot state is a bigger design question and would need a ruling.
 
