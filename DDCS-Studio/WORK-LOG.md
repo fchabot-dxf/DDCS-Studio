@@ -58081,3 +58081,88 @@ broader-blast-radius change this dispatch never scoped a judgment call for — r
 Owner's-eyes verification, screenshots, `drill-form-reproduction-2299.spec.js` against the actual flipped
 tree (it failed, see above), and the full suite were not meaningfully run against the flip itself — there is
 no flip standing to verify. `drillData.js` is back at HEAD; nothing to commit, nothing to revert.
+
+## t2315 — FIX THE THIRD DORMANT BUG (t2313), machinery only — drill stays unflipped, per the dispatch's own
+explicit boundary. `drillData.js` untouched throughout (confirmed clean before AND after).
+
+### GATE — is the object children shape genuinely part of the vocabulary, or an accident unique to the split node?
+
+Genuinely part of it — NOT unique to `split_horizontal`/`split_vertical`. Grepped `formWidgets.js`'s own
+`traverse` (the ONE place every node type's `children`/`uiChildren` gets consumed) and found the object shape
+already normalized, independently, for `section`, `panel` (×2), `param_group`, `group_box`, `grid_container`
+(all via `Array.isArray(x)?x:(x.DO||[])` — a Blockly-round-tripped single-mouth block's own `DO` key) and
+`tab_group` (its own `.TABS` key, each tab page then ALSO normalizing its own nested `.DO`), plus a fully
+GENERIC fallback (`allMouthChildren`, the "unwired placeholder" branch) already handling ANY mouth-key
+combination. `userOpView.js`'s `hasTreeLayout` carried a THIRD, independent variant of the same idea. Only
+`flattenBlocks` (userOps.js) had none. So the real finding isn't "split_horizontal is special" — it's that
+THREE different consumers already agreed the object shape is real and load-bearing, one didn't, and nothing
+had ever exercised that gap until t2313 placed the first real split node in a live tree.
+
+### THE SWEEP — full list, with verdict
+
+| consumer | file | verdict (before this turn) |
+|---|---|---|
+| `flattenBlocks` | userOps.js:104 | WRONG — assumed array, crashed on object (the t2313 bug) |
+| `hasTreeLayout`'s `checkNodes` | userOpView.js:110-120 | correct, but its own independent inline variant |
+| `traverse`'s `section`/`panel`/`param_group`/`group_box`/`grid_container` branches | formWidgets.js | correct, 5 near-identical inline copies of the SAME `.DO` ternary |
+| `traverse`'s `tab_group`/`tab_page` branches | formWidgets.js | correct, its own `.TABS`-specific shape (kept as-is — TABS needs pages kept SEPARATE, not flattened, so it isn't a `childrenOf` candidate) |
+| `traverse`'s `split_horizontal`/`split_vertical` branch | formWidgets.js | correct, its own LEFT/RIGHT/TOP/BOTTOM-specific shape (kept as-is — same reason: needs mouths kept separate, not flattened) |
+| `traverse`'s unwired-placeholder fallback | formWidgets.js (`allMouthChildren`) | correct, already the generic form — this IS what `childrenOf` now is, moved and shared |
+
+### THE FIX — declared once, per the dispatch's own suggestion
+
+`childrenOf(nodeChildren)` (new, `blocks/userOps.js` — the lower layer `formWidgets.js` ALREADY imports from,
+confirmed by reading its own import list before choosing a home: it already pulls `paramFieldsFromStack` from
+there, and `userOps.js` imports nothing from `ui/`, so this is the established, safe dependency direction, not
+a new one). Identical logic to the old local `allMouthChildren`: array → identity; object → flatten every
+array-valued key; falsy → `[]`. Three call sites now share it:
+- `flattenBlocks` (userOps.js) — the actual bug fix.
+- `formWidgets.js`'s `traverse` — replaced ALL SIX flattening call sites (section, panel×2, param_group,
+  group_box, grid_container, tab_page's nested DO) plus removed the now-redundant local `allMouthChildren`
+  definition entirely, importing the shared one instead. The `split_horizontal`/`tab_group` branches that
+  need mouths kept SEPARATE (not flattened together) are untouched — `childrenOf` is the wrong tool for those,
+  by design, not an oversight.
+- `hasTreeLayout` (userOpView.js) — its own independent inline variant replaced with the shared call.
+
+### PROVING ORDER IS UNCHANGED — measured across all 32 twins, not reasoned about alone
+
+`childrenOf` is IDENTITY for array input (`if (Array.isArray(x)) return x;` — same reference, zero
+transformation), and every one of the 32 shipped twins' own `children`/`uiChildren` is array-shaped today
+(confirmed: none use the object form anywhere yet — only the never-shipped split node does). That's a
+sufficient logical proof, but the dispatch asked to MEASURE it: captured `flattenBlocks(def.template)`'s
+output (type + `_group` per block, in order) for all 32 `*DataDef()` twins BEFORE the fix, again AFTER, and
+diffed — **byte-identical, 0 differences** (scratchpad script + both snapshots, not kept). Also ran the
+existing per-twin wiring specs (`drill-as-data`, `bore-as-data`, `text-as-data`, `atc-warmup-as-data`, etc. —
+each already asserts `(blockIndex,key)` correctness end-to-end) — unaffected, all passing.
+
+### THE CRASH ITSELF — confirmed fixed directly, not just inferred from the sweep
+
+Rebuilt t2313's exact reverted wrap (`split_horizontal`, `children:{LEFT:[param_group,…],RIGHT:[sim]}`) as a
+synthetic tree (not touching `drillData.js`) and ran it through `flattenBlocks` directly: no throw, output
+`['split_horizontal','param_group','field_ref','section','field_ref','sim']` — both mouths flattened in
+declared key order, LEFT before RIGHT, matching the object literal's own key order.
+
+### Non-vacuous, proven the same way as every prior gated turn
+
+Temporarily reverted `flattenBlocks`'s loop back to `(blocks || [])` and re-ran `tests/children-of-shape-
+2315.spec.js`: the crash-reproduction test fails (`TypeError: (blocks||[]) is not iterable`, the exact
+original error), the other four (which exercise `childrenOf` directly, independent of `flattenBlocks`'s own
+implementation) still pass. Restored, re-ran clean.
+
+### Regression sweep
+
+Full suite: **2818 passed, 0 failed, 15 flaky** (26.0m). No failure at all this run — every flaky entry is a
+spec this turn never touched, recovering on retry, none in `userOps.js`/`formWidgets.js`/`userOpView.js`'s
+own broad blast radius (both widely-imported files touching MANY specs) — a real, meaningful green run for a
+change to foundational, shared machinery, not just an absence of red.
+
+### Files changed
+
+- `web/blocks/userOps.js` — `childrenOf` (new, exported), `flattenBlocks` updated to use it.
+- `web/ui/formWidgets.js` — imports `childrenOf` from `userOps.js`; local `allMouthChildren` removed; 6
+  duplicated `.DO`-ternary call sites + the 2 `allMouthChildren` call sites now call the shared helper.
+  `split_horizontal`/`tab_group`'s own mouth-specific branches unchanged.
+- `web/wizards/views/userOpView.js` — `hasTreeLayout`'s inline normalization replaced with the shared import.
+- `tests/children-of-shape-2315.spec.js` (new) — `childrenOf` unit coverage, the crash-reproduction
+  regression guard, and an equivalence proof against `hasTreeLayout`'s old inline formula. Proven non-vacuous.
+- `drillData.js` — untouched (confirmed clean before and after every edit this turn).

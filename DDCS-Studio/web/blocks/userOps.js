@@ -99,17 +99,37 @@ export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string',
 // its allow-list — a NEW field on a spec silently vanishes there otherwise (the exact defect class this project
 // keeps finding: a declaration written, a hand-picked spread that doesn't know to carry it).
 
+// t2315 — a node's `children`/`uiChildren` value takes TWO shapes depending on provenance: hand-authored
+// (a plain array, every one of the 32 shipped data-op twins today) or Blockly-round-tripped from a MULTI-
+// MOUTH block (an object keyed by mouth name — `DO` for a single-mouth container, `LEFT`/`RIGHT` or
+// `TOP`/`BOTTOM` for split_horizontal/split_vertical, `TABS` for tab_group). formWidgets.js's own `traverse`
+// already normalized this per node-type (five near-identical `Array.isArray(x)?x:(x.DO||[])` copies, plus a
+// LEFT/RIGHT-specific one, plus its own generic `allMouthChildren` fallback) and userOpView.js's
+// `hasTreeLayout` had a THIRD, independent variant — `flattenBlocks` here had NONE, and crashed
+// (`TypeError: (blocks||[]) is not iterable`) the first time a real op ever placed a `split_horizontal` node
+// in a live `uiChildren` tree (t2313). Declared ONCE here (the lower layer both `userOps.js` and
+// `formWidgets.js` already share — `formWidgets.js` already imports `paramFieldsFromStack` from this same
+// module) so a fourth consumer can't re-derive its own copy, or miss the normalization entirely the way this
+// one did. IDENTITY for array input (returns the same reference, same order, zero transformation) — every
+// existing array-shaped child stays byte-identical; proven across all 32 twins' own `flattenBlocks` output
+// before/after (scratchpad/t2315-flatten-snapshot.mjs, not kept — 0 diffs).
+export function childrenOf(nodeChildren) {
+    if (!nodeChildren) return [];
+    if (Array.isArray(nodeChildren)) return nodeChildren;
+    return Object.values(nodeChildren).flatMap((v) => (Array.isArray(v) ? v : []));
+}
+
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
 export function flattenBlocks(blocks, out = [], currentGroup = null) {
-    for (const b of (blocks || [])) { 
-        if (!b) continue; 
+    for (const b of childrenOf(blocks)) {
+        if (!b) continue;
         let g = currentGroup;
         if (b.type === 'param_group' && b.params && b.params.group) g = String(b.params.group).trim();
         b._group = g;
-        out.push(b); 
+        out.push(b);
         if (b.uiChildren) flattenBlocks(b.uiChildren, out, g);
-        if (b.children) flattenBlocks(b.children, out, g); 
+        if (b.children) flattenBlocks(b.children, out, g);
     }
     return out;
 }

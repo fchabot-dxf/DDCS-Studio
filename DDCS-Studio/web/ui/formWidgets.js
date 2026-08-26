@@ -19,7 +19,7 @@ import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';
 import { factsOf, factMm, factLabel, unitOf } from '../data/latheTools.js';   // t1325 — the tool's quick facts, and the ONE conversion for its unit   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool, toolsOfKinds } from '../wizards/toolPicker.js';   // t1325 — toolsOfKinds: an op offers only the kinds it declares it can hold   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
-import { paramFieldsFromStack } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present
+import { paramFieldsFromStack, childrenOf } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present; t2315 — the ONE children/uiChildren shape normalization, shared with flattenBlocks
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
 import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
@@ -1276,14 +1276,6 @@ function unwiredPlaceholder(type) {
     return row;
 }
 
-/** t1561 — every child a mouth-object holds, regardless of mouth NAME (DO/TABS/LEFT/RIGHT/...). An array passes
- *  through unchanged; anything falsy returns []. Used only where the caller does NOT already know its own block's
- *  mouth names (the unwired-type fallback) — every other branch above still addresses its own mouth by name. */
-function allMouthChildren(obj) {
-    if (!obj) return [];
-    if (Array.isArray(obj)) return obj;
-    return Object.values(obj).flatMap((v) => (Array.isArray(v) ? v : []));
-}
 
 // t2311 (BACKLOG #10 → t2309's own gate) — a split's `ratio` token was PROPORTIONAL-ONLY (two plain numbers,
 // e.g. '2:1'): the declared vocabulary had no way to express a FIXED-pixel pane beside one that fills the
@@ -1348,7 +1340,7 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 hdr.addEventListener('click', () => { const now = !(sec.getAttribute('data-collapsed') === '1'); applyFold(sec, now, true); setSectionCollapsed(s, now); });
                 
                 if (node.children) {
-                    const childNodes = Array.isArray(node.children) ? node.children : (node.children.DO || []);
+                    const childNodes = childrenOf(node.children);
                     traverse(childNodes, body);
                 }
             } else if (node.type === 'field_ref' || node.type === 'formfield' || node.type === 'param_field') {
@@ -1415,8 +1407,8 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     </div>
                 </div>`;
                 container.appendChild(pnlBox);
-                if (node.uiChildren) traverse(Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []), container);
-                if (node.children) traverse(Array.isArray(node.children) ? node.children : (node.children.DO || []), container);
+                if (node.uiChildren) traverse(childrenOf(node.uiChildren), container);
+                if (node.children) traverse(childrenOf(node.children), container);
             } else if (node.type === 'code_preview') {
                 // t2263 (wizards-as-data E2 measurement, PILOT on ATC Check ONLY) — the one node type all 32
                 // twins' declarations are missing: every hand-written built-in hardcodes its own <div
@@ -1498,7 +1490,7 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // pre-rendered row out of byParam via the param_field branch above — the ONE materialization the
                 // caller already produced by consuming renderOpForm(formBindings(def)). No second derivation here
                 // (t1562's rule): this branch decides only WHERE the rows land, never what they contain.
-                const pgKids = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                const pgKids = childrenOf(node.children);
                 traverse(pgKids, container);
             } else if (node.type === 'group_box') {
                 // t1561 STEP 2 — a titled card. Collapsible per its own `collapsible` param; REUSES the exact
@@ -1522,7 +1514,7 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     hdr.innerHTML = `<span class="form-sec-title">${escHtml(gTitle)}</span>`;
                     box.append(hdr, body); container.appendChild(box);
                 }
-                const gChildren = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                const gChildren = childrenOf(node.children);
                 traverse(gChildren, body);
             } else if (node.type === 'grid_container') {
                 // t1561 STEP 2 — a plain CSS grid; columns/gap come straight from the block's own params.
@@ -1531,7 +1523,7 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 const gap = (node.params && node.params.gap) || '16px';
                 gridBox.style.cssText = `display:grid; grid-template-columns: repeat(${columns}, 1fr); gap:${gap}; width:100%;`;
                 container.appendChild(gridBox);
-                const gcChildren = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                const gcChildren = childrenOf(node.children);
                 traverse(gcChildren, gridBox);
             } else if (node.type === 'tab_group') {
                 // t1561 STEP 2 — a tab strip + panes. Only direct `tab_page` children are meaningful here (a
@@ -1569,7 +1561,7 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     };
                     btn.addEventListener('click', () => setActive(i));
                     panes.push({ btn, pane });
-                    const pageChildren = tabNode.children ? (Array.isArray(tabNode.children) ? tabNode.children : (tabNode.children.DO || [])) : [];
+                    const pageChildren = childrenOf(tabNode.children);
                     traverse(pageChildren, pane);
                 });
                 if (panes[activeIdx]) { panes[activeIdx].btn.style.color = 'var(--text-main,inherit)'; panes[activeIdx].btn.style.background = 'var(--bg,transparent)'; }
@@ -1588,8 +1580,8 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // TABS, LEFT/RIGHT, ...) — not just DO, which every OTHER branch above can assume because it
                 // already knows its own block's mouth names. Collect every array-valued key so a block with an
                 // unfamiliar mouth name still loses nothing, not just the ones that happen to use DO.
-                traverse(allMouthChildren(node.uiChildren), container);
-                traverse(allMouthChildren(node.children), container);
+                traverse(childrenOf(node.uiChildren), container);
+                traverse(childrenOf(node.children), container);
             }
         }
     }
