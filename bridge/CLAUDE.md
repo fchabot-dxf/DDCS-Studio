@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-**Read [`AGENTS.md`](AGENTS.md) first.** It is the canonical entry point for this repo.
+**Read the ROOT [`../AGENTS.md`](../AGENTS.md) first** — it is the canonical entry point for the repo, and
+it is NOT auto-loaded. Then [`RULES.md`](RULES.md) for this folder's own rules.
 
 Critical reminder, repeated here because it is the easiest mistake to make:
 

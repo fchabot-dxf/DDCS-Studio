@@ -6,7 +6,7 @@ has no official PC API; this project synthesizes one from the interfaces the ven
 and accessories (SMB file share, serial keyboard/Modbus port, macro event-hooks, virtual buttons).
 
 > **Most work in this repo is done by AI agents.** If you are an agent, start with
-> **[`AGENTS.md`](AGENTS.md)**.
+> **[`RULES.md`](RULES.md)**.
 
 ## Two controllers — don't mix them up
 | | DDCS **V4.1** (bench) | DDCS **Expert / M350** (target) |
@@ -19,7 +19,7 @@ matrix in **[`controllers/README.md`](controllers/README.md)** and never cross-a
 checking it.
 
 ## Map
-- **[`AGENTS.md`](AGENTS.md)** / [`CLAUDE.md`](CLAUDE.md) — agent entry point + the two-controller rule.
+- **[`RULES.md`](RULES.md)** / [`CLAUDE.md`](CLAUDE.md) — this folder's rules + the two-controller rule.
 - [`archive/`](archive/) — historical/superseded originals (DESIGN, EXPERIMENTS, RS232 probe notes,
   packaged skill). Context only — current truth lives under `controllers/`.
 - [`controllers/`](controllers/) — per-machine findings, build guides, and assets:

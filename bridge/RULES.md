@@ -1,7 +1,14 @@
-# AGENTS.md — read this first
+# RULES — working on the bridge and the controllers
+
+⛔ **Not the repo's entry point** — that is the ROOT [`../AGENTS.md`](../AGENTS.md), which the root
+`CLAUDE.md` points at. This file holds the rules for THIS folder. It was called `AGENTS.md` until
+2026-08-25; two files of that name is how the reachability fact below ended up somewhere nobody looked.
+
+⭐ **Where each seat is and which controller it reaches:** [`../context/SEATS.md`](../context/SEATS.md).
+⛔ Do not restate addresses here — one fact, one home.
 
 This repo is a **homebrew / reverse-engineering effort to build an unofficial PC + AI control
-API for DDCS CNC controllers**. Most work here is done *by* AI agents. This file is your entry point.
+API for DDCS CNC controllers**. Most work here is done *by* AI agents. The repo's entry point is the root `AGENTS.md`; this file is the rules for `bridge/`.
 
 ## ⛔ The one rule that matters: there are TWO different controllers
 
@@ -9,7 +16,7 @@ API for DDCS CNC controllers**. Most work here is done *by* AI agents. This file
 |---|---|---|
 | Model | **DDCS V4.1** | **DDCS Expert (M350)** |
 | Role | safe sandbox — no motors, no switches | production machine (Ultimate Bee 1010) |
-| Reachable from | home LAN `10.0.0.50` (SMB) | **studio**: SMB `\\192.168.0.99\` + Modbus on **COM6** (only when on-site) |
+| Reached from | ⭐ **Ranchy, at home** | ⭐ **Fairy, at the studio** |   ← ⛔ addresses live in [`../context/SEATS.md`](../context/SEATS.md), not here
 | Status (2026-06-06) | bench-proven sandbox | **LIVE** — SMB R/W + Modbus + checkpoint readback all proven on the real machine |
 
 **They do NOT behave the same.** A fact confirmed on the V4.1 is *not* automatically true on the
@@ -29,7 +36,7 @@ check which controller it was confirmed on.
 
 ## Where things live
 ```
-/AGENTS.md            ← you are here
+/RULES.md             ← you are here
 /CLAUDE.md            ← pointer to this file (auto-loaded by Claude Code)
 /README.md            ← human-facing project overview ("what is")
 /ROADMAP.md           ← what's next: bridge-app build order, open experiments, guardrails

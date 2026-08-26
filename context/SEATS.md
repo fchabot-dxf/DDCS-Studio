@@ -18,7 +18,7 @@ bench V4.1      →  RANCHY   ⛔ Fairy does not have one. Do not route V4.1 que
 
 ⚠ **Both seats got this wrong simultaneously on 2026-08-25.** Fairy filed *"is the tool-offset row nonzero on a
 V4.1?"* as needing the studio; Ranchy told the owner it had *"no path to a controller"* — while
-`bridge/AGENTS.md` had said *"Reachable from home LAN 10.0.0.50"* the whole time. **The fact was present,
+`bridge/AGENTS.md` (now `bridge/RULES.md`) had said *"Reachable from home LAN 10.0.0.50"* the whole time. **The fact was present,
 correct, and read past by both.**
 
 ⭐ **MOTORLESS changes what is testable.** Nothing can crash on the bench V4.1 — no tool, no table. Tests that
