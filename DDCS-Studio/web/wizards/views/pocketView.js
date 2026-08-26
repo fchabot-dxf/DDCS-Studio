@@ -116,7 +116,7 @@ export const pocketView = {
 
         const gcode = wizard.generate(params);
         el('wiz_pocket_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'pocketVizContainer', undefined, undefined, undefined, undefined, { opType: 'pocket', params });   // t2176 — BACKLOG 10: when editing an existing op, the 3D view shows this op in whole-program context
+        ctx.preview3D(gcode, 'pocketVizContainer', undefined, undefined, undefined, undefined, { opType: 'pocket', params });   // t2176 — BACKLOG 10: whole-program context (editing splices in place; a new op previews appended at the end)
         layout.render(el('pocketLayoutCanvas'), buildPocketSpec(params, s.stock));
 
         const status = el('pocketVizStatus');

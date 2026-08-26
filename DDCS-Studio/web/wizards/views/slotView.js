@@ -111,7 +111,7 @@ export const slotView = {
 
         const gcode = wizard.generate(params);
         el('wiz_slot_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'slotVizContainer', undefined, undefined, undefined, undefined, { opType: 'slot', params });   // t2176 — BACKLOG 10: whole-program context when editing an existing op
+        ctx.preview3D(gcode, 'slotVizContainer', undefined, undefined, undefined, undefined, { opType: 'slot', params });   // t2176 — BACKLOG 10: whole-program context (editing splices in place; a new op previews appended at the end)
         layout.render(el('slotLayoutCanvas'), buildSlotSpec(params, s.stock));
 
         const status = el('slotVizStatus');

@@ -63,17 +63,24 @@ test('PLAY stays scoped: pressing Play only ever runs the isolated op, not the w
     }
 });
 
-test('authoring a BRAND-NEW op (not yet in the program): single-op preview is unchanged, no whole-program splice attempted', async ({ page }) => {
+test('authoring a BRAND-NEW op (not yet in the program): previews APPENDED after the existing ops (t2307)', async ({ page }) => {
+    // t2307 (BACKLOG #10) — investigated and lifted the "no position to show yet" limitation this test used to
+    // pin: a brand-new op DOES have a representable position — insert()'s own default "+ Add as a 2nd operation"
+    // choice (wizardManager.js, the PRIMARY button on a non-empty canvas) appends it to the end. _contextGcode
+    // now mirrors that for the not-yet-editing case instead of short-circuiting to null.
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsStudio.wizardManager);
     await loadThreeOpProgram(page);
-    // open() for a NEW op — editingOpId stays null, so _contextGcode must short-circuit
+    // open() for a NEW op — editingOpId stays null; _contextGcode now appends this draft to the committed stack
     await page.evaluate(() => window.ddcsStudio.wizardManager.open('pocket'));
     await page.waitForFunction(() => document.querySelector('.wiz-viz3d'), null, { timeout: 8000 });
     const r = await page.evaluate(() => {
         const host = document.querySelector('.wiz-viz3d');
-        return { editingOpId: window.ddcsStudio.wizardManager.editingOpId, context: host.__contextGcode };
+        return { editingOpId: window.ddcsStudio.wizardManager.editingOpId, context: host.__contextGcode || '', isolated: host.__gcode || '' };
     });
     expect(r.editingOpId, 'a fresh open is not editing an existing op').toBeNull();
-    expect(r.context, 'no whole-program splice for a brand-new (uncommitted) op').toBeNull();
+    expect(r.context.length, 'a whole-program splice WAS built for the brand-new op').toBeGreaterThan(0);
+    const isolatedLines = r.isolated.trim().split('\n').length;
+    const contextLines = r.context.trim().split('\n').length;
+    expect(contextLines, `whole-program context (${contextLines} lines) is longer than the isolated op alone (${isolatedLines} lines) — the 3 existing ops are really in it`).toBeGreaterThan(isolatedLines);
 });

@@ -582,17 +582,21 @@ export class WizardManager {
     // (a throwaway benchmark, not assumed): re-emitting a 60-op stack via emitMapped costs ~1.3ms, a 12-op one
     // ~0.3ms — negligible against the ~200-300ms a live-typing debounce already waits, so the backlog's own
     // "backdrop fallback if re-trace proves prohibitive" is not needed; the real whole-program feed is safe.
-    // `wholeProgramCtx` ({opType, params}), when the caller has it AND an existing op is being edited
-    // (this.editingOpId), builds a fresh draft of THIS op (opFromMarker — the SAME codec programModel's own
-    // marker-import already uses, not a second op-building path) and splices it into the CURRENT committed
-    // program (replaceOpById, also already a shared primitive) via ONE re-emit (emitMapped, the same call Studio/
-    // Blocks make for their own whole-program views — no second renderer). A brand-new (not-yet-committed) op has
-    // no position in the program to show yet, so it keeps the single-op-only preview unchanged.
+    // `wholeProgramCtx` ({opType, params}) builds a fresh draft of THIS op (opFromMarker — the SAME codec
+    // programModel's own marker-import already uses, not a second op-building path) and splices it into the
+    // CURRENT committed program via ONE re-emit (emitMapped, the same call Studio/Blocks make for their own
+    // whole-program views — no second renderer). An op being EDITED (this.editingOpId set) splices in at its own
+    // id (replaceOpById, also already a shared primitive) — its position is already known. A brand-new
+    // (not-yet-committed) op has no id yet, so it previews APPENDED at the end instead: that's not an invented
+    // position, it's what insert()'s own "+ Add as a 2nd operation" choice (wizardManager.js, the PRIMARY/default
+    // button on a non-empty canvas) would actually do. On an empty canvas this just degenerates to the single-op
+    // preview (append to []).
     _contextGcode(wholeProgramCtx) {
-        if (!wholeProgramCtx || !this.editingOpId) return null;
+        if (!wholeProgramCtx) return null;
         try {
             const draft = opFromMarker(wholeProgramCtx.opType, wholeProgramCtx.params);
-            const combined = draft && replaceOpById(getStack(), this.editingOpId, draft);
+            if (!draft) return null;
+            const combined = this.editingOpId ? replaceOpById(getStack(), this.editingOpId, draft) : [...getStack(), draft];
             return combined ? emitMapped(combined, activeDialectOpts()).text : null;
         } catch (_) { return null; }   // best-effort context — a failure here must fall back to the single-op preview, never break it
     }
@@ -638,7 +642,7 @@ export class WizardManager {
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
-        host.__contextGcode = this._contextGcode(wholeProgramCtx);   // t2176 — null when not editing an existing op, or the splice failed; getGcode falls back to host.__gcode either way
+        host.__contextGcode = this._contextGcode(wholeProgramCtx);   // t2176 — null when there's no wholeProgramCtx or the draft/splice failed; getGcode falls back to host.__gcode either way
         host.__start = start || null;
         host.__startHints = Array.isArray(startHints) ? startHints : null;
         host.__simStock = simStock || null;   // t417 E3 — the derived per-op sim stock (rotary round bar) or null → the global
