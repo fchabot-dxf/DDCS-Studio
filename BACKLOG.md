@@ -1989,6 +1989,37 @@ of truth for the same op and would drift from the params that are supposed to de
 the generator, not stored beside it. That is a design question about what a parametric op's params include, not
 a bug fix. **Worth a ruling before anyone builds it.**
 
+#### ⭐ ADVISOR, 2026-08-26 — THE MECHANISM THIS ENTRY DESCRIBES ALREADY EXISTS AND IS SHIPPED
+
+The entry's own prescription — *"the disabled state of a child has to be part of the op's own PARAMS"* — is
+the exact definition of a **STRUCTURAL BINDING**, which shipped for corner and is live:
+
+```
+userOps.js:855   a STRUCTURAL binding (no blockIndex) drives GUARDS via the prune params, e.g. corner's probeZFirst
+userOps.js:744   structural binding defaults are filled before the prune
+whenGuard.js     pruneGuards collapses a template carrying BOTH arms to the chosen shape at build
+userOps.js:740   bindings are re-derived against the PRUNED stack every build
+```
+
+⇒ **So this is not a new design — it is an application of a proven one.** A child that can be turned off
+becomes a `guard` around that child, keyed to a plain boolean param. The param IS the source of truth, the
+generator reads it, and nothing is stored beside the params. ⭐ That satisfies the entry's own ⛔ (no second
+source of truth) rather than working around it.
+
+⚠ **What is genuinely still open, and it is narrower than "a design question":**
+
+1. **WHOSE param is it?** A structural binding is authored on the DEF. Disabling a block is an ad-hoc act on
+   one INSTANCE. Turning every child into a declared toggle means the op's author decides in advance which
+   children are switchable — which is a real product choice, and the part that still needs the owner.
+2. ⚠ **It may not be representable for every op.** A parametric op's children are GENERATED from params, so
+   "disable the third one" has no stable referent when the params change. ⭐ For drill it happens to be fine —
+   `array{drill}` holds ONE child stamped at N points, so disabling it means "all of them", which a boolean
+   expresses exactly. **Check the shape per op before promising it generally.**
+
+⇒ **Recommended framing for the ruling:** not *"should nested disable persist?"* but *"should an op's author
+be able to declare a child SWITCHABLE?"* — which is answerable, has a shipped mechanism, and stops short of
+making every block in every op independently persistent.
+
 ### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
 *(found t2279, investigating the Blockly event survey's own "loose blocks" question — the dispatch's own
