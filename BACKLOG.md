@@ -2703,9 +2703,23 @@ expiry**, not a systematic wizard→cloud call. ⇒ **Severity drops sharply**: 
 account", it is "an expired session re-authorised itself on the next action that happened to need it, and the
 next action happened to be a wizard."
 
-**The concrete lead, unconfirmed:** `data/profileStore.js` imports `getAccessToken`, `ensureRoot`, `read` and
-`write` from `ui/cloud/googleDrive.js`. If opening a wizard reads the machine profile and the token had
-expired, the Drive layer would re-authorise exactly once. ⚠ **Two auth paths exist and they are different** —
+⛔ **THE ADVISOR'S THREE CANDIDATES WERE ALL CHECKED AND ALL WRONG. Do not chase them:**
+
+```
+savePrefs.js      only READS getAccount().connected — never initiates       ⛔ ruled out
+cloudAccount.js   its popup's ONLY caller is a header button's onclick      ⛔ ruled out
+profileStore.js   an EXPORT/IMPORT feature — Drive is a destination, not a
+                  dependency; wizard settings come from settingsPanel /
+                  workspaceMachine, which are local                          ⛔ ruled out
+```
+
+⇒ **THE TRIGGER IS NOT FINDABLE BY READING.** Three passes failed. **Instrument it:** breakpoint or wrap
+`googleDrive.js`'s token request and open a wizard with an expired session. The stack will name the caller in
+one run, which is cheaper than a fourth guess.
+
+⭐ **And note what the failed search itself establishes:** nothing on the settings path gives a wizard a
+reason to touch the network. Opening one should be entirely local, so whatever reaches for Drive is reaching
+for something it does not need. ⚠ **Two auth paths exist and they are different** —
 `cloudAccount.js`'s popup (whose ONLY caller is a header button's onclick, so it is not this) and
 `googleDrive.js`'s own GIS token client. The screenshot's "Choose an account" chooser is GIS's, which points
 at the second.
