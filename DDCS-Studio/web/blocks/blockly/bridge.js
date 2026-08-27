@@ -72,10 +72,24 @@ const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
 // ONE of the four sites got written CHILDLESS by recToJson with no error (t1069 opunit · t1093 cam_table ·
 // t1595 guard · t1627 uibox · t1636 skim, the same silent loss five times). Measured: both lists produced the
 // exact same behaviour (one 'DO' statement-input mouth) — they were never two families, just one fact restated
-// four ways. Now the def itself carries it, so `wizards/ops/*.js` and `mouthOf` are the ONLY two places a new
-// child-holding kind is ever named. `user_root` keeps its own two NAMED mouths (PRESENTATION/EXECUTION) — a
-// different shape, handled separately below — not part of this collapse.
-export const mouthOf = (def) => def.mouth;
+// four ways. Now the def itself carries it, so `wizards/ops/*.js` and `mouthsOf` (below) are the ONLY two
+// places a new child-holding kind is ever named. `user_root` keeps its own two NAMED mouths
+// (PRESENTATION/EXECUTION) — a different shape, handled separately below — not part of this collapse.
+// t2333 (the stackBridge.js sweep, found gating drill's flip at t2329) — a kind may hold MULTIPLE
+// independently-named mouths (`def.mouths`, an array of `{name,label}`) instead of one (`def.mouth`, a bare
+// string) — DECLARED already by split_horizontal/split_vertical (LEFT/RIGHT, TOP/BOTTOM) and groupBox/tabGroup
+// (their own single-entry arrays), but never actually READ anywhere: neither the Blockly SHAPE builder
+// (`addMouth`, below) nor stackBridge.js's round-trip serializer ever consulted `def.mouths`, only
+// `def.mouth` — confirmed by gridContainer.js's own t2299 comment, which found and named the identical gap
+// once already (its own fix switched to singular since it only needed one; split_horizontal genuinely needs
+// two DISTINGUISHABLE ones, so singular can't express it). `mouthsOf` normalizes BOTH shapes to one list so
+// every consumer has ONE thing to loop over — a plain `def.mouth` becomes a one-item list, byte-identical
+// behavior for every existing single-mouth kind (including groupBox/tabGroup's own length-1 `mouths` arrays,
+// which take the exact same single-mouth path this normalization already had — fixed as the same side effect,
+// not a second change). Replaces the old singular-only `mouthOf` outright — every one of its 3 call sites
+// (this file's own block-shape builder, stackBridge.js's read AND write directions) needed the multi-mouth
+// case, so there was no remaining single-mouth-only consumer left to keep it for.
+export const mouthsOf = (def) => def.mouths || (def.mouth ? [{ name: def.mouth, label: null }] : []);
 // Blocks build/read ALL fields when a def lists them (so a dynamic block like array round-trips every pattern,
 // not just the default); a `dynamic` extension toggles which are visible. The wizard uses fieldsFor() directly.
 export const fieldsOf = (def, params) => (def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields)) || [];
@@ -265,7 +279,7 @@ function jsonDef(def) {
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
-    else if (mouthOf(def)) addMouth(mouthOf(def));
+    else for (const m of mouthsOf(def)) addMouth(m.name, m.label);
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only

@@ -6,7 +6,7 @@
  * stack is written into the workspace for "open as blocks". block.type === op type, so it's a 1:1 walk.
  */
 import { BLOCKS } from '../../wizards/ops/index.js';
-import { FN, fieldKind, fieldsOf, mouthOf, getBlockly, OP_BLOCKS } from './bridge.js';
+import { FN, fieldKind, fieldsOf, mouthsOf, getBlockly, OP_BLOCKS } from './bridge.js';
 import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
 import { regroupOps } from '../programModel.js';   // t1948 — collapse-on-delete: the SAME flatten-then-regroup pipeline addOperation grows a program with
 import { findStrayTopBlockIds } from '../programShape.js';   // t2281 — a block dragged from the toolbox and left unconnected is its own separate top-level chain; exclude it from the program entirely (see the function's own doc for how "the primary chain" is chosen)
@@ -178,9 +178,25 @@ function toRecord(b) {
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
         r.uiChildren = pBlk ? chain(pBlk) : [];
         r.children = eBlk ? chain(eBlk) : [];
-    } else if (mouthOf(def)) {   // t1638 — every child-holding kind reads back through its OWN declared mouth, one check
-        const doInput = b.getInput(mouthOf(def)), first = doInput && doInput.connection && doInput.connection.targetBlock();
-        if (first) r.children = chain(first);
+    } else {
+        // t1638 — every child-holding kind reads back through its OWN declared mouth(s), one check.
+        // t2333 — GENERALIZED to `mouthsOf` (bridge.js): a single declared mouth (the common case — every
+        // existing kind) reads back into a flat `r.children` array, BYTE-IDENTICAL to before; a node
+        // declaring MULTIPLE named mouths (split_horizontal/split_vertical's LEFT/RIGHT, TOP/BOTTOM) reads
+        // each into `r.children[name]` — the SAME mouth-keyed object shape `childrenOf` already normalizes
+        // everywhere else, so nothing downstream needs to learn a new shape.
+        const mouths = mouthsOf(def);
+        if (mouths.length === 1) {
+            const doInput = b.getInput(mouths[0].name), first = doInput && doInput.connection && doInput.connection.targetBlock();
+            if (first) r.children = chain(first);
+        } else if (mouths.length > 1) {
+            const obj = {};
+            for (const m of mouths) {
+                const inp = b.getInput(m.name), first = inp && inp.connection && inp.connection.targetBlock();
+                if (first) obj[m.name] = chain(first);
+            }
+            if (Object.keys(obj).length) r.children = obj;
+        }
     }
     // t1595 — a guard's three declared fields collapse back into the ONE `when` predicate pruneGuards reads, so the
     // record world holds exactly one representation of the condition and the canvas holds exactly one. See guard.js.
@@ -390,13 +406,28 @@ function recToJson(rec) {
         // `chainToJson` itself now normalizes too, so passing the raw (possibly object-shaped) value still works.
         if (childrenOf(rec.uiChildren).length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
         if (childrenOf(rec.children).length) inputs.EXECUTION = { block: chainToJson(rec.children) };
-    } else if (mouthOf(def)) {   // t1638 — every child-holding kind writes into its OWN declared mouth, one check
-        if (childrenOf(rec.children).length) inputs[mouthOf(def)] = { block: chainToJson(rec.children) };
-    } else if (childrenOf(rec.children).length) {
-        // t1638 — THE DURABLE HALF: a record carrying children whose def declares no mouth would otherwise be
-        // written CHILDLESS here with no error (t1069/t1093/t1595/t1627/t1636 — five silent losses this way).
-        // FAIL LOUD instead: add `mouth: 'DO'` to the def in wizards/ops/*.js if this kind is meant to hold children.
-        throw new Error(`recToJson: block "${rec.type}" (kind "${def.kind}") carries ${childrenOf(rec.children).length} children but its def declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`);
+    } else {
+        // t1638 — every child-holding kind writes into its OWN declared mouth(s), one check.
+        // t2333 — GENERALIZED to `mouthsOf` (bridge.js): a single declared mouth (the common case — every
+        // existing kind) writes the SAME flat `rec.children` array into that one mouth, BYTE-IDENTICAL to
+        // before; a node declaring MULTIPLE named mouths writes `rec.children[name]` into each mouth's own
+        // input — this is what closes the gap `split_horizontal`'s own flip found: it declares TWO named
+        // mouths (LEFT/RIGHT) that a single `mouth:'DO'` could never distinguish (see layout.js).
+        const mouths = mouthsOf(def);
+        if (mouths.length === 1) {
+            if (childrenOf(rec.children).length) inputs[mouths[0].name] = { block: chainToJson(rec.children) };
+        } else if (mouths.length > 1) {
+            for (const m of mouths) {
+                const kids = rec.children && rec.children[m.name];
+                if (childrenOf(kids).length) inputs[m.name] = { block: chainToJson(kids) };
+            }
+        } else if (childrenOf(rec.children).length) {
+            // t1638 — THE DURABLE HALF: a record carrying children whose def declares no mouth would otherwise be
+            // written CHILDLESS here with no error (t1069/t1093/t1595/t1627/t1636 — five silent losses this way).
+            // FAIL LOUD instead: add `mouth: 'DO'` (or `mouths: [...]`, for 2+) to the def in wizards/ops/*.js if
+            // this kind is meant to hold children.
+            throw new Error(`recToJson: block "${rec.type}" (kind "${def.kind}") carries ${childrenOf(rec.children).length} children but its def declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`);
+        }
     }
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;

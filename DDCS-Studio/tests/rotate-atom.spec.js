@@ -35,12 +35,16 @@ test('rotate atom is registered as a Modify wrap block', async ({ page }) => {
     const ops = await import('/wizards/ops/index.js');
     const br = await import('/blocks/blockly/bridge.js');
     const def = ops.BLOCKS.rotate;
-    return { kind: def && def.kind, cat: def && def.category, inPalette: ops.PALETTE.includes(def), mouth: br.mouthOf(def) };
+    const mouths = br.mouthsOf(def);
+    return { kind: def && def.kind, cat: def && def.category, inPalette: ops.PALETTE.includes(def), mouth: mouths[0] && mouths[0].name, mouthCount: mouths.length };
   });
   expect(r.kind).toBe('rotate');
   expect(r.cat).toBe('Transforms');
   expect(r.inPalette).toBe(true);
   // t1638 — isWrap collapsed into the def's own declared `mouth`; rotate still renders as a C-block with a DO input.
+  // t2333 — mouthOf (singular-only) was replaced by mouthsOf (bridge.js), which normalizes a single `def.mouth`
+  // into a one-item list; a single-mouth kind like rotate still reads back exactly one mouth named 'DO'.
+  expect(r.mouthCount, 'rotate declares exactly one mouth').toBe(1);
   expect(r.mouth, 'rotate renders as a C-block with a DO statement input').toBe('DO');
 });
 

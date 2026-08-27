@@ -378,10 +378,12 @@ it never carried divergence risk and was out of scope for this deletion.
 shapes have a real, working consumer: `panelTypes.js:329` flattens `def.template` (walking BOTH `uiChildren` and
 `children` — mouth-agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero
 extra code needed by a twin that has content to declare. `layout_2d_canvas` is wired too, but GENERICALLY — bridge.js
-(`else if (mouthOf(def)) addMouth(mouthOf(def))`) gives any def carrying a `.mouth` a Blockly mouth regardless of
-type, so grepping the literal string `layout_2d_canvas` outside its own declaration finds nothing even though the
-round-trip is live: the shape vocabulary nests inside it via that generic mechanism. (The advisor twice reported all
-three ORIGINAL container blocks dead by that grep; corrected by the worker at t1726 for this one.)
+(`else for (const m of mouthsOf(def)) addMouth(m.name, m.label)`) gives any def carrying a `.mouth` (or the plural
+`.mouths`, t2333 — a kind needing MULTIPLE independently-named mouths, e.g. `split_horizontal`'s LEFT/RIGHT) a
+Blockly mouth regardless of type, so grepping the literal string `layout_2d_canvas` outside its own declaration
+finds nothing even though the round-trip is live: the shape vocabulary nests inside it via that generic mechanism.
+(The advisor twice reported all three ORIGINAL container blocks dead by that grep; corrected by the worker at t1726
+for this one.)
 
 Two more container blocks were declared alongside it — `sim_3d_box` and `code_preview_panel` — and neither carried a
 `.mouth` (so the generic mechanism above never applied to them) nor any other consumer. Traced live (cycle 856 ACT
@@ -408,7 +410,7 @@ pane they would have backed) — see WORK-LOG t1734.
 | what the bar shows and what it opens | `BUILTINS` + `opensAs`, `blocks/wizardLibrary.js:42-81` (**25** entries, **25** with `opensAs`) | `rg -n "opensAs" DDCS-Studio/web/blocks/wizardLibrary.js` |
 | the data twins | `SEED_BUILDERS`, `web/app.js:100-107` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:98-99`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
 | the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:34-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
-| which block kinds hold children | **`def.mouth`** on each def — see INVARIANT #1 (the one-line reader's file:line lives there, machine-checked) | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
+| which block kinds hold children | **`def.mouth`** (one) or **`def.mouths`** (2+, t2333 — `split_horizontal`/`split_vertical`'s LEFT/RIGHT, TOP/BOTTOM) on each def, normalized by `mouthsOf` — see INVARIANT #1 (the one-line reader's file:line lives there, machine-checked) | `rg -n "mouth:|mouths:" DDCS-Studio/web/wizards/ops/` |
 | which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:46`, t2289 shifted from 39 by +7 — `comment` joined the set) | — |
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:917` (t1996 shifted this from 893 — see INV6); exported as `hookKeysOf` `:924` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |

@@ -334,8 +334,11 @@ test('architecture map ASSERTED: every TRAP citation still holds, uniquely', () 
 // checked anything. The real claim — "the fork-arm check is asserted silent rather than deleted" — lives at
 // userOps.js:861 today; see the header comment for the full account.
 const INVARIANT_CLAIMS = [
-    { id: 'INV1 mouth guard throws by name', file: 'web/blocks/blockly/stackBridge.js', find: 'carries ${rec.children.length} children but its def declares no' },
-    { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthOf = (def) => def.mouth;' },
+    // t2333 — re-anchored, not merely re-verified: was `carries ${rec.children.length} children` (mouthOf reader) —
+    // t2319's own childrenOf fix to this throw's own text, and t2333's own mouthOf→mouthsOf generalization, both
+    // landed without this citation being updated at the time. Real text/reader confirmed live at their current lines.
+    { id: 'INV1 mouth guard throws by name', file: 'web/blocks/blockly/stackBridge.js', find: 'carries ${childrenOf(rec.children).length} children but its def declares no' },
+    { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthsOf = (def) => def.mouths || (def.mouth ? [{ name: def.mouth, label: null }] : []);' },
     { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', find: "if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'skim', 'guard'].includes(def.kind)) b.children = [];" },
     { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', find: 'carries an undeclared top-level field "${k}"' },
     { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', find: "subs.forEach((fn) => { try { fn({ stack, proj, origin }); } catch (e) { console.error('[programModel] a subscriber threw:', e); } });" },
@@ -431,7 +434,9 @@ const REGISTRY_CLAIMS = [
     { id: 'REG SEED_BUILDERS data-twin registry', file: 'web/app.js', find: 'export const SEED_BUILDERS = [' },
     { id: 'REG SEED_BUILDERS export reason (sweep the registry, not a hand list)', file: 'web/app.js', find: 'rather than a hand-typed parallel list that a new twin could silently fall out of.' },
     { id: 'REG WIZARD_VIEWS coded-view registry', file: 'web/wizards/views/index.js', find: 'export const WIZARD_VIEWS = [' },
-    { id: 'REG def.mouth reader (which kinds hold children)', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthOf = (def) => def.mouth;' },
+    // t2333 — re-anchored: mouthOf (singular-only) replaced by mouthsOf, which also reads the plural def.mouths
+    // a multi-mouth kind (split_horizontal/split_vertical) declares.
+    { id: 'REG def.mouth/def.mouths reader (which kinds hold children)', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthsOf = (def) => def.mouths || (def.mouth ? [{ name: def.mouth, label: null }] : []);' },
     { id: 'REG DURABLE_DATA_FIELDS (Blockly round-trip survivors)', file: 'web/blocks/blockly/stackBridge.js', find: "const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];" },
     { id: 'REG KNOWN_LEAF_RECORD_FIELDS', file: 'web/blocks/blockly/stackBridge.js', find: "const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', 'disabled', 'comment', '_group', ...DURABLE_DATA_FIELDS]);" },
     { id: 'REG hookKeysOf export (what counts as a hook)', file: 'web/blocks/userOps.js', find: 'export const hookKeysOf = (def) => Object.keys(def || {}).filter(isHookKey);' },
