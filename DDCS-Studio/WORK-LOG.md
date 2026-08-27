@@ -58594,3 +58594,101 @@ user this turn, not kept in the repo.
 The geometry seam BACKLOG#21's own next layer exposed is now closed — `update()` follows `render()` into tree
 mode, proven live and by a non-vacuous test. Nothing else about the flip has been re-attempted this turn (the
 dispatch's own explicit boundary); the next attempt starts clean, with one fewer known blocker than t2321 had.
+
+## t2325 — THE FLIP, attempt 6: GATE FAILED on a SIXTH, viewport-specific dormant bug — STOPPED and reverted,
+per the dispatch's own "GATE ANYWAY... if it renders but anything looks off, SAY SO rather than adjusting the
+tree to compensate." `drillData.js` is back at HEAD. Every blocker from t2309 through t2323 stayed fixed —
+this is a genuinely NEW one, and (per the dispatch's own instruction) the owner's #1 check — dragging a
+hole-pattern handle — is exactly what caught it.
+
+### The three named guards — all passed cleanly
+
+Re-applied the exact wrap (LEFT: param_group controls, RIGHT: sim visual, `ratio: '360px:*'`, matching every
+prior attempt). `drill-form-reproduction-2299.spec.js` (3/3), `no-duplicate-ids-tree-render-2319.spec.js`, and
+`geometry-seam-tree-mode-2323.spec.js` (2/2) all passed against the real flipped tree — 6/6 total. BACKLOG#20's
+own dormant panel/sim id-pair bug did NOT fire (a live duplicate-id sweep against `wizardManager.open(
+'user_drill_data')` came back empty), matching t2321's own result — still never exercised, two turns running.
+
+### THEN: the drag did nothing — traced past the obvious false lead to the real cause
+
+Screenshotted the real `wizardManager.open('user_drill_data')` render — visually correct: PATTERN/TOOL/DEPTH &
+FEED in the controls column, VISUALIZATION on the right, a working grid + stock outline + "pos" handle. But a
+programmatic drag on that handle (`page.mouse.down/move/up`, the same technique already proven live against
+the CLASSIC drill wizard in the SAME test run — `originX` 0→79.384 there) left `originX` completely unchanged
+(0→0) on the flipped tree. Before treating that as real, ruled out the obvious false lead the same way t2321's
+own screenshot finding was confirmed rather than assumed: re-ran the identical drag technique against
+`user_drill_data` in FLAT mode (this turn's own flip reverted to HEAD first) — it worked (`originX` 0→87.346).
+So the drag mechanism itself, and this test's own technique, are both fine; the failure is specific to TREE
+mode with this turn's wrap.
+
+### ROOT CAUSE, traced to source, not guessed
+
+`document.elementFromPoint()` at the handle's own `getBoundingClientRect()` center returned `null` — nothing
+is there. The handle's own `x` coordinate (512px) sits PAST the visible viewport (`#wizard`'s own overlay
+measures 412px wide — the project's own DEFAULT test viewport, `playwright.config.js:40`, `{width:412,
+height:915}` — the mobile width the whole suite runs at unless a spec opts into a wider one). Walking the
+handle's own ancestor chain found it: `.wiz-visual` (the `sim` node's own nested div, `formWidgets.js:1364`,
+`simBox.className = 'wiz-visual'` — reusing the shell's CSS class for its `flex:1 1 0` fill shorthand, a
+DIFFERENT element from the shell's native pane `render()` hides) measures **0px wide**, and its child content
+(the `feature-canvas` SVG, 194px+) overflows straight past it, pushing the handle off past the right edge of
+the actual page.
+
+Confirmed at a WIDE viewport as the decisive check: at 1400px, the SAME handle sits exactly on-screen
+(`elementFromPoint` correctly resolves to it), because `.wiz-controls` (which `render()`'s own `isTree` branch
+widens to `flex:1 1 100%` when the shell's native `.wiz-visual` is hidden) measures 1294px there — plenty of
+room for the split's fixed 360px LEFT pane plus a real ~934px RIGHT fill. At the 412px default, `.wiz-controls`
+itself only reaches **~365px**, because the SHELL's own responsive rule (`styles.css:2445`,
+`@media (max-width: 860px)`) stacks `.wiz-controls`/`.wiz-visual` vertically below 861px (`flex-direction:
+column`, both panes `flex: 0 0 auto`) rather than keeping them side-by-side — so on mobile, the shell was
+NEVER trying to fit a fixed 360px column plus a filling one INTO THE SAME ROW at 365px total; it stacks them
+instead. `renderUiTree`'s own `split_horizontal` handling (`formWidgets.js:1305-1330`) has NO equivalent —
+it is hardcoded to `flex-direction:row` via inline styles unconditionally, with no narrow-viewport awareness
+at all. So the DECLARED tree's split tries to lay LEFT(360px fixed)+RIGHT(fill) out side-by-side inside a
+~365px-wide widened `.wiz-controls`, RIGHT gets essentially 0px, and its content spills off past the right
+edge of the actual page — invisible and undraggable on a phone, which is this app's own primary target
+device (`context/`'s own "full-responsive incl. iPhone" plan, and the whole test suite's own default
+viewport).
+
+### WHY THIS WASN'T FOUND BEFORE NOW
+
+`split_horizontal`/`split_vertical` (t2309/t2311) were built and proven against desktop-width specs
+(`split-node-ratio-2311.spec.js` uses no `test.use({viewport})` override either, but its own assertions never
+measure absolute screen position — only relative flex proportions, which stay mathematically valid regardless
+of total width). No prior gate in this arc ever checked absolute on-screen position at the project's own
+DEFAULT (mobile) viewport — t2321's own screenshot-based check would have shown this too, had it zoomed in or
+measured a bounding rect instead of eyeballing the full modal; the geometry WAS there, just off past the edge
+of a 412px frame, easy to miss in a full-page screenshot that itself renders a black gap where the pane's
+content should be, not an obviously-wrong position. This turn's drag verification is the first check in this
+arc's own gate history to measure an interactive element's ABSOLUTE screen position rather than trusting a
+screenshot's overall look — a stronger standard, worth keeping for whatever gate does this fix.
+
+### Disposition — reverted, not patched, per the same standard every prior gate used
+
+This directly breaks the owner's own #1 verification priority AT THE APP'S OWN PRIMARY TARGET WIDTH — not a
+cosmetic rough edge at an unusual size, a fully invisible, undraggable pane on a phone, which is exactly the
+device wizards-as-data itself is meant to work on first. The actual fix (teaching `renderUiTree`'s
+`split_horizontal`/`split_vertical` handling its own responsive narrow-viewport stacking, mirroring the
+shell's `@media (max-width: 860px)` rule — likely a media-query-driven CSS class instead of the current
+inline `flex-direction:row` styling, or a `matchMedia` check in `renderUiTree` itself) is DECLARED machinery
+work spanning `formWidgets.js`'s tree renderer, not a one-line ratio tweak, and needs its own verification
+that desktop mode (proven working this turn) stays byte-identical. Reverted `drillData.js` to HEAD; confirmed
+clean. Scratch diagnostic specs (hit-test, desktop-width check, flat-mode control) were exploratory only, not
+committed.
+
+### Files changed
+
+None. `drillData.js` reverted (applied, gated, screenshotted, drag-tested at two viewports, reverted — net
+zero diff). No machinery touched this turn; the gap found lives in `formWidgets.js`'s `renderUiTree`, which
+this turn only read, never edited.
+
+### The actionable fix, for whoever picks this up
+
+`renderUiTree`'s `split_horizontal`/`split_vertical` branch (`formWidgets.js:1305-1330`) needs its own
+narrow-viewport stacking, mirroring `styles.css:2445`'s `@media (max-width: 860px)` rule for the shell's own
+`.wiz-controls`/`.wiz-visual` pair — either a CSS class (`.ui-split{display:flex}` + a matching media query,
+replacing the current inline `flex-direction:row` styling so a stylesheet rule can override it) or a JS
+`matchMedia('(max-width: 860px)')` check inside `traverse()` that switches to `flex-direction:column` and
+drops the fixed-pixel LEFT pane to `flex:0 0 auto` below the breakpoint. Either way, DESKTOP mode (proven
+working this turn, 1400px) must stay byte-identical — verify at BOTH the project's own 412px default viewport
+AND a wide one, not just one or the other; this turn's own drag-position check (not just a screenshot) is the
+right verification shape to reuse.
