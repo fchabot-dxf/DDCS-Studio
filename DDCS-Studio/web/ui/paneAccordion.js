@@ -308,8 +308,6 @@ function addVisualSizer(split) {
     sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
     split.appendChild(sp);   // BELOW the last pane (the feature canvas)
 
-    // The ceiling is asked of the container at DRAG TIME, not read from a constant — see visualMaxHeight.
-    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
     let dragging = false, stopFollow = null, startTopHeight = 0;
     // t2345 — the pane list and their top/bottom order CANNOT change mid-drag (nothing else resizes this
     // split while a pointer is captured on it), so both are read ONCE at pointerdown and reused by every
@@ -319,6 +317,22 @@ function addVisualSizer(split) {
     // (applyVisualHeight/applyPaneRatio — the latter itself doing a deliberate forced reflow per mounted
     // visual, see stackChrome) runs at most once per animation frame instead of once per pointer event too.
     let dragPanes = [], dragThreeDTop = false;
+    // t2349 — DELTA-based, not frame-based: `heightAt` used to read `visual.getBoundingClientRect().top`
+    // fresh on every call — the pointer's Y relative to the visual's CURRENT on-screen position. That position
+    // is not provably stable across a multi-frame drag (a growing/shrinking visual can shift the surrounding
+    // layout under it — the advisor's own suspected mechanism, e.g. browser scroll anchoring reacting to
+    // content growth), so a request computed against a moving reference frame can silently diverge from the
+    // pointer's actual on-screen travel. Captured once at pointerdown instead: `dragStartY` (the pointer's own
+    // Y) and `dragStartHeight` (EXACTLY what the old formula computed at that instant — `y - visual.top`, NOT
+    // the visual's own rendered height, which is a subtly different quantity whenever the pointer isn't
+    // sitting precisely on the visual's own bottom edge — the sibling handler below hit this as a real bug,
+    // see its own comment) — `heightAt(y)` is then a pure `dragStartHeight + (y - dragStartY)`, which only
+    // ever depends on how far the POINTER itself has moved since pointerdown, never on where anything else
+    // drew itself in between. Not confirmed this was the owner's own creep (the specific scroll-anchoring
+    // theory was tested and found not to reproduce in this harness — see WORK-LOG), but it closes a real class
+    // of fragility either way and needs no new read: the capture already happens once per drag either way.
+    let dragStartY = 0, dragStartHeight = 0;
+    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(dragStartHeight + (y - dragStartY))));
     let rafId = null, pendingY = null;
     const applyMove = (y) => {
         let clampedTotalHeight = heightAt(y);
@@ -345,16 +359,15 @@ function addVisualSizer(split) {
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
 
+        // t2349 — same delta-based heightAt, and the SAME dragPanes/dragThreeDTop every onMove frame used
+        // (not a fresh re-query): the authoritative final write must land exactly where the last frame showed,
+        // never recomputed against a possibly-shifted frame or a possibly-reordered re-query.
         let clampedTotalHeight = heightAt(e.clientY);
         setVisualHeight(clampedTotalHeight);
 
-        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
-        if (panes.length > 1) {
+        if (dragPanes.length > 1) {
             let frac = startTopHeight / Math.max(1, clampedTotalHeight);
-            const a = panes[0];
-            const b = panes[1];
-            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
-            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             setPaneRatio(newRatio);
         }
     };
@@ -375,6 +388,12 @@ function addVisualSizer(split) {
         } else {
             startTopHeight = 0;
         }
+        // t2349 — capture EXACTLY what the old per-frame formula computed (`y - visual.top`), just once
+        // instead of every frame: NOT `visual.getBoundingClientRect().height` (a different quantity — the
+        // pointer sits approximately, not exactly, at the visual's own bottom edge; this one-off approximation
+        // error mattered, verified: it stuck the ratio in the sibling handler below, see that fix's own note).
+        dragStartY = e.clientY;
+        dragStartHeight = e.clientY - visual.getBoundingClientRect().top;
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
@@ -421,9 +440,15 @@ function addPaneSplitter(split) {
     let dragging = false, stopFollow = null, actsAsSizer = false;
     let startBottomHeight = 0;
     const visual = split.closest('.wiz-visual');
+    // t2349 — DELTA-based, not frame-based: see addVisualSizer's own comment above for the full reasoning.
+    // `dragStartY` (the pointer's own Y at pointerdown) plus `dragStartTopHeight`/`dragStartVisualHeight`
+    // (the top pane's / the whole visual's height at that same instant) replace every mid-drag
+    // `visual.getBoundingClientRect().top` read — the request now depends only on how far the POINTER has
+    // moved since pointerdown, never on where anything else drew itself in between.
+    let dragStartY = 0, dragStartTopHeight = 0, dragStartVisualHeight = 0;
     const heightAt = (y) => {
         if (!visual) return getVisualHeight();
-        return Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
+        return Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(dragStartVisualHeight + (y - dragStartY))));
     };
     // t2345 — same shape/fix as addVisualSizer's onMove above: the a/b (preview3d/layout2d) top-order test is
     // invariant for the duration of a drag (they cannot swap position mid-drag), so it is read ONCE at
@@ -435,7 +460,7 @@ function addPaneSplitter(split) {
         if (actsAsSizer) {
             applyVisualHeight(heightAt(y));
         } else {
-            let requestedTopHeight = y - visual.getBoundingClientRect().top;
+            let requestedTopHeight = dragStartTopHeight + (y - dragStartY);
             let requestedTotalHeight = requestedTopHeight + startBottomHeight;
             let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
             let actualTopHeight = clampedTotalHeight - startBottomHeight;
@@ -463,15 +488,14 @@ function addPaneSplitter(split) {
         if (actsAsSizer) {
             setVisualHeight(heightAt(e.clientY));
         } else {
-            let requestedTopHeight = e.clientY - visual.getBoundingClientRect().top;
+            // t2349 — same delta-based math and the SAME dragThreeDTop every onMove frame used (not a fresh
+            // re-query): the authoritative final write must land exactly where the last frame showed.
+            let requestedTopHeight = dragStartTopHeight + (e.clientY - dragStartY);
             let requestedTotalHeight = requestedTopHeight + startBottomHeight;
             let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
             let actualTopHeight = clampedTotalHeight - startBottomHeight;
-            const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
-            const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
-            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
             let frac = actualTopHeight / clampedTotalHeight;
-            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             setVisualHeight(clampedTotalHeight);
             setPaneRatio(newRatio);
         }
@@ -502,6 +526,17 @@ function addPaneSplitter(split) {
         const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
         const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
         dragThreeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+        // t2349 — capture EXACTLY what the old per-frame formula computed (`y - visual.top`), just once
+        // instead of every frame: NOT the top pane's own `.getBoundingClientRect().height` — the visual's own
+        // top edge sits above chrome (the "VISUALIZATION" section-label) the pane's own box does not include,
+        // so that approximation was measurably wrong and stuck the ratio at 412px (verified: 0.5 → 0.5 across
+        // a whole real-mouse drag with the height-based capture, vs the correct capture below moving it the
+        // same amount the frame-based original did). Both start values are the identical `y - visual.top`
+        // quantity, just feeding two different downstream formulas (the ratio branch adds startBottomHeight to
+        // it; the actsAsSizer branch below in `heightAt` uses it directly as the requested total) — kept as
+        // two named variables rather than one shared value, matching how the original two call sites read.
+        dragStartY = e.clientY;
+        if (visual) { const startOffset = e.clientY - visual.getBoundingClientRect().top; dragStartTopHeight = startOffset; dragStartVisualHeight = startOffset; }
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');

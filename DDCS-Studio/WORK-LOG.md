@@ -59669,3 +59669,78 @@ Node-tier: 228/228 clean. E2E first pass: 15 failed / 2833 passed / 26 skipped (
 
 `web/styles.css` (new `.ui-split-pane > .wiz-visual { min-height: 0 }` rule), `web/ui/formWidgets.js` (removed the inline `min-height:300px` from both `simBox` and `pnlBox`).
 
+## t2349 — the middle splitter's reported "creep." Could not confirm the mechanism; fixed a real architectural fragility anyway, and caught a genuine bug in my OWN fix before shipping it.
+
+Dispatch's own hypothesis, marked explicitly INFERRED: `paneAccordion.js`'s ratio-splitter `applyMove` reads
+`visual.getBoundingClientRect().top` fresh every frame; if growing the visual shifts the surrounding layout
+(browser scroll anchoring reacting to content growth was the named suspect), the reference frame itself moves
+mid-drag, and the request silently diverges from the pointer's real travel — a slow, one-directional creep. Told
+explicitly to verify before fixing, and that the harness had "already failed twice" on a different bug this
+session — a standing caution to take seriously here too.
+
+### THE HYPOTHESIS TESTED, FIVE WAYS — none reproduced a creep or reversal
+
+1. **Stationary-pointer test**: dispatched many synthetic `pointermove` events at a FIXED clientY, logged
+   `visual.getBoundingClientRect().top` per rAF flush. Never drifted — flat across 12 frames at both 412px and
+   1400px.
+2. **Fuller trace of the same stationary test**: also logged `--pane-ratio` and container heights per frame.
+   Found a brief 2-3 frame SETTLING transient at 412px (0.502→0.501→0.500, then flat) — a converging correction,
+   not an unbounded drift; 1400px was flat from frame 1.
+3. **Continuous synthetic drag** (30 frames, 6px/frame downward, dispatched via raw `PointerEvent`s): zero
+   direction reversals at either width.
+4. **Real mouse pipeline** (Playwright's `page.mouse`, actual CDP-level input, closer to a genuine gesture than
+   raw dispatch): zero reversals at either width, ratio moved monotonically the whole drag.
+5. **Owner-reported differential** (mid-turn amendment: drill/tree creeps, corner/classic "behaves much
+   better," same shared handler): could not complete as asked — neither `corner` nor `pocket` (a genuine
+   two-pane classic mill wizard) exposes a ratio splitter via `openWiz(opType)` → `#wiz_user_form` in this
+   harness at all (`panes.length !== 2` guards `addPaneSplitter` — corner has only one pane; pocket's own split
+   never satisfied the guard either, a separate, real finding worth naming even though it blocked the requested
+   comparison).
+
+**A/B against pre-t2347** (the amendment's own timing question — did removing the inline min-height cause or
+unmask this?): reverted `formWidgets.js`/`styles.css` to their exact pre-t2347 committed state, re-ran the real-
+mouse drag on drill — **byte-identical numbers to post-t2347**, at both widths. t2347 made zero measurable
+difference. Not the cause, not a mask.
+
+**Said so rather than averaging**: this harness cannot reproduce the reported creep, by any method tried. Per
+the amendment's own explicit permission, reporting that plainly rather than forcing a match.
+
+### FIXED ANYWAY — a real fragility, not a confirmed-cause patch
+
+The scroll-anchoring THEORY was not confirmed, but the underlying CODE SHAPE it named is real regardless: both
+handlers computed their per-frame request against `visual.getBoundingClientRect().top`, re-read fresh on every
+call. Made both DELTA-based instead — `dragStartY` (the pointer's own Y) and a start-offset captured ONCE at
+pointerdown, so every subsequent frame depends only on how far the POINTER has moved, never on where anything
+else in the layout drew itself in between. Checked the OTHER handler (`addVisualSizer`, the bottom sizer) as
+asked — same shape, same fix, applied alongside rather than left inconsistent. `onUp`'s authoritative final
+write uses the identical delta math and the same `dragThreeDTop`/`dragPanes` every `onMove` frame already used
+(not a fresh re-query), so it lands exactly where the last frame showed rather than risking a re-measured
+mismatch.
+
+### A REAL BUG IN MY OWN FIRST ATTEMPT, caught before shipping
+
+First pass captured the start-offset as the PANE's/VISUAL's own rendered height
+(`topPane.getBoundingClientRect().height`) rather than the exact quantity the original formula computed
+(`y - visual.getBoundingClientRect().top`). These are NOT the same number — the visual's own top edge sits
+above chrome (the "VISUALIZATION" section-label) the pane's own box doesn't include — and the discrepancy was
+large enough to matter: verified live, the ratio got stuck at exactly 0.5 for an entire 412px real-mouse drag
+that should have moved it. Caught by re-running the SAME direct-DOM-state check I'd used to establish the
+baseline, not by inspection — a stuck ratio is silent in a suite that only checks clamping and final position
+sanity, not "did this specific drag reach a specific number." Fixed by capturing `y - visual.top` at pointerdown
+instead (a single read, same cost as what it replaced) rather than the pane's own height. Re-verified:
+post-fix numbers now match the pre-t2349 (original, frame-based) numbers EXACTLY — `0.5 → 0.5401785714285714`
+at 412px, `0.5 → 0.7031539888682746` at 1400px, both to the full float precision logged — true behavioral
+equivalence, not just "close."
+
+### CLAMPS verified
+
+`RATIO_MIN`/`RATIO_MAX` and `VIZH_MIN`/`visualMaxHeight` are untouched — the delta math feeds the exact same
+`Math.max(...,Math.min(...))` clamp calls the original did, just with a different (frame-independent) input.
+The direct-DOM-state re-verification above exercises this implicitly (both widths, real numbers, no gap between
+requested and clamped).
+
+### Files changed
+
+`web/ui/paneAccordion.js` — both `onMove` handlers, delta-based capture at pointerdown instead of a
+per-frame/per-call `getBoundingClientRect()` read.
+
