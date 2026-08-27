@@ -2681,3 +2681,47 @@ counts. That is a look-at-it check once it exists, not a design question — bui
 
 **STILL REAL IF:** `grep -n "fieldA" DDCS-Studio/web/blocks/dataOps/drillData.js` → any hit means the ring
 handle still writes two params.
+
+---
+
+### 34. ⛔ OPENING A WIZARD TRIGGERS A FULL-PAGE GOOGLE SIGN-IN — on mobile it navigates out of the app
+
+*(reported by the owner from a phone, 2026-08-26, with a screenshot: `accounts.google.com/v3/si` — "Choose an
+account to continue to ddcs-studio.pages.dev")*
+
+⛔ **It is a REDIRECT, not a popup.** The whole tab leaves Studio. On mobile that means **losing whatever the
+user was doing** — a wizard mid-edit, unsaved work in the editor. That is worse than the sign-in itself.
+
+⚠ **No wizard→cloud call path was found by grepping** (`wizardManager.js` and `wizards/` import nothing from
+`ui/cloud*`), so the trigger is INDIRECT and needs tracing with the app running, not by reading. **Do not
+assume a call site — instrument and catch it.**
+
+**Candidates, none confirmed:** the wizard's own **"★ Save preset"** control (`ui/savePrefs.js` imports
+`getAccount` from `cloudAccount.js`); the projects layer (`ui/projects/projectManager.js`, same import); a
+token refresh that happens to fire on the next user action after expiry.
+
+#### THE THREE QUESTIONS, answered as far as reading allows
+
+1. **Is it normal?** ⛔ **No.** Opening a wizard is local work — it emits G-code from parameters. It has no
+   business requiring a Google account, and nothing in the wizard path should reach the cloud layer at all.
+2. **Why not at app open?** Because the trigger sits on a wizard code path rather than boot. ⚠ **That is
+   worse, not better** — a surprise mid-task costs the user their place; the same prompt at boot would cost
+   nothing.
+3. **Can it detect an existing session?** ⭐ **It already should.** `cloudAccount.js` is documented as *"ONE
+   source of truth for is there an account"* and `headerAccount.js` consumes it. So either the state is not
+   being consulted before the redirect fires, or a token expired and the app is re-authorising **silently and
+   destructively** instead of asking.
+
+#### ⇒ WHAT THE FIX HAS TO ACHIEVE, whatever the trigger turns out to be
+
+```
+⛔ NEVER redirect the top-level window for auth. A popup or an in-page flow can fail without
+   destroying the user's work; a redirect cannot.
+⛔ NEVER trigger auth from a path the user did not associate with the cloud. Opening a wizard is not
+   a cloud gesture.
+⭐ CONSULT the existing session first — and if a token has expired, say so rather than silently
+   restarting an OAuth flow.
+```
+
+**STILL REAL IF:** open any wizard in a browser with no cloud session → a navigation to `accounts.google.com`
+means still real.
