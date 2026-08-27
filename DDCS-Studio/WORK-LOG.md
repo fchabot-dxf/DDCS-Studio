@@ -59397,3 +59397,73 @@ leftover from the stopped task, not caught by the normal reap.
 `cam-block-native-params-s5.spec.js`, `cam-substack-fork.spec.js` (the four test-helper fixes). `drillData.js`
 untouched — not a flip turn.
 
+## t2341 — THE FLIP LANDED. Attempt 9. Opening the built-in Drill wizard now renders from its own declared data — the first time in fifteen releases this arc's own work is something the owner can actually see.
+
+The edit itself, byte-identical to every prior attempt (t2337's own diff, re-applied from the scratch copy saved
+that turn): drill's two top-level `uiChildren` nodes — `sim` (visual) and `param_group` (controls) — wrapped in
+one `split_horizontal`, `ratio:'360px:*'`, LEFT carrying controls and RIGHT carrying the visual, mirroring the
+classic shell's own CSS shorthand exactly. `hasTreeLayout()` now returns true for this twin, so `renderUiTree`
+drives its live render instead of the hardcoded `#wiz_drill` shell. The shell itself is untouched — `openWiz('drill')`
+still opens it; the twin is reached by its own opType (`openWiz('user_drill_data')`, the SAME call
+`commandDeck.js`'s real bar-click gesture makes via `opensAs` — confirmed by reading the click handler directly,
+not assumed). Updated the node's own comment to summarize the full nine-attempt, twelve-finding history rather
+than leave it saying "t2337" now that t2337 turned out not to be the landing turn.
+
+### GUARDS — all twenty, against the flipped state
+
+`drill-form-reproduction-2299`, `no-duplicate-ids-tree-render-2319`, `geometry-seam-tree-mode-2323`,
+`split-node-responsive-2327` (4 tests), `stack-bridge-multi-mouth-2333` (2 tests), `form-row-composite-widget-2335`
+(2 tests), `stock-spill-792` (2 tests), and `roundtrip-whole-program-1319` (4 tests, the t2339 fix's own guard) —
+**20/20 clean.**
+
+### LIVE VERIFICATION, both viewports — the REAL bar-click gesture, not a synthetic render
+
+First attempt used `window.openWiz('drill')` (matching `drill-form-reproduction-2299.spec.js`'s own boot) and
+found the tree host (`#wiz_user_form`) completely empty — traced directly: `openWiz('drill')` opens the CLASSIC
+`#wiz_drill` shell by its old type name; the REAL bar click (`commandDeck.js:96`, `wizItemOnclick`) calls
+`openWiz(e.opensAs)`, which for the Drill bar entry is `openWiz('user_drill_data')` — the twin's own opType.
+Once corrected, both viewports matched t2337's own historical dry-run numbers exactly:
+
+- **412px**: `#wiz_user_form` populated, no duplicate DOM ids anywhere in the document, 2D SVG rect
+  279.515625×200 (non-zero, on-screen), a real `[data-hid]` drag handle found and dragged (164.8,571.3 →
+  204.8,591.3 — a genuine ~40px pointer-down/move/up sequence, not a synthetic value write).
+- **Desktop (1400×950)**: same form, no duplicate ids, 2D SVG rect 822×154, handle dragged (850.8,500.4 →
+  890.8,520.4).
+- **Feeds-speeds Apply** (the exact mechanism t2329 found broken and t2335 fixed at its source): picked tool #1
+  (needed first — `feedSuggestWidget` returns early with no tool Ø, which is why an earlier verification attempt
+  that skipped this step saw no change and had to be corrected, not a product bug), picked a material, clicked
+  Suggest — feed field went 100 → 7891 at BOTH viewports, a genuine tool+material-derived computation, not a
+  static default.
+
+Screenshots sent to the user this turn (`t2341-drill-flipped-412.png`, `t2341-drill-flipped-1400.png`) — the
+first built-in wizard whose open view is drawn from `uiChildren`, not from `index.html`'s own static markup.
+
+### FULL SUITE
+
+Node-tier: 228/228 clean. E2E first pass: 13 failed / 2835 passed / 26 skipped (24.7m). Two of the thirteen
+looked, by name, like they could be genuinely drill-related — `disable-guard-2307.spec.js` names drill
+explicitly, and `stack-bridge-multi-mouth-2333.spec.js` is one of this turn's own 20 guards, which had JUST
+passed clean minutes earlier — both were watched closely rather than assumed away. Re-ran all 13 together,
+isolated: 11/13 cleared immediately, INCLUDING both of those two (confirming `stack-bridge-multi-mouth-2333`'s
+one failure inside the full batch was order-dependent pollution from the batch itself, not a real interaction
+with the flip; `disable-guard-2307` matches its own standing five-turns-running documented-flake status,
+restated in this turn's own dispatch). Remaining 2 (`modal-pre-canvas-1654.spec.js:51`,
+`param-group-rows-1605.spec.js:90`) confirmed unrelated by grep (neither file references drill, `childrenOf`,
+or `split_horizontal`) and re-run twice each, isolated: `modal-pre-canvas-1654` 4/4 clean; `param-group-rows-1605:90`
+failed once (a 60s timeout) then passed clean on the immediate repeat — the same intermittent-timeout shape as
+every other documented flake this arc, not a content mismatch. **FAILED COUNT attributable to this turn's
+changes: 0.**
+
+### Files changed
+
+`web/blocks/dataOps/drillData.js` — ONE FILE, the flip alone, exactly as every attempt has kept it. 43
+insertions, 21 deletions (byte-identical diff shape to t2337's own, plus the updated attribution comment).
+
+### THE NEWS, stated plainly, per this turn's own dispatch instruction
+
+**IT LANDED.** After eight prior attempts and eleven findings (t2309 through t2339) — each one a real, separately
+gated defect the guards of the day did not know to check — opening the built-in Drill wizard now shows the owner
+something drawn from its own declared data, not from hand-written HTML. This is the first built-in wizard this
+arc has ported that way. The pattern this whole sequence exists to close (t2339's own sweep, closing six
+confirmed hand-rolled-children sites and documenting the rest) held: no twelfth finding surfaced this attempt.
+
