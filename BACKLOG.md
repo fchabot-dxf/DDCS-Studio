@@ -2842,6 +2842,35 @@ token refresh that happens to fire on the next user action after expiry.
    being consulted before the redirect fires, or a token expired and the app is re-authorising **silently and
    destructively** instead of asking.
 
+#### ✅ RULED BY THE OWNER, 2026-08-27 — REMOVE THE PRESET ROW. The feature is a duplicate concept.
+
+The trigger (t2343) is `mountPresetRow`'s background Drive check on every wizard open. The fix is not to
+defer or fail-quiet that check — it is that **the preset feature occupies a gap that does not exist**, by the
+owner's own taxonomy:
+
+```
+reuse VALUES for a job     →  a PROJECT — which can be ONE op. Right weight, already exists.
+reuse an IDENTITY/layout   →  a CUSTOM WIZARD fork (the arc's own mechanism, live today)
+the middle ground          →  nothing. Presets were the hand-rolled July version (t794),
+                              built before the arc made the declared version real.
+```
+
+Owner: *"custom wizard includes form layout though — not needed for a job. but a project can be one op."*
+A fork carries the whole wizard definition — more than a job needs; a one-op project carries just the
+configured op — exactly what a values-recall is.
+
+⇒ **THE WORK: remove `mountPresetRow` and the preset feature behind it** (`ui/wizardTemplates.js` —
+listTemplates/cloudRead/the ★ popover), per the standing delete-freely and no-legacy-burden rulings. Sweep
+consumers before deleting; git keeps it. This kills the wizard-open Drive call entirely — the OAuth prompt
+dies with the feature rather than being managed.
+
+⚠ STILL WORTH DOING alongside: make `cloudConnected()` mean VALIDATED, not non-empty — other callers may
+repeat the same silent-reauth pattern, and an expired session should say so in the header chip.
+
+⚠ One honest follow-up to CHECK, not assume: how convenient is inserting a ONE-OP project into the CURRENT
+job? If that path is clunky, it is the real replacement's gap — file it separately if so, do not keep
+presets for it.
+
 #### ⇒ WHAT THE FIX HAS TO ACHIEVE, whatever the trigger turns out to be
 
 ```
