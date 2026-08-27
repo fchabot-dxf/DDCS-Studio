@@ -2595,7 +2595,7 @@ a two-pointer/pinch path finds none → still real.
 
 ---
 
-### 33. [⭐ DESIGN DECIDED 2026-08-26 — option A, hole #1 is the rotate handle] ⛔ THE Ø HANDLE ROTATES THE WHOLE PATTERN — one handle drives two params, so neither is controllable
+### 33. [✅ SHIPPED t2327 — V2026.08.26.12, visual approved by the owner] THE Ø HANDLE ROTATES THE WHOLE PATTERN — one handle drives two params, so neither is controllable
 
 *(reported by the owner from the drill wizard, 2026-08-26: "diameter marker moves position too, and that's
 not ok — it's impossible to control and keep the position")*
@@ -2761,3 +2761,12 @@ token refresh that happens to fire on the next user action after expiry.
 
 **STILL REAL IF:** open any wizard in a browser with no cloud session → a navigation to `accounts.google.com`
 means still real.
+
+<!-- 33 shipped -->
+> **#33 CLOSED.** Shipped at t2327 in **both** `drillData.js` (twin) and `drillView.js` (the classic,
+> live-shipping wizard) — they drive the same shared `canvasWidgets.js` radial gesture, so both carried the
+> bug. Hole #1 is the rotate handle; the Ø grip has a locked arm and cannot write an angle by construction.
+> ⭐ **The owner approved the visual** ("love it") after the worker honestly flagged that the dotted arm might
+> read as similar to the ring's dashed guide at a glance. ⚠ **The LINE pattern shares the identical fused
+> handle** (`drillView`'s `end`, `drillData`'s `dr_line`) — **checked, reported, deliberately NOT fixed.**
+> `fillText`'s `txt_rot` was checked too and is already angle-only, so it is safe.
