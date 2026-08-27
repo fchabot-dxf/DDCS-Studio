@@ -59633,3 +59633,39 @@ the second repeat — the same generic `_boot.js` timeout shape, no content mism
 
 `web/ui/paneAccordion.js` — one file, both `onMove` handlers.
 
+## t2347 — FOUND AND FIXED the "shrinking the preview leaves an empty gap" bug. Root cause was an inline `min-height:300px` in JS, not the CSS the dispatch's own inferred candidates pointed at.
+
+Dispatch established, OBSERVED: `applyVisualHeight` (paneAccordion.js) queries every `.wiz-visual` and formWidgets.js's `sim` branch creates one for the tree, so the pane DOES visibly shrink — matching the symptom. INFERRED, explicitly flagged as unverified: something OUTSIDE the pane holds the original height. Asked to check three candidates (the split container's own flex-basis under stacking, an intervening wrapper, the shell's hidden `.wiz-visual` still occupying layout) and to localize via two controls (desktop vs 412px; flipped vs non-flipped).
+
+### THE WRONG TURN, caught and corrected mid-investigation
+
+First traced via the Blocks tab's Wizard View (`#blk_wiz_user_form`, the route t2341/t2343/t2345 have all used) — found `.wiz-visual`'s computed `min-height` resolving to a literal "300px" and its box refusing to shrink past that. Built a CSS fix (`.ui-split-pane > .wiz-visual { min-height: 0 }`, widening the desktop rule's own `.wiz-2pane > .wiz-visual { min-height: 0 }` reset via a descendant-tolerant selector, since a split-nested `.wiz-visual`'s real parent is `.ui-split-pane2`, not `.wiz-2pane`) — reasoned as consistent with t2327's own precedent of parallel-extending `.wiz-2pane`-scoped rules to `.ui-split-*`. Re-measured: **no change at all**, before and after the CSS edit, byte-identical.
+
+Root-caused the CSS fix's own failure rather than assuming a caching issue: `formWidgets.js:1391`'s `simBox.style.cssText` sets `min-height:300px` **inline** — inline style ALWAYS wins over any stylesheet rule regardless of specificity, so no CSS-only fix could ever have worked. This was the actual root cause the whole time; the CSS diagnosis was a plausible-looking dead end.
+
+### ALSO caught: I had been testing the wrong host
+
+The Blocks-tab route (`#blk_wiz_user_form`) is NOT what the owner's own screenshot shows — t2341 already established the real gesture is `openWiz('user_drill_data')` → `#wiz_user_form`, the classic bar-click modal. Re-traced there. Bonus finding along the way: `#blk_wiz_user`'s own CSS (styles.css:2532-2544) applies the STACKED-layout treatment UNCONDITIONALLY (its sidebar column is always narrow, regardless of window width) — so my earlier "1400px" Blocks-tab trace was never actually exercising desktop-mode CSS at all. Not a bug, just a fact about that OTHER route worth knowing; the real modal correctly uses the viewport-based `@media` rules.
+
+### THE REAL MEASUREMENT, on the correct host
+
+A moderate drag (150px) showed NO gap (`.wiz-visual` shrank 484→331px, the requested-vs-actual gap stayed a flat 20px both before and after) — the bug only surfaces once the requested height drops PAST the hidden 300px floor. An extreme drag (600px, well past `VIZH_MIN`) exposed it cleanly: `--viz-explicit-h` correctly wrote "160px" and `--viz-stack-h` wrote "76px", `.viz-split`'s own children correctly shrank to 71px/50px (their own `min-height:0` resets DO reach them — descendant-scoped selectors, unlike `.wiz-visual`'s own direct-child-scoped reset) — but `.wiz-visual` itself stayed frozen at exactly 300px, its OWN inline floor. The gap is INTERNAL to the pane: content shrinks to ~120px, the box refuses to shrink below 300px, leaving ~135px+ of empty space between the shrunk canvases and the pane's own bottom edge — not a gap between the pane and the content below it (which was the more visible framing, but not what my `gapVisualBottomToUsageTop` metric — flat at 20px throughout — was actually measuring).
+
+### THE FIX
+
+Removed the inline `min-height:300px` from BOTH `simBox` (the `sim` node type) and `pnlBox` (the `panel` node type, same shape, fixed alongside for consistency — no shipped twin currently uses `panel`, but leaving one of two near-identical branches with the bug would be inconsistent). Kept the `.ui-split-pane > .wiz-visual { min-height: 0 }` CSS addition too, even though it turned out not to be THE fix on its own — it is not dead weight: it is the same explicit reset the desktop direct-child rule already declares for defense-in-depth, and it is what the browser now actually reports (`min-height: 0px`, confirmed by re-measurement) once the inline floor stopped shadowing it.
+
+VERIFIED, not assumed: re-ran the SAME extreme-drag trace after the fix — `.wiz-visual`'s own `min-height` now correctly computes `"0px"`, and its rendered height (192.594px, before-vs-after 484→193 matching content) tracks `.viz-split`'s own shrink proportionally, no stuck floor, no internal gap. Checked the classic (non-flipped) control too: corner's own visual pane, opened the same way, never even reaches `renderUiTree`'s `sim` branch (flat-mode ops use an entirely separate render path) — confirming the bug was structurally confined to tree-mode twins from the start, exactly matching the owner's own report.
+
+### PRESERVED t2345's fix
+
+Purely a CSS/inline-style change — zero touches to `paneAccordion.js`'s `onMove`/rAF-coalescing logic. No new layout read was added anywhere in the drag path.
+
+### FULL SUITE
+
+Node-tier: 228/228 clean. E2E first pass: 15 failed / 2833 passed / 26 skipped (21.9m). Re-ran all 15 together, isolated: 11/15 cleared immediately (including `pane-visual-host-programmatic-1762` and `stack-bridge-multi-mouth-2333`, both of which had ALSO passed clean in this turn's own earlier guard run — order-dependent pollution from the batch, the same pattern this arc keeps finding). Remaining 3 (`corner-wall-collapse-1664:54`, `fork-parity-1593:121`, `wizard-face-1599:130`) individually repeat-checked (`--repeat-each=2`): `corner-wall-collapse` 6/6 clean; `fork-parity-1593` — the 32-twin, byte-identical-emit sweep — 2/2 clean, confirming this turn's changes (pure layout, no params/emit logic touched) left emission untouched; `wizard-face-1599` failed once (40.6s timeout) then passed on the immediate repeat (19.4s), its own well-documented multi-turn flake, same generic shape, zero relation to this fix. **FAILED COUNT attributable to this turn's changes: 0.**
+
+### Files changed
+
+`web/styles.css` (new `.ui-split-pane > .wiz-visual { min-height: 0 }` rule), `web/ui/formWidgets.js` (removed the inline `min-height:300px` from both `simBox` and `pnlBox`).
+

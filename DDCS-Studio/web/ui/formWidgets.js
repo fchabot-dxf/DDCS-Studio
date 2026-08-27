@@ -1388,7 +1388,17 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             } else if (node.type === 'sim') {
                 const simBox = document.createElement('div');
                 simBox.className = 'wiz-visual';
-                simBox.style.cssText = 'width:100%; height:100%; min-height:300px; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                // t2347 — NO inline min-height. It used to be 300px, a fixed floor that always wins over any
+                // stylesheet rule (inline beats cascade regardless of specificity) — so once a drag (or the
+                // stored preference) requested something smaller, this box refused to shrink below 300px while
+                // its OWN children (correctly reset to min-height:0 by the stylesheet) shrank to fit, leaving a
+                // growing empty gap between the shrunk canvases and this box's own still-large bottom edge.
+                // The classic shell's own `.wiz-visual` (index.html) carries no such inline floor and sizes
+                // correctly from the stylesheet alone (`.ui-split-pane > .wiz-visual { min-height: 0 }` /
+                // `.wiz-2pane > .wiz-visual { min-height: 0 }`, plus each child's own real content minimum) —
+                // this box now matches that, exactly as intended ("construct the viz-split structure exactly
+                // as it is in index.html for Corner", just below).
+                simBox.style.cssText = 'width:100%; height:100%; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
 
                 // t2257 (BACKLOG 20) — layout2d: false is a NEW, additive opt-out: a 3D-only sim (ATC — no
                 // param_field/block ever declares 2D geometry for it, so a layout2d pane was always empty
@@ -1422,7 +1432,8 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             } else if (node.type === 'panel') {
                 const pnlBox = document.createElement('div');
                 pnlBox.className = 'wiz-visual';
-                pnlBox.style.cssText = 'width:100%; height:100%; min-height:300px; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                // t2347 — same fix as simBox just above: no inline min-height (it fought the drag/stylesheet).
+                pnlBox.style.cssText = 'width:100%; height:100%; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
                 
                 pnlBox.innerHTML = `
                 <span class="section-label">FEATURE CANVAS</span>

@@ -2455,6 +2455,18 @@ button.primary:hover {
    (a status line, a legend, two canvases), so the surface declines to be selected and a near-miss does nothing at
    all instead of doing something alarming. The FORM keeps its selectable text; this is scoped to the visual. */
 .wiz-visual { user-select: none; -webkit-user-select: none; }
+/* t2347 — a DECLARED split's own pane (`.ui-split-pane`, split_horizontal/split_vertical) is not `.wiz-2pane`'s
+   DIRECT CHILD, so `.wiz-2pane > .wiz-visual`'s own `min-height: 0` (below) never reaches a `.wiz-visual`
+   nested inside one — its AUTOMATIC (content-based) minimum height then wins over whatever smaller height the
+   sizer drag (or the stored preference) requests, leaving a growing GAP between the shrunk canvases and the
+   pane's own still-large outer box. MEASURED, not inferred: dragging the sizer on the flipped drill at 412px
+   writes `--viz-explicit-h`/`--viz-stack-h` correctly, and `.viz-split`'s own children correctly report
+   `min-height: 0` and shrink to match (71px/50px) — `.wiz-visual` itself was the one element still reporting a
+   resolved `min-height: 300px` and refusing to shrink past it. Same reset the desktop rule already declares,
+   widened via a descendant-tolerant selector so it reaches the split-nested case too — unconditional (not
+   width-gated): the missing reset is the same defect at any viewport, stacked mode just has a far smaller
+   total budget, so an ordinary drag hits the clamp far more easily there. */
+.ui-split-pane > .wiz-visual { min-height: 0; }
 @media (min-width: 861px) {
     .wiz-visual { height: var(--viz-explicit-h, auto); }
 }
