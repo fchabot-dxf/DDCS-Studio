@@ -1179,6 +1179,19 @@ export function renderOpForm(host, bindings) {
     }
     const addRow = (spec, label, target) => {
         const row = document.createElement('div');
+        // t2335 (Finding 2, t2333) — THE MISSING DECLARATION: `render()`'s own byParam-building code (userOpView.js)
+        // has ALWAYS read a row's boundary via `inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement`
+        // — but neither `.form-row` nor `.grid-2` was ever actually ASSIGNED to a row anywhere in this file. For a
+        // SIMPLE widget (its own data-param element a direct child of `row`) `inp.parentElement === row` anyway, so
+        // it worked BY ACCIDENT; for a COMPOSITE widget (toggle/slider/stepper/toolpick/threadpick/feedsuggest/
+        // planesuggest — roughly half of every widget carrying a bindable value, each wrapping its own controls in an
+        // inner span/label before appending to `row`) `inp.parentElement` was that INNER wrapper, not `row` — a bug
+        // in EVERY render path, tree or flat, that only SURFACED once a field_ref (tree mode) needed to relocate a
+        // composite widget's row by that exact boundary and stranded the wrapping row behind (feeds-speeds Apply
+        // silently no-opping for drill). Declaring the class here — the ONE place a row is ever created — closes the
+        // gap for every widget uniformly, present or future, regardless of how deeply it nests its own controls;
+        // `.closest()` already climbs past any wrapper to find the tagged ancestor, so no widget function changes.
+        row.classList.add('form-row');
         // ③ — a `when`-gated binding tags its row so the view can show/hide it from the live params (e.g. corner's start
         // #21/#22, visible only under probeZFirst). Purely a marker; the widget still renders + reads (dead when hidden).
         const w = Array.isArray(spec) ? spec[0] : spec;
