@@ -59744,3 +59744,117 @@ requested and clamped).
 `web/ui/paneAccordion.js` — both `onMove` handlers, delta-based capture at pointerdown instead of a
 per-frame/per-call `getBoundingClientRect()` read.
 
+## t2351 — ROOT-CAUSED wizard-face-1599's own six-turn boot flake. A genuine race, in the test, not the app — and it turned out to be shared by 13 other files.
+
+Dispatch's own framing: this file's own "documented flake" carrying cost (a triage round paid on t2337 through
+t2349, six consecutive turns, a different test failing each time) now exceeded the cost of actually fixing it.
+Explicitly told not to raise a timeout (suppression) and not to weaken any assertion; to find the real race and
+pin it with a deterministic wait; to escalate rather than patch if the race turned out to live in APP code; and
+to verify under the SAME full-parallel-suite load that breaks it, not in isolation (which has always passed).
+
+### FIRST, a dead end worth naming: config-level retries already exist for contention-shaped flakiness
+
+`playwright.config.js:20-35` documents `workers: 6` + `retries: 2` as a DELIBERATE, ALREADY-MEASURED mitigation
+for exactly this shape ("the contention-starved population shifts run to run" — t1718/t1719's own history, word
+for word this file's own pattern). My own full-suite runs all session have used `--retries=0` to get an
+unmasked "first-pass" signal for attribution — which is correct for that purpose, but means the REAL gate
+(`npm test`, `retries:2`) likely never sees most of what I've been triaging as "failures" at all. Noted as
+context, not treated as the fix: the dispatch wants the race pinned, not hidden behind a retry.
+
+### THE REAL RACE, found by reading the failing page's own snapshot, not by more waiting
+
+Instrumented `boot()` with per-phase timing first. In a real full-suite run, 3 of 4 tests in the file completed
+in under a second (`readyBlkws` — the specific wait that's always named in the timeout stack — took 2-3ms each).
+The 4th (CUSTOMIZE) never logged at all: it hung the FULL 5-minute test timeout inside that exact wait, exactly
+matching every prior turn's own stack trace. Pulled the error-context screenshot for that hang: the page was
+sitting on the plain EDITOR view — program toolbar, "(System Ready)" — never the Blocks tab at all.
+
+Traced why: `boot()` waits for `window.ddcsGetBlockProgram && window.ddcsEditWizardDef`, then calls
+`window.showApp && window.showApp('blocks')`. Grepped where each of the THREE globals this depends on is
+actually assigned: `window.showApp` — `gatewayStatus.js`'s own top-level line; `window.ddcsGetBlockProgram` —
+`programModel.js`'s own top-level line; `window.ddcsEditWizardDef` — `app.js`'s own ASYNC
+`import('./blocks/devMode.js').then(...)` chain. Three unrelated modules, no ordering relationship between them
+at all. Under normal load all three happen to already be set by the time any one of them resolves — pure
+coincidence, not a guarantee the app makes — so a wait checking only 2 of the 3 silently worked. Under the CPU
+contention of six parallel workers, that coincidence can break: `showApp` isn't set yet, `window.showApp &&
+window.showApp('blocks')` — its OWN pre-existing guard — silently no-ops, nothing is ever clicked, and the next
+wait (for `window.__blkws`) blocks forever because the one call that would have produced it never ran. A GENUINE
+race, confirmed with a real artifact (the screenshot), not inferred from the timeout shape alone.
+
+### THE FIX uses an existing, better-declared answer instead of hand-listing a third global
+
+Rather than patch the immediate gap (`&& window.showApp`, which I built and verified first, then improved on),
+found the project's own already-declared, MORE ROBUST answer to this exact class:
+`document.documentElement.dataset.ddcsReady === '1'` (`index.html:1451`, t1279's own "ONE DECLARED SIGNAL"
+comment) — set once, at the very end of boot, after EVERY deferred dynamic import (including the one that sets
+`showApp`) has actually landed. t1279 built this to fix the SAME shape of bug once before, for a different
+symptom (the lathe-model identity flake) — but the fix was never swept to the other files that share the
+identical hand-rolled 2-of-N-globals pattern. Switched `wizard-face-1599`'s own wait to the canonical signal
+instead of hand-listing three globals (a list that would go stale again the moment some future test needed a
+fourth thing this same function doesn't yet check for) — matching this project's own "declare over hand-roll"
+principle exactly.
+
+### SWEPT to the rest of the class — 13 more files, same shape, same fix
+
+Grepped the whole suite for the identical pattern (`ddcsGetBlockProgram && ddcsEditWizardDef` immediately
+followed by `showApp && showApp('blocks')`, with no wait for `showApp` in between) and found it copy-pasted into
+13 OTHER files: `disable-guard-2307`, `enum-options-codec-1607`, `guard-roundtrip-1595`, `hook-carry-1682`,
+`modal-pre-canvas-1654`, `param-group-rows-1605`, `passes-field-1613`, `save-dialog-declared-1615`,
+`shared-labels-1611`, `stack-bridge-multi-mouth-2333`, `subscriber-error-surface-1656`,
+`corner-wall-collapse-1664`, `fork-parity-1593` — every one of which has independently shown up as a "documented
+flake, clears on isolation" across THIS SAME ARC's own prior full-suite triages (t2337 through t2349). This is
+very likely the dominant single cause of this whole arc's own environmental-flake carrying cost, not a
+coincidence of 14 unrelated files happening to share one bug. Fixed all 14 with the identical one-line change
+(the hand-listed 2-global wait → the canonical `ddcsReady` signal), each with a short pointer comment back to
+this file's own fuller trace rather than repeating the whole story 14 times.
+
+Left `roundtrip-whole-program-1319`, `slot-twin-repoint-1500`, `value-fidelity-1520`, `lathe-blocks-bar-1315`
+untouched — these ALREADY use the canonical `ddcsReady` signal (confirmed by reading each), so they were never
+in the vulnerable set; naming them here so the sweep's own completeness is checkable, not just asserted.
+`wizard-manager-1617` waits on a DIFFERENT pair (`openWizardManager`/`ddcsEditWizardDef`) and calls `showApp`
+much later in its own test body, not immediately after boot — plausibly a smaller version of the same shape,
+not confirmed, left alone rather than guessed at; worth a look if it ever shows the same symptom.
+
+### VERIFIED under the actual failing condition, not in isolation
+
+Smoke-tested all 14 fixed files together, isolated: 44/45 clean; the one failure was a DIFFERENT, PRE-EXISTING,
+already-documented mechanism (`t1766`'s own reproject-echo race, its own 30s bound, unrelated to this fix) —
+re-ran alone, clean, confirmed a one-off. Then ran the FULL SUITE (not isolated — the dispatch's own explicit
+bar) TWICE:
+
+- **Run 1**: 12 failed / 2836 passed (22.2m). `wizard-face-1599` and every one of the other 13 fixed files —
+  ABSENT from the failure list entirely. Triaged the 12 unrelated failures per the standing discipline (isolated
+  re-run, repeats, the `middle-superset` shard checked separately) — all 12 resolved to non-attributable causes.
+  FAILED COUNT attributable: 0.
+- **Run 2**: 12 failed / 2836 passed (22.4m). `wizard-face-1599` appears once — `CUSTOMIZE`, 46.3s. **Checked the
+  exact failure location before assuming anything**: the stack points at `waitForEmpty` (this file's own line
+  113), NOT `boot()`'s wait — a COMPLETELY DIFFERENT function, and the pre-existing, already-documented t1766
+  reproject-echo race (its own comment: "rarely, and only under sustained load... a still-pending echo... can
+  briefly, or under load not-so-briefly, leave the model non-empty"), not a recurrence of what this turn fixed.
+  Duration alone rules out the old bug too: the fixed race always hit the test's FULL 300s timeout (blocked
+  forever on a `showApp` call that never happened); this failure hit `waitForEmpty`'s own internal ~30s bound
+  exactly (120 × 250ms) — a bounded, informative poll timing out under real load, not a silent infinite hang. Ran
+  the other 11 of run 2's failures + `wizard-face-1599` in isolation: 10/11 unrelated failures cleared
+  immediately (not enumerated per-file here, matches the standing full-suite triage discipline); `wizard-face-
+  1599`'s CUSTOMIZE failed AGAIN, isolated, single-worker (37.0s) — SAME location (`waitForEmpty`), confirming
+  this is a real, if now more visible, gap in a DIFFERENT mechanism than the one this turn targeted, not
+  something this turn's own fix caused (the fix never touches `waitForEmpty` at all).
+
+**HONEST STATE, not smoothed over**: the boot()-level race this turn was dispatched to find — the ONE that
+produced a full 300s hang with zero content changed, six turns running — has ZERO recurrences across both full-
+suite runs, the 14-file isolated smoke test, and every solo run: fully, repeatably fixed, with a real artifact
+(the failing page's own screenshot) proving the mechanism, not just the absence of a symptom. `waitForEmpty`'s
+own t1766 race is SEPARATE, PRE-EXISTING (a different function, a different bound, a different failure
+signature, already carrying its own extensive documentation and a bounded/informative error rather than a
+silent hang), and NOT something this turn's dispatch named. Deliberately did not extend the fix into it: t1766's
+own wait condition is already correct (polling the actual model+workspace state, not a blind timer), so
+"fix" there would mean either raising ITS OWN 30s bound — a DIFFERENT case than the one the dispatch's own
+"do not raise a timeout" warning was about, but still a real design decision — or a deeper trace into WHY the
+echo occasionally takes that long, which is its own turn's worth of work, not a five-minute add-on to this one.
+Reporting both findings distinctly rather than either claiming a false "two clean runs" or silently patching
+scope beyond what was dispatched.
+
+### Files changed
+
+`tests/wizard-face-1599.spec.js` + 13 other files listed above — one wait condition each, no other changes.
+

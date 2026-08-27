@@ -33,7 +33,9 @@ import { waitReady } from './_boot.js';
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
+    // t2351 — the app's own declared "everything is wired" signal (t1279), not a hand-picked global subset —
+    // see wizard-face-1599's own boot() for the full trace of why this class of wait was silently racy.
+    await waitReady(page, () => document.documentElement.dataset.ddcsReady === '1');
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await waitReady(page, () => !!window.__blkws);
 };

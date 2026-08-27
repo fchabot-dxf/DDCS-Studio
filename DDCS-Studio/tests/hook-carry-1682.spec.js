@@ -75,7 +75,9 @@ test('REAL GESTURE: fork surfacing through the actual Customize -> Save as new p
     test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    // t2351 — the app's own declared "everything is wired" signal (t1279), not a hand-picked global subset —
+    // see wizard-face-1599's own boot() for the full trace of why this class of wait was silently racy.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 60000 });
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
     await page.waitForFunction(() => !!window.ddcsSaveAsWizard, null, { timeout: 60000 });

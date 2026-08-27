@@ -28,7 +28,9 @@ import { test, expect } from '@playwright/test';
 
 const bootRegistry = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    // t2351 — the app's own declared "everything is wired" signal (t1279), not a hand-picked global subset —
+    // see wizard-face-1599's own boot() for the full trace of why this class of wait was silently racy.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 60000 });
 };
 const boot = async (page) => {
     await bootRegistry(page);

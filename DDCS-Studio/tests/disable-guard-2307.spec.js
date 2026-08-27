@@ -25,7 +25,12 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 // truthy, showApp is guaranteed to exist too. Mirrored here rather than re-deriving a second gate.
 const boot = async (page) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 20000 });
+    // t2351 — waits for the app's own declared "everything is wired" signal (t1279, index.html), not a
+    // hand-picked subset of globals: checking only ddcsGetBlockProgram/ddcsEditWizardDef missed window.showApp
+    // (called right below), which under full-suite CPU contention can still be unset — a silent no-op that left
+    // this test waiting its full timeout for a Blocks tab that was never actually opened. See wizard-face-1599's
+    // own boot() for the full trace (the same fix, found there first, swept to every file sharing this shape).
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 100000 });
 };

@@ -13,7 +13,9 @@ import { test, expect } from '@playwright/test';
 
 const bootBlocks = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+    // t2351 — the app's own declared "everything is wired" signal (t1279), not a hand-picked global subset —
+    // see wizard-face-1599's own boot() for the full trace of why this class of wait was silently racy.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 60000 });
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     // t2206 — was 60000, mismatched against every test in this file's own `test.setTimeout` (120_000-180_000):
     // the inner wait could time out and fail the test with 2+ minutes of its own declared budget still unused.

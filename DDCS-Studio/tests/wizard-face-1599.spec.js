@@ -52,7 +52,26 @@ import { waitReady } from './_boot.js';
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
-    await waitReady(page, () => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
+    // t2351 — the file's own long-documented "generic boot-timeout" flake, root-caused: this wait used to check
+    // only `ddcsGetBlockProgram && ddcsEditWizardDef`, never `showApp` — genuinely independent globals, set by
+    // unrelated modules with no ordering relationship at all (`window.showApp` — gatewayStatus.js's own
+    // top-level assignment; `window.ddcsGetBlockProgram` — programModel.js's own top-level assignment;
+    // `window.ddcsEditWizardDef` — app.js's OWN ASYNC `import('./blocks/devMode.js').then(...)` chain). Under
+    // normal load they happen to already all be set by the time any one of them resolves — a coincidence, not a
+    // guarantee — so checking 2 of the 3 this function actually depends on silently worked. Under the heavy CPU
+    // contention of a full parallel suite run, that coincidental ordering can break: `showApp` isn't set yet
+    // when the line below runs, `window.showApp && window.showApp('blocks')` — its own existing guard — silently
+    // no-ops (no error, nothing to catch), and the app is left on the plain editor view forever. The NEXT wait
+    // (for `window.__blkws`) then blocks for the test's full timeout, because the one call that would have
+    // produced it never ran. CONFIRMED, not inferred: captured the exact failing page's own snapshot from a real
+    // full-suite run — the editor toolbar, not the Blocks tab, still showing after the timeout fired.
+    // THE FIX uses the project's own ALREADY-DECLARED answer to exactly this class (t1279, index.html's own
+    // "ONE DECLARED SIGNAL" comment, fixing the identical shape once before for a different flake): wait for
+    // `document.documentElement.dataset.ddcsReady === '1'`, set ONLY once every deferred dynamic import
+    // (including gatewayStatus.js's own `window.showApp` assignment) has actually landed — not a hand-picked
+    // subset of the globals a test happens to know it needs, which is exactly the kind of list that goes stale
+    // the moment a test needs one more thing than it originally checked for.
+    await waitReady(page, () => document.documentElement.dataset.ddcsReady === '1');
     // t1734 — the Blocks tab must actually be OPEN for face()/settle() to read anything: ddcsEditWizardDef opens it
     // as a side effect (so the CUSTOMIZE test below always worked), but ddcsLoadBlockStack alone does not — the
     // other three tests here only ever call that, and window.__blkws stayed undefined until this was added (a
