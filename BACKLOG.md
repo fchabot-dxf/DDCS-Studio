@@ -3020,8 +3020,8 @@ travel, the body regenerates.
 with the reason, or establish whether the def travels in the `.mjson` and carry it. Decide at build time with
 the file in hand, not now.
 
-⚠ **Entry-point placement** (wizard bar? editor context menu? the project manager?) is a design call for the
-owner at build time — surface the options, don't pick silently (no unasked affordances).
+✅ **Entry point RULED by the owner, 2026-08-27: the QUICK MENU.** ("that would go in quick menu right?")
+Insert-op-from-project joins the quick menu's actions; no other entry point unless the owner adds one later.
 
 ⚠ Sequencing: the preset REMOVAL (#34) proceeds independently — the owner has never saved a preset, so
 nothing is lost in the interim. This entry exists so the gap does not fall between two turns.
