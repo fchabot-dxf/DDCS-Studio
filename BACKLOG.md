@@ -2770,3 +2770,38 @@ means still real.
 > read as similar to the ring's dashed guide at a glance. ⚠ **The LINE pattern shares the identical fused
 > handle** (`drillView`'s `end`, `drillData`'s `dr_line`) — **checked, reported, deliberately NOT fixed.**
 > `fillText`'s `txt_rot` was checked too and is already angle-only, so it is safe.
+
+---
+
+### 35. DORMANT — SEVEN `.pa-mount[data-prefix="d_"]` ELEMENTS COEXIST IN THE DOCUMENT — an unscoped query would find the wrong one
+
+*(found at t2333 while root-causing BACKLOG-adjacent Finding 3 — the "Path Datum invisible" report — never a
+failure on its own; filed here rather than left in a WORK-LOG entry nobody will re-read)*
+
+**OBSERVED, not inferred** — a live measurement inside a synthetic tree-mode op carrying a `path_anchor` node
+(`ui/pathAnchorField.js`) found `document.querySelectorAll('.pa-mount').length === 7` on a fresh page, before
+opening anything beyond the one synthetic op. Multiple classic wizards' own static shells (`index.html`) bake
+in a hidden `.pa-mount[data-prefix="d_"]` unconditionally — t2293's own comment already named "6 static shells
+(surfacing/text/slot/pocket/contour/drill), each with their OWN single hidden `<input id="d_pathDatum">`," all
+sharing the same `'d_'` prefix. `document.querySelector('.pa-mount[data-prefix="d_"]')` (unscoped, document-
+wide) found a **different, never-built (empty)** mount than the one `mountPathAnchor` had just correctly
+populated via its own SCOPED call (`root.querySelector(...)`, `root` = the caller's own container — t2293's
+own fix, still correct).
+
+⇒ **This is the identical shape to the bug already fixed twice in this exact area** (t2293's own id-collision
+root cause, t2319's own dead id-stamp follow-up) — a THIRD instance of "a document-wide DOM lookup finds
+whichever the browser hits first, not necessarily the caller's own," this time on `.pa-mount` itself rather
+than on the `id`/`data-param` inside it.
+
+⚠ **Nothing currently trips it.** `mountPathAnchor` itself is already correctly scoped; the only unscoped
+`.pa-mount` query found (t2333's own diagnostic) was throwaway investigation code, not shipped. Filed as a
+DORMANT hazard, not a live bug — the same "declared once, proven never" pattern this whole area keeps
+producing, one layer further in.
+
+**Sketch of the fix, not a prescription:** any FUTURE code that needs to find "the currently open op's own
+picker" should scope through `#wiz_user_form` (or whatever the live form host is) the same way
+`stock-spill-792.spec.js`'s own t2335 fix does (`#wiz_user_form .pa-mount`, unambiguous by containment,
+prefix-agnostic) — never a bare `.pa-mount[data-prefix="..."]` against `document`.
+
+**STILL REAL IF:** `document.querySelectorAll('.pa-mount').length` measures > 1 with any wizard open → still
+real (the multiple static-shell instances are baked into `index.html` and are not going away on their own).

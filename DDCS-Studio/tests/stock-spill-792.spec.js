@@ -18,6 +18,19 @@ import { test, expect } from '@playwright/test';
  * user-facing rule that had not. It is restated as the rule itself: the param EXISTS and is BOUND, it is NOT VISIBLE,
  * and the placement still RECEIVES it. That version cannot pass while the spill is back, and cannot fail because the
  * renderer changed its mind about how to hide something.
+ *
+ * ── t2335 (Finding 3, t2333): RESTATED AGAIN, for the SAME reason t1357 restated it ─────────────────────────────
+ * "Path Datum + Attach remain VISIBLE" meant, unstated, "as the raw `[data-param]` field" — true for every twin
+ * that renders them as an ordinary dropdown (every twin today). `path_anchor` (a TREE-mode uiChildren node,
+ * `formWidgets.js`) DELIBERATELY hides that same raw field (`display:none`) and mounts a corner-grid PICKER
+ * instead — faithfully reproducing the classic hardcoded shell's own convention (`type="hidden"`, no visible
+ * dropdown, t2271's own "REPRODUCE, DON'T IMPROVE" ruling). Confirmed live, not assumed (t2333): the picker
+ * builds correctly and is genuinely visible (360×43px, no hidden ancestor) once you look through the CORRECTLY
+ * SCOPED path — `stock-spill-792` measuring the raw field alone would have read that state as `false` and
+ * reported a spill that was never there. THIS IS NOT A LOOSENED CHECK: flat mode (every twin today) must still
+ * show the raw field exactly as strictly as before; the only change is accepting path_anchor's own picker as
+ * the SAME fact — "the real placement choice is visible" — expressed through whichever mechanism the twin
+ * currently uses, since which one is live was never the rule, only that one of them is.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -36,28 +49,39 @@ test('the four stock fields are OFF SCREEN in every mill twin form; Path Datum +
 
     const r = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#wiz_user_form [data-param]')];
-      const shown = (name) => {
-        const el = rows.find((e) => e.dataset.param === name);
-        if (!el) return { present: false, visible: false };
+      const visibleRect = (el) => {
         const b = el.getBoundingClientRect();
         let hidden = false;
         for (let n = el; n && n !== document.body; n = n.parentElement) {
           const c = getComputedStyle(n);
           if (c.display === 'none' || c.visibility === 'hidden') { hidden = true; break; }
         }
-        return { present: true, visible: !hidden && b.width > 0 && b.height > 0 };
+        return !hidden && b.width > 0 && b.height > 0;
       };
+      const shown = (name) => {
+        const el = rows.find((e) => e.dataset.param === name);
+        if (!el) return { present: false, visible: false };
+        return { present: true, visible: visibleRect(el) };
+      };
+      // t2335 (Finding 3, t2333) — scoped to the LIVE form (#wiz_user_form), not document-wide: t2333 found 7
+      // .pa-mount[data-prefix] elements coexisting in the document (static-shell instances baked into
+      // index.html), so an unscoped query risks finding a DIFFERENT twin's own (unbuilt) mount. Any .pa-mount
+      // found here is necessarily THIS open twin's own, regardless of its own prefix value.
+      const mount = document.querySelector('#wiz_user_form .pa-mount');
+      const pickerVisible = !!(mount && mount.children.length > 0 && visibleRect(mount));
       return { stock: Object.fromEntries(['stockW', 'stockH', 'stockZ', 'stockDatum'].map((k) => [k, shown(k)])),
-        pathDatum: shown('pathDatum'), stockAttach: shown('stockAttach') };
+        pathDatum: shown('pathDatum'), stockAttach: shown('stockAttach'), pickerVisible };
     });
 
     for (const stock of STOCK) {
       // THE RULE: a stock dimension is not a per-op placement choice, so the operator is never asked for one.
       expect(r.stock[stock].visible, `${twin}: ${stock} must not be ON SCREEN`).toBe(false);
     }
-    // …and the two that ARE real choices are on screen, which is what stops this passing on an empty form.
-    expect(r.pathDatum.visible, `${twin}: Path Datum (the real placement choice) is visible`).toBe(true);
-    expect(r.stockAttach.visible, `${twin}: Attach to Stock (the real placement choice) is visible`).toBe(true);
+    // …and the real placement choice IS on screen — as the raw fields (flat mode, every twin today) OR as
+    // path_anchor's own picker (tree mode) — which is what stops this passing on an empty form either way.
+    const rawFieldsVisible = r.pathDatum.visible && r.stockAttach.visible;
+    expect(rawFieldsVisible || r.pickerVisible,
+      `${twin}: the real placement choice must be visible, either as the raw Path Datum/Attach fields or as path_anchor's own picker`).toBe(true);
     await page.evaluate(() => window.closeWiz && window.closeWiz());
   }
 });
