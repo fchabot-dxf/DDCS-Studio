@@ -350,6 +350,11 @@ class DDCSStudio {
     } catch (_) { /* packaged / no server → no stamp */ }
 })();
 
+// t2353-adjacent — the EXTERNAL drag probe (?debug=drag): read-only splitter instrumentation for the owner's
+// real-device drag bug, loaded ONLY behind the flag (zero weight otherwise). Advisor-authored one-off by the
+// owner's direction; lives OUTSIDE paneAccordion.js so it observes any fix rather than depending on one.
+if (/[?&]debug=drag/.test(location.search)) import('./debug/dragProbe.js').catch(() => {});
+
 // Initialize application when DOM is ready
 const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();
