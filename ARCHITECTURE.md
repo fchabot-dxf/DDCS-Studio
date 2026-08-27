@@ -518,6 +518,34 @@ rewrite. Every mechanism is proven once on corner; the other 31 twins inherit it
 commit, one concern); `NEXT-SESSION.md:187-189` (*a symptom is an observation, not a diagnosis; grep who declares
 and who consumes before relaying*).
 
+**18 · A generic `.children`/`.uiChildren` walker goes through `childrenOf`, never a bare array assumption.**
+Guard: `childrenOf`, `web/blocks/userOps.js:116`. Break it → `TypeError: (x||[]) is not iterable`, or a silent
+undercount, the moment the walk reaches a `split_horizontal`/`split_vertical` node — its OWN `.children` is the
+mouth-keyed object `{LEFT:[...], RIGHT:[...]}` (or `{TOP:...,BOTTOM:...}`), not an array (t2333's `mouthsOf`,
+the sibling normalizer for the DEF-level mouth declaration, is a different thing — this is about reading the
+CHILD ARRAY VALUE itself, wherever a node's own children/uiChildren field is iterated). **Narrow the search
+correctly:** a split/multi-mouth node is placed ONLY as an entry inside a `uiChildren` array by convention (it is
+pure layout/presentation vocabulary — no functional G-code atom type declares 2+ mouths) — so a walker that
+recurses `.children` alone, and never follows `.uiChildren`, cannot reach one, and is safe by construction even
+with a bare loop (confirmed by direct inspection at t2339: `opGlow.js`, `blocksApp.js`'s `findModelById`,
+`programModel.js`'s five by-id walkers, `opSession.js`'s four walkers, `opBuilders.js`'s `scanAtoms`/`_framed`,
+`lint.js`, `suggest.js`, `setupSheet.js`'s `collectOps`, `stackBridge.js`'s `recWithDefaults`,
+`odTurnData.js`/`polygonData.js`'s `root.children` filters — all `.children`-only, none fixed, left as-is). The
+walkers that DO need the fix are the ones that ALSO recurse `.uiChildren` generically, unguarded — six confirmed
+so far, all fixed at t2337/t2339: `tests/roundtrip-whole-program-1319.spec.js`'s own `flat()` (the one that
+actually broke, gating drill's flip attempt 8), `web/blocks/dataOps/edgeData.js`/`centerDrillData.js`/
+`partingData.js`'s own post-instantiate `walk()` helpers (safe in practice today — none of those three twins are
+tree-mode yet — but the identical shape, fixed pre-emptively rather than waiting for their own future flip to
+find it the hard way), and three `tests/cam-block-native-params*.spec.js`/`cam-substack-fork.spec.js` local
+finders. `userOps.js`'s `flattenBlocks`, `userOpView.js`'s `hasTreeLayout`, `blocksApp.js`'s `checkLayoutNodes`,
+and `formWidgets.js`'s `traverse` were ALREADY fixed this way (t2315) before drill ever flipped once. **A full
+mechanical scanner + inventory ratchet (the shape `tests/node/op-lookup-scan-1968.test.mjs` uses for the
+sibling `flattenOps`/`findOpById` bypass class) was considered and deliberately NOT built** — once the risk is
+correctly narrowed to "recurses `.uiChildren` generically, unguarded," the known instances are six, all now
+fixed and each covered by its own real-app or round-trip test; a scanner's own tuning/false-positive burden and
+its own citation-drift liability (see #17) were judged not worth it against that small, now-closed surface. If a
+SEVENTH instance of this exact shape is ever found the hard way again, that is the trigger to reconsider.
+
 ---
 
 ## TRAPS — the specific wrong assumptions that have actually cost hours

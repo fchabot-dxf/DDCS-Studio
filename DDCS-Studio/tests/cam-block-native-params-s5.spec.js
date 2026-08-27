@@ -102,8 +102,11 @@ test.describe(() => {
         await page.screenshot({ path: `${SCRATCH}/s5-param-group.png` });   // VIEW the FORM family
         const r = await page.evaluate(async () => {
             const { workspaceToStack } = await import('/blocks/blockly/stackBridge.js');
+            const { childrenOf } = await import('/blocks/userOps.js');
             const back = workspaceToStack(window.__blkws);
-            let pg = null; const walk = (bs) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === 'param_group') pg = b; if (b.uiChildren) walk(b.uiChildren); if (b.children) walk(b.children); } };
+            // t2339 — childrenOf, not a bare (bs||[]): a split_horizontal/split_vertical node's `.children` is
+            // mouth-keyed, not a plain array (t2337's roundtrip-1319 finding).
+            let pg = null; const walk = (bs) => { for (const b of childrenOf(bs)) { if (!b) continue; if (b.type === 'param_group') pg = b; walk(b.uiChildren); walk(b.children); } };
             walk(back);
             const fields = (pg && pg.children || []).map((c) => ({ type: c.type, param: c.params.param, label: c.params.label, widget: c.params.widget }));
             const B = (t) => window.__blkws.getAllBlocks(false).find((b) => b.type === t);

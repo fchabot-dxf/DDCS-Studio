@@ -59284,3 +59284,116 @@ narrow, understood fix. Next attempt (9) should apply that one-line fix to
 must be shown to make the test fail against the CURRENTLY-REVERTED drill too if `childrenOf` is bypassed, then
 pass with it applied), THEN re-attempt the flip once that guard is closed.
 
+## t2339 — END THE PATTERN. Swept the whole repo for the hand-rolled-children class; fixed six confirmed instances, left the rest documented. `drillData.js` still unflipped — this was explicitly not a flip turn.
+
+Dispatch's own framing: eleven findings across eight flip attempts, several of them this SAME rule (`childrenOf`)
+re-implemented by hand — find the rest in one pass instead of one per future attempt.
+
+### THE SWEEP
+
+Two Explore agents covered `web/` (product code, all subdirectories except `vendor`) and `tests/`+`scripts/`+
+`tools/` in parallel, instructed to find every read of `.children`/`.uiChildren` on an op/block tree node — not
+just `for...of`, but `.map`/`.flatMap`/`.filter`/`.forEach`/spread/destructuring/`Object.values`/local recursive
+helpers — and report a verdict per site. Their combined output named ~30 candidate sites. Each was verified by
+direct code reading (not taken on the agents' word), against the actual mechanism confirmed via
+`stack-bridge-multi-mouth-2333.spec.js` and `stackBridge.js:182-199`'s own comment: **a `split_horizontal`/
+`split_vertical` node's mouth-keyed `{LEFT:[...],RIGHT:[...]}` shape lives ONLY on that node's OWN `.children`
+property — and that node is placed ONLY as an entry inside a `uiChildren` array** (pure layout/presentation
+vocabulary; no functional G-code atom type declares 2+ mouths, so it never appears in a functional `children`
+stack). This narrows the real risk precisely: a walker that recurses `.children` alone, never following
+`.uiChildren`, cannot reach a multi-mouth node and is safe even with a bare loop. A walker is only unsafe if it
+ALSO recurses `.uiChildren` generically, unguarded.
+
+### FIXED — six sites sharing the exact shape that broke `roundtrip-whole-program-1319` (t2337)
+
+All route through `childrenOf` (`userOps.js:116`), the existing normalizer, identity for the array case — same
+low-risk pattern as t2315's `flattenBlocks` fix.
+
+- `tests/roundtrip-whole-program-1319.spec.js:104` — the confirmed break. `flat()`'s bare `for (const x of (st||[]))`
+  → `for (const x of uo.childrenOf(st))`, using the already-imported `uo` (userOps.js) module.
+- `web/blocks/dataOps/edgeData.js`'s `applyProbeSources`, `centerDrillData.js`'s `applyStraightPeck`,
+  `partingData.js`'s `applyPartHeader` — each has its own post-instantiate `walk()` that recurses BOTH
+  `b.children` and `b.uiChildren` unguarded, identical shape to the confirmed bug. SAFE IN PRACTICE TODAY (none
+  of edge/centerDrill/parting is tree-mode yet), fixed pre-emptively rather than waiting for THEIR OWN future
+  flip attempt to rediscover this the hard way — exactly the "one per attempt" pattern this turn exists to end.
+- `tests/cam-block-native-params.spec.js:86`, `cam-block-native-params-s5.spec.js:106`,
+  `cam-substack-fork.spec.js:113` — three local `walk()` finders (for `cam_table`/`param_group`/`opunit`) over
+  `workspaceToStack()` output, same unguarded both-fields shape.
+
+### VERIFIED, not assumed
+
+Non-vacuous: re-flipped drill from scratch (`$TEMP/t2337-drillData-flipped.js`, saved at t2337) over the fixed
+`roundtrip-whole-program-1319.spec.js` — `ok 4/4`, including the previously-crashing test. Reverted drill to
+HEAD (`git diff --stat` empty, confirmed clean) — the fix stays correct against the unflipped baseline too, same
+file, `ok 4/4`. Ran all 4 touched test files plus `stack-bridge-multi-mouth-2333.spec.js` together, isolated —
+15/15 clean. Ran every test file touching edge/centerDrill/parting/probe-source/tool-prefill (19 files, 72
+tests, found by grepping the changed functions' own names and the twins' opTypes) — 72/72 clean, confirming the
+three dataOps fixes are byte-identical for every existing (still-flat) caller. Node-tier: 228/228 clean.
+
+### DOCUMENTED, not fixed — the rest of the sweep's ~24 remaining candidate sites
+
+All confirmed by direct reading to recurse `.children` ONLY (never `.uiChildren`) — safe by the architecture
+fact above, today and for the current design (a functional stack never embeds a layout node): `opGlow.js`'s
+`_findById`/`valueRangesForSubtree`, `blocksApp.js`'s `findModelById`, `opBuilders.js`'s `scanAtoms`/`_framed`,
+`opSession.js`'s `find`/`flat`/`mergeArrays`/inline `middle()` walk, `programModel.js`'s `findOpById`/
+`replaceOpById`/`removeOpById`/`insertOpAfterId`/`stripEndprogram` (confirmed directly: these recurse `b.children`
+only, matching `.type==='op'`, and an 'op' wrapper's own `.children` is the functional stack — never reaches a
+`uiChildren`-nested split node structurally), `lint.js`'s `walk`, `suggest.js`'s `seq`, `setupSheet.js`'s
+`collectOps`, `stackBridge.js`'s `recWithDefaults` (toolbox-flyout curation, functional-only), `odTurnData.js`/
+`polygonData.js`'s `root.children` filters, plus the top-level `root.uiChildren` spreads in `opCamMap.js`/
+`userOps.js:558` and `formWidgets.js`'s `traverse` top guard (both operate on the OUTER array, which is always a
+plain array by construction — hand-authored or round-tripped, per `stackBridge.js:401-408`'s `user_root`
+special-case, `chainToJson` always returns flat). None of these were touched — fixing code that cannot reach the
+bug would be unrequested, unreviewable churn.
+
+Also confirmed ALREADY FIXED (not re-touched): `userOps.js`'s `flattenBlocks`, `userOpView.js`'s `hasTreeLayout`,
+`blocksApp.js`'s `checkLayoutNodes`, `formWidgets.js`'s `traverse` split-branch — all route through `childrenOf`
+since t2315, before drill ever flipped once.
+
+### THE PERMANENT GUARD — considered a mechanical scanner, decided against it, said why
+
+`tests/node/op-lookup-scan-1968.test.mjs` is this project's own precedent for exactly this shape of problem (a
+sibling bug class: shallow-lookup bypasses of `flattenOps`/`findOpById`) — a brace-matching scanner + an
+inventory ratchet that fails on either a new violation or a stale entry. Considered building the same machinery
+for THIS bug class. Decided against it, documented in `ARCHITECTURE.md` INVARIANT #18 rather than left unsaid:
+once the risk is correctly narrowed to "recurses `.uiChildren` generically, unguarded" (not every `.children`
+read), the known instances are exactly six, all now fixed, each covered by its own real-app or round-trip test
+(`stack-bridge-multi-mouth-2333`, the fixed `roundtrip-whole-program-1319`, the three fixed `cam-block-native-
+params*`/`cam-substack-fork` specs). A scanner's own tuning burden (op-lookup-scan-1968's header documents four
+rounds of false-positive tuning before it stabilized) and its own citation-drift liability outweigh the marginal
+benefit against a surface this small and this covered. If a SEVENTH instance of the exact shape (walks both
+fields, no guard) is ever found the hard way again, that is the trigger to build it — named as the reconsider
+condition in the ARCHITECTURE.md entry itself, not left implicit.
+
+### ARCHITECTURE.md
+
+Added INVARIANT #18 (the guard, the narrowed risk shape, the full list of confirmed-safe vs confirmed-fixed
+sites, and the scanner decision + its own reconsider trigger) — `childrenOf` had NO citation anywhere in the map
+before this turn, despite being touched at t2315/t2333/t2337 and now t2339.
+
+### FULL SUITE
+
+Node-tier: 228/228 clean. E2E first pass: 19 failed / 2829 passed / 26 skipped (25.5m). Re-ran all 19 together,
+isolated: 16/19 cleared immediately. Remaining 3, each individually re-verified as NOT attributable — none of
+the three files reference any file this turn touched (confirmed by grep): `pull-v41-wcs.spec.js` (2/2 clean on
+a repeat-each=2 re-run — the SAME test already proven order-dependent-flaky earlier this session at t2337, 3/3
+clean run alone there too); `corner-wall-collapse-1664.spec.js` (its two failing tests each passed on their
+OTHER repeat within the same repeat-each=2 run — a `window.__blkws` boot-readiness timeout, the identical
+generic shape as every other documented flake this arc, on a file with zero relation to Blockly-mouth
+mechanics); `wizard-face-1599.spec.js` (a DIFFERENT test than the previously-documented CUSTOMIZE flake this
+time — "a plain program leaves the Wizard View tab empty" — ran the whole file alone, 4/4 clean, including that
+exact test). **FAILED COUNT attributable to this turn's changes: 0.**
+
+Also fixed mid-turn, not part of the diff: an orphaned `node` process (PID 40760) left holding port 3211 after
+an earlier background full-suite run was deliberately stopped (a duplicate invocation, my own mistake — killed
+via `TaskStop` before it doubled the run time) — the port didn't release cleanly, found via `netstat`, killed
+directly. `proc_health.py watch` came back clean throughout (0 flagged in-tree); this was an out-of-tree
+leftover from the stopped task, not caught by the normal reap.
+
+### Files changed
+
+`ARCHITECTURE.md` (new INVARIANT #18); `web/blocks/dataOps/edgeData.js`, `centerDrillData.js`, `partingData.js`
+(the three walker fixes); `tests/roundtrip-whole-program-1319.spec.js`, `cam-block-native-params.spec.js`,
+`cam-block-native-params-s5.spec.js`, `cam-substack-fork.spec.js` (the four test-helper fixes). `drillData.js`
+untouched — not a flip turn.
+

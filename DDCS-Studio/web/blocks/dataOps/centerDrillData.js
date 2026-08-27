@@ -9,7 +9,7 @@
  * step is zero — one behaviour, two ways to ask for it, rather than two code paths that could disagree.
  */
 import { centerDrillStack, CDRILL_DEFAULTS, CDRILL_VARS, DRILL_KINDS } from '../../wizards/lathe/centerDrill.js';
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, childrenOf } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { LATHE_GROUP } from './facingData.js';
@@ -67,13 +67,15 @@ export const CDRILL_BINDINGS = deriveBindingsFor(cdrillDataStack(CDRILL_DEFAULTS
 /** STRAIGHT means "no step". Rather than a second arm that could drift, the identity writes the peck it implies. */
 export function applyStraightPeck(stack, resolved) {
     if ((resolved && resolved.kind) !== 'straight') return stack;
-    const walk = (bs) => (bs || []).forEach((b) => {
+    // t2339 — childrenOf, not a bare (bs||[]): `b.children`/`b.uiChildren` can be the mouth-keyed object a
+    // split_horizontal/split_vertical node takes, not just a plain array (t2337's roundtrip-1319 finding).
+    const walk = (bs) => childrenOf(bs).forEach((b) => {
         if (b.type === 'assign' && b.params && b.params.var === CDRILL_VARS.peck) {
             b.params.value = '0';
             b.params.note = 'straight — one plunge, so there is no step';
         }
-        if (b.children) walk(b.children);
-        if (b.uiChildren) walk(b.uiChildren);
+        walk(b.children);
+        walk(b.uiChildren);
     });
     walk(stack);
     return stack;

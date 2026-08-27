@@ -16,7 +16,7 @@
  * panel (E3), no sim-starts (E2), no in-place swap (E4).
  */
 import { edgeStack } from '../../wizards/stacks/edgeWizard.js';
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, childrenOf } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive EDGE_BINDINGS over a CANONICAL-pruned stack (the superset guards duplicate nothing bound — #1..#6 are outside the guards — but keep the corner-identical shape)
 import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — the declared 'edge' anchor → the per-pass preview marker (mirror corner's provider)
@@ -101,7 +101,9 @@ function applyProbeSources(stack) {
     const resolve = (typeof window !== 'undefined' && window.ddcsResolveProbeSources) ? window.ddcsResolveProbeSources : null;
     const sources = resolve ? resolve(['port', 'fastFeed', 'retract']) : {};
     if (!sources || !Object.keys(sources).length) return stack;
-    const walk = (blocks) => { for (const b of blocks) { if (b && b.type === 'assign' && b.params) { for (const f in PROBE_SRC_VARS) { if (b.params.var === PROBE_SRC_VARS[f] && sources[f]) { b.params.value = String(srcVal(sources[f], b.params.value)); b.params.note = srcNote(sources[f], b.params.note); } } } if (b && b.children) walk(b.children); if (b && b.uiChildren) walk(b.uiChildren); } };
+    // t2339 — childrenOf (not a bare for-of): `blocks` can be the mouth-keyed object a split_horizontal/
+    // split_vertical node's own `.children` takes, not just a plain array (t2337's roundtrip-1319 finding).
+    const walk = (blocks) => { for (const b of childrenOf(blocks)) { if (b && b.type === 'assign' && b.params) { for (const f in PROBE_SRC_VARS) { if (b.params.var === PROBE_SRC_VARS[f] && sources[f]) { b.params.value = String(srcVal(sources[f], b.params.value)); b.params.note = srcNote(sources[f], b.params.note); } } } if (b) { walk(b.children); walk(b.uiChildren); } } };
     walk(stack);
     return stack;
 }

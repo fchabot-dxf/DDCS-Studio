@@ -108,9 +108,12 @@ test.describe(() => {
         await page.waitForTimeout(400);
         const r = await page.evaluate(async () => {
             const { workspaceToStack } = await import('/blocks/blockly/stackBridge.js');
+            const { childrenOf } = await import('/blocks/userOps.js');
             const back = workspaceToStack(window.__blkws);
             let opunit = null;
-            const walk = (bs) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === 'opunit') opunit = b; if (b.uiChildren) walk(b.uiChildren); if (b.children) walk(b.children); } };
+            // t2339 — childrenOf, not a bare (bs||[]): a split_horizontal/split_vertical node's `.children` is
+            // mouth-keyed, not a plain array (t2337's roundtrip-1319 finding).
+            const walk = (bs) => { for (const b of childrenOf(bs)) { if (!b) continue; if (b.type === 'opunit') opunit = b; walk(b.uiChildren); walk(b.children); } };
             walk(back);
             // t1071 — the chip: a friendly per-instance label + the routing key rendered READ-ONLY (audit Finding 1)
             const blk = window.__blkws.getAllBlocks(false).find((b) => b.type === 'opunit');

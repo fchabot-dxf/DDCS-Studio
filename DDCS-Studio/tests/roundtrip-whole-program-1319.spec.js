@@ -101,7 +101,10 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const SB = await import('/blocks/blockly/stackBridge.js');
         const ws = Blockly.getMainWorkspace();
-        const flat = (st, out = []) => { for (const x of (st || [])) { out.push(x.type); flat(x.children, out); flat(x.uiChildren, out); } return out; };
+        // t2339 (t2337's finding) — childrenOf, not a bare for-of: a split_horizontal/split_vertical node's own
+        // `.children` is the mouth-keyed object `{LEFT:[...],RIGHT:[...]}`, not a plain array — `uo` (userOps.js)
+        // is already imported above and already exports the normalizer every other consumer routes through.
+        const flat = (st, out = []) => { for (const x of uo.childrenOf(st)) { out.push(x.type); flat(x.children, out); flat(x.uiChildren, out); } return out; };
         const out = [];
         for (const def of uo.listUserOps()) {
             if (def.hidden) continue;

@@ -8,7 +8,7 @@
  * Inventing a second code path to make the toggle feel weightier would be ceremony.
  */
 import { partingStack, PART_DEFAULTS, PART_VARS, PART_KINDS, partKind } from '../../wizards/lathe/parting.js';
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, childrenOf } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { LATHE_GROUP } from './facingData.js';
@@ -68,14 +68,16 @@ export const PART_BINDINGS = deriveBindingsFor(partDataStack(PART_DEFAULTS), PAR
 /** The header says what the operator chose. It is the ONE thing the identity changes, so it had better be right. */
 export function applyPartHeader(stack, resolved) {
     const groove = partKind(resolved && resolved.kind) === 'groove';
-    const walk = (bs) => (bs || []).forEach((b) => {
+    // t2339 — childrenOf, not a bare (bs||[]): `b.children`/`b.uiChildren` can be the mouth-keyed object a
+    // split_horizontal/split_vertical node takes, not just a plain array (t2337's roundtrip-1319 finding).
+    const walk = (bs) => childrenOf(bs).forEach((b) => {
         if (b.type === 'comment' && b.params && /GROOVE|PART OFF/.test(String(b.params.text))) {
             b.params.text = groove
                 ? 'GROOVE — plunge to a diameter and come out. Every size is a #var below.'
                 : 'PART OFF — plunge until the work comes free. Every size is a #var below.';
         }
-        if (b.children) walk(b.children);
-        if (b.uiChildren) walk(b.uiChildren);
+        walk(b.children);
+        walk(b.uiChildren);
     });
     walk(stack);
     return stack;
