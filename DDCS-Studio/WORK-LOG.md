@@ -58934,3 +58934,62 @@ FAILED EVEN AT REVERTED HEAD — the same pre-existing, well-documented flake th
 and t2327 (its own file comments name the t1766 reproject-echo race explicitly) — confirmed NOT caused by
 this turn's work either way. **FAILED COUNT attributable to the flip: exactly 3, fully confirmed. The other 8
 are confirmed UNRELATED, not merely assumed.**
+
+## t2331 — INVESTIGATION ONLY, per explicit instruction: settle t2329 Finding 2's own hypothesis before
+deciding what fixing the three findings even means. Built nothing; no code shipped. **THE HYPOTHESIS IS
+FALSE** — tree mode does NOT rebuild the form DOM on a field change where flat mode patches in place. Both
+modes behave IDENTICALLY in this respect.
+
+### METHOD — instrument, observe, don't reason
+
+Temporarily instrumented `userOpView.js`'s `render()` (a counter at entry, a second one right before
+`host.innerHTML = ''` — the actual rebuild line — and a third at the sync-in-place early-return) and
+`update(mgr)` (a counter at entry). Drove the EXACT interaction shape t2329's own failing test used (query a
+field, dispatch `'change'`, then re-query a SECOND field's reference to check whether it survived) against
+TWO subjects: the real, unflipped `user_drill_data` (FLAT mode, drill itself — no other twin needed) as the
+control, and a SYNTHETIC `split_horizontal`-wrapped op (TREE mode, built the exact way every prior gate-check
+in this arc has, registered fresh — `drillData.js` was never touched, per the dispatch's own explicit
+boundary). Counters were reset immediately after each op's initial open (so the ONE `render()` call `onShow`
+always makes doesn't pollute the measurement), then read after dispatching one `'change'` event.
+
+### RESULTS — the actual counts, not a conclusion first
+
+```
+FLAT  (real user_drill_data):     render=0  fullRebuild=0  syncInPlace=0  update=3
+TREE  (synthetic split_horizontal): render=0  fullRebuild=0  syncInPlace=0  update=1
+```
+
+In BOTH modes, a field's own `'change'` event calls `update()` only — `render()` never fires again, so
+`host.innerHTML = ''` (the actual DOM-clearing line) never executes mid-edit either. Confirmed at the DOM
+level too, not just by the counter: a `[data-param="clearance"]` (tree) / `[data-param="material"]` (flat)
+element reference captured BEFORE a SIBLING field's own `'change'` event stayed `.isConnected === true`
+afterward, and a fresh re-query returned the SAME element (`===`), in both modes. **No element goes stale as
+a side effect of another field's change, in either render path.** This directly traces to the code's own
+control flow, confirming what reading it suggested before instrumenting: the delegated `'change'`/`'input'`
+listener `render()` installs (line ~397-413) calls `_throttledUpdate()`/`_inlineUpdate()` → `mgr.update()` →
+`view.update(mgr)` ONLY — `render()` is called from exactly two places in the whole file, `onShow` (a fresh
+wizard open) and `setForm` (EDIT-mode seeding, i.e. re-opening an op to edit it) — NEVER from the ordinary
+field-change cycle a user's own typing/clicking drives, in either mode.
+
+### ALREADY ELIMINATED — so nobody re-checks it
+
+t2329 already ruled out `feedSuggestWidget`'s own `host.closest('#wiz_user_form')` DOM-scoping as the cause of
+Finding 2 (checked directly: the id resolves correctly in tree mode, the button and both tool/feed fields are
+all found). This turn adds: the STALE-REFERENCE hypothesis for the SAME finding is also eliminated — no
+reference goes stale in tree mode that wouldn't ALSO go stale in flat mode, and none do in either.
+
+### THE META-ANSWER
+
+Since the hypothesis is FALSE, the conditional follow-up ("is the rebuild necessary or incidental") does not
+apply — there is no rebuild to characterize. **Findings 1, 2, and 3 (t2329) are three ORDINARY, INDEPENDENT
+bugs, not three symptoms of one shared behavioral difference between the render paths.** Each needs its own
+root-causing and its own fix, on its own terms — Finding 1 (`stackBridge.js`'s `recToJson`) already has a
+clear, mechanical shape (teach it `childrenOf`, matching t2315/t2317/t2319). Findings 2 and 3 remain exactly
+as open as t2329 left them — this turn narrows finding 2's search space (rules out both DOM-scoping AND
+stale-references) without replacing it with a new lead; whoever picks it up next starts one hypothesis
+poorer but with two real ones already crossed off, not zero.
+
+### Files changed
+
+None. The instrumentation (3 temporary counters in `userOpView.js`) was added, used to produce the counts
+above, then reverted — confirmed via `git diff --stat` (no output). `drillData.js` was never touched.
