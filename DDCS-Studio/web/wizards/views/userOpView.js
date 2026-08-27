@@ -590,8 +590,20 @@ export function createUserOpView(ns, opts) {
             // toggle it box-scoped (not a bare `#wiz_user .wiz-viz3d` first-match — two boxes exist for form3d+2d, and
             // #wiz_user is shared across ops so a stale pane can linger from a prior op's panel).
             const pt = panelType(_def.panel);
-            const viz3dBox = elNS('userViz3dBox');
-            const viz3dIn = (baseId) => { const c = elNS(baseId); return (c && c.parentElement) ? c.parentElement.querySelector('.wiz-viz3d') : null; };
+            // t2323 (BACKLOG #21's own next layer, found gating drill's flip at t2321) — render()'s own isTree
+            // branch (this file, ~line 371) hides the shell's native .wiz-visual pane and relies on the
+            // DECLARED tree's own `sim` node to provide visualization instead — but sim's own rendered ids all
+            // carry a `_tree` suffix (formWidgets.js's sim branch: userViz3dContainer_tree, userVizContainer_tree,
+            // …), which nothing below ever targeted. Real geometry kept drawing into the pane render() had just
+            // hidden. vizBase resolves every viz-family base id to the right one for whichever mode is active;
+            // FLAT mode (isTree false) resolves to the exact same bare id every existing call already used —
+            // byte-identical, proven live (tests/geometry-seam-tree-mode-2323.spec.js).
+            const isTree = hasTreeLayout(_def.template);
+            const vizBase = (base) => (isTree ? `${base}_tree` : base);
+            const vid = (base) => id(vizBase(base));
+            const vel = (base) => elNS(vizBase(base));
+            const viz3dBox = vel('userViz3dBox');
+            const viz3dIn = (baseId) => { const c = elNS(vizBase(baseId)); return (c && c.parentElement) ? c.parentElement.querySelector('.wiz-viz3d') : null; };
             // t421/t552/t560/t570 — apply the DECLARED sim intent (opSimContext) to the op's preview panel:
             //  · rotary rig (showRotaryRig, sim{rotary}) — the 4th-axis chuck+tailstock (generic mirror of rotaryCenterView).
             //  · machine-frame + tool-machine-frame (toolMachineFrame, sim{toolMachine}, HOMING) — FORCE the envelope + render the
@@ -608,7 +620,7 @@ export function createUserOpView(ns, opts) {
             const applySimIntent = (rigCont) => applyPreviewIntent(mgr, rigCont, _def.opType);
             // t518 — the Comm 'commscreen' preview host is a sibling in #userVizContainer; drop any stale one at the top of EVERY
             // render so it never leaks into another op's 3D/2D pane (self-cleaning; the commscreen branch re-creates it fresh).
-            { const c0 = elNS('userVizContainer'); const h0 = c0 && c0.querySelector('.comm-screen-host'); if (h0 && pt.mode !== 'commscreen') h0.remove(); }
+            { const c0 = vel('userVizContainer'); const h0 = c0 && c0.querySelector('.comm-screen-host'); if (h0 && pt.mode !== 'commscreen') h0.remove(); }
             if (pt.mode === '3d2d') {
                 // form3d+2d — the built-in probe pattern generalized (edge/middle: 3D base + 2D overlay, never either/or):
                 // the 3D sim + the DECLARED per-pass markers in the dedicated 3D box, AND the 2D drag canvas in #userVizContainer.
@@ -630,7 +642,7 @@ export function createUserOpView(ns, opts) {
                 // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
                 const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
                 if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
-                mgr.preview3D(previewGcode, id('userViz3dContainer'), (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool, wholeProgramCtx);
+                mgr.preview3D(previewGcode, vid('userViz3dContainer'), (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool, wholeProgramCtx);
                 // t1648 — a DECLARED, OPTIONAL sim-only var seed: lets an op seed live-frame/controller-read registers for
                 // the PREVIEW trace only (never emitted, never pushed to the controller — previewVarSeed's own contract).
                 // Read via the LIVE-fn registry (getUserPreviewVarSeed), NOT `_def.previewVarSeed` directly — a function
@@ -638,9 +650,9 @@ export function createUserOpView(ns, opts) {
                 // registerUserOp re-attaches it into this registry from the app's OWN code, the same convention every
                 // other op-code hook here already follows (previewGeometry/simGcode/statusHint/…).
                 const pvs = _def && getUserPreviewVarSeed(_def.opType);
-                if (pvs) { try { mgr.previewVarSeed(id('userViz3dContainer'), pvs(params)); } catch (_) { /* seed is optional */ } }
-                applySimIntent(id('userViz3dContainer'));   // t578 — seat the machine-frame/seat intent BEFORE the layout overlay reads the trace, so the fresh-open route connects Start→seeks→HOME (the drag's own re-feed already had the intent set)
-                const c = elNS('userVizContainer');
+                if (pvs) { try { mgr.previewVarSeed(vid('userViz3dContainer'), pvs(params)); } catch (_) { /* seed is optional */ } }
+                applySimIntent(vid('userViz3dContainer'));   // t578 — seat the machine-frame/seat intent BEFORE the layout overlay reads the trace, so the fresh-open route connects Start→seeks→HOME (the drag's own re-feed already had the intent set)
+                const c = vel('userVizContainer');
                 if (c) {
                     c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
                     // t73/t87 — the SIM-ONLY first-start marker ALSO shows on the Layout canvas (a 2nd renderer of the panel's
@@ -648,7 +660,7 @@ export function createUserOpView(ns, opts) {
                     // hollow ○, and route a drag to the SAME onStartDrag(pos,0) → both surfaces edit one userStarts (never emitted).
                     // Re-render on drag so the marker tracks. (t87: draggable — the human confirmed the sim start should be movable.)
                     const renderLayoutWithSim = () => {
-                        const box = elNS('userViz3dContainer');
+                        const box = vel('userViz3dContainer');
                         const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
                         const panel = host && host.__panel;
                         const ps = (panel && typeof panel.getPassStarts === 'function') ? (panel.getPassStarts() || []) : [];
@@ -751,16 +763,16 @@ export function createUserOpView(ns, opts) {
                 // so a multi-pass op shows its ①②③④ markers here as well as in form3d+2d (they were only wired in the 3d2d branch).
                 let starts3d = null;
                 try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts3d = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
-                const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, id('userVizContainer'), (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool, wholeProgramCtx);
+                const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, vid('userVizContainer'), (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool, wholeProgramCtx);
             } else if (pt.mode === '2d') {
                 if (viz3dBox) viz3dBox.style.display = 'none';
-                const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = elNS('userVizContainer'); if (c) c.style.display = '';
+                const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = vel('userVizContainer'); if (c) c.style.display = '';
                 setFormHost(() => elNS('wiz_user_form'));   // t1804 — see the form3d+2d call site's own comment
                 renderLayout2D(c, _def, params); renderZRulerBeside(c, _def, params);
             } else if (pt.mode === 'commscreen') {
                 // t518 — Comm/MDI: a live mock of the DDCS controller screen (popup / status / input / beep) instead of a toolpath.
                 if (viz3dBox) viz3dBox.style.display = 'none';
-                const c = elNS('userVizContainer');
+                const c = vel('userVizContainer');
                 if (c) {
                     c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';   // hide the shared 3D pane
                     let host = c.querySelector('.comm-screen-host');
@@ -771,8 +783,8 @@ export function createUserOpView(ns, opts) {
             }
             // Apply the DECLARED rig/machine/seat/magazine intent (see applySimIntent above) for the plain-3D mode — the 3d2d mode
             // already applied it right after preview3D, BEFORE its layout overlay read the trace (t578 fresh-open connectivity).
-            if (pt.mode === '3d') applySimIntent(id('userVizContainer'));
-            const status = elNS('userVizStatus');
+            if (pt.mode === '3d') applySimIntent(vid('userVizContainer'));
+            const status = vel('userVizStatus');
             // t554 — an optional DECLARED status hint (def.statusHint(params) → a string): homing surfaces the unset-travel warning
             // ("⚠ Set Z travel …", the t540 behaviour) in-place. Generic seam; a def without one → no hint (unchanged).
             let _hint = ''; try { const hf = getUserStatusHint(_def.opType); if (hf) _hint = hf(params) || ''; } catch (_) { /* hint is optional */ }
