@@ -59549,3 +59549,87 @@ capture for Dropbox/OneDrive specifically) rather than folded into or confused w
 `BACKLOG.md` only (entry #34). No app code touched — node-tier run (228/228 clean) per the dispatch's own
 "node-tier if you do not [change code]" instruction; no e2e run needed.
 
+## t2345 — FIXED the preview splitter's stutter: hoisted per-drag-invariant reads out of onMove, coalesced the write side into one requestAnimationFrame per frame. Verified the diagnosis, didn't just trust it.
+
+Dispatch's own diagnosis (advisor, by reading): `paneAccordion.js`'s `onMove` at line 314 does a style WRITE
+(`applyVisualHeight`) then a DOM query + two `getBoundingClientRect` READS right after it — a read forced
+immediately after a write triggers a synchronous reflow, on every single `pointermove` (up to 120Hz on a phone).
+Also asked to check the second `onMove` (then at line 416, `addPaneSplitter`) for the same shape, and to
+VERIFY rather than trust — the advisor named itself wrong four times on a different bug the same day.
+
+### VERIFIED, and the real cost is BIGGER than the diagnosis described
+
+Read `applyVisualHeight` and its own callees directly rather than assuming a "simple style write": it queries
+EVERY mounted `.wiz-visual` on the page (not just the one being dragged — "a drag in one wizard rebalances every
+mounted pane live"), and for each one calls `visualMaxHeight` (2-4 `getBoundingClientRect` calls) AND
+`stackChrome`, which does a DELIBERATE forced reflow (its own comment: "forced reflow: intentional" — removes
+the app's own height overrides, reads the natural layout, restores them; load-bearing for a real historical
+ratchet bug, t2113, not something to "fix"). So the true per-call cost of the write side is larger than "two
+rect reads" — which strengthens the case for fix #2 (coalesce to one write per frame) rather than weakens it.
+
+Checked the second `onMove` as asked: SAME shape, and in its common (non-`actsAsSizer`) branch it does its own
+`querySelector` for the ratio pair (`preview3d`/`layout2d`) and 2 more rect reads on every event too — same bug,
+reported and fixed alongside the first (the dispatch's ask to "check" was read as "and fix if found," since
+leaving one of two near-identical handlers unfixed would be an inconsistent, half-done job on the exact same
+pattern).
+
+### THE FIX — exactly the two named changes, both handlers, no interaction redesign
+
+(1) The pane list and their top/bottom order (`threeDTop`) cannot change mid-drag (nothing else resizes a split
+while a pointer is captured on its handle) — read ONCE at `pointerdown`, stored in a closure var, reused by
+every `onMove` call instead of re-querying/re-measuring per event.
+(2) `onMove` now only records the latest `e.clientY` and schedules ONE `requestAnimationFrame`; the actual
+read+write work (`heightAt`, `applyVisualHeight`, `applyPaneRatio`) moved into that deferred callback, so it
+runs at most once per animation frame regardless of how many raw pointer events land in that frame. `onUp`
+cancels any pending frame before doing its own — unchanged, unthrottled — final computation, so a stale queued
+frame can never fire after the authoritative write and clobber it.
+
+### NON-VACUOUS, measured before and after — not argued
+
+First attempt used `page.mouse.move()` in a loop: showed only a ~5% reduction (2460→2340 rect calls), which
+would have been a "ships a fix that changes nothing" result. Root-caused rather than accepted: Playwright's
+`mouse.move()` round-trips over CDP per call, so each awaited move already takes longer than one animation
+frame — it cannot reproduce a native high-frequency touch/pointer BURST (many events genuinely landing within
+the same 16ms frame), which is exactly the case rAF-coalescing targets. Rebuilt the measurement to dispatch 20
+synthetic `PointerEvent`s SYNCHRONOUSLY inside `page.evaluate` (all within one JS task, before any rAF can run)
+and count `getBoundingClientRect` calls. Result, A/B against `git checkout HEAD --`:
+
+- **Before (HEAD)**: 20 synchronous events → **800** rect calls (40 per event — full reflow-forcing read/write
+  on every single one).
+- **After (this fix)**: 20 synchronous events → **0** rect calls until the coalesced frame flushes once (then
+  39, matching `applyVisualHeight`'s own multi-visual cost described above) — a >20× reduction, and the
+  forced-reflow-during-the-burst-itself is eliminated entirely (0 vs 800 mid-burst).
+
+Confirms the diagnosis was correct and the fix delivers the claimed benefit with real numbers, not just
+architectural reasoning — the dispatch's own "if the thrash is NOT the dominant cost say so plainly" did not
+apply; it plainly is.
+
+### BEHAVIOR PRESERVED — same formulas, same clamps, less frequently evaluated
+
+No math changed: `applyMove(y)` in both handlers is the ORIGINAL onMove body verbatim, just reading
+`dragPanes`/`dragThreeDTop` (hoisted) instead of re-querying, and called from a rAF callback instead of directly.
+`onUp` in both handlers is completely untouched except for a `cancelAnimationFrame` guard — the FINAL ratio for
+a given gesture is computed exactly as before, unthrottled, from the real pointerup `e.clientY`. Ran every
+existing splitter/sizer test (`pane-sizer-1353`, `pane-sizer-mobile-1468`, `pane-splitter-790`,
+`form-section-collapse-820`, `polish-batch-1239`, `theme-motion-887` — 24 tests) TWICE: once immediately after
+the edit, once again after the A/B round-trip (revert → measure → restore) to confirm the restore was byte-
+identical to the fix — 24/24 clean both times, including the exact behavior-sensitive ones ("a full-length
+DOWN-DRAG leaves the handle reachable," "a PERSISTED oversize heals on open," "DRAG rebalances live (no snap) +
+persists").
+
+### FULL SUITE
+
+Node-tier: 228/228 clean. E2E first pass: 17 failed / 2831 passed / 26 skipped (28.3m). Re-ran all 17 together,
+isolated: 13/17 cleared immediately (none had ever referenced `paneAccordion.js`, confirmed by grep). Remaining
+4, individually re-verified via `--repeat-each=2`: `param-group-rows-1605:90`, `save-dialog-declared-1615:119`,
+and `stack-bridge-multi-mouth-2333:71` (one of THIS turn's own guards — order-dependent pollution from the
+batch, matching the exact pattern this arc has hit repeatedly) all cleared 2/2. `wizard-face-1599` continued its
+own well-documented, multi-turn-running flake — `:130` (CUSTOMIZE) failed once (5-min timeout) then passed
+(16.3s) on the immediate repeat; a DIFFERENT test in the same file (`:147`) then failed once (2-min timeout) on
+the second repeat — the same generic `_boot.js` timeout shape, no content mismatch, zero relation to
+`paneAccordion.js`. **FAILED COUNT attributable to this turn's changes: 0.**
+
+### Files changed
+
+`web/ui/paneAccordion.js` — one file, both `onMove` handlers.
+

@@ -311,33 +311,43 @@ function addVisualSizer(split) {
     // The ceiling is asked of the container at DRAG TIME, not read from a constant — see visualMaxHeight.
     const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
     let dragging = false, stopFollow = null, startTopHeight = 0;
-    const onMove = (e) => { 
-        if (!dragging) return; 
-        e.preventDefault(); 
-        let clampedTotalHeight = heightAt(e.clientY);
+    // t2345 — the pane list and their top/bottom order CANNOT change mid-drag (nothing else resizes this
+    // split while a pointer is captured on it), so both are read ONCE at pointerdown and reused by every
+    // onMove frame instead of re-querying + re-measuring on every pointermove (up to 120Hz on a phone) — that
+    // was a read (querySelectorAll + 2x getBoundingClientRect) landing right after applyVisualHeight's OWN
+    // write, forcing a synchronous reflow on every single event. rAF-coalescing (below) means the write side
+    // (applyVisualHeight/applyPaneRatio — the latter itself doing a deliberate forced reflow per mounted
+    // visual, see stackChrome) runs at most once per animation frame instead of once per pointer event too.
+    let dragPanes = [], dragThreeDTop = false;
+    let rafId = null, pendingY = null;
+    const applyMove = (y) => {
+        let clampedTotalHeight = heightAt(y);
         applyVisualHeight(clampedTotalHeight);
-        
-        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
-        if (panes.length > 1) {
+        if (dragPanes.length > 1) {
             let frac = startTopHeight / Math.max(1, clampedTotalHeight);
-            const a = panes[0];
-            const b = panes[1];
-            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
-            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             applyPaneRatio(newRatio);
         }
+    };
+    const onMove = (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        pendingY = e.clientY;
+        if (rafId == null) rafId = requestAnimationFrame(() => { rafId = null; if (pendingY != null) applyMove(pendingY); });
     };
     const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }   // a stale queued frame must not fire after this authoritative write
+        pendingY = null;
         try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
-        
+
         let clampedTotalHeight = heightAt(e.clientY);
         setVisualHeight(clampedTotalHeight);
-        
+
         const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
         if (panes.length > 1) {
             let frac = startTopHeight / Math.max(1, clampedTotalHeight);
@@ -358,6 +368,8 @@ function addVisualSizer(split) {
                 setPaneCollapsed(kind, false);
             }
         }
+        dragPanes = panes;
+        dragThreeDTop = panes.length > 1 && panes[0].getBoundingClientRect().top <= panes[1].getBoundingClientRect().top;
         if (panes.length > 1) {
             startTopHeight = panes[0].getBoundingClientRect().height;
         } else {
@@ -413,28 +425,37 @@ function addPaneSplitter(split) {
         if (!visual) return getVisualHeight();
         return Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
     };
-    const onMove = (e) => { 
-        if (!dragging) return; 
-        e.preventDefault(); 
+    // t2345 — same shape/fix as addVisualSizer's onMove above: the a/b (preview3d/layout2d) top-order test is
+    // invariant for the duration of a drag (they cannot swap position mid-drag), so it is read ONCE at
+    // pointerdown instead of re-queried + re-measured on every pointermove; the write side is coalesced to one
+    // requestAnimationFrame per frame instead of firing on every raw pointer event.
+    let dragThreeDTop = false;
+    let rafId = null, pendingY = null;
+    const applyMove = (y) => {
         if (actsAsSizer) {
-            applyVisualHeight(heightAt(e.clientY));
+            applyVisualHeight(heightAt(y));
         } else {
-            let requestedTopHeight = e.clientY - visual.getBoundingClientRect().top;
+            let requestedTopHeight = y - visual.getBoundingClientRect().top;
             let requestedTotalHeight = requestedTopHeight + startBottomHeight;
             let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
             let actualTopHeight = clampedTotalHeight - startBottomHeight;
-            const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
-            const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
-            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
             let frac = actualTopHeight / clampedTotalHeight;
-            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             applyVisualHeight(clampedTotalHeight);
             applyPaneRatio(newRatio);
         }
     };
+    const onMove = (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        pendingY = e.clientY;
+        if (rafId == null) rafId = requestAnimationFrame(() => { rafId = null; if (pendingY != null) applyMove(pendingY); });
+    };
     const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }   // a stale queued frame must not fire after this authoritative write
+        pendingY = null;
         try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
@@ -478,6 +499,9 @@ function addPaneSplitter(split) {
             actsAsSizer = false;
             startBottomHeight = 0;
         }
+        const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
+        const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+        dragThreeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
