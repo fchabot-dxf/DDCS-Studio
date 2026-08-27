@@ -2805,3 +2805,48 @@ prefix-agnostic) — never a bare `.pa-mount[data-prefix="..."]` against `docume
 
 **STILL REAL IF:** `document.querySelectorAll('.pa-mount').length` measures > 1 with any wizard open → still
 real (the multiple static-shell instances are baked into `index.html` and are not going away on their own).
+
+---
+
+### 36. ⛔ FOUR WIDGETS HAVE NO BINDABLE DOM VALUE — `field_ref` cannot reference them at all
+
+*(found at t2335 while surveying all 18 widget functions for an unrelated fix; recorded here because it is a
+LIMIT ON THE ARC, not a bug, and it was about to live only in a WORK-LOG entry)*
+
+```
+cornerGrid · regionPick · coordList · the xy/rect canvas pads
+⇒ they carry NO [data-param] element. their value is read from CLOSURE STATE.
+```
+
+⭐⭐ **`field_ref` works by RELOCATING an element that carries a bindable value.** These four have no such
+element to relocate. ⇒ **A wizard using any of them cannot be expressed as a declared tree**, however much
+machinery gets fixed.
+
+⚠ **This is structurally different from every blocker the flip has hit so far.** Those were bugs
+(`childrenOf`, the dead id, the geometry seam) or missing vocabulary (fixed-pixel panes, responsive
+stacking) — all fixable, and all fixed. **This is a widget whose value has no DOM representation**, so
+there is nothing for a reference to point at.
+
+**THREE POSSIBLE ANSWERS, none obviously right:**
+
+```
+A  give them a bindable element    a hidden [data-param] input mirroring the closure state.
+                                   ⚠ two sources of truth for one value — the defect class this
+                                     project hits most often.
+B  a different node type            not field_ref's relocation, but a node that CONSTRUCTS the
+                                   widget in place from the declaration.
+C  accept the limit                 those wizards keep their hand-written shells. ⚠ then "every
+                                   wizard becomes a data twin" is false, and the arc needs to say
+                                   which wizards it does NOT cover.
+```
+
+⚠ **Establish the blast radius before deciding** — which of the 15 shells actually use these four? If it is
+one obscure op, C is cheap. If `regionPick` or the canvas pads are in the mill family, it decides how far
+the arc can reach. ⭐ **That count is the single most useful next fact about the arc's true cost**, and it is
+one grep.
+
+⛔ **Do NOT bolt on option A reflexively.** A hidden mirror input is exactly the "one thing declared twice"
+shape that has produced repeated defects here.
+
+**STILL REAL IF:** `grep -n "data-param" DDCS-Studio/web/ui/formWidgets.js` → if cornerGrid / regionPick /
+coordList / the canvas pads still have no `[data-param]`, still real.
