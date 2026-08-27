@@ -59467,3 +59467,85 @@ something drawn from its own declared data, not from hand-written HTML. This is 
 arc has ported that way. The pattern this whole sequence exists to close (t2339's own sweep, closing six
 confirmed hand-rolled-children sites and documenting the rest) held: no twelfth finding surfaced this attempt.
 
+## t2343 — FOUND the Google sign-in trigger (BACKLOG #34), by instrumentation, not reading. Reported, NOT fixed.
+
+Dispatch was explicit: three prior reading passes each named a wrong candidate, and the advisor's own "fired
+once, not every open" narrowing (2026-08-26) was itself wrong per the owner's later report. Stop reading,
+instrument it.
+
+### METHOD
+
+Stubbed GIS's own script (`**/gsi/client` route intercepted, served a minimal `window.google.accounts.oauth2`
+that logs a stack trace per call and never completes a real OAuth handshake — no live Google network call was
+ever made). Wrapped `window.fetch` and `window.open` at the page level (`addInitScript`, so the wrap is in place
+before any app code runs) to log a stack trace for any call touching `googleapis.com`/`accounts.google.com`.
+
+FIRST run simulated "never connected" (cleared `ddcs_cloud_token`) — nothing fired on either a control wizard
+(`user_corner_data`, never flipped) or drill (`user_drill_data`, flipped at t2341). Traced why: `getAccount().
+connected` (`cloudAccount.js:18`) is `!!localStorage.getItem(TOK)` — a bare string presence check, never
+validated or cleared on expiry — so clearing the token entirely simulated "never signed in," not the owner's
+real state ("was signed in, token now stale"). SECOND run set a fake-but-present token + provider, matching the
+real scenario — and the trigger fired immediately and identically on BOTH the control and the flipped drill.
+
+### THE FOUND CALLER — full detail in BACKLOG.md #34, not duplicated here
+
+`wizardManager.js:287` calls `mountPresetRow` on every wizard open (its own t794 comment: "Idempotent per
+open") → `wizardTemplates.js`'s `listTemplates`/`cloudRead`/`cloudFileRef` (a background check for cloud-saved
+presets, gated on `cloudConnected()` which is true on a STALE token) → `googleDrive.js`'s `ensureRoot()` → `api()`
+gets a 401 from the stale token → `api()`'s own retry logic (correct in general — keeps a user signed in across
+the hourly token expiry for a DELIBERATE cloud action) calls `silentRefresh()` → GIS's `initTokenClient({prompt:
+''})` → when GIS can't complete that silently, it falls back to the visible "Choose an account" chooser the
+owner screenshotted. Reproduced live with a real stack trace, not inferred.
+
+Explicitly verified NOT caused by t2341: byte-identical trigger and stack on `user_corner_data` (never flipped)
+and `user_drill_data` (flipped). A second, separate, boot-time-only trigger also exists
+(`cloudAccount.js`'s `backfillIdentity`, called from the header avatar on every load) but is gated to fire once
+per page load, not on every wizard open — noted, not the answer to this report.
+
+### NOT FIXED — reported per the dispatch's own explicit caution
+
+The generic `api()` 401→silentRefresh retry should stay; it is correct for an intentional cloud action. The real
+fix belongs at `mountPresetRow`'s own call — it should not run an unprompted network operation as a side effect
+of merely opening a wizard. Three real options were named in BACKLOG #34 (defer the cloud check to on-demand;
+fall back to local-only on a 401 from this specific caller, skipping silentRefresh entirely; cache a short-lived
+"cloud check failed" flag) without picking one — that is a product/UX call, not an unambiguous mechanical fix,
+and this arc has already spent three wrong diagnoses on this bug; a fourth wrong FIX would be worse than a
+fourth turn spent reporting precisely. `BACKLOG.md` #34 updated: the new finding added at the top (kept
+findable), and the old "fired once" narrowing struck-through in place rather than deleted, so the wrong turn in
+reasoning stays visible to whoever reads the entry's own history next.
+
+### AMENDMENT absorbed mid-turn — sharper signature: once per page load, not per open
+
+Polled before commit, per protocol. The owner's own report sharpened: the first wizard open in a session
+triggers it, later opens in the SAME session do not, until a reload. Reconciled without needing a second
+mechanism: `mountPresetRow`'s chain would in principle re-run every open, but in the real app the first
+`silentRefresh()` (whether silent or via the user completing the visible chooser once) writes a fresh token to
+`localStorage`, so every subsequent `api()` call that page load stops 401-ing before `silentRefresh` is ever
+reached again. Tried to confirm this precisely — a second instrumented run whose GIS stub resolves a fake token
+(the first run's stub never resolved, which is why it looked like a per-open repeat) — and it came back
+INCONCLUSIVE, said plainly rather than glossed: faking Drive's own API responses (needed since the real Drive
+API correctly 401s any fake token) made `ensureRoot()` cache a literal `"undefined"` folder id from the mocked
+empty-file-list response, changing which code path the second open took — an artifact of the mock, not evidence
+either way about real frequency. The CALLER finding does not depend on resolving this: it came from the first
+run, which mocked ONLY GIS and let the real, unmocked Drive API 401 a genuinely invalid token — solid ground.
+Said so in BACKLOG #34 rather than overclaiming a precise frequency my own instrumentation couldn't actually
+pin down cleanly.
+
+### SECOND amendment — a fourth theory, checked, confirmed not applicable
+
+Polled again before commit and got one more: an unused OAuth REFRESH token (`cloudAccount.js:160` writes
+`ddcs_cloud_refresh`, confirmed by grep to have zero readers anywhere) as the real root cause — access token
+expires, no renewal path exists, next Drive touch cold-starts a sign-in. Checked rather than assumed, per its
+own explicit "confirm it before building" instruction: `cloudAccount.js:65`'s own doc comment settles it —
+"Google uses GIS (its token model); Dropbox/OneDrive use the PKCE popup" — and `connect()`'s own branching
+(`:66-83`) confirms Google's path (`connectGoogleFlow`) never touches PKCE or captures a refresh token at all;
+only Dropbox/OneDrive's connect path does. For a Google account (the owner's own case, per the screenshot's
+`accounts.google.com` origin), there is no refresh token to have used — theory dead for this bug, exactly as its
+own framing anticipated it might turn out to be. Kept as a genuinely separate, smaller, real finding (dead
+capture for Dropbox/OneDrive specifically) rather than folded into or confused with the Google-specific report.
+
+### Files changed
+
+`BACKLOG.md` only (entry #34). No app code touched — node-tier run (228/228 clean) per the dispatch's own
+"node-tier if you do not [change code]" instruction; no e2e run needed.
+

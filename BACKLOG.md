@@ -2689,6 +2689,96 @@ handle still writes two params.
 *(reported by the owner from a phone, 2026-08-26, with a screenshot: `accounts.google.com/v3/si` — "Choose an
 account to continue to ddcs-studio.pages.dev")*
 
+⭐⭐ **FOUND, 2026-08-27 (t2343) — INSTRUMENTED, NOT READ. The caller is `wizardTemplates.js`'s `mountPresetRow`,
+called from `wizardManager.js:287` on EVERY wizard open** ("the adaptive preset row at the form top," its own
+t794 P3 comment says — "Idempotent per open," meaning literally every open, matching the owner's own correction
+below that it recurs rather than fired once). The full, real stack trace (captured live, GIS's own token client
+stubbed so no real Google network call was made, a stale-but-present token simulating the owner's own
+post-expiry state):
+```
+GIS initTokenClient({prompt:''})
+  ← silentRefresh()          googleDrive.js:79
+  ← api()'s 401 retry        googleDrive.js:55
+  ← ensureRoot()             googleDrive.js:96
+  ← cloudFileRef()           wizardTemplates.js:29
+  ← cloudRead()              wizardTemplates.js:37
+  ← listTemplates()          wizardTemplates.js:51
+  ← mountPresetRow()         wizardTemplates.js:81
+  ← wizardManager.js:287, called on every wizard open
+```
+**Why three prior reading passes missed it**: `getAccount().connected` (`cloudAccount.js:18`) is `!!localStorage.
+getItem(TOK)` — a token STRING existing, never checked for validity or cleared on expiry. So "connected" stays
+true forever after the FIRST successful connect, even hours later once the ~1h access token has actually
+expired. `mountPresetRow` asks `listTemplates`, which asks the cloud ONLY `if (cloudConnected())` — true, on a
+stale token, exactly the owner's state — to see if cloud-saved presets exist for the op just opened.
+`ensureRoot()`'s underlying `api()` call gets a 401 from the stale token, and `api()`'s own 401 handling ALWAYS
+tries a `silentRefresh()` — by design, correct for a DELIBERATE cloud action (Save/Open to the Project Manager),
+but this call didn't come from one: it came from a passive, unprompted background check that runs on every open
+regardless of whether the user has ever touched cloud presets for that op. `prompt:''` usually IS silent, but
+when GIS can't complete it silently (session actually gone, third-party-cookie blocking, mobile Safari/Chrome),
+it falls back to the visible "Choose an account" chooser — the screenshot, confirmed by the earlier reading pass
+to be GIS's own UI, not `cloudAccount.js`'s popup (ruled out below, correctly).
+
+**Verified INDEPENDENT of t2341's drill flip**: ran the identical instrumented open on `user_corner_data`
+(never flipped) and `user_drill_data` (flipped at t2341) — byte-identical trigger, same stack, both fire. The
+flip changed nothing about this; do not chase it as a cause.
+
+**A second, separate, boot-time-only trigger exists and is NOT this bug**: `cloudAccount.js`'s
+`backfillIdentity()` (called from the header avatar, "renders on every load") also unconditionally calls
+`getUserInfo()` when connected+missing identity fields, hitting the same 401→silentRefresh path — but it is
+gated to fire ONCE per page load (`captureGoogleIdentity._tried`), not on every wizard open, so it does not
+match the owner's "recurring on wizard open" report. Noted for completeness; not the answer to this entry.
+
+⚠ **AMENDED BY THE OWNER, same turn — sharper signature, addressed honestly rather than re-asserted over:**
+it is NOT per-open, it is ONCE PER PAGE LOAD — the first wizard open in a session triggers the sign-in, later
+opens in the same session do not, until a reload. That is fully CONSISTENT with `mountPresetRow` as the caller
+and needs no second mechanism: `mountPresetRow`'s own chain (above) would in principle re-attempt on every open,
+but in the real app the FIRST attempt's `silentRefresh()` — whether it resolves silently or the user completes
+the visible chooser once — writes a genuinely fresh token to `localStorage` (`googleDrive.js:81`), so every
+`api()` call for the rest of that page load stops 401-ing and `silentRefresh` is never reached again. Attempted
+to confirm this precisely (a second instrumented run whose GIS stub actually resolves a fake token, rather than
+hanging forever like the first run's stub did, to see whether a resolved token stops the second open from
+re-triggering) — **inconclusive, said plainly rather than papered over**: the synthetic mock needed to also fake
+Drive's own API responses (the real googleapis.com correctly 401s ANY fake token, real or "refreshed"), and that
+second mock introduced its own artifact (`ensureRoot()` caching a literal `"undefined"` folder id from the
+mocked empty-file-list response, which changed which code path the second open took) — not trustworthy evidence
+either way on the precise frequency. **The caller finding itself does not depend on resolving this**: it comes
+from the FIRST run, which mocked ONLY GIS (no real OAuth completes) and let the REAL, unmocked Drive API return
+its own genuine 401 to a genuinely invalid token — solid ground, not synthetic. Frequency (once vs. recurring)
+changes SEVERITY, not WHERE the fix goes.
+
+⚠ **A FOURTH THEORY WAS RAISED AND CHECKED, SAME TURN — CONFIRMED NOT APPLICABLE, for a structural reason, not
+a guess:** the idea was that `cloudAccount.js:160` captures an OAuth **refresh token** (`localStorage`'s
+`ddcs_cloud_refresh`) that nothing ever reads back (confirmed true by grep — zero readers repo-wide, only a
+write at connect and a clear at disconnect), so an expired access token has no renewal path and the next Drive
+touch hits a cold sign-in. **Checked before building anything, as asked**: `cloudAccount.js:65`'s own doc
+comment states the branch plainly — *"Google uses GIS (its token model); Dropbox/OneDrive use the PKCE popup."*
+`connect()` (`:66-83`) confirms it in code: for `provider === 'google'` it calls `connectGoogleFlow()` (GIS
+token-model, `:86-97`), which stores ONLY an access token — no PKCE code exchange, no refresh token, ever.
+The PKCE path that captures `REFRESH` (`openConnectModal`, `:82`) is reached only for Dropbox/OneDrive. **So for
+a Google account — the owner's own case, confirmed by the screenshot's `accounts.google.com` origin — a refresh
+token is never even captured in the first place; there is nothing to "use."** The theory is dead for THIS bug,
+exactly as its own framing anticipated it might be. The unused-`REFRESH`-key observation stands as a real, small,
+SEPARATE finding worth a line: any Dropbox/OneDrive user who connects also gets a captured refresh token that
+is never used — same dead-capture shape, different provider, out of scope for this Google-specific report.
+
+⛔ **NOT FIXED THIS TURN — reported, not patched, per the standing caution on auth-path changes (three prior
+wrong diagnoses already spent on this).** The generic `api()` 401→silentRefresh retry is CORRECT and should stay
+— it is what keeps a user signed in across the hourly token expiry for an intentional cloud action (Save/Open).
+The actual fix belongs at the CALLER: `mountPresetRow`'s cloud-presets check should not run an unprompted
+network operation (including a "silent" refresh that can visibly fail into a chooser) as a side effect of simply
+opening a wizard. Genuine design choices remain open, not resolved here: defer the cloud template check to
+on-demand (only query cloud when the user actually opens the presets dropdown, not eagerly on mount); or treat a
+401 from THIS specific caller as "cloud unavailable right now" and fall back to local-only without ever calling
+silentRefresh; or cache a short-lived "cloud check failed" flag so a stale-token session doesn't re-attempt on
+every single wizard open in the same session. Any of these closes the bug; picking between them is a product
+call this entry deliberately leaves to whoever fixes it next, with the caller now named precisely enough that no
+further instrumentation should be needed.
+
+**STILL REAL IF (updated)**: connect a real Google account, wait past the ~1h token expiry (or fake it — set
+`localStorage.ddcs_cloud_token` to a garbage string with `ddcs_cloud_provider='google'` still set), then open
+any wizard → a live GIS `initTokenClient`/chooser fires. Reproduced exactly this way above.
+
 ⚠ **CORRECTED 2026-08-26 — the sign-in itself is NORMAL and the flow is not a bug.** The advisor first
 wrote this up as a rogue full-page redirect. It is not. `cloudAccount.js:164` opens the app's ordinary,
 deliberately-designed sign-in as a **popup** (`window.open(… 'width=520,height=680')`) with a proper
@@ -2698,10 +2788,14 @@ navigation**, because phones largely do not honour popups. **Platform behaviour,
 ⛔ **THE REAL DEFECT IS THE TRIGGER, and only the trigger:** signing in is a CLOUD gesture. **Opening a
 wizard is not.** Something on the wizard path calls into the cloud layer unbidden.
 
-⭐⭐ **NARROWED 2026-08-26 — IT FIRED ONCE, NOT ON EVERY WIZARD OPEN.** That is the signature of a **token
-expiry**, not a systematic wizard→cloud call. ⇒ **Severity drops sharply**: this is not "wizards need an
-account", it is "an expired session re-authorised itself on the next action that happened to need it, and the
-next action happened to be a wizard."
+⛔ **THIS NARROWING WAS WRONG — CORRECTED 2026-08-27 (t2343).** The owner later reported it recurring on wizard
+open, not a one-off. Instrumentation (found above, top of this entry) confirms why: `mountPresetRow` genuinely
+IS a systematic wizard→cloud call, on every single open, once the account is in the stale-but-"connected" state
+— not a rare expiry artifact. Left below, struck rather than deleted, so the wrong turn in reasoning stays
+visible: ~~**NARROWED 2026-08-26 — IT FIRED ONCE, NOT ON EVERY WIZARD OPEN.** That is the signature of a token
+expiry, not a systematic wizard→cloud call. Severity drops sharply: this is not "wizards need an account", it is
+"an expired session re-authorised itself on the next action that happened to need it, and the next action
+happened to be a wizard."~~
 
 ⛔ **THE ADVISOR'S THREE CANDIDATES WERE ALL CHECKED AND ALL WRONG. Do not chase them:**
 
