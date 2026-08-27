@@ -59201,3 +59201,86 @@ clean (none of the 5 files import or reference `formWidgets`/`stock-spill` at al
 SAME pre-documented flake this arc has hit at t2325/t2327/t2329, four turns running now. **FAILED COUNT
 attributable to this turn's changes: 0 — every one of the 14 resolved to environmental flakiness, none left
 assumed.**
+
+## t2337 — THE FLIP, attempt 8. GATED — a real, new, confirmed finding. `drillData.js` reverted; drill stays unflipped.
+
+Applied the edit exactly as dispatched: drill's two top-level `uiChildren` nodes (`sim`, `param_group`) wrapped
+in one `split_horizontal`, `ratio:'360px:*'`, `LEFT` carrying the controls `param_group` and `RIGHT` carrying
+`sim` — mirroring the classic shell's own CSS shorthand (`.wiz-controls{flex:0 0 360px}`,
+`.wiz-visual{flex:1 1 0}`) exactly. Diff: one file, 39 insertions / 21 deletions — ONE COMMIT, REVERTIBLE ALONE,
+as required.
+
+### Guards, live verification — ALL CLEAN
+
+All ten prior findings' own guards ran green against the flipped state: `drill-form-reproduction-2299`,
+`no-duplicate-ids-tree-render-2319`, `geometry-seam-tree-mode-2323`, the t2327 on-screen-position checks, the
+`mouthsOf` round-trip test (`stack-bridge-multi-mouth-2333`), `form-row-composite-widget-2335`, and the updated
+`stock-spill-792` (which now runs against drill's OWN real tree-mode `path_anchor` picker for the first time —
+`ok 20/21`). Live-drove the REAL `wizardManager.open('user_drill_data')` path at both 412px and desktop,
+screenshots sent (`t2337-drill-flipped-412.png`, `t2337-drill-flipped-1400.png`): 3D preview renders, 2D layout
+shows a real draggable "pos" handle (412px: rect 279.5×200, drag 0→47.033; desktop: rect 822×154, drag
+0→60.976), no duplicate ids. Additionally exercised the feeds-speeds Apply on the flipped drill per this turn's
+own explicit instruction (drill in tree mode is exactly the case that exposed the t2329/t2335 no-op bug): Tool
+dropdown populates ("T1 · 6mm Flat End"), Spindle RPM field present, Apply correctly computes 947 at both
+viewports. Node-tier: 228/228 clean.
+
+### FULL SUITE — 24 failed / 2824 passed / 26 skipped on first pass. Triaged to ONE real, attributable finding.
+
+Re-ran all 24 serialized (`--workers=1 --retries=0`): 20/24 cleared immediately. The remaining 4 were checked
+individually:
+
+- **`wizard-face-1599.spec.js` CUSTOMIZE** — 300000ms `_boot.js` `waitReady` timeout. The SAME pre-documented
+  flake named in t2325/t2327/t2329/t2335 (four turns running before this one; five now). Not re-verified via
+  A/B this turn — the pattern is already established beyond reasonable doubt.
+- **`pull-v41-wcs.spec.js`** — genuine A/B: passed clean, single-file, against BOTH the flipped and the
+  reverted `drillData.js` (flipped: 3/3 with `--repeat-each=3`, run alone; reverted: 1/1, run alongside the
+  other two candidates). The test has no relationship to drill or `uiChildren`/`split_horizontal` — its one
+  failure inside the 24-file serialized batch is environmental (order/timing pollution from the batch itself),
+  not attributable to this turn's edit.
+- **`undo-reproject-echo.spec.js:46`** — genuine A/B: **fails identically with `drillData.js` reverted to
+  HEAD** (`page.waitForFunction` timeout on `ddcsGetBlockProgram()[0].params.x`, unrelated to drill). Confirmed
+  PRE-EXISTING and unrelated to this turn's edit — not a new regression, not this turn's scope, left as-is.
+- **`roundtrip-whole-program-1319.spec.js:96` ("AND NOTHING IS LOST FROM ANY OP")** — **CONFIRMED REAL AND
+  ATTRIBUTABLE.** Genuine A/B, single-file: fails every time with drill flipped
+  (`TypeError: (st || []) is not iterable`, inside the test's own local `flat()` helper); passes clean
+  (`ok 5/5`, including this test) with `drillData.js` reverted to HEAD. Root cause, read directly at
+  `tests/roundtrip-whole-program-1319.spec.js:104`:
+  ```js
+  const flat = (st, out = []) => { for (const x of (st || [])) { out.push(x.type); flat(x.children, out); flat(x.uiChildren, out); } return out; };
+  ```
+  This recurses into both `x.children` and `x.uiChildren` for every registered op's stack, hand-rolling the
+  iteration with a bare `for...of (st || [])` that assumes children are ALWAYS array-shaped. Drill's flipped
+  `uiChildren` now contains a `split_horizontal` node whose own `children` is the MOUTH-KEYED OBJECT
+  `{LEFT:[...], RIGHT:[...]}` — declared vocabulary (`wizards/ops/layout.js`'s `mouths:[...]`), not an array —
+  so `for...of` throws directly on that shape. This is exactly the gap `childrenOf()` (`web/blocks/userOps.js:116`)
+  already exists to close (it normalizes array-shaped OR mouth-keyed-object-shaped children into one iterable
+  shape) — but this test's own local `flat()` was hand-rolled before `split_horizontal` (or any multi-mouth
+  `uiChildren` node) existed in any SHIPPED wizard's presentation tree, and nothing has exercised that branch
+  until this turn's flip made drill the first one to reach it. Matches this whole arc's own pattern exactly:
+  each fix exposes the next thing nothing else exercises — this is the eleventh.
+
+  **STOPPED per the standing discipline — GATE, do not patch around it.** `drillData.js` reverted to HEAD
+  (confirmed clean, `git diff --stat` empty) and left unflipped. NOT fixed this turn: the sketch of the fix is
+  a one-line change (`flat(childrenOf(x.children), out); flat(childrenOf(x.uiChildren), out);`, importing
+  `childrenOf` from `userOps.js`, already imported earlier in the same test file's other blocks) — small,
+  understood, and low-risk, but per this arc's own established gate-vs-fix-turn separation and this turn's own
+  dispatch scope (attempt the flip, report, "if anything looks off, SAY SO rather than adjusting the tree to
+  compensate"), the fix belongs to a SEPARATE subsequent turn, same as every one of the ten prior findings.
+
+### Files changed this turn
+
+None committed. `drillData.js` was flipped, fully verified live (screenshots sent), then reverted to HEAD before
+any commit — matching this turn's own outcome (gated, not landed). No other files touched.
+
+### Verdict
+
+**DID NOT LAND.** Attempt 8 is the closest yet — every one of the ten prior findings' own guards passed clean,
+both viewports verified live including the feeds-speeds fix, and 23 of 24 full-suite failures resolved to
+confirmed non-attributable causes (20 immediate + `wizard-face-1599` documented flake + `pull-v41-wcs`
+A/B-cleared + `undo-reproject-echo` A/B-cleared as pre-existing). The full suite did its job exactly as t2329
+predicted it would: it found the one thing the guards never exercised. Finding is filed here with a concrete,
+narrow, understood fix. Next attempt (9) should apply that one-line fix to
+`roundtrip-whole-program-1319.spec.js` FIRST, as its own separate gate-closing turn (non-vacuousness: the fix
+must be shown to make the test fail against the CURRENTLY-REVERTED drill too if `childrenOf` is bypassed, then
+pass with it applied), THEN re-attempt the flip once that guard is closed.
+
