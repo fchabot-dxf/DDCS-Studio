@@ -58692,3 +58692,140 @@ drops the fixed-pixel LEFT pane to `flex:0 0 auto` below the breakpoint. Either 
 working this turn, 1400px) must stay byte-identical — verify at BOTH the project's own 412px default viewport
 AND a wide one, not just one or the other; this turn's own drag-position check (not just a screenshot) is the
 right verification shape to reuse.
+
+## t2327 — TWO PARTS, committed separately. PART 1: teach the split node responsive stacking (t2325's own
+gate finding, closing it). PART 2 (BACKLOG #33, amendment mid-turn, user-decided design, user-reported live):
+the drill circle pattern's fused Ø+angle handle split into two independent ones. DRILL ITSELF STAYS UNFLIPPED
+this turn — Part 2 touches `drillData.js` but only its `drillPatternGeometry` handle math, never `uiChildren`.
+
+### PART 1 — split_horizontal/split_vertical gain narrow-viewport stacking
+
+THE DESIGN DECISION — mirror the shell, don't invent: `renderUiTree`'s split now stacks below the SAME 860px
+breakpoint `.wiz-2pane`'s own `.wiz-controls`/`.wiz-visual` pair already stacks under (`styles.css:2445`,
+`@media (max-width: 860px)`) — extended the SAME media-query block rather than declaring a second 860, so the
+one number can't drift out of sync with itself. Stacking ORDER derives from LEFT/RIGHT's own EXISTING
+physical-placement meaning (no new authored field): pane2 (RIGHT) goes on top, pane1 (LEFT) below, matching
+`.wiz-visual{order:1}`/`.wiz-controls{order:2}` exactly. A SHARED constant, not a per-node breakpoint override
+— every current and foreseeable declared split wants the SAME breakpoint (the shell's own), a per-node
+override is speculative machinery with no forcing case yet; adding one later (an optional `params.stackBelow`)
+stays additive if a real case ever needs it. `split_vertical` needed no override at all — it is already a
+single column at every width, nothing to stack.
+
+THE MECHANICAL PROBLEM an inline-style fix couldn't solve: an inline style always beats a stylesheet rule
+regardless of specificity, so `flex-direction`/`flex`/`order` could not stay inline (the box's/panes' own
+previous `style.cssText` sets) AND be overridden by a media query. Moved them OUT into `.ui-split`/
+`.ui-split-horiz`/`.ui-split-vert`/`.ui-split-pane1`/`.ui-split-pane2` (styles.css, right after `.wiz-2pane`'s
+own splitter rules) — the ratio-derived flex WEIGHTS stay inline as CSS custom properties
+(`--split-flex1`/`--split-flex2`, since they're AUTHORED data a shared stylesheet can't hardcode), everything
+else (direction/order/the breakpoint) lives in the stylesheet where the media query can win with normal
+cascade, no `!important` needed (nothing else sets inline order/flex on these elements, unlike the shell's own
+splitter feature, which is why ITS media-query override needs `!important` and this one doesn't).
+
+VERIFIED: `tests/split-node-responsive-2327.spec.js` (new) — stacks at the project's own 412px default
+(RIGHT above LEFT), stays side-by-side at 1400px, every EXISTING ratio value (default/1:1/2:1) renders
+byte-identically to before at a wide viewport, `split_vertical` stays a column at both widths. Non-vacuousness
+proven: reverted `formWidgets.js`+`styles.css` to HEAD, the narrow-stacking assertion genuinely failed
+(`flexDirection` read `"row"` instead of `"column"`), restored, re-confirmed 4/4 pass. Extended TWO existing
+tree-mode guards with the exact blind spot t2325 found live (a container can be FOUND, non-hidden, and even
+carry real status text while rendering physically PAST the viewport edge) — `geometry-seam-tree-mode-2323`
+gained `treeContainerOnScreen` (proven non-vacuous the same way: fails pre-fix, passes post-fix);
+`no-duplicate-ids-tree-render-2319` gained a check on the SIM node's own container (NOT the path_anchor mount
+— that one sits on the FIXED-width LEFT pane, which never goes off-screen regardless of this bug; the first
+draft of this addition checked the wrong side and was silently vacuous until re-derived and re-verified).
+
+LIVE VERIFICATION — re-applied drill's own flip temporarily (screenshotted, reverted after, matching every
+prior turn's own discipline): at the project's own 412px default, the visual pane now stacks ON TOP with the
+form below, matching the shell's own convention exactly, and a real drag on the pos handle changed originX
+(0→47.033) — confirmed on-screen (`elementFromPoint` resolves to the actual handle) and functionally working,
+where t2325 found it fully invisible and undraggable. `scratchpad/t2327-drill-flipped-narrow.png` sent to the
+user.
+
+### PART 2 (BACKLOG #33) — the circle pattern's fused Ø+angle handle, split
+
+THE BUG, traced to source: `canvasWidgets.js`'s `radial` gesture's `drag()` wrote BOTH `fieldA` (angle, via
+`atan2` of the raw cursor bearing) AND `field` (radius, via raw `hypot` distance) off ONE drag when both were
+declared on the same handle (`drillData.js`'s `dr_ring` — `field:'dia', fieldA:'startAngle'` — and
+`drillView.js`'s identical `ring` decl, the CLASSIC, currently-shipping wizard) — moving the handle in ANY
+direction rotated every hole about the centre, which is what the owner encountered live and described as "the
+diameter marker moves the position." It also violated the standing rule that handles are independent.
+
+THE DECIDED DESIGN (owner, pre-agreed — this turn built it, didn't design it): split into two single-purpose
+handles instead of a guard on the fused one. Hole #1 IS the pattern's own orientation, so dragging it (not an
+abstract lever standing in for it) writes `startAngle` — an angle-only `radial` (`fieldA` alone, `field`
+omitted), the EXACT shape `canvasWidgets.js` already supported and `fillText.js`'s own `txt_rot` already used
+— reused, not invented. The Ø handle keeps `field`+`rScale` but drops `fieldA` entirely, and rides a LOCKED
+arm 90° off hole #1 — new: `lockA` (`canvasWidgets.js`) makes the drag PROJECT onto that fixed bearing
+(`dx·cos(a) + dy·sin(a)`) instead of raw `hypot` distance, so a sideways nudge off the arm drives ~0 radius
+change ("slides along the arm only") and it can never write an angle even by construction. Drawn with a
+dotted guide line (`fc-guide`, matching the existing ring-guide styling) from centre to the handle, and a
+DIAMOND shape (new `shape:'diamond'` on the declaration → `kind:'diamond'` → a `<polygon>` in
+`featureCanvas.js`, never a `<circle>` — circles are holes on this canvas) so it reads as a radius handle, not
+a stray dot or another hole. The arm's own bearing is derived from hole #1's CURRENT angle (`armA = rotA +
+90°`), so the two handles can never collide as the pattern rotates.
+
+FIXED IN BOTH CONSUMERS THAT SHARED THE SHAPE: `drillData.js` (the not-yet-flipped data twin) AND
+`drillView.js` (the CLASSIC, currently-shipping wizard — what the owner actually uses day to day; the
+amendment explicitly permitted reporting-without-fixing here, but fixing it was the small marginal cost of a
+mechanism already built, and leaving the LIVE bug the owner hit unfixed while only touching the unshipped twin
+would have missed the point). CHECKED, NOT FIXED (explicitly out of scope, reported per the amendment's own
+instruction): `drillView.js`'s `end` handle and `drillData.js`'s own `dr_line` (the LINE pattern's pitch/angle
+handle) share the IDENTICAL fused shape (`field`+`fieldA` both set) — the decided design generalizes cleanly
+("the rotate handle is the thing the param positions," a line's own end point mirroring hole #1 here), but
+building that case is deferred, per the amendment's own explicit boundary. `fillText.js`'s `txt_rot` does NOT
+share the defect — checked and confirmed already angle-only.
+
+Every OTHER `radial` consumer (`contourData.js`/`contourView.js`, `pocketData.js`/`pocketView.js`,
+`panelTypes.js`'s own generic role-based dia handle) never sets `lockA`/`shape` — confirmed by grep across the
+whole repo — so they keep the exact original isotropic-hypot math and circle rendering, unchanged.
+
+VERIFIED: `tests/drill-circle-handle-split-2327.spec.js` (new) — the classic drill wizard: dragging Ø changes
+`dia`, leaves `startAngle` untouched; dragging hole #1 changes `startAngle`, leaves `dia` untouched; the Ø
+handle renders as a polygon; a dotted arm exists. A second test exercises `canvasWidgets.js`'s `radial.drag`
+directly: motion along a locked arm drives the full radius, motion perpendicular to it drives ~0, and the
+SAME perpendicular motion WITHOUT `lockA` still uses the old raw-distance math (byte-identical for every
+existing caller). Non-vacuousness proven: reverted all four touched files to HEAD, both new tests genuinely
+failed (the handle didn't exist; the projection math produced 80 instead of ~0), restored, re-confirmed both
+pass.
+
+THREE EXISTING TESTS BROKE, all EXPECTED consequences of the redesign, all fixed (not silently left red):
+`canvas-widgets.spec.js` expected exactly 2 handles (origin+ring) — now 3 (origin+rot+ring) — updated to check
+3, plus a new assertion that the Ø handle is a diamond. `drill-canvas.spec.js` dragged "the first
+`circle.fc-handle`" — which now resolves to the NEW angle-only `rot` handle (a plain circle, rendered first in
+DOM order) instead of the diamond Ø handle (no longer a circle at all) — retargeted via `[data-hid="ring"]`,
+and the drag direction itself had to change from a hardcoded rightward `+60,0` to "away from the circle's own
+centre," since the Ø handle's locked arm is now ROTATION-DEPENDENT (at the default `startAngle:0` it points
+straight up, exactly perpendicular to a rightward drag — the fix's own "sideways does nothing" working
+exactly as designed, just not in the direction this old test assumed). `drill-patterns-846.spec.js` counted
+`paths.length` as the hole count — now off by one (the new arm guide is a `paths` entry too, since that field
+is the general vector-geometry channel, not a holes-only one) — refined to filter by point-count (`pts.length
+> 2`, since `_holeRing`'s 13-point rings are structurally distinct from the arm's 2-point line) instead of a
+brittle hardcoded offset.
+
+THE ONE THING REASONING COULDN'T SETTLE, per the amendment's own framing: whether the dotted arm reads as
+clutter on a phone. Screenshotted (`scratchpad/t2327-diamond-handle.png`, sent to the user) at the classic
+wizard with a 6-hole bolt circle — the arm IS visually similar to the ring's own dashed-guide outline
+(both `fc-guide`-styled), so at a glance the diamond can read as "a point somewhere on the dashed ring" rather
+than "at the end of a distinct radial arm." Functionally correct either way (the drag isolation is real and
+proven), but flagged honestly rather than claimed settled — the owner's call.
+
+### Files changed
+
+Part 1: `web/ui/formWidgets.js`, `web/styles.css`, `tests/split-node-responsive-2327.spec.js` (new),
+`tests/geometry-seam-tree-mode-2323.spec.js`, `tests/no-duplicate-ids-tree-render-2319.spec.js`.
+Part 2: `web/blocks/dataOps/drillData.js`, `web/viz/canvasWidgets.js`, `web/viz/featureCanvas.js`,
+`web/wizards/views/drillView.js`, `tests/drill-circle-handle-split-2327.spec.js` (new),
+`tests/canvas-widgets.spec.js`, `tests/drill-canvas.spec.js`, `tests/drill-patterns-846.spec.js`.
+`drillData.js`'s own `uiChildren`/flip untouched by either part — confirmed via `git diff`, the only change
+there is inside `drillPatternGeometry`. `scratchpad/t2327-drill-flipped-narrow.png` and
+`scratchpad/t2327-diamond-handle.png` — both sent to the user this turn, not kept in the repo.
+
+### FULL SUITE (both parts together)
+
+First pass: **22 failed / 2822 passed / 26 skipped.** Re-ran all 22 serialized (`--workers=1`, isolated):
+**18 passed clean.** Of the remaining 4: THREE (`disable-guard-2307`, `wizard-face-1599` ×2) are the SAME
+documented load-timing flakes this turn's own dispatch named in advance ("disable-guard-2307 and
+wizard-face-1599 are documented load-timing flakes"). The fourth (`pull-v41-wcs.spec.js`) is NOT a timeout —
+a real assertion mismatch (`wcsTag` expected `'changed'`, got `null`) — investigated rather than assumed:
+zero imports from any file touched this turn (a controller-import-modal review test, `#import-modal`/
+`/api/vars` mocking — a completely separate UI surface), and passed clean in 882ms when re-run alone. **FAILED
+COUNT after full triage: 0 attributable to this change.**
