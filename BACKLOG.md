@@ -2684,13 +2684,23 @@ handle still writes two params.
 
 ---
 
-### 34. ⛔ OPENING A WIZARD TRIGGERS A FULL-PAGE GOOGLE SIGN-IN — on mobile it navigates out of the app
+### 34. ⛔ OPENING A WIZARD TRIGGERS THE GOOGLE SIGN-IN — the flow is fine, the TRIGGER is the bug
 
 *(reported by the owner from a phone, 2026-08-26, with a screenshot: `accounts.google.com/v3/si` — "Choose an
 account to continue to ddcs-studio.pages.dev")*
 
-⛔ **It is a REDIRECT, not a popup.** The whole tab leaves Studio. On mobile that means **losing whatever the
-user was doing** — a wizard mid-edit, unsaved work in the editor. That is worse than the sign-in itself.
+⚠ **CORRECTED 2026-08-26 — the sign-in itself is NORMAL and the flow is not a bug.** The advisor first
+wrote this up as a rogue full-page redirect. It is not. `cloudAccount.js:164` opens the app's ordinary,
+deliberately-designed sign-in as a **popup** (`window.open(… 'width=520,height=680')`) with a proper
+popup-blocked fallback message. ⇒ **What the owner saw is mobile Chrome turning that popup into a
+navigation**, because phones largely do not honour popups. **Platform behaviour, not a defect.**
+
+⛔ **THE REAL DEFECT IS THE TRIGGER, and only the trigger:** signing in is a CLOUD gesture. **Opening a
+wizard is not.** Something on the wizard path calls into the cloud layer unbidden.
+
+⚠ The mobile consequence still matters when judging priority — because the popup becomes a navigation on a
+phone, an unwanted prompt costs the user their place. But **do not go looking for a redirect bug; there is
+none.**
 
 ⚠ **No wizard→cloud call path was found by grepping** (`wizardManager.js` and `wizards/` import nothing from
 `ui/cloud*`), so the trigger is INDIRECT and needs tracing with the app running, not by reading. **Do not
@@ -2715,12 +2725,12 @@ token refresh that happens to fire on the next user action after expiry.
 #### ⇒ WHAT THE FIX HAS TO ACHIEVE, whatever the trigger turns out to be
 
 ```
-⛔ NEVER redirect the top-level window for auth. A popup or an in-page flow can fail without
-   destroying the user's work; a redirect cannot.
-⛔ NEVER trigger auth from a path the user did not associate with the cloud. Opening a wizard is not
-   a cloud gesture.
-⭐ CONSULT the existing session first — and if a token has expired, say so rather than silently
-   restarting an OAuth flow.
+⛔ NEVER trigger auth from a path the user did not associate with the cloud.
+   Opening a wizard is not a cloud gesture. THIS IS THE WHOLE BUG.
+⭐ CONSULT the existing session first — and if a token has expired, SAY SO rather than silently
+   restarting a sign-in the user did not ask for.
+⚠ Leave the popup flow alone. It is correct, it has a blocked-popup fallback, and its
+   become-a-navigation behaviour on mobile is Chrome's, not ours.
 ```
 
 **STILL REAL IF:** open any wizard in a browser with no cloud session → a navigation to `accounts.google.com`
