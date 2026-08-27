@@ -58829,3 +58829,108 @@ a real assertion mismatch (`wcsTag` expected `'changed'`, got `null`) — invest
 zero imports from any file touched this turn (a controller-import-modal review test, `#import-modal`/
 `/api/vars` mocking — a completely separate UI surface), and passed clean in 882ms when re-run alone. **FAILED
 COUNT after full triage: 0 attributable to this change.**
+
+## t2329 — THE FLIP, attempt 7: GATE FAILED on THREE separate, NEW findings — STOPPED and reverted. Unlike
+every prior attempt (one blocker each), this one surfaced three at once, all only reachable once a real
+built-in wizard actually ran its OWN interaction paths through the tree — not because the flip got worse, but
+because six turns of fixes finally cleared enough ground for these to be the first things standing.
+
+### THE THREE NAMED GUARDS + BOTH VIEWPOINTS — all passed cleanly
+
+Re-applied the exact wrap (unchanged from every prior attempt). All 15 targeted guards passed 15/15:
+`drill-form-reproduction-2299` (3), `no-duplicate-ids-tree-render-2319` (1), `geometry-seam-tree-mode-2323`
+(2), `split-node-responsive-2327`/`split-node-ratio-2311` (7), `drill-circle-handle-split-2327` (2). Live
+verification at BOTH viewports per this turn's own explicit instruction (a single width is what hid t2325's
+bug for six attempts): at 412px, no duplicate ids, a non-zero 2D container (279.5×200), a real drag
+(originX 0→**47.033**); at 1400px, no duplicate ids, a non-zero 2D container (822×154), a real drag
+(originX 0→**60.976**). BACKLOG#20's dormant panel/sim id pair did NOT fire — third attempt running.
+Screenshots at both widths sent to the user (`t2329-drill-flipped-412.png`, `t2329-drill-flipped-1400.png`).
+
+### THEN: the FULL SUITE surfaced 25 failures — triaged to 11 real, then to THREE distinct causes
+
+First pass: 25 failed / 2819 passed / 26 skipped. Re-ran all 25 serialized: 14 resolved as load flakes,
+**11 remained.** Unlike every prior full-suite run this arc has done, most of these 11 are NOT generic
+timeouts — several are explicit thrown errors or value mismatches, and several name drill/twin-family
+functionality directly. Confirmed via A/B (reverted `drillData.js` to HEAD, re-ran the same tests) that all
+three of the below pass cleanly pre-flip and fail only with the flip applied — genuine causation, not assumed.
+
+**FINDING 1 — `stackBridge.js`'s Blockly-workspace round-trip doesn't know about multi-mouth children.**
+Thrown, not silent: `recToJson: block "split_horizontal" (kind "undefined") carries 2 children but its def
+declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`
+— a DELIBERATE loud guard (someone built this to fail loud rather than silently drop content), and it is
+correctly catching a REAL gap: `chainToJson`/`recToJson` (the JSON→Blockly-workspace direction, used when a
+def gets forked/saved/reopened through the Blocks canvas) has never been taught `childrenOf`'s own
+object-shaped-children handling — every OTHER consumer that needed it (blockEmitter.js, devMode.js,
+tokenGuard.js, panelTypes.js, whenGuard.js) was fixed across t2315/t2317/t2319, but this ONE direction of
+`stackBridge.js` (t2319 fixed `chainToJson`'s OWN `.length` guards for the JSON-building direction, NOT this
+JSON-consuming direction) was never exercised by any prior gate, because no prior flip attempt ever drove a
+def through an ACTUAL fork/save/reload cycle — only render + drag. Confirmed hitting 2 separate tests
+(`value-fidelity-1520`'s drill/bore identity round-trip, `roundtrip-whole-program-1319`'s whole-family
+sweep), and almost certainly the root cause of a third (`fork-parity-1593`'s own timeout waiting for blocks
+to ever appear after `ddcsEditWizardDef` — consistent with an uncaught exception during that same load path
+leaving the workspace never populated).
+
+**FINDING 2 — the feeds-speeds helper's Apply button silently no-ops for the drill twin.** Expected feed 947
+(Aluminum × tool 1 Ø6 2fl), got **"100"** — the untouched DEFAULT, meaning Apply's own click handler bailed
+out early rather than computing anything. Traced partway: `feedSuggestWidget`'s own DOM-scoping
+(`host.closest('#wiz_user_form')`) is NOT the cause — checked directly, `#wiz_user_form` resolves correctly
+in tree mode, the button and both tool/feed fields are all found. Leading (unconfirmed) hypothesis: the
+failing test's own interaction is fully synchronous — set toolNum, dispatch 'change', set material, dispatch
+'change', click Apply, read feed — ALL inside one `page.evaluate` with no waits between steps. If tree mode's
+`render()` fully REBUILDS the form DOM on every field-change event (unlike flat mode, which may patch values
+in place without recreating elements), the `material` element reference the test captured BEFORE the
+toolNum-triggered rebuild would go stale — writing 'Aluminum' onto a detached node that the live form never
+sees — and the Apply button's own closure-captured `sel` (rebuilt fresh) would read an empty/default material
+value, matching its own early-bail branch (`if (!matName) { ...; return; }`) exactly, and matching the
+observed "untouched default" result. NOT independently confirmed this turn — marked as the leading hypothesis,
+not a proven cause.
+
+**FINDING 3 — Path Datum is invisible for the drill twin specifically.** `stock-spill-792`'s own sweep across
+all 8 mill twins expects Path Datum + Attach-to-Stock to stay VISIBLE (the two real per-op placement choices,
+unlike the 4 stock-dimension fields it correctly expects hidden) — for `user_drill_data` it measured
+`visible:false`. NOT root-caused this turn (observed only, via the full-suite run + isolated re-run, both
+attributed cleanly to the flip via the same A/B). `path_anchor`'s own rendering was the subject of both
+t2293 (BACKLOG#21's original fix) and t2319 (its follow-up, the dead id-stamp) — plausibly a THIRD layer of
+the same area, but that is a guess, not a finding, and is flagged as exactly that.
+
+### Disposition — reverted, not patched, matching every prior gate's own standard
+
+Three separate, real defects surfacing on the SAME attempt is a different shape of finding than any prior gate
+in this arc (always exactly one) — not evidence the flip is "worse," but evidence that six turns of fixes
+finally cleared enough ground for a REAL wizard's REAL interaction paths (fork/save, an advisory helper's
+click handler, a field-visibility sweep) to reach code that has never been exercised through a tree-mode
+render before. Reverted `drillData.js` to HEAD; confirmed clean (`git diff --stat`, no output).
+
+### Files changed
+
+None. `drillData.js` reverted (applied, gated at both viewports, screenshotted, drag-verified with real
+numbers at both, full-suite-tested, reverted — net zero diff). `scratchpad/t2329-drill-flipped-412.png` and
+`scratchpad/t2329-drill-flipped-1400.png` — both sent to the user this turn, not kept in the repo.
+
+### The actionable fix, for whoever picks this up next — THREE separate pieces of work, not one
+
+1. `stackBridge.js`'s `recToJson`/`chainToJson` (the JSON→Blockly-workspace direction) needs the SAME
+   `childrenOf`-based object-shaped-children handling every other consumer already has — likely the most
+   mechanical of the three, matching t2315/t2317/t2319's own established shape.
+2. The feeds-speeds Apply-button no-op needs its hypothesis actually confirmed or refuted: instrument
+   `render()`/`update()` to check whether a field-level 'change' event in tree mode triggers a full DOM
+   rebuild (vs flat mode's own behavior), and if so, decide whether that's the real defect or whether the
+   TEST's own synchronous multi-step pattern needs `await`s between steps (a real user's own clicks are never
+   this fast — worth checking whether a REAL, paced interaction also fails before assuming the app is wrong
+   rather than the test).
+3. Path Datum's own invisibility for drill in tree mode needs tracing to source the same way t2293/t2319 did
+   for path_anchor's prior two layers — likely another id-scoping or CSS-cascade interaction specific to the
+   `.ui-split`/tree-mode nesting Part 1 of t2327 introduced, but unconfirmed.
+
+### FULL SUITE
+
+25 failed / 2819 passed / 26 skipped, first pass. 14/25 resolved as load flakes on isolated re-run, leaving 11.
+Of those, THREE (above) are confirmed real via A/B against HEAD (fail with the flip, pass clean reverted). The
+remaining EIGHT were ALSO A/B'd, not left unconfirmed: `disable-guard-2307` (×2), `field-help-798`,
+`modal-pre-canvas-1654` (×2), and `pull-v41-wcs` all passed CLEAN against reverted HEAD — pure load flakes,
+unrelated to the flip, matching this arc's own established pattern of full-suite noise under sustained
+back-to-back Playwright runs. `wizard-face-1599`'s own three tests (CUSTOMIZE / plain-program / MID-EDIT)
+FAILED EVEN AT REVERTED HEAD — the same pre-existing, well-documented flake this arc has hit at t2323, t2325,
+and t2327 (its own file comments name the t1766 reproject-echo race explicitly) — confirmed NOT caused by
+this turn's work either way. **FAILED COUNT attributable to the flip: exactly 3, fully confirmed. The other 8
+are confirmed UNRELATED, not merely assumed.**
