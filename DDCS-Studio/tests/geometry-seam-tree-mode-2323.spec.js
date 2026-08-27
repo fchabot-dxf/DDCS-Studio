@@ -51,6 +51,7 @@ const driveOpenDirect = async (page, def) => {
         const shellStatus = document.getElementById('userVizStatus');
         const rectOf = (el) => el ? el.getBoundingClientRect() : null;
         const sr = rectOf(shellContainer);
+        const tr = rectOf(treeContainer);
         // A container's own bounding rect is a STRUCTURAL/CSS fact owned by render()'s (unmodified,
         // already-correct) tree layout — non-zero regardless of whether update() ever wrote geometry
         // into it. update()'s own unambiguous side effect is the status line it sets as its last act
@@ -62,6 +63,12 @@ const driveOpenDirect = async (page, def) => {
             shellContainerVisible: !!(sr && sr.width > 0 && sr.height > 0),
             treeStatusText: treeStatus ? treeStatus.textContent : null,
             shellStatusText: shellStatus ? shellStatus.textContent : null,
+            // t2327 — the exact blind spot t2325 found live: a container can be FOUND, non-hidden, and even
+            // carry real status text while still rendering physically PAST the right edge of the viewport
+            // (the split_horizontal responsive-stacking gap). Checked at whatever viewport the test itself
+            // runs at — no override here, so this runs at the project's own 412px default unless the test
+            // sets one, the exact width t2325's finding was specific to.
+            treeContainerOnScreen: !!(tr && tr.x >= 0 && tr.x + tr.width <= window.innerWidth),
         };
     }, def);
 };
@@ -102,6 +109,10 @@ test('TREE mode: geometry draws into the tree\'s own rendered container, not the
     // tree's own container: its own status-line write landed on the _tree-suffixed element, not the shell's.
     expect(r.treeStatusText, 'update() wrote its status line into the tree\'s own container').toBeTruthy();
     expect(r.shellStatusText, 'update() did NOT write into the hidden shell\'s status element').toBeFalsy();
+    // t2327 — the tree's own container must be ON-SCREEN, not just present: t2325 found this exact template
+    // shape (a fixed-360px split at the project's default 412px viewport) renders the tree container fully
+    // past the right edge of the page before that turn's responsive-stacking fix.
+    expect(r.treeContainerOnScreen, 'the tree\'s own container renders within the visible viewport, not off past the right edge').toBe(true);
 });
 
 test('CONTROL — FLAT mode: geometry still draws into the plain (non-suffixed) container, byte-identical', async ({ page }) => {

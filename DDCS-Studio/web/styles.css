@@ -2418,6 +2418,25 @@ button.primary:hover {
 .wiz-2pane .wiz-visual .viz-split > [data-viz-pane="preview3d"] { flex-grow: calc(var(--pane-ratio, 0.5) * 100); }
 .wiz-2pane .wiz-visual .viz-split > [data-viz-pane="layout2d"]  { flex-grow: calc((1 - var(--pane-ratio, 0.5)) * 100); }
 
+/* t2327 (BACKLOG's 6th layer, found gating drill's flip at t2325) — the DECLARED `split_horizontal`/
+   `split_vertical` tree node (formWidgets.js's `renderUiTree`) used to be a static inline flex-direction,
+   with NO narrower-viewport behavior at all — unlike `.wiz-2pane`'s own `.wiz-controls`/`.wiz-visual` pair,
+   just above, which STACKS below 860px (the same `@media (max-width: 860px)` block this rule extends,
+   one source of truth for the breakpoint — never a second hardcoded 860). At the project's own 412px
+   default viewport a fixed-360px LEFT pane consumed nearly all the available width and the fill RIGHT
+   pane (and every drag handle inside it) collapsed to 0 and rendered off-screen. The ratio itself stays
+   fully dynamic via `--split-flex1`/`--split-flex2` (set inline per node, since the split's flex weights
+   are AUTHORED data, not something a shared stylesheet can hardcode) — only the ≤860px override lives
+   here, so it can share the breakpoint text with the block around it instead of drifting from it. */
+.ui-split { display: flex; gap: 16px; width: 100%; height: 100%; min-height: 0; }
+.ui-split-horiz { flex-direction: row; }
+.ui-split-vert { flex-direction: column; }
+.ui-split-pane { display: flex; flex-direction: column; }
+.ui-split-pane1 { flex: var(--split-flex1, 1); }
+.ui-split-pane2 { flex: var(--split-flex2, 1); }
+.ui-split-horiz > .ui-split-pane { min-width: 0; }
+.ui-split-vert > .ui-split-pane { min-height: 0; }
+
 /* THE SPLITTER — a slim grabbable horizontal divider between the two panes; shown only when BOTH are open+visible
    (data-split-on). ≥44px effective grab via the ::before overlay; touch-native (pointer events + touch-action:none). */
 .viz-pane-splitter { display: none; flex: 0 0 8px; align-self: stretch; position: relative; z-index: 2;
@@ -2482,6 +2501,13 @@ button.primary:hover {
         position: sticky; top: 0; z-index: 3;
         background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, .3);
     }
+    /* t2327 — a DECLARED horizontal split stacks here exactly like `.wiz-controls`/`.wiz-visual` do just
+       above: pane2 (RIGHT) on top, pane1 (LEFT) below — the SAME order this block already gives the shell's
+       own visual/controls pair, derived from LEFT/RIGHT's own existing physical-placement meaning rather than
+       a new authored field. `split_vertical` needs no override — it is already a single column. */
+    .ui-split-horiz { flex-direction: column; height: auto; }
+    .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+    .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
 }
 
 /* t1760 — THE BLOCKS PANE'S OWN COLUMN IS ALWAYS NARROW, REGARDLESS OF THE WINDOW: the ≤860px block above stacks

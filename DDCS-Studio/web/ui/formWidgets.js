@@ -1311,17 +1311,30 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             if (!node) continue;
             if (node.type === 'split_horizontal' || node.type === 'split_vertical') {
                 const isHoriz = node.type === 'split_horizontal';
+                // t2327 — a horizontal split now STACKS below 860px (styles.css's own `.ui-split*` rules,
+                // sharing the SAME `@media (max-width: 860px)` block `.wiz-2pane` already stacks under —
+                // see that file for the finding this closes). The ratio-derived flex weights are AUTHORED
+                // data, so they stay inline (as CSS custom properties the stylesheet reads via `var()`) —
+                // everything ELSE (direction, stacking order, the breakpoint itself) moved OUT of inline
+                // style and into `.ui-split`/`.ui-split-horiz`/`.ui-split-vert` so the media query can
+                // override it with normal cascade, not `!important`: an inline style always beats a
+                // stylesheet rule regardless of specificity, so `flex-direction`/`flex`/`order` could not
+                // have stayed inline AND been responsive. Desktop rendering (every existing ratio value —
+                // proportional, fixed-pixel, the '1:1' default) is byte-identical: `.ui-split-pane1{flex:
+                // var(--split-flex1,1)}` resolves to the exact same value paneFlexCss always computed.
                 const box = document.createElement('div');
-                box.style.cssText = `display:flex; flex-direction:${isHoriz ? 'row' : 'column'}; gap:16px; width:100%; height:100%; min-height:0;`;
+                box.className = isHoriz ? 'ui-split ui-split-horiz' : 'ui-split ui-split-vert';
                 const ratio = (node.params && node.params.ratio) || '1:1';
                 const [tok1, tok2] = ratio.split(':');
                 const flex1 = paneFlexCss(tok1), flex2 = paneFlexCss(tok2);
+                box.style.setProperty('--split-flex1', flex1);
+                box.style.setProperty('--split-flex2', flex2);
 
                 const pane1 = document.createElement('div');
-                pane1.style.cssText = `flex: ${flex1}; display:flex; flex-direction:column; ${isHoriz ? 'min-width:0;' : 'min-height:0;'}`;
+                pane1.className = 'ui-split-pane ui-split-pane1';
                 const pane2 = document.createElement('div');
-                pane2.style.cssText = `flex: ${flex2}; display:flex; flex-direction:column; ${isHoriz ? 'min-width:0;' : 'min-height:0;'}`;
-                
+                pane2.className = 'ui-split-pane ui-split-pane2';
+
                 box.append(pane1, pane2);
                 container.appendChild(box);
                 

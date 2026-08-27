@@ -52,8 +52,22 @@ test('a tree render carrying path_anchor produces NO duplicate DOM ids anywhere 
         for (const id of allIds) counts[id] = (counts[id] || 0) + 1;
         const dupes = Object.entries(counts).filter(([, n]) => n > 1);
         const paMount = host.querySelector('.pa-mount');
-        return { dupes, paMountFound: !!paMount };
+        // t2327 — this same split_horizontal('360px:*') shape, rendered at whatever viewport this test runs
+        // at (no override — the project's own 412px default), is exactly what t2325 found pushed off-screen
+        // before that turn's responsive-stacking fix. path_anchor sits on the FIXED-width LEFT pane, which
+        // never goes off-screen regardless of the bug (a fixed pane always starts near x:0) — the RIGHT
+        // (fill) pane's own content is what collapses and overflows, so the meaningful check is `sim`'s own
+        // rendered container (`userVizContainer_tree`, RIGHT), not the path_anchor mount.
+        const simContainer = document.getElementById('userVizContainer_tree');
+        const r = simContainer ? simContainer.getBoundingClientRect() : null;
+        return {
+            dupes, paMountFound: !!paMount,
+            simContainerFound: !!simContainer,
+            simContainerOnScreen: !!(r && r.x >= 0 && r.x + r.width <= window.innerWidth),
+        };
     });
     expect(r.paMountFound, 'the path anchor picker actually mounted').toBe(true);
     expect(r.dupes, `no duplicate ids anywhere in the document: ${JSON.stringify(r.dupes)}`).toEqual([]);
+    expect(r.simContainerFound, 'the sim node\'s own container mounted').toBe(true);
+    expect(r.simContainerOnScreen, 'the RIGHT (fill) pane renders within the visible viewport, not off past the right edge').toBe(true);
 });
