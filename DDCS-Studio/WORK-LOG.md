@@ -58485,3 +58485,112 @@ the flat-mode ones — OR `sim`'s own formWidgets.js branch needs to reuse/reloc
 `.wiz-visual` pane (moving it into the tree's own layout) rather than building a second, parallel, never-
 populated one. Either way, FLAT mode's own 9 existing call sites must stay byte-identical — that's the real
 verification burden of this fix, not the tree-mode addition itself.
+
+## t2323 — FIX THE GAP t2321 FOUND: `update()`'s own geometry calls now follow `render()` into tree mode.
+Drill stays UNFLIPPED this turn, per the dispatch's own explicit boundary — this is the machinery fix, not
+the flip. THE FIRST USER-VISIBLE RESULT THE WIZARDS-AS-DATA ARC HAS PRODUCED landed live this turn (screenshot
+below), even though it isn't shipped as drill's own flip yet.
+
+### The fix — teach `update()`'s call sites, not `sim`'s branch (Option A, matching the advisor's own instinct)
+
+t2321 traced the gap to source: `render()`'s own `isTree` branch (line ~371) correctly hides the shell's
+native `.wiz-visual` pane and widens `.wiz-controls` in tree mode, anticipating that a declared tree's own
+`sim` node provides visualization instead — but `update()`, the SAME file's OTHER function (the one that
+actually DRAWS geometry: `mgr.preview3D`, `applySimIntent`, every drag-handle/marker call), never got the
+memo. It kept targeting the same plain, non-`_tree`-suffixed ids `sim`'s own formWidgets.js branch does NOT
+use (that branch renders `userViz3dContainer_tree`, `userVizContainer_tree`, ... — deliberately different ids,
+t2301/BACKLOG#20's own precedent, to avoid a duplicate-id class). Real geometry kept computing correctly and
+drawing into the pane `render()` had just hidden.
+
+Two ways to close it: teach `update()`'s ~9 call sites to follow `isTree` (Option A), or have `sim`'s own
+formWidgets.js branch relocate/reuse the shell's EXISTING `.wiz-visual` pane instead of building a second,
+parallel one (Option B). Took Option A — it's the smaller, more local change (one file, one new set of
+helpers, no change to `sim`'s own rendered structure or to `render()`'s already-correct hide logic), and it
+generalizes: any FUTURE viz-family id `update()` ever grows gets the same treatment for free by routing
+through `vid`/`vel` instead of `id`/`elNS` directly.
+
+Added, right after `pt = panelType(_def.panel)` (userOpView.js's `update()`):
+
+```js
+const isTree = hasTreeLayout(_def.template);
+const vizBase = (base) => (isTree ? `${base}_tree` : base);
+const vid = (base) => id(vizBase(base));
+const vel = (base) => elNS(vizBase(base));
+```
+
+Then replaced all ~9 direct `id('userViz...')`/`elNS('userViz...')` calls in `update()` with `vid(...)`/
+`vel(...)` — the comm-screen cleanup, all three panel modes (`3d2d`/`2d`/`3d`/`commscreen`), every
+`mgr.preview3D`/`mgr.previewVarSeed`/`applySimIntent` call, `renderLayoutWithSim`'s `box`, and the trailing
+status element. FLAT mode (`isTree` false, the untouched default) resolves every one to the EXACT SAME bare
+id every existing call already used — `vizBase` is the identity function in that branch, so FLAT mode's own
+9 call sites are byte-identical to before, not just "should be."
+
+### Live verification — screenshot, not assumed
+
+Re-applied the standard flip wrap to `drillData.js` (identical shape to t2313/t2317/t2321) purely to drive
+the real `wizardManager.open('user_drill_data')` path with the fix active, screenshotted, then reverted.
+`scratchpad/t2323-drill-flipped.png` (sent to the user this turn) shows a WORKING 3D preview (green stock
+block, machine axes, "Material view · flat endmill Ø6") and a WORKING 2D layout (grid, a blue draggable "pos"
+handle, a rectangle boundary) — both inside the correctly-structured 2-pane modal, both where the pane
+`render()` actually shows. This is the exact spot t2321's screenshot showed solid black.
+
+### Permanent regression test — `tests/geometry-seam-tree-mode-2323.spec.js`, non-vacuousness proven the hard way
+
+Built as a synthetic tree-mode op (no source-file flip needed to run — same technique every prior gate-check
+in this arc used), driven via `setUserOpDef` + the view's own exported `onShow`/`update` methods directly
+(bypassing `wizardManager.open()`'s own `listUserOps()` lookup, which does not see an op registered in the
+same synchronous tick — a test-harness timing quirk, unrelated to the fix; traced and worked around, not
+papered over). Two tests: TREE mode (asserts the tree's own `_tree`-suffixed container exists, the shell's
+native pane stays hidden, and — the load-bearing assertion — `update()`'s own status-line write landed on the
+tree's container, not the shell's) and a FLAT-mode CONTROL (asserts the reverse: no `_tree` container exists,
+the plain pane stays visible, status text lands there instead).
+
+**The first version of this test was vacuous, and catching that took real digging.** Its original assertion
+checked the tree container's own `getBoundingClientRect()` for non-zero size — but that size is a STRUCTURAL/
+CSS fact `render()`'s (unmodified, already-correct) tree layout owns; the container gets a real size from
+flex/CSS regardless of whether `update()` ever draws anything into it. Proof: temporarily hardcoding
+`isTree = false` inside `update()` (simulating the pre-fix state) left the test passing unchanged — the
+non-vacuousness check that's supposed to catch exactly this failed to catch it. Rebuilt the assertion around
+`update()`'s own unambiguous, unique side effect instead: the status line it sets as its last act
+(`status.textContent = ...`). With that swap, forcing `isTree` false in `update()` now makes the TREE-mode
+test fail cleanly (`treeStatusText` empty — confirmed live, not assumed), and restoring the real fix makes
+both tests pass again. Non-vacuousness is genuinely proven, not just claimed.
+
+### FULL SUITE run, and the flake hunt that followed
+
+Ran the complete suite: **13 failed / 2825 passed / 26 skipped** on the first pass. None of the 13 names
+share any relationship to `userOpView.js`, `sim`, or viz-container ids — `corner-wall-collapse`,
+`fork-parity`, `group-gesture`, `gui-blocks-roundtrip`, `homing-refusal-reaches-twin`, `middle-superset`
+(a sharded 14336-combo sweep), `modal-pre-canvas`, `palette-by-role`, `pane-visual-host-programmatic`,
+`save-dialog-declared`, `subscriber-error-surface`, `wizard-face-1599`, `wizard-manager-1617` — spread across
+totally unrelated features, with timeout/visibility-race failure modes, matching the "mass timeout reds under
+parallel load" pattern this arc has hit before. Re-ran all 13 serialized (`--workers=1`, isolated from the
+rest of the suite): **12 passed clean.** The 13th (`wizard-face-1599`'s CUSTOMIZE test) failed twice more,
+each time on a DIFFERENT symptom — once on its own documented t1766 "reproject echo race... only under
+sustained load," once stuck in `_boot.js`'s generic app-readiness wait, both nowhere near `userOpView.js`'s
+code path. Suspicious of the correlation (3 fails with the fix active), ran a genuine A/B: saved the fix to a
+scratch copy, reverted `userOpView.js` to HEAD, ran the same test — passed clean in 19s. Restored the fix,
+ran again — **passed clean in 17.5s.** Fix-active tally across the whole hunt: 3 fails, then 1 clean pass; HEAD:
+1 clean pass. No consistent correlation with the fix either way — this is the exact "Slow test file (5.0m)"
+class of environmental flake this file's own comments already document, almost certainly aggravated by the
+extended run of stacked back-to-back Playwright invocations this turn's own flake hunt produced. **FAILED
+COUNT after full triage: 0 attributable to this change.**
+
+### `drillData.js` — confirmed reverted to HEAD
+
+Re-confirmed via `git diff --stat` (no output) as the final step before commit — applied only transiently for
+the live-verification screenshot and the (now-superseded) discovery of the flake, reverted immediately after
+each use.
+
+### Files changed
+
+`web/wizards/views/userOpView.js` (the fix — `vizBase`/`vid`/`vel` + ~9 call-site replacements in `update()`),
+`tests/geometry-seam-tree-mode-2323.spec.js` (new — 2 tests, non-vacuousness proven against a genuine
+pre-fix-behavior run). `drillData.js` untouched at HEAD. `scratchpad/t2323-drill-flipped.png` — sent to the
+user this turn, not kept in the repo.
+
+### For whoever attempts the flip next
+
+The geometry seam BACKLOG#21's own next layer exposed is now closed — `update()` follows `render()` into tree
+mode, proven live and by a non-vacuous test. Nothing else about the flip has been re-attempted this turn (the
+dispatch's own explicit boundary); the next attempt starts clean, with one fewer known blocker than t2321 had.
