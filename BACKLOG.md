@@ -2698,6 +2698,18 @@ navigation**, because phones largely do not honour popups. **Platform behaviour,
 ⛔ **THE REAL DEFECT IS THE TRIGGER, and only the trigger:** signing in is a CLOUD gesture. **Opening a
 wizard is not.** Something on the wizard path calls into the cloud layer unbidden.
 
+⭐⭐ **NARROWED 2026-08-26 — IT FIRED ONCE, NOT ON EVERY WIZARD OPEN.** That is the signature of a **token
+expiry**, not a systematic wizard→cloud call. ⇒ **Severity drops sharply**: this is not "wizards need an
+account", it is "an expired session re-authorised itself on the next action that happened to need it, and the
+next action happened to be a wizard."
+
+**The concrete lead, unconfirmed:** `data/profileStore.js` imports `getAccessToken`, `ensureRoot`, `read` and
+`write` from `ui/cloud/googleDrive.js`. If opening a wizard reads the machine profile and the token had
+expired, the Drive layer would re-authorise exactly once. ⚠ **Two auth paths exist and they are different** —
+`cloudAccount.js`'s popup (whose ONLY caller is a header button's onclick, so it is not this) and
+`googleDrive.js`'s own GIS token client. The screenshot's "Choose an account" chooser is GIS's, which points
+at the second.
+
 ⚠ The mobile consequence still matters when judging priority — because the popup becomes a navigation on a
 phone, an unwanted prompt costs the user their place. But **do not go looking for a redirect bug; there is
 none.**
