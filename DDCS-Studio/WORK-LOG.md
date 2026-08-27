@@ -59120,3 +59120,84 @@ pass 13 failed / 2833 passed / 26 skipped. Re-ran all 13 serialized: 12/13 clean
 that one) and it passed clean, matching the SAME pre-documented load-timing flake this file has hit at t2325/
 t2327/t2329 ("disable-guard-2307 and wizard-face-1599 are documented load-timing flakes"). **FAILED COUNT
 attributable to this turn's changes: 0.**
+
+## t2335 — TWO PARTS, committed separately, both closing t2333's own findings. PART 1: FIX Finding 2 —
+declared the row class `.closest()` always assumed. PART 2: FIX the STALE TEST behind Finding 3 — the app was
+never broken. `drillData.js` untouched throughout; drill stays unflipped.
+
+### PART 1 — Finding 2: declare `.form-row`, don't teach 18 widgets their own boundary
+
+CONFIRMED NOT A TREE-MODE BUG, exactly as t2333 found: `render()`'s own `byParam` row-boundary lookup
+(`userOpView.js`) has ALWAYS read `inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement` —
+and neither `.form-row` nor `.grid-2` was EVER actually assigned to a row anywhere in `formWidgets.js`
+(confirmed again this turn: no `styles.css` rule for either, `.grid-2` used only in an unrelated gateway
+file). A SIMPLE widget's own `[data-param]` element happens to be a direct child of its row, so
+`inp.parentElement` accidentally equals the row — this is the ENTIRE reason it has worked for anyone, ever.
+
+SURVEYED before choosing (per the dispatch's own instruction): read all 18 widget functions in
+`formWidgets.js`. **6 are SIMPLE** (number [default config], dropdown, declared-I/O, segmented, text, action —
+their own data-param element a direct child of the row). **8 are COMPOSITE** (number [stepperSide:'left'],
+slider, toolpick, threadpick, toggle, stepper, feedsuggest, planesuggest — each wraps its own controls in an
+inner span/label before appending to the row). **4 carry no `[data-param]` at all** (cornerGrid, regionPick,
+coordList, the xy/rect canvas pads — read via closure state, not a bindable DOM value; a separate, pre-existing
+incompatibility with `field_ref`'s own relocation model, not this bug). Composite widgets are roughly HALF of
+every widget that carries a real value — common, everyday types (toggle/checkbox above all), not an edge case.
+
+DECIDED: wire the declaration, don't teach every widget its own host. `renderOpForm`'s own `addRow` (the ONE
+place a row is EVER created) now tags `row.classList.add('form-row')` unconditionally. `.closest()` already
+climbs past ANY wrapper depth to find a tagged ancestor — this closes the gap for all 18 widgets uniformly,
+present or future, with ONE line, touching ZERO widget functions. The alternative (a widget carrying its own
+`host` explicitly) would have meant changing the RETURN CONTRACT of `renderOpForm`/every widget — a wider,
+more invasive surface for the SAME fix, and one every future widget author would have to remember to honour.
+A selector already naming two classes that don't exist reads as a declaration that was simply never wired,
+not a design this turn should replace.
+
+VERIFIED: `tests/form-row-composite-widget-2335.spec.js` (new) — a composite widget's row IS found via
+`.closest('.form-row')`, IS a live descendant of the real form (not a detached fragment); the feeds-speeds
+Apply button (itself composite) correctly computes and fills 947 for Aluminum/tool-1. Non-vacuousness proven:
+reverted `formWidgets.js` to HEAD, both assertions genuinely failed reproducing the exact original symptoms
+(row not found; feed stuck at the untouched default); restored, both pass. Regression-swept: 31 test files +
+this new one touching `renderOpForm`/`formWidgets` — 117/117 clean, first pass, no follow-up needed. Confirmed
+`.form-row` has exactly ONE other consumer in the whole repo (the fix target itself) — no other code could be
+affected by its sudden existence.
+
+### PART 2 — Finding 3: the app was never broken, `stock-spill-792.spec.js` was checking the wrong thing
+
+t2333 already established, live: the picker builds correctly and is genuinely visible (360×43px, no hidden
+ancestor, real content) once queried through the CORRECTLY-SCOPED path; the raw field being hidden is
+`path_anchor`'s own deliberate, documented behavior (matches the classic shell's own convention). Not
+re-verified via a fresh live measurement this turn — t2333's own trace already proved the mechanism directly,
+and re-deriving the identical fact would have meant a throwaway drill re-flip this turn's own dispatch
+explicitly ruled out; relied on the existing evidence instead.
+
+REWORDED, not loosened: `stock-spill-792.spec.js`'s own comment block now states plainly that the previous
+"raw field visible" check was correct ONLY because no shipped twin had ever reached `path_anchor` in tree
+mode — so nobody reads the change as softening a real regression guard. The assertion itself now accepts
+EITHER the raw fields visible (flat mode — every twin today, checked exactly as strictly as before, unchanged)
+OR `path_anchor`'s own picker visible with real content (tree mode, once a twin flips) — scoped to
+`#wiz_user_form .pa-mount` (unambiguous by containment, prefix-agnostic — learned from t2333's own dormant-
+hazard finding, see below). Ran against all 8 CURRENT twins (still flat-mode) — both tests pass exactly as
+before, confirming the flat-mode check lost none of its own strictness.
+
+FILED, NOT FIXED, per the dispatch's own explicit instruction: BACKLOG.md #35 — the 7 coexisting
+`.pa-mount[data-prefix="d_"]` elements t2333 found (multiple static-shell instances baked into `index.html`,
+all sharing the same prefix), a dormant hazard for any FUTURE unscoped `.pa-mount` query, matching the
+identical shape of two bugs already fixed in this exact area (t2293, t2319). Nothing currently queries
+unscoped, so nothing is broken — named with a sketch of the fix and a "STILL REAL IF" check, not left buried
+in a WORK-LOG entry.
+
+### Files changed
+
+Part 1: `web/ui/formWidgets.js`, `tests/form-row-composite-widget-2335.spec.js` (new). Part 2:
+`tests/stock-spill-792.spec.js`, `BACKLOG.md` (repo root, new #35). `drillData.js` untouched by either part.
+
+### FULL SUITE
+
+Node-tier: 228/228 clean (`npm run test:node`). E2E: first pass 14 failed / 2834 passed / 26 skipped. Re-ran
+all 14 serialized: 9/14 clean immediately; the remaining 5 (modal-pre-canvas-1654, palette-by-role-1623,
+tooltable-gate-1890, wcs-sync-gate-1906, wizard-face-1599) were ALL re-run a further time, isolated — 4/5
+clean (none of the 5 files import or reference `formWidgets`/`stock-spill` at all, confirmed by grep); the
+5th (`palette-by-role-1623`) was re-run alone a THIRD time and passed clean too. `wizard-face-1599` is the
+SAME pre-documented flake this arc has hit at t2325/t2327/t2329, four turns running now. **FAILED COUNT
+attributable to this turn's changes: 0 — every one of the 14 resolved to environmental flakiness, none left
+assumed.**
