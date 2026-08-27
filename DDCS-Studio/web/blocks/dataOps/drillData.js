@@ -334,7 +334,22 @@ export function drillPatternGeometry(p, boreDia) {
     const hs = handleScale(p, '', ox, oy, w, h);
     const handles = [{ type: 'point', id: 'dr_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
     if (pattern === 'circle') {
-        handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', fieldA: 'startAngle', cx: ox, cy: oy, r: _dn(p.dia, 50) / 2, a: hs.size.a + _dn(p.startAngle, 0) * Math.PI / 180, rScale: 2, minR: 0, label: 'Ø' });
+        // t2327 (BACKLOG #33, user-decided design) — the OLD single handle wrote BOTH dia (radius, via rScale)
+        // AND startAngle (via atan2 of the raw cursor bearing) off ONE drag, so moving it ANY direction rotated
+        // every hole about the centre — reported live as "the diameter marker moves the position." Split into
+        // the two things actually being controlled: hole #1 IS the pattern's own orientation, so dragging IT
+        // (not an abstract lever standing in for it) writes startAngle; the Ø handle keeps a grip on the
+        // circumference but drops the angle write entirely, riding a LOCKED arm 90° off hole #1 (`lockA` —
+        // canvasWidgets.js — so it only responds to motion ALONG the arm, never rotates anything) with a dotted
+        // guide line so it reads as a RADIUS, not a stray dot, and a diamond shape (never circle — circles are
+        // holes on this canvas) so it's never mistaken for one. The arm follows hole #1 (armA depends on the
+        // SAME rotA), so the two handles can never collide as the pattern rotates.
+        const dia = _dn(p.dia, 50), r = dia / 2;
+        const rotA = hs.size.a + _dn(p.startAngle, 0) * Math.PI / 180;
+        const armA = rotA + Math.PI / 2;
+        paths.push({ pts: [{ x: ox, y: oy }, { x: ox + r * Math.cos(armA), y: oy + r * Math.sin(armA) }], cls: 'fc-guide' });
+        handles.push({ type: 'radial', id: 'dr_rot', fieldA: 'startAngle', cx: ox, cy: oy, r, a: rotA });
+        handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', cx: ox, cy: oy, r, a: armA, rScale: 2, minR: 0, lockA: true, shape: 'diamond', label: 'Ø' });
     } else if (pattern === 'grid') {
         handles.push({ type: 'rect', id: 'dr_grid', field: 'dx', fieldH: 'dy', minw: null, minh: null, label: 'pitch', ...hs.size, sx: Math.max(1, Math.round(_dn(p.cols, 3))) - 1, sy: Math.max(1, Math.round(_dn(p.rows, 2))) - 1 });   // signed pitch (no min)
     } else if (pattern === 'rect') {

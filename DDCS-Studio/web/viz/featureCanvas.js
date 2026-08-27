@@ -512,6 +512,18 @@ export class FeatureCanvas {
                 if (!g.fill) { el.style.fill = 'none'; el.style.stroke = fillCol; el.style.strokeWidth = '2'; }
                 else { el.style.fill = fillCol; el.style.stroke = fillCol; }
                 handles.appendChild(el);
+            } else if (h.kind === 'diamond') {
+                // t2327 (BACKLOG #33) — a Ø/pitch-only radial handle (canvasWidgets.js's `shape:'diamond'`) draws
+                // as a diamond, never a circle: circles are holes on this same canvas, and a handle that LOOKS
+                // like a hole beside real holes reads as one more hole rather than a control. Same visual weight
+                // as the plain circle handle (±6px), same .fc-handle colour/interaction styling.
+                const s = 7;
+                const pts = `${r3(c.x)},${r3(c.y - s)} ${r3(c.x + s)},${r3(c.y)} ${r3(c.x)},${r3(c.y + s)} ${r3(c.x - s)},${r3(c.y)}`;
+                const el = svgEl('polygon', { points: pts, class: 'fc-handle', ...hid });
+                const emitCol = h.emits ? '#14b8a6' : null;
+                const fillCol = emitCol || col;
+                if (fillCol) { el.style.fill = fillCol; el.style.stroke = fillCol; }
+                handles.appendChild(el);
             } else {
                 const el = svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid });
                 const emitCol = h.emits ? '#14b8a6' : null;   // t1684 — emits:true (lathe's dimension handles) tints TEAL, the declared convention

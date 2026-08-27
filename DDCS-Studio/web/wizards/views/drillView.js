@@ -61,8 +61,18 @@ function buildDrillSpec(params, stock) {
         const hsC = handleScale(params, 'd_', ox, oy, num(params.dia, 50), num(params.dia, 50));
         decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsC.pos };
         const R = num(params.dia, 50) / 2, a0 = num(params.startAngle, 0) * Math.PI / 180;
+        const armA = a0 + Math.PI / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        decls.push({ type: 'radial', id: 'ring', field: 'd_dia', fieldA: 'd_startAngle', cx: ox, cy: oy, r: R, a: a0, rScale: 2, editMin: 0, label: 'Ø', value: num(params.dia, 50) });
+        // t2327 (BACKLOG #33, user-decided design, user-reported live) — the OLD single 'ring' handle wrote BOTH
+        // d_dia (radius) AND d_startAngle (atan2 of the raw cursor bearing) off one drag, so ANY drag direction
+        // rotated the whole pattern about the centre — reported as "the diameter marker moves the position."
+        // Split to match drillData.js's own twin fix: hole #1 (the pattern's OWN orientation) becomes the angle
+        // handle; Ø keeps a grip on the circumference via a LOCKED arm 90° off hole #1 (`lockA` —
+        // canvasWidgets.js — so it only responds to motion along the arm, never rotates anything), drawn as a
+        // dotted guide line + a diamond handle (never circle — circles are holes on this canvas).
+        items.push({ kind: 'line', x1: ox, y1: oy, x2: ox + R * Math.cos(armA), y2: oy + R * Math.sin(armA) });
+        decls.push({ type: 'radial', id: 'rot', fieldA: 'd_startAngle', cx: ox, cy: oy, r: R, a: a0 });
+        decls.push({ type: 'radial', id: 'ring', field: 'd_dia', cx: ox, cy: oy, r: R, a: armA, rScale: 2, minR: 0, lockA: true, shape: 'diamond', editMin: 0, label: 'Ø', value: num(params.dia, 50) });
     } else if (pat === 'grid') {
         const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
         const dx = num(params.dx, 20), dy = num(params.dy, 20);

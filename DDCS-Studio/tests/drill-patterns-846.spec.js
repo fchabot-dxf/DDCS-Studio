@@ -9,7 +9,10 @@ import { test, expect } from '@playwright/test';
 const pp = (page, p) => page.evaluate(async (p) => (await import('/wizards/ops/array.js')).patternPoints(p), p);
 const geo = (page, p, bore) => page.evaluate(async ({ p, bore }) => {
     const g = (await import('/blocks/dataOps/drillData.js')).drillPatternGeometry(p, bore);
-    return { nHoles: g.paths.length, handleIds: g.handles.map((h) => h.id) };
+    // t2327 (BACKLOG #33) — the circle pattern's own `paths` now also carries a 2-point dotted ARM guide
+    // (centre → the Ø handle), alongside one many-point ring per hole (`_holeRing`, drillData.js — a 13-point
+    // circle outline). `pts.length > 2` keeps counting only the hole rings, unaffected by that addition.
+    return { nHoles: g.paths.filter((pth) => (pth.pts || []).length > 2).length, handleIds: g.handles.map((h) => h.id) };
 }, { p, bore });
 
 test.use({ viewport: { width: 1400, height: 1000 } });   // two-pane wizard → the pattern cluster shows in the form pane

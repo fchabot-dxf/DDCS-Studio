@@ -83,11 +83,30 @@ export const CANVAS_GESTURES = {
     // distance into the radius field via `rScale` (2 = Ø from a radius · 1/(n-1) = pitch). Omit `fieldA` for radius-only,
     // or `rScale` for angle-only (pure rotate). `minR` clamps the radius.
     radial: {
-        place: (d) => ({ x: d.cx + d.r * Math.cos(d.a), y: d.cy + d.r * Math.sin(d.a), kind: 'size', label: d.label, value: d.value }),
+        // t2327 (BACKLOG #33) — `shape: 'diamond'` swaps the rendered kind so a Ø/pitch-only handle (no `fieldA`)
+        // never reads as a hole (FeatureCanvas draws every plain 'size' handle as a circle, the same shape holes
+        // use). Byte-identical for every existing caller, which never sets `shape` (fillText's txt_rot,
+        // drillView's ring/end, drillData's own dr_line/dr_dia).
+        place: (d) => ({ x: d.cx + d.r * Math.cos(d.a), y: d.cy + d.r * Math.sin(d.a), kind: d.shape === 'diamond' ? 'diamond' : 'size', label: d.label, value: d.value }),
         drag: (d, w) => {
             const dx = w.x - d.cx, dy = w.y - d.cy, m = {};
             if (d.fieldA) m[d.fieldA] = Math.atan2(dy, dx) * DEG;
-            if (d.rScale) m[d.field] = clampMin(Math.hypot(dx, dy) * d.rScale, d.minR);
+            if (d.rScale) {
+                // t2327 (BACKLOG #33) — `lockA`: a fused Ø+angle handle (field AND fieldA both present) meant ANY
+                // drag rotated the whole pattern, since the angle came from atan2 of the raw cursor bearing and
+                // radius from raw distance-from-centre — moving the "diameter" handle sideways silently moved
+                // every hole. The decided fix splits the field: the point that's ALREADY the pattern's own
+                // orientation (drill's hole #1, a line's end point) becomes the angle handle (fieldA alone, no
+                // rScale — the existing "angle-only" shape this gesture already supported, matching fillText's
+                // txt_rot); the Ø/pitch handle keeps `field`+`rScale` but drops `fieldA`, and locks its own
+                // bearing (`d.a`, fixed by the caller, not recomputed from the cursor) — `lockA` makes ITS drag
+                // PROJECT onto that fixed arm (`dot(cursorOffset, armDirection)`) instead of using raw hypot
+                // distance, so a sideways nudge off the arm changes the radius ~0 rather than jumping to
+                // whatever the raw distance happens to be — "it slides along the arm only." Omitting `lockA`
+                // (every existing radius-only caller) keeps the original isotropic hypot() math, unchanged.
+                const proj = d.lockA ? (dx * Math.cos(d.a) + dy * Math.sin(d.a)) : Math.hypot(dx, dy);
+                m[d.field] = clampMin(proj * d.rScale, d.minR);
+            }
             return m;
         },
     },

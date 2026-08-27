@@ -176,12 +176,17 @@ test('drill wizard renders its handles from the registry (point + radial)', asyn
     return {
       handles: cont.querySelectorAll('.fc-handle').length,
       moves: cont.querySelectorAll('.fc-handle-move').length,
+      diamonds: cont.querySelectorAll('polygon.fc-handle').length,
       hasDia: labels.some((t) => /Ø/.test(t)),
     };
   });
-  expect(r.handles, 'origin (point) + ring (radial) both render').toBe(2);
+  // t2327 (BACKLOG #33) — the circle ring split into TWO handles (hole #1's own angle-only rotate handle, plus
+  // the diamond-shaped Ø handle) so a drag can no longer fuse radius+angle into one move — origin(point) +
+  // rot(radial, angle-only) + ring(radial, diamond) = 3.
+  expect(r.handles, 'origin (point) + rot (angle-only) + ring (diamond Ø) all render').toBe(3);
   expect(r.moves, 'origin is a move/snap handle').toBe(1);
-  expect(r.hasDia, 'the radial ring shows its Ø value label').toBe(true);
+  expect(r.diamonds, 'the Ø handle renders as a diamond, not a circle').toBe(1);
+  expect(r.hasDia, 'the diamond Ø handle shows its value label').toBe(true);
 });
 
 test('text wizard renders its four canvas handles from the registry', async ({ page }) => {

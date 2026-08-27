@@ -26,12 +26,23 @@ test('drill 2D layout canvas: renders + drag handle drives a field', async ({ pa
   await page.waitForTimeout(100);
   const diaBefore = await page.inputValue('#d_dia');
 
-  // Drag the round (size) handle outward; expect d_dia to grow.
-  const ring = page.locator('#drillLayoutCanvas circle.fc-handle').first();
+  // Drag the Ø (diamond) handle outward; expect d_dia to grow. t2327 (BACKLOG #33) — the circle ring split
+  // into hole #1's own angle-only rotate handle (a plain circle, first in DOM order) plus this diamond-shaped
+  // Ø handle — `[data-hid="ring"]` targets it directly rather than relying on DOM/shape order. The Ø handle
+  // now rides a LOCKED arm (90° off hole #1) and only responds to motion ALONG that arm — drag AWAY FROM the
+  // circle's own centre (`[data-hid="origin"]`), not an arbitrary fixed screen direction, since the arm's
+  // actual on-screen orientation depends on the current startAngle.
+  const origin = page.locator('#drillLayoutCanvas [data-hid="origin"]');
+  const ring = page.locator('#drillLayoutCanvas [data-hid="ring"]');
+  const ob = await origin.boundingBox();
   const box = await ring.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const cx = ob.x + ob.width / 2, cy = ob.y + ob.height / 2;
+  const hx = box.x + box.width / 2, hy = box.y + box.height / 2;
+  const len = Math.hypot(hx - cx, hy - cy) || 1;
+  const ux = (hx - cx) / len, uy = (hy - cy) / len;   // unit vector from centre through the handle == the arm's own direction
+  await page.mouse.move(hx, hy);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.move(hx + ux * 60, hy + uy * 60, { steps: 6 });
   await page.mouse.up();
   await page.waitForTimeout(100);
   const diaAfter = await page.inputValue('#d_dia');
