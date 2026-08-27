@@ -2808,7 +2808,7 @@ real (the multiple static-shell instances are baked into `index.html` and are no
 
 ---
 
-### 36. ⛔ FOUR WIDGETS HAVE NO BINDABLE DOM VALUE — `field_ref` cannot reference them at all
+### 36. [⭐ MEASURED 2026-08-27 — ZERO twins affected, a footnote not a cap] FOUR WIDGETS HAVE NO BINDABLE DOM VALUE — `field_ref` cannot reference them at all
 
 *(found at t2335 while surveying all 18 widget functions for an unrelated fix; recorded here because it is a
 LIMIT ON THE ARC, not a bug, and it was about to live only in a WORK-LOG entry)*
@@ -2839,6 +2839,25 @@ C  accept the limit                 those wizards keep their hand-written shells
                                    wizard becomes a data twin" is false, and the arc needs to say
                                    which wizards it does NOT cover.
 ```
+
+#### ⭐ BLAST RADIUS MEASURED, 2026-08-27 — **ZERO twins use any of them. This is a FOOTNOTE, not a cap.**
+
+```
+coord-list · corner-grid · region-pick · xy-pad
+→ declared by 0 of the 32 dataOps twins
+```
+
+⇒ **The arc's reach is not limited by this today**, so ⛔ **do not spend a turn on options A/B.** The widgets
+exist in `formWidgets.js` and each has a Blockly field twin installed by `bridge.js`
+(`cornerGridField`/`regionPickField`/`coordListField`) — they are simply not bound by any declaration.
+
+⚠ **Two things that keep it open rather than closing it:**
+- the grep covered TWINS. A hand-written shell may still use one directly, so a wizard **becoming** a twin
+  could hit this. Re-run the check per shell when porting one, not once globally.
+- it remains a real limit for any FUTURE op that wants one of these widgets.
+
+⇒ **Revisit only when a specific port actually needs it** — at which point the blast radius is one wizard and
+the choice between A, B and C is concrete instead of theoretical.
 
 ⚠ **Establish the blast radius before deciding** — which of the 15 shells actually use these four? If it is
 one obscure op, C is cheap. If `regionPick` or the canvas pads are in the mill family, it decides how far
