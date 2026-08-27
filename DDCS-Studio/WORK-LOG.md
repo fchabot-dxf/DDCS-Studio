@@ -58993,3 +58993,130 @@ poorer but with two real ones already crossed off, not zero.
 
 None. The instrumentation (3 temporary counters in `userOpView.js`) was added, used to produce the counts
 above, then reverted — confirmed via `git diff --stat` (no output). `drillData.js` was never touched.
+
+## t2333 — TWO PARTS. PART 1: FIX Finding 1 (t2329's own stackBridge.js throw). PART 2: root-cause Findings 2
+and 3, REPORT ONLY, fix nothing (per this turn's own explicit boundary). `drillData.js` untouched throughout —
+neither part needed it.
+
+### PART 1 — `def.mouths` (plural) was already declared, never read; taught it to 3 consumers, not hand-special-cased
+
+THE REAL SHAPE OF THE GAP: `wizards/ops/layout.js` already declares `mouths: [{name:'LEFT'},{name:'RIGHT'}]` for
+`split_horizontal` (TOP/BOTTOM for `split_vertical`) — the def was never missing a mouth declaration, as the
+throw message's own wording ("declares no `mouth`") suggested. The PLURAL form was simply never READ: neither
+`bridge.js`'s Blockly SHAPE builder (`addMouth`) nor `stackBridge.js`'s round-trip serializer ever consulted
+`def.mouths`, only the SINGULAR `def.mouth` — and `gridContainer.js`'s own t2299 comment had already found and
+named this EXACT gap once, for itself (its own fix switched to singular, since it only needed one mouth).
+`groupBox.js` and `tabGroup.js`'s own OUTER block carry the IDENTICAL dead-plural shape today, undetected only
+because nothing had given them real children yet either.
+
+THE DESIGN CHOICE (asked explicitly): generalize, don't hand-special-case a third time. `user_root`'s own two
+NAMED mouths (PRESENTATION/EXECUTION) are hand-special-cased because its children live on two SEPARATE record
+properties (`uiChildren`/`children`) — a genuinely different shape. `split_horizontal`'s own children are ALL
+under ONE `rec.children` property, keyed by mouth name (`{LEFT:[...], RIGHT:[...]}`) — exactly the shape
+`childrenOf` already normalizes everywhere else in the app. `mouthsOf(def)` (bridge.js) normalizes `def.mouths`
+OR `def.mouth` (wrapped as a one-item list) to ONE thing every consumer loops over: a single mouth (every
+existing kind, INCLUDING groupBox/tabGroup's own length-1 arrays) takes the exact same one-mouth path as
+before, byte-identical; two-or-more mouths read/write `rec.children[name]` per mouth. `mouthOf` (singular-only)
+is removed outright — all 3 of its own call sites needed the generalization, so there was no remaining
+consumer to keep it for.
+
+VERIFIED: `tests/stack-bridge-multi-mouth-2333.spec.js` (new) — `stackToWorkspace`/`workspaceToStack` round-
+trips a `split_horizontal` with real LEFT/RIGHT content cleanly (no throw), and a single-mouth kind
+(`param_group`) stays byte-identical (a flat array, not mouth-keyed). Non-vacuousness proven: reverted
+`bridge.js`+`stackBridge.js` to HEAD, the multi-mouth test genuinely reproduced t2329's own original throw
+verbatim; restored, both pass. Regression-swept: all 37 test files touching `stackBridge`/`workspaceToStack`/
+`stackToWorkspace` (119/122 clean first pass; the 3 remainder triaged individually — one load-timing flake,
+confirmed unrelated; and two REAL breaks, both fixed below, not left red).
+
+TWO EXISTING TESTS BROKE, both real consumers of the now-removed `mouthOf`, both fixed: `rotate-atom.spec.js`
+called `br.mouthOf(def)` directly, expecting the bare string `'DO'` — updated to `br.mouthsOf(def)`, asserting
+exactly one mouth named `'DO'` (unchanged claim, new shape). `tests/node/architecture-map-1698.test.mjs` — TWO
+of its own citations pointed at the literal `mouthOf` declaration line (now gone) — re-anchored to
+`mouthsOf`'s new line, and its OWN ARCHITECTURE.md prose (the `layout_2d_canvas`/generic-mouth section, and the
+REGISTRIES table's "which block kinds hold children" row) updated alongside, not left describing removed code.
+**A THIRD citation in the SAME test was found broken but pre-existing** — `'INV1 mouth guard throws by name'`
+cited `carries ${rec.children.length} children`, but the real throw text (both before AND after this turn's
+edit) has always read `carries ${childrenOf(rec.children).length} children` — a drift dating to t2319's own
+`childrenOf` adoption in this exact throw message, never caught since. Fixed alongside (same area, cheap,
+matches the worker-role's own "fix the map when your act proves it wrong" instruction) rather than left for a
+future turn to trip over. `node tests/node/architecture-map-1698.test.mjs` and `npm run test:node` (228/228)
+both confirm clean.
+
+### PART 2 — Findings 2 and 3, root-caused by direct trace, NOT fixed
+
+Built a SYNTHETIC tree-mode op for each (matching every prior gate-check's own methodology) — `drillData.js`
+untouched throughout, per this turn's own explicit boundary.
+
+**FINDING 2 — feeds-speeds Apply no-ops for drill: ROOT-CAUSED, OBSERVED not inferred.** Traced by instrumenting
+`feedSuggestWidget`'s own click handler (temporary, reverted) to print its actual computed values. Result:
+`matName` read CORRECTLY ('Aluminum'); `toolNumEl` was **not found at all** (`form.querySelector(
+'[data-param="toolNum"]')` returned null) because `form` itself — computed as `host.closest('#wiz_user_form')
+|| host.parentElement` — resolved to a DETACHED node with no id, not the live form. TRACED TO SOURCE:
+`render()`'s own tree-mode branch pre-renders EVERY binding as a flat form into a DETACHED `tempHost` div, then
+records `byParam[param] = { row: inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement, read
+}` for each field. **`.form-row` and `.grid-2` are never actually assigned as class names anywhere in the
+form-widget rendering path** (confirmed by repo-wide grep — `.grid-2` exists only in an unrelated gateway
+file) — so that `.closest()` chain always falls through to the THIRD option, `inp.parentElement`. For a
+COMPOSITE widget that wraps its own interactive elements in an inner span before appending to its own `host`
+argument (`feedSuggestWidget`'s and `toolPickWidget`'s own `right` span, both via the identical
+`host.append(labelSpan(b), right)` pattern), `inp.parentElement` is that INNER span, NOT `host` — so
+`field_ref`'s own relocation (`container.appendChild(byParam[paramName].row)`) moves only the inner span into
+the live tree, stranding the WIDGET FUNCTION's own `host` closure variable — and hence anything computed from
+it later, like the click handler's own `host.closest('#wiz_user_form')` — in the detached `tempHost` fragment.
+A SIMPLE (single-element, no inner wrapper) widget's own `inp.parentElement` coincidentally equals its real row
+container, which is why `toolDia` (a plain number input, pocket's own test) is unaffected while `toolNum`/
+`material` (both composite, drill's own test) are. **NOT A TREE-VS-FLAT RENDER-CYCLE DIFFERENCE** (t2331 already
+eliminated that) — a STRUCTURAL MISMATCH between `byParam`'s own row-boundary assumption (a CSS class that was
+never real) and composite widgets' own actual DOM shape, only reachable once a real op puts a composite widget
+under a `field_ref` in a tree — which nothing did before drill's own flip attempts.
+
+**FINDING 3 — Path Datum "invisible" for drill: ROOT-CAUSED, OBSERVED, and the app is NOT broken.** Built the
+same synthetic-op methodology with a `path_anchor` node. Traced (temporary instrumentation in
+`pathAnchorField.js`, reverted) through `mountPathAnchor`'s own body: the picker builds CORRECTLY — 2 real
+children, connected, and — checked directly, not assumed — genuinely VISIBLE on screen (360×43px, no hidden
+ancestor) when queried through the CORRECTLY-SCOPED path (`form.querySelector('.pa-mount[data-prefix="d_"]')`).
+The RAW `pathDatum`/`stockAttach` fields ARE hidden (`display:none`) — but that is `path_anchor`'s OWN,
+DELIBERATE, documented behavior (t2271's own comment: "REPRODUCE, DON'T IMPROVE" — the classic shell always
+hid these two fields behind the picker, `type="hidden"`, no visible dropdown). **`stock-spill-792.spec.js`'s
+own assertion checks whether the RAW field is visible** — true for every OTHER twin in its 8-twin sweep (none
+of which use `path_anchor` — they're still flat-mode, where `pathDatum` renders as an ordinary visible
+dropdown with no picker to replace it) — but for a TREE-mode twin using `path_anchor`, the raw field being
+hidden IS the correct, intended state; the picker is what "the real placement choice is visible" now means. NO
+APP DEFECT — a TEST EXPECTATION that never anticipated a shipped twin reaching `path_anchor` in tree mode
+(exactly this arc's own repeated theme: declared once at t2271/t2293, proven never until now). SEPARATELY
+OBSERVED, a real but so-far-DORMANT hazard: **7 `.pa-mount[data-prefix="d_"]` elements coexist in the live
+document** (multiple static-shell instances baked into `index.html`, per t2293's own comment, all sharing the
+common `'d_'` prefix) — an UNSCOPED, document-wide `.pa-mount[data-prefix="d_"]` query finds a DIFFERENT
+(unbuilt, empty) one than the correctly-scoped `mountPathAnchor` call populates. `mountPathAnchor` itself is
+ALREADY correctly scoped (t2293's own fix) and nothing currently queries it unscoped — but ANY future code
+that does would hit this exact trap silently. Named, not fixed — no current consumer is broken by it.
+
+### Files changed
+
+Part 1: `web/blocks/blockly/bridge.js`, `web/blocks/blockly/stackBridge.js`,
+`tests/stack-bridge-multi-mouth-2333.spec.js` (new), `tests/rotate-atom.spec.js`,
+`tests/node/architecture-map-1698.test.mjs`, `ARCHITECTURE.md` (repo root). Part 2: none — both findings
+root-caused via temporary instrumentation in `web/ui/formWidgets.js` (Finding 2) and `web/ui/pathAnchorField.js`
+(Finding 3), both reverted (confirmed via `git diff --stat`, no output). `drillData.js` untouched by either
+part.
+
+### The actionable fix, for whoever picks findings 2/3 up next
+
+Finding 2: `render()`'s own `byParam` row-computation (`userOpView.js`) needs its `.closest('.form-row')`/
+`.closest('.grid-2')` chain replaced with something that actually captures a composite widget's own OUTER
+container — either the widget registry declaring its own row boundary explicitly, or `renderOpForm` itself
+tagging each row with a REAL, consistently-applied class before handing it to a widget function. Finding 3:
+`stock-spill-792.spec.js`'s own assertion needs to recognize `path_anchor`'s own visible-picker convention for
+a tree-mode twin (check `.pa-mount`'s own visibility/content, correctly scoped, instead of — or in addition
+to — the raw field) rather than treating "raw field hidden" as a failure; the dormant unscoped-`.pa-mount`
+hazard is a separate, smaller cleanup (scope every `.pa-mount` query the same way `mountPathAnchor` itself
+already is) that can ride along or wait, since nothing currently trips it.
+
+### FULL SUITE
+
+Node-tier: 228/228 clean (`npm run test:node`), including the re-anchored architecture-map test. E2E: first
+pass 13 failed / 2833 passed / 26 skipped. Re-ran all 13 serialized: 12/13 clean; the 13th
+(`disable-guard-2307`'s own CONTROL test) failed on a generic boot timeout — re-ran isolated (3/3, including
+that one) and it passed clean, matching the SAME pre-documented load-timing flake this file has hit at t2325/
+t2327/t2329 ("disable-guard-2307 and wizard-face-1599 are documented load-timing flakes"). **FAILED COUNT
+attributable to this turn's changes: 0.**
