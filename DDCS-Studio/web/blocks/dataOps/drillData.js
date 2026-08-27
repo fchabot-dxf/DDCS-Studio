@@ -267,27 +267,49 @@ function drillDataStack(p = DRILL_DEFAULTS) {
     return [{
         type: 'user_root',
         params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: formWidgets.js's `sim` and `panel` branches hardcode the
-            // SAME DOM ids for their own layout2d pane (userVizStatus_tree/userVizContainer_tree) — a real id
-            // collision wherever both are declared, not just cosmetic redundancy. `sim` renders everything
-            // `panel` did (t2257's own systemic-check comment, atcChangeData.js) PLUS the 3D pane; `panel`
-            // never even reads its own `params.panel` value ('form3d+2d' vs 'form3d' vs 'form' vs 'commscreen'
-            // all render byte-identically — confirmed by reading formWidgets.js's panel branch directly). Left
-            // AS-IS here (no `layout2d:false`): drill has real 2D content (previewGeometry, the hole-pattern
-            // handles), so sim's own default (2D pane included) is what this twin actually needs — unlike ATC,
-            // which had none.
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            { type: 'param_group', params: { group: 'Drill' }, children: [
-                { type: 'usage_text', params: { text: 'Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.' } },
-                { type: 'section', params: { title: 'PATTERN' }, children: [geometryGroup, gridGroup, circleGroup, rectGroup, lineGroup] },
-                { type: 'section', params: { title: 'TOOL' }, children: [toolGroup] },
-                holeDiaGroup,
-                peckGroup,
-                { type: 'section', params: { title: 'DEPTH & FEED' }, children: [depthFeedGroup] },
-                { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
-            ] },
-        ],
+        uiChildren: [{
+            // t2341 — THE FLIP (attempt 9, landed): wrapped in split_horizontal so hasTreeLayout() (userOpView.js)
+            // switches this twin onto renderUiTree — the first built-in wizard whose live render path is driven
+            // by its own declaration instead of the hardcoded #wiz_drill shell. Ratio '360px:*' (t2311) mirrors
+            // the shell's own CSS shorthand exactly (.wiz-controls{flex:0 0 360px}, .wiz-visual{flex:1 1 0}):
+            // LEFT is the fixed 360px controls column, RIGHT fills with the visual. Eleven findings closed
+            // across eight prior attempts (t2309-t2339) before this one landed: the fixed-pixel ratio grammar,
+            // childrenOf for object-shaped children (form + emit), a dead id-stamp causing duplicate DOM ids,
+            // update() following render() into tree mode, the split's own narrow-viewport stacking,
+            // stackBridge.js's recToJson learning def.mouths (plural), the feeds-speeds Apply no-op (a
+            // row-boundary class that was declared but never wired, fixed at its source for every composite
+            // widget), the Path Datum "invisible" report (a stale test expectation, not a bug), and — the one
+            // that gated attempt 8 (t2337) — a hand-rolled child-iteration helper elsewhere in the suite that
+            // assumed children/uiChildren are always arrays, breaking on this node's own mouth-keyed
+            // {LEFT,RIGHT} shape; t2339 fixed the six confirmed instances of that pattern repo-wide via
+            // childrenOf and documented the rest as safe by construction (ARCHITECTURE.md INVARIANT #18). See
+            // tests/drill-form-reproduction-2299.spec.js, tests/no-duplicate-ids-tree-render-2319.spec.js,
+            // tests/geometry-seam-tree-mode-2323.spec.js, tests/split-node-responsive-2327.spec.js,
+            // tests/stack-bridge-multi-mouth-2333.spec.js, tests/form-row-composite-widget-2335.spec.js,
+            // tests/stock-spill-792.spec.js, and tests/roundtrip-whole-program-1319.spec.js.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{ type: 'param_group', params: { group: 'Drill' }, children: [
+                    { type: 'usage_text', params: { text: 'Drills/bores a hole pattern in the active WCS. Drag the handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it; the 3D view (right) verifies the cut. Peck = plunge (hole Ø = drill); Bore = ring-step an end mill (hole Ø ≥ tool). Spindle start + end-of-program are added from Settings.' } },
+                    { type: 'section', params: { title: 'PATTERN' }, children: [geometryGroup, gridGroup, circleGroup, rectGroup, lineGroup] },
+                    { type: 'section', params: { title: 'TOOL' }, children: [toolGroup] },
+                    holeDiaGroup,
+                    peckGroup,
+                    { type: 'section', params: { title: 'DEPTH & FEED' }, children: [depthFeedGroup] },
+                    { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                ] }],
+                // t2301 (BACKLOG 20) — 'panel' removed: formWidgets.js's `sim` and `panel` branches hardcode the
+                // SAME DOM ids for their own layout2d pane (userVizStatus_tree/userVizContainer_tree) — a real id
+                // collision wherever both are declared, not just cosmetic redundancy. `sim` renders everything
+                // `panel` did (t2257's own systemic-check comment, atcChangeData.js) PLUS the 3D pane; `panel`
+                // never even reads its own `params.panel` value ('form3d+2d' vs 'form3d' vs 'form' vs 'commscreen'
+                // all render byte-identically — confirmed by reading formWidgets.js's panel branch directly). Left
+                // AS-IS here (no `layout2d:false`): drill has real 2D content (previewGeometry, the hole-pattern
+                // handles), so sim's own default (2D pane included) is what this twin actually needs — unlike ATC,
+                // which had none.
+                RIGHT: [{ type: 'sim', params: { rotary: false, machine: false, magazine: false } }],
+            },
+        }],
         children: appendToolSel(appendEntry(drillStack(p))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
     }];
 }
