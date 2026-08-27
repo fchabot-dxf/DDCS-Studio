@@ -2992,3 +2992,36 @@ shape that has produced repeated defects here.
 
 **STILL REAL IF:** `grep -n "data-param" DDCS-Studio/web/ui/formWidgets.js` → if cornerGrid / regionPick /
 coordList / the canvas pads still have no `[data-param]`, still real.
+
+---
+
+### 37. INSERT OP FROM PROJECT — the preset successor, ruled with the owner 2026-08-27
+
+*(the gap the preset removal (#34) leaves, found by the owner: "within a project, i might want to insert ops
+of different presets." A one-op project covers STARTING a job from saved values; this covers COMPOSING one.)*
+
+**THE FEATURE:** from within the current job — *Insert op from project…* → browse your saved projects → see
+each project's ops → pick one → it is inserted into the current stack with its saved params.
+
+```
+⭐ PROJECTS STAY THE ONLY STORE OF VALUES. This is a READ of one project from inside another —
+   one storage concept, a new gesture over it (one stack, many views). A one-op project then
+   behaves exactly as a preset did — and so does ANY op in ANY past job, which is strictly more
+   than presets offered: every job you have done is the library.
+```
+
+**Mechanics mostly exist:** a project's ops are readable from its stack/markers (`opFromMarker` reconstructs
+an op from params), and inserting into the current stack is what every wizard already does. The imported op
+re-emits under the CURRENT job's context (settings, machine, WCS) exactly like a reimported `.nc` — params
+travel, the body regenerates.
+
+⚠ **THE ONE REAL HAZARD, name-it-now:** importing an op whose TYPE is not registered in this workspace (a
+`user_*` op whose custom def lives in another workspace's storage). ⛔ Do not silently drop or guess — refuse
+with the reason, or establish whether the def travels in the `.mjson` and carry it. Decide at build time with
+the file in hand, not now.
+
+⚠ **Entry-point placement** (wizard bar? editor context menu? the project manager?) is a design call for the
+owner at build time — surface the options, don't pick silently (no unasked affordances).
+
+⚠ Sequencing: the preset REMOVAL (#34) proceeds independently — the owner has never saved a preset, so
+nothing is lost in the interim. This entry exists so the gap does not fall between two turns.
