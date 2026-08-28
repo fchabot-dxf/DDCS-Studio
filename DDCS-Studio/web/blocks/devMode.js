@@ -15,7 +15,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance, armBlocks } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -889,11 +889,48 @@ function prepareCandidate(a, framing) {
     // declared field ORDER; anything authored in the workspace is appended and WINS by param name (a pill the user just
     // plugged in is the newer declaration for that knob). A hand-built stack (no source opType) inherits nothing.
     //
-    // t2365 — re-attach the candidate's own program-level progstart/progend before comparing against the
-    // source (see reattachFraming's own comment for the full account: a spindle/retract binding, e.g. drill's
-    // real `rpm`, can legitimately target one of them, and the fork's own flatten never has them without this).
-    const forkChildren = reattachFraming(a.opRec.children, framing, getUserDef(a.opRec.opType));
-    const inherited = forkInheritance(getUserDef(a.opRec.opType), forkChildren);
+    // t2369 — BACKLOG #39: for a GUARDED registered def specifically, `a.opRec.children` (the placed instance)
+    // is not a shape reattachFraming can recover from at all — t2367's own live measurement found pocket's
+    // def.template carries 77 blocks across its structural fork arms while a PLACED pocket op carries ZERO,
+    // before any fork code runs. `instantiate()`'s own `pruneGuards` call (userOps.js) SPLICES the untaken
+    // arm's blocks out of the clone entirely — a placed op is, by design, the CONCRETE single-arm shape Insert
+    // needs to emit/render, and nothing downstream of that build step ever sees the other arm again. The one
+    // place that STILL has both arms is the def's own `template` — literally what CUSTOMIZE already reads. So:
+    // one source for the SHAPE (the def's template, cloned), one source for the VALUES (the placed op's own
+    // live params) — never the def's own baked-in defaults, which would silently discard whatever the user
+    // had already typed before choosing to fork.
+    //
+    // SCOPED to `armBlocks(srcDef.template) > 0` (a GENUINELY guarded def), not every registered def: an
+    // UNGUARDED op's placed `.children` can carry something the def's own template does NOT — a GUI param
+    // block the user dragged onto a value socket ON THIS PLACED CANVAS after inserting, before saving (t1593's
+    // own pill-authoring mechanism, `extractParamBlocks` just above). Sourcing from `srcDef.template`
+    // unconditionally would silently discard that live edit for all 31 unguarded twins to fix a problem that
+    // only exists for the guarded ones — so the 31 keep the EXACT t2365 `reattachFraming` path, byte-for-byte,
+    // and only a def that actually loses data at LIFT takes the new one.
+    //
+    // Cloning `srcDef.template` verbatim means `forkInheritance`'s own `alignByType` (userOps.js) compares the
+    // source's flatten against an IDENTICAL clone of itself — a trivial 1:1 match at every index, no remapping
+    // needed, no new alignment logic — and a `bindingSpecs`-driven def (pocket) never even reaches alignByType
+    // (its own early-return copies `srcDef.bindings`/`bindingSpecs` verbatim regardless of `forkChildren`'s
+    // shape), so this is a strict superset of what already worked, not a parallel mechanism.
+    const srcDef = getUserDef(a.opRec.opType);
+    let forkChildren, inherited;
+    if (srcDef && Array.isArray(srcDef.template) && srcDef.template.length && armBlocks(srcDef.template) > 0) {
+        forkChildren = JSON.parse(JSON.stringify(srcDef.template));
+        inherited = forkInheritance(srcDef, forkChildren);
+        if (inherited && a.opRec.params) {
+            for (const b of inherited.bindings) {
+                if (b && b.param != null && b.param in a.opRec.params) b.default = a.opRec.params[b.param];
+            }
+        }
+    } else {
+        // t2365 — re-attach the candidate's own program-level progstart/progend before comparing against the
+        // source (see reattachFraming's own comment for the full account: a spindle/retract binding, e.g.
+        // drill's real `rpm`, can legitimately target one of them, and the fork's own flatten never has them
+        // without this). EXACTLY the t2365 path — unguarded (or unregistered) is unchanged by t2369.
+        forkChildren = reattachFraming(a.opRec.children, framing, srcDef);
+        inherited = forkInheritance(srcDef, forkChildren);
+    }
     const bindings = inherited
         ? [...inherited.bindings.filter((b) => !authoredBindings.some((x) => x.param === b.param)), ...authoredBindings]
         : authoredBindings;
@@ -1024,14 +1061,12 @@ function saveAsCustomOp() {
             // value sockets BY IDENTITY over its own pruned stack, exactly as the source does) and `forkedFrom` (which source
             // this copy came from — the provenance registerUserOp reads to re-attach the source's code hooks, since a function
             // cannot be stored on a def). Both are inert DATA on the def; neither is derivable from the template.
-            // t2365 — a placed twin's own `a.opRec.children` already carries its full declared `user_root`/
-            // uiChildren tree verbatim (confirmed live — see prepareCandidate's own comment), so no separate
-            // "copy the layout" step is needed for THAT. What the stored template DOES need, when bindings were
-            // successfully inherited, is `forkChildren` (not the bare `a.opRec.children`) — the SAME
-            // progstart/progend-reattached shape `forkInheritance` remapped its blockIndex values against
-            // (reattachFraming's own comment has the full account); storing the bare, un-reattached children
-            // would leave a spindle/retract binding (drill's own `rpm`) pointing at a position that isn't
-            // there. No successful inheritance → the original, unmodified children, exactly as before.
+            // t2365/t2369 — the stored template is `forkChildren` whenever bindings were successfully
+            // inherited, never the bare `a.opRec.children` — see `prepareCandidate`'s own t2369 comment for
+            // which of the two `forkChildren` sources applies (the def's own cloned template for a registered
+            // def — the ONE shape that still carries every guard arm — or the placed instance's own
+            // progstart/progend-reattached children when no def is registered). No successful inheritance →
+            // the original, unmodified children, exactly as before either fix.
             const authorFork = (type, name) => {
                 const stack = inherited ? forkChildren : a.opRec.children;
                 const d = userOpFromStack(type, name, stack, bindings, panel, sim);

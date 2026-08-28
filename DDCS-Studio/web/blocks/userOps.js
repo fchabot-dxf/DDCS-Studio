@@ -134,6 +134,16 @@ export function flattenBlocks(blocks, out = [], currentGroup = null) {
     return out;
 }
 
+// t1593 — COUNT THE ARMS, NOT THE GUARDS: a guard survived the old canvas as a CHILDLESS block, so counting
+// guards missed exactly the twins whose forks came back with every guard present and every arm inside them gone
+// (measured: atc test/change/table, rotary clock, homing). What the arms ARE is the blocks a guard contains.
+// Extracted (t2369) so `validateUserOp`'s own refusal check and `devMode.js`'s own fork-body-sourcing decision
+// (guarded → source the def's own template; unguarded → the placed instance, byte-identical to before) share
+// ONE declared arm-count rather than two independent re-derivations of the same concept.
+export function armBlocks(t) {
+    return flattenBlocks(t || []).reduce((n, b) => n + ((b && b.type === 'guard' && b.children) ? flattenBlocks(b.children).length : 0), 0);
+}
+
 // Parse a param block's `options` string ("Rough=500, Finish=1500", or newline-separated) → [[label, value], …].
 // t1607 — the binding's TYPE decides the value codec. NUMERIC types (number/int — and no type at all: the GUI
 // param pill lands in a numeric socket, valid by construction) keep the original contract: coerce, DROP what
@@ -899,10 +909,6 @@ export function validateUserOp(def) {
     // silence is real rather than the check having quietly stopped working. SCOPED to forks (`forkedFrom`).
     if (def && def.forkedFrom) {
         const src = USER_DEFS.get(def.forkedFrom);
-        // COUNT THE ARMS, NOT THE GUARDS. A guard survived the old canvas as a CHILDLESS block, so counting guards
-        // missed exactly the twins whose forks came back with every guard present and every arm inside them gone
-        // (measured: atc test/change/table, rotary clock, homing). What the arms ARE is the blocks a guard contains.
-        const armBlocks = (t) => flattenBlocks(t || []).reduce((n, b) => n + ((b && b.type === 'guard' && b.children) ? flattenBlocks(b.children).length : 0), 0);
         const want = src ? armBlocks(src.template) : 0, got = armBlocks(def.template);
         if (want && got < want) {
             errs.push(`“${(src && src.label) || def.forkedFrom}” builds ${want} blocks across its structural fork arms and this copy `

@@ -60930,3 +60930,132 @@ untouched (still open — the dispatch's own STOP applies; no fix to report agai
 No changes to `web/blocks/devMode.js`, `web/blocks/userOps.js`, `web/blocks/whenGuard.js`, or any fork/build
 code — this turn's #39 work was investigation-only, per the dispatch's own explicit instruction.
 
+## t2369 — BUILD THE #39 FIX (approved direction), plus BACKLOG #7 found already shipped and closed as found.
+
+### BACKLOG #39 — the fix
+
+Exactly the approved direction: `prepareCandidate` (`devMode.js`) now sources the fork's BODY from a clone of
+`getUserDef(opType).template` — the def's own abstract, UNPRUNED template, the same shape CUSTOMIZE reads —
+instead of the placed instance's pruned `.children`, then seeds each inherited binding's own `.default` from
+the placed op's live `params`. One source for the SHAPE (the def), one source for the VALUES (the placed op).
+
+**SCOPED to genuinely guarded defs, established as a real design decision not assumed:** unconditionally
+routing every registered def through the new sourcing would have been WRONG — an unguarded op's placed
+`.children` can carry something its def's own template does not (a GUI param block a user dragged onto a
+value socket on the canvas, after inserting, before saving — `extractParamBlocks`'s own live-canvas read,
+still running unconditionally just above this branch). Sourcing from the def's template regardless would
+silently discard that live edit for all 31 unguarded twins to fix a problem only the guarded ones have. Gated
+on `armBlocks(srcDef.template) > 0` — a NEW exported helper, extracted from `validateUserOp`'s own t1593
+refusal check (`userOps.js`) rather than re-derived a second time, since both call sites now need the identical
+concept: "does this def's template carry any structural-fork-arm blocks at all." Live-measured: `armBlocks` on
+drill's own template is 0 (routes the OLD, unchanged `reattachFraming` path), pocket's is 77 (routes the new
+one) — confirmed via a scratch debug probe before writing the real test, not assumed from the code alone.
+
+**VERIFIED THE REAL SYMPTOM, both required halves, fields not wrappers:** inserted a pocket via the real
+toolbar, set `depth=7.77` on the placed op's own live form BEFORE ever forking, Saved Custom Wizard, opened the
+fork — same 39 fields/sections as the untouched source; the fork's own `depth` field opens pre-filled with
+`7.77`, not the def's own `4` (the params-seed half). Switched the fork's own `strategy` field (pocket's real
+structural fork, raster/spiral — the geometry-derived `tooSmall` is the other one, not directly settable) to
+`raster`; `direction` — a field that exists ONLY inside the raster arm (`when:{param:'strategy',is:'raster'}`,
+pocketData.js) — appeared, enabled, with a real populated dropdown (not present-but-disabled, not empty); the
+committed op's own `params.strategy` read back `'raster'`, proving the OTHER arm's fields are not just visible
+but actually reachable and load-bearing. `tests/fork-to-custom-2365.spec.js`'s own former KNOWN-GAP test
+(asserting the now-closed refusal) replaced with this positive verification.
+
+**Proven non-vacuous:** stashed `devMode.js` (the pre-t2369 state), re-ran the new pocket test — failed 3/3 at
+the very first assertion (`forkOpType` truthy — the fork never registers at all pre-fix, the same refusal
+t2367 established). Restored from the stash, re-confirmed green, `git diff --stat` showed the exact same diff
+as before stashing.
+
+**A real, near-miss found and correctly set aside as out of scope:** the first version of the "source stays
+untouched" check read the SOURCE's own DOM field after forking and got `7.77` back — looked like a mutation
+bug. Traced with a scratch debug probe comparing object references (`sourceBindingsIsSameArray`,
+`sourceBindingIsSameObject`) before assuming anything: both `false`, and the registered source's own `default`
+read `4` throughout — genuinely untouched. The DOM showing `7.77` is `wizardManager.js`'s own pre-existing,
+unrelated "last-used values" feature (t1437, `open()`'s own seed-on-fresh-open) correctly remembering that
+*this very test* placed a real pocket with `depth=7.77` under `user_pocket_data` moments earlier — working
+exactly as designed, not a leak. Fixed the TEST (assert against `getUserDef`'s own registered default, not the
+DOM, for this one check) rather than chasing a bug that doesn't exist.
+
+**REGRESSION-CHECKED, as required:** `fork-to-custom-2365.spec.js` (3) + `fork-parity-1593.spec.js` (2) +
+`drill-form-reproduction-2299.spec.js` (3) + `pocket-form-reproduction-2301.spec.js` (3) = 11/11, run together
+(1.4m). Drill's own 37/37 through INSERT-then-SAVE unchanged (confirmed taking the OLD, unmodified branch —
+`armBlocks` measures 0 for its template). `fork-parity-1593`'s own "the refused set is EMPTY" still holds
+across all 32 shipped twins. Node tier 238/238 (the `armBlocks` extraction touches nothing node-tier tests
+cover directly, but the extraction is a pure move — re-ran anyway).
+
+BACKLOG #39 marked CLOSED with a correction note (same pattern as #35/#38's own).
+
+### BACKLOG #7 — found ALREADY SHIPPED, closed as found, nothing built
+
+Dispatched as a build task ("match the mockup... theme chips OUT... version IN (footer)... workspace name OUT
+(to the header)... the ONE added datapoint... FULL SUITE at the end") — read the entry in full as instructed,
+then drove the REAL app live before writing a line of code, per this project's own standing "a doc's own
+'REMAINING FRONTIER' list is the least trustworthy line in it — grep for the capability, not the file's claim"
+discipline (`NEXT-SESSION.md`'s own pattern-worth-inheriting section). Every requirement was already met,
+shipped incrementally across t2145/t2147/t2149/t2184 — turns that predate this entire session's own arc —
+and the entry itself was simply never marked closed.
+
+Checked each line of the entry against the live app, not the code alone: the brand element is a `<button>`
+now (t2149's own "the logo stops being a link"), not an `<a href>` — THE TRAP the entry warns about no longer
+applies in its original form (there is no navigate-away hazard either way); `.hdr-ws-name-txt` sits in the
+header OUTSIDE the brand (`brandAnchor.contains(wsNameEl)` measured `false`); `<span class="ver">` is `hidden`
+in `index.html`, exactly where the two version-sync scripts still find it by raw-text regex, unaffected by
+being visually elsewhere; theme chips are gone from both menus, confirmed absent from both menus' own rendered
+HTML; the CUTS are honored — no standalone "not saved to a file" row, no filename row, both confirmed absent
+by live regex against the rendered menu HTML, not assumed; the quick menu's own `hq-saved-line` shows
+"Saved 03:37 PM" (locale time — the mockup's "14:22" reads as the author's own 24-hour locale, not a literal
+format spec, given `toLocaleTimeString`'s own use of the browser default) with the FULL today/yesterday/older
+honesty rule already coded (`headerPost.js:311-315`) and a `title` naming WHERE ("Saved to this PC only" /
+"…to your cloud…"), sourced from a local icon function, not `wizIcons.js` (matching the entry's own explicit
+ban); the version footer is selectable (a `user-select` override on that one row, confirmed by reading the
+CSS/comment, not just visually) and reads the live version text — verified in a screenshot. Header-name-click-
+opens-menu is satisfied by construction: the whole chip (name + chevron) is ONE button, matching
+`header-workspace-name-2147.spec.js`'s own already-passing "it IS the chevron button, not a second click
+target" test — the entry's own "also worth doing" ask is met by a different, arguably cleaner mechanism than
+literally adding a second click handler.
+
+**The one genuine, deliberate divergence from the mockup, found and correctly judged NOT a gap:** the mockup
+drew ONE quick menu holding both the Saved line and the version footer. The shipped app splits the header into
+TWO menus (`#hdrPostBtn`'s workspace/file menu vs. `#hdrAppBtn`'s brand/app menu, a t2149 architecture decision
+made AFTER this entry was written) — the Saved line lives in the first, the version footer in the second. Both
+exist, both are reachable, screenshotted separately below. This is a later, deliberate, well-reasoned split
+(BACKLOG #9's own "workspace actions" vs. "the app's own identity" distinction), not an unbuilt piece of #7.
+
+Screenshots at `verification/t2369-backlog7-closed/`: `1-header-shows-workspace-not-version.png` (the header
+strip — workspace name "Test Rig ⌃", no version anywhere), `2-workspace-menu-saved-line.png` (the file menu:
+identity line, "Saved 03:37 PM" with its disk icon, Save/Open/Wizards/Settings), `3-app-menu-version-footer.png`
+(the app menu: FAQ/About/Download/Rate/Website, then "V2026.08.28.4" as a selectable footer).
+
+BACKLOG #7 marked CLOSED with a correction note (same pattern). Nothing built for #7 this turn — the honest
+report is "already done," not a silent no-op or a redundant rebuild.
+
+### FULL SUITE
+
+2878 passed / 0 failed / 13 flaky / 26 skipped (25.1m). FAILED COUNT attributable to t2369: **0**. Named
+individually per the dispatch's own request (not a bare count): of the 13 flaky (all passed on retry),
+`middle-superset.spec.js`, `pane-visual-host-programmatic-1762.spec.js`, `wcs-sync-gate-1906.spec.js`, and
+`wizard-face-1599.spec.js` repeat the SAME pre-existing timeout-class flakes already named at both t2365's and
+t2367's own full-suite runs; the other 9 (`blocks-rotary-rig`, `formfield-block`, `g53-and-cut-legend`,
+`group-gesture`, `header-workspace-name-2147`, `pull-v41-wcs`, `tooltable-gate-1890`, `wcs-sync-gate-1906`'s
+second test, `wizardbar-panel-2196`) are new names this run, but every one is on a file this turn never touched
+(this turn's own shipped files are `web/blocks/devMode.js`, `web/blocks/userOps.js`,
+`tests/fork-to-custom-2365.spec.js`, and `BACKLOG.md`'s own two closure notes) — consistent with the project's
+own documented "parallel suites → mass timeout reds" pattern, not a regression. Node tier: 238/238.
+
+### Files changed
+
+`web/blocks/devMode.js` — `prepareCandidate`'s own fork-body sourcing, scoped to `armBlocks(srcDef.template) >
+0`; a stale comment in `authorFork` updated to describe both `forkChildren` sources.
+
+`web/blocks/userOps.js` — `armBlocks` extracted from `validateUserOp`'s own local closure into a small,
+exported, named function (`flattenBlocks`'s own neighbourhood); `validateUserOp`'s own call site updated to
+use it, byte-identical behavior.
+
+`tests/fork-to-custom-2365.spec.js` — rebaselined: the file's own header comment updated for the t2367→t2369
+account; the former "KNOWN GAP" test (asserting a now-closed refusal) replaced with a positive lossless
+verification for pocket via INSERT-then-SAVE, including the guard-flip and params-seed proofs.
+
+`BACKLOG.md` — #39 marked CLOSED (built, verified); #7 marked CLOSED (found already shipped, verified, nothing
+built).
+

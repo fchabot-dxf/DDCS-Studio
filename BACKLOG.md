@@ -3083,7 +3083,7 @@ pixel while moving, converging only at ▲ up.
 
 ---
 
-### 39. [⭐ ROOT CONFIRMED t2367 — STRUCTURAL, at LIFT: `pruneGuards` deletes the untaken arm at Insert-build, by design. Fix direction approved: fork body from the def's own unpruned template, placed params seed VALUES only] A GUARDED WIZARD LOSES ITS GUARD ARMS WHEN FORKED FROM A PLACED OP
+### 39. [✅ CLOSED t2369 — fork body sourced from the def's own unpruned template, scoped to genuinely guarded defs; both structural arms proven as real fields, params-seed proven against the registry] A GUARDED WIZARD LOSES ITS GUARD ARMS WHEN FORKED FROM A PLACED OP
 
 *(surfaced t2365 while fixing the insert-then-save fork; the worker judged it too large to fold in and
 flagged it rather than patching it — the right call, recorded here so it is not lost)*
@@ -3126,3 +3126,25 @@ t2299, pocket t2301), which is a different thing.
 guard-arm loss is not gated behind a porting run that has barely started — it applies to any guarded wizard
 forked from a placed op, today. Every other wizard still reaches the fork losslessly through the pre-existing
 all-32 `CUSTOMIZE` path, which is unaffected — so the blast radius is *guarded wizards, via one of two doors*.
+
+> **#39 CLOSED (t2369).** Built exactly the approved direction: `prepareCandidate` (`devMode.js`), when the
+> placed op's `opType` resolves to a registered def that is GENUINELY guarded (`armBlocks(srcDef.template) > 0`
+> — extracted from `validateUserOp`'s own t1593 check into an exported `userOps.js` helper so both call sites
+> share one declared arm-count, not two), sources the fork's BODY from a clone of the def's own unpruned
+> `template` — the same shape CUSTOMIZE reads — instead of the placed instance's pruned `.children`, then seeds
+> each inherited binding's own `.default` from the placed op's live params. **Deliberately SCOPED to guarded
+> defs only, not every registered def** — an unguarded op's placed `.children` can carry a GUI param block the
+> user dragged onto a value socket on the canvas after inserting, and sourcing from the def's template
+> unconditionally would have silently discarded that live edit for all 31 unguarded twins to fix a problem only
+> the guarded ones have; drill (and the other 31) keep the exact t2365 `reattachFraming` path, confirmed
+> byte-identical (`armBlocks` on drill's own template measures 0, so it never reaches the new branch).
+> Live-verified both required halves: pocket's own two structural arms (`strategy` raster/spiral) are now real,
+> enabled, populated fields after an INSERT-then-SAVE fork — not just present wrappers, the `direction` field
+> that exists ONLY in the raster arm was switched to and its committed value confirmed to reach the real op —
+> and a value set on the placed op BEFORE forking (`depth=7.77`) seeds the fork's own default, proven against
+> the DEF's own registered binding (not the DOM, which is legitimately influenced by `wizardManager.js`'s own
+> unrelated t1437 "last-used values" feature — a real find made and then correctly set aside as out-of-scope
+> during this turn's own verification). Regression-checked: `fork-parity-1593`'s "refused set is EMPTY" still
+> holds for all 32 twins (1.3m run, unaffected), drill's own 37/37 unchanged. `tests/fork-to-custom-2365.spec.js`
+> rebaselined — its own KNOWN-GAP test (asserting the now-closed refusal) replaced with a positive lossless
+> verification.
