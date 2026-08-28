@@ -2590,7 +2590,7 @@ it would have answered "not real" for the wrong reason.)*
 
 ---
 
-### 32. [⚠ RE-VERIFIED STILL REAL 2026-08-28] NO PINCH-TO-ZOOM ON ANY FEATURE CANVAS — mobile has no zoom at all
+### 32. [✅ SHIPPED t2371 — two-pointer pinch, exactly the sketched shape] NO PINCH-TO-ZOOM ON ANY FEATURE CANVAS — mobile has no zoom at all
 
 > **Checked 2026-08-28:** `viz/featureCanvas.js` has **zero** `touchstart`/`touches`/`pinch` handlers (only
 > `viz/gcodeViz3d.js` handles touch at all). Still live, unchanged.
@@ -2628,6 +2628,24 @@ parameter-driven canvas exists for, and it works today.
 
 **STILL REAL IF:** `grep -c "pointerdown" DDCS-Studio/web/viz/featureCanvas.js` returns hits but a search for
 a two-pointer/pinch path finds none → still real.
+
+> **#32 SHIPPED (t2371) — exactly the sketch above, not reinvented.** `_pointers` (a `Map`, by pointerId)
+> tracks every down pointer; ONE pointer keeps the existing drag/pan path byte-for-byte (confirmed live — a
+> handle drag before and immediately after a pinch writes the same fields the same way); a SECOND pointer
+> always switches to pinch, cancelling whatever single-pointer gesture was running first (a handle drag fires
+> its own real `onDragEnd`, exactly like a normal release). The pinch anchors ONE reference point per gesture
+> — the world point under the two-finger midpoint at the second pointerdown — and every subsequent move re-
+> solves the transform to keep that point fixed under the CURRENT (moved) midpoint at a scale set by the
+> CURRENT (changed) finger distance: the same "keep the point under the gesture fixed" shape `wheel`'s own
+> handler already used for a stationary cursor, just anchored to a drifting midpoint instead — one formula
+> covers pan-by-midpoint-drift and zoom-by-distance-ratio together. `_userAdjusted` set, matching wheel/pan, so
+> the auto-fit stops fighting the user on a pinch too. `touch-action: none` was ALREADY set on `.feature-canvas`
+> before this turn (`_mount()`'s own inline style) — the conflict this entry warns about was already resolved;
+> the gesture handler was the only missing piece. A pinch ending never hands off to a resumed single-pointer
+> drag/pan — the surviving finger needs its own fresh `pointerdown`. No native multi-touch API in Playwright, so
+> `tests/feature-canvas-pinch-zoom-2371.spec.js` dispatches synthetic two-pointer `PointerEvent`s
+> (`pointerType:'touch'`) directly at the SVG — proven non-vacuous (fails 2/2 pinch-direction assertions against
+> the pre-fix file, the untouched single-pointer-drag test unaffected either way).
 
 ---
 

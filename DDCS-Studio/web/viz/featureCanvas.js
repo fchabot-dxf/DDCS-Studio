@@ -64,6 +64,16 @@ export class FeatureCanvas {
         this.spec = null;
         this.active = null;        // { id } while a handle is being dragged
         this.pan = null;           // { x, y } (viewBox units) while panning the background
+        // t2371 (BACKLOG #32) — PINCH-TO-ZOOM. `_pointers` tracks every currently-down pointer by id (client px);
+        // a SECOND pointer touching down cancels whatever single-pointer gesture (handle drag / background pan)
+        // was in progress and starts a pinch instead — one finger keeps today's drag path untouched, two always
+        // means pinch, never a fight between them. `_pinch` holds the gesture's own anchor, computed ONCE at the
+        // second pointerdown (dist0/scale0 for the zoom ratio, w0 = the world point under the midpoint at that
+        // instant) — every subsequent move re-solves cxw/cyw to keep THAT world point under the CURRENT midpoint
+        // at the CURRENT scale, the same "keep the point under the gesture fixed" anchor the wheel handler below
+        // already uses, just anchored to a drifting two-finger midpoint instead of a stationary cursor.
+        this._pointers = new Map();
+        this._pinch = null;
         this._tf = null;           // world↔screen transform; frozen during a drag, persisted after pan/zoom
         this._userAdjusted = false; // true once the user pans/zooms — stop auto-fitting (dbl-click re-fits)
         this._vw = 0; this._vh = 0; // last viewBox size, for redraws outside render()
@@ -116,10 +126,52 @@ export class FeatureCanvas {
         this._ro.observe(container);
     }
 
+    /** t2371 (BACKLOG #32) — the pinch-anchor math, shared by _pinchStart/_pinchMove: two tracked pointers'
+     *  client coords → their viewBox-space distance + midpoint (the SAME units _clientToVB/_W already use). */
+    _pinchGeom() {
+        const pts = [...this._pointers.values()].map((p) => this._clientToVB(p.x, p.y));
+        const [v0, v1] = pts;
+        return { dist: Math.max(1, Math.hypot(v1.x - v0.x, v1.y - v0.y)), mid: { x: (v0.x + v1.x) / 2, y: (v0.y + v1.y) / 2 } };
+    }
+
+    /** A second pointer just went down — end whatever single-pointer gesture was running (a handle drag fires its
+     *  own onDragEnd, exactly as a normal release would; a background pan just stops) and anchor the pinch. */
+    _pinchStart() {
+        if (this.active) {
+            const id = this.active.id; this.active = null;
+            if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
+        }
+        this.pan = null;
+        const { dist, mid } = this._pinchGeom();
+        this._pinch = { dist0: dist, scale0: this._tf.scale, w0: this._W(mid.x, mid.y) };
+        this.svg.style.cursor = 'default';
+    }
+
+    /** Re-anchor `_pinch.w0` under the CURRENT midpoint at a scale set by the CURRENT distance ratio — one update
+     *  covers both zoom (distance changing) and pan (midpoint drifting), the same "keep the point under the
+     *  gesture fixed" shape the wheel handler below uses for a stationary cursor. */
+    _pinchMove() {
+        const { dist, mid } = this._pinchGeom();
+        const t = this._tf;
+        t.scale = Math.max(this._minScale, Math.min(this._maxScale, this._pinch.scale0 * (dist / this._pinch.dist0)));
+        t.cxw = this._pinch.w0.x - (mid.x - t.cx) / t.scale;
+        t.cyw = this._pinch.w0.y + (mid.y - t.cy) / t.scale;
+        this._userAdjusted = true;   // matches wheel/pan — stop auto-fitting once the user has taken the view
+        this._draw(this.spec, this._vw, this._vh);
+    }
+
     _bind() {
         const svg = this.svg;
         svg.addEventListener('pointerdown', (e) => {
-            if (!this.spec || !this._tf || e.button !== 0) return;
+            if (!this.spec || !this._tf) return;
+            // t2371 (BACKLOG #32) — track EVERY down pointer regardless of what it hits; a second one always
+            // means pinch (never fights a handle drag / background pan for the gesture). `button !== 0` still
+            // gates a real MOUSE click (right/middle) the way it always did — a touch contact's own `button` is
+            // always 0, so this never blocks a second finger.
+            try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+            this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (this._pointers.size >= 2) { this._pinchStart(); e.preventDefault(); return; }
+            if (e.button !== 0) return;
             const w = this._toWorld(e);
             const hit = this._hit(w);
             if (!hit) {
@@ -134,7 +186,7 @@ export class FeatureCanvas {
                 const eg = this._hitEdge(w);
                 if (eg) { if (this.spec.onEdgePick) this.spec.onEdgePick(eg.axis, eg.dir); e.preventDefault(); return; }
             }
-            try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+            // (pointer capture already taken above, before the pinch check)
             // Grab a handle. For a POSITION handle, precompute the snap "from" points (the handle itself + the path's
             // 9 bbox anchors) so any path corner/edge/centre can snap onto a stock anchor while dragging.
             if (hit) this.active = { id: hit.id, kind: hit.kind, noSnap: !!hit.noSnap, snapOffsets: (hit.kind === 'move' && !hit.noSnap) ? this._snapOffsets(hit) : null };
@@ -144,6 +196,11 @@ export class FeatureCanvas {
         });
         svg.addEventListener('pointermove', (e) => {
             if (!this.spec || !this._tf) return;
+            if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (this._pinch) {
+                if (this._pointers.size >= 2) { this._pinchMove(); e.preventDefault(); }
+                return;   // a pinch owns the gesture until a pointer lifts — never falls through to drag/pan
+            }
             if (this.active) {
                 // Handles live in the pattern's build frame; the view draws them placed → undo the placement here.
                 if (this.spec.onDrag) {
@@ -180,6 +237,12 @@ export class FeatureCanvas {
             }
         });
         const end = (e) => {
+            this._pointers.delete(e.pointerId);
+            try { this.svg.releasePointerCapture(e.pointerId); } catch (_) {}
+            // t2371 (BACKLOG #32) — a pinch ends the moment either finger lifts; the SURVIVING finger (if any)
+            // does NOT resume a single-pointer drag/pan mid-gesture — it needs its own fresh pointerdown, the
+            // same way lifting one of two mouse buttons wouldn't hand off to a different tool mid-click.
+            if (this._pinch) { this._pinch = null; this.svg.style.cursor = 'default'; return; }
             const act = this.active;
             let id;
             if (this.active) { id = this.active.id; this.active = null; }
@@ -187,7 +250,7 @@ export class FeatureCanvas {
             else return;
             this.svg.style.cursor = 'default';
             const hadSnap = !!this._snap; this._snap = null;
-            try { this.svg.releasePointerCapture(e.pointerId); } catch (_) {}
+            // (pointer capture already released above, before the pinch check)
             if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
             // t732 — REFIT-ON-DROP so the canvas ACCOMMODATES a marker dragged to the edge. A free (noSnap) sim-start marker
             // is held at the 80px gutter by _followHandle during the drag; with the frozen viewBox and no refit it would PIN
