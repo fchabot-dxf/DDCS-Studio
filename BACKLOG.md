@@ -3070,7 +3070,7 @@ pixel while moving, converging only at ▲ up.
 
 ---
 
-### 39. A GUARDED WIZARD LOSES ITS GUARD ARMS WHEN FORKED FROM A PLACED OP
+### 39. [⭐ ROOT CONFIRMED t2367 — STRUCTURAL, at LIFT: `pruneGuards` deletes the untaken arm at Insert-build, by design. Fix direction approved: fork body from the def's own unpruned template, placed params seed VALUES only] A GUARDED WIZARD LOSES ITS GUARD ARMS WHEN FORKED FROM A PLACED OP
 
 *(surfaced t2365 while fixing the insert-then-save fork; the worker judged it too large to fold in and
 flagged it rather than patching it — the right call, recorded here so it is not lost)*
