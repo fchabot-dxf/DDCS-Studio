@@ -3050,3 +3050,43 @@ pixel while moving, converging only at ▲ up.
 > reach tree pane-bodies (confirmed 164.375px against a 0.618 ratio). Narrow consumes the ratio through its
 > own already-working mechanism. The single-digit-px in-motion lag observed at t2355 is now unexplained and
 > unreproduced — if it resurfaces on a real device, re-file with fresh probe rows rather than this diagnosis.
+
+---
+
+### 39. A GUARDED WIZARD LOSES ITS GUARD ARMS WHEN FORKED FROM A PLACED OP
+
+*(surfaced t2365 while fixing the insert-then-save fork; the worker judged it too large to fold in and
+flagged it rather than patching it — the right call, recorded here so it is not lost)*
+
+**Two doors reach "save this as my own wizard", and they lift different things:**
+
+```
+CUSTOMIZE      ddcsEditWizardDef  -> loads the wizard's OWN template     all 32 twins, guards included
+INSERT + SAVE  saveAsFork         -> lifts a PLACED op's lifted shape    guarded wizards refuse
+```
+
+t2365 fixed this door's framing mismatch — a placed op carries different `progstart`/`progend` framing than a
+standalone template, so every binding past that boundary was silently dropped and the fork registered a fully
+structured but **completely empty** form. `reattachFraming` (`devMode.js`) now splices the candidate's own
+live framing back at the source's relative position. **Drill forks losslessly through it — 37/37 bindings.**
+
+⚠ **A GUARDED wizard (pocket) taken through the same door still hits a separate, older refusal.** It is
+**loud** — it declines with a visible reason rather than registering something quietly wrong, which was the
+floor t2365 was held to — but it is not the lossless "indistinguishable" outcome the arc's plan describes.
+Confirmed pre-existing via A/B against bare HEAD; **`CUSTOMIZE` forks pocket losslessly**, so no wizard is
+unreachable — this is one door, not the feature.
+
+⛔ **Do not fix by widening the refusal.** The guard-arm loss has its own root in how a placed op's guarded
+arms are lifted; find that root before writing anything. The refusal is a correct symptom of it.
+
+### STILL REAL IF
+
+Insert a **pocket** op into a job, then Save Custom Wizard from that placed op. If it refuses with a visible
+guard-arm reason, this is live. (Customize -> pocket -> save must still fork losslessly; if THAT breaks, it is
+a regression in `fork-parity-1593.spec.js`'s territory, not this entry.)
+
+### ⭐ THE CONTEXT THAT MAKES THIS SMALLER THAN IT LOOKS
+
+Only **two** wizards have a declared `uiChildren` form at all today — drill (t2299) and pocket (t2301). Every
+other wizard reaches the fork through the pre-existing all-32 `CUSTOMIZE` path, which is unaffected. So this
+entry's blast radius is exactly: *guarded wizards, via one of two doors*. It grows as more forms are declared.

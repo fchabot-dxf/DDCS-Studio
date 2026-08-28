@@ -24,28 +24,34 @@ completed plans are not kept — *"we can always plan again."*
 
 ---
 
-## WHERE THINGS STAND — 2026-08-26
+## WHERE THINGS STAND — 2026-08-28
 
-**Branch `wizards-as-data-blocks`. Released V2026.08.26.2.**
+**Branch `wizards-as-data-blocks`. Released V2026.08.28.4.**
 
 The live arc is **wizards-as-data**: every built-in becomes a `{template, bindings}` definition, so a wizard
 can be reproduced from declared data alone. `drill` is the pilot.
 
 ```
-DONE  usage_text + path_anchor declared · guard/whenOk already covered structural forks
-      drill's holeDia + clearance bound (fan-out via postInstantiate)
-      t2297 — method GATED OUT, correctly: t1385 had already merged drill|bore into ONE holecycle
-              block, so there was never a structural fork to bind
-      ⭐⭐ t2299 — THE ARC'S FIRST END-TO-END PROOF. drill's FORM is a declared uiChildren tree,
-              pinned by drill-form-reproduction-2299 on three independent axes
-IN    t2301 — pocket's form (it has a shape-type switch, so it exercises guard for LAYOUT,
-              which drill's tree never did) + drop `panel` from the remaining 23 dataOps defs
-NEXT  ⭐ THE FORK, once t2301 lands:
-        A  reproduce the remaining 4 mill forms (contour/slot/surfacing/text) — breadth
-        B  go to E2 and REGISTER the twins — depth. t2301's panel cleanup is its prerequisite.
-        advisor leans B: two reproductions prove the pattern; the value only lands when
-        something USES the twins, which is also where the next real defects surface.
+DONE  t2299 — drill's FORM is a declared uiChildren tree (the arc's first end-to-end proof)
+      t2301 — pocket's form, exercising guard for LAYOUT
+      t2365 — FORK-TO-CUSTOM. Both doors now work for an unguarded declared form.
 ```
+
+⭐⭐ **THE HONEST NUMBER, established t2365 — read this before planning breadth.** *Twin* and *declared form*
+are different things, and the gap between them is the arc's real remaining distance:
+
+```
+32  wizards registered as TWINS ({template, bindings})   — done, forkable via CUSTOMIZE
+ 2  wizards with a DECLARED uiChildren FORM              — drill (t2299), pocket (t2301)
+```
+
+⇒ **The remaining work is the other thirty FORMS.** `NEXT` was fork A/B; **B landed** (the twins are
+registered and used). ⇒ **A is what is left**: reproduce the remaining mill forms — contour, slot, surfacing,
+text — then the probe/ATC/lathe families.
+
+⚠ **One consequence is already filed:** BACKLOG #39 — a *guarded* wizard forked from a **placed op** loses its
+guard arms and refuses (loudly, correctly). Blast radius today is small precisely because only two forms are
+declared; **it grows with every form ported**, so #39 wants closing early in the breadth run, not after it.
 
 - **Corner is the gated pilot** — no wizard ports until corner is right.
 
