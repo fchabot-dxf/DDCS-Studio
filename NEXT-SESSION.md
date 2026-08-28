@@ -37,17 +37,32 @@ DONE  t2299 — drill's FORM is a declared uiChildren tree (the arc's first end-
       t2365 — FORK-TO-CUSTOM. Both doors now work for an unguarded declared form.
 ```
 
-⭐⭐ **THE HONEST NUMBER, established t2365 — read this before planning breadth.** *Twin* and *declared form*
-are different things, and the gap between them is the arc's real remaining distance:
+⭐⭐ **THE HONEST NUMBER — CORRECTED 2026-08-28 by grepping, after the advisor wrote the wrong one here.**
+
+⚠ The first version of this block said *"only 2 wizards have a declared form; the remaining work is the other
+thirty FORMS."* **That was false**, taken from a hand-back phrase (*"the only two turned to data-twin form"*)
+instead of from the code. It is the exact failure this file's own closing section warns about — *a document's
+own frontier list is the least trustworthy line in it; grep for the capability, not the file's claim.*
+**Measured:**
 
 ```
-32  wizards registered as TWINS ({template, bindings})   — done, forkable via CUSTOMIZE
- 2  wizards with a DECLARED uiChildren FORM              — drill (t2299), pocket (t2301)
+33  dataOps files declare uiChildren
+32  of them declare a param_group  — i.e. essentially EVERY twin has a declared form
+ 4  use a split_horizontal/vertical → hasTreeLayout() drives the LIVE render from the
+    declaration (drill t2341, centerDrill, edge, parting)
+ 2  are pinned by a form-REPRODUCTION ratchet spec (drill t2299, pocket t2301)
 ```
 
-⇒ **The remaining work is the other thirty FORMS.** `NEXT` was fork A/B; **B landed** (the twins are
-registered and used). ⇒ **A is what is left**: reproduce the remaining mill forms — contour, slot, surfacing,
-text — then the probe/ATC/lathe families.
+⭐ **And flat mode is not a lesser path.** `blocksApp.js:788-794` records the empirical check: a sectioned
+twin takes its own flat path, and `formBindings()` + `renderOpForm()`'s section-grouping already produces the
+**complete** form — Corner 23/23 fields, WCS 6/6, ATC Length 7/7, Surfacing 30/30, **zero exceptions**. A
+different branch inside the same renderer, *not* a gap.
+
+⇒ **The remaining distance is the PROOF, not the declaration.** The plan's done-condition (`:164-168`) is
+*"the arc is done when the gap list is empty"*, and that list is maintained by the reproduction specs — of
+which there are **two**. ⇒ **Next is extending the ratchet to the rest**: a verification exercise, far cheaper
+than the porting run this block used to describe. Flip a wizard to `split` only where a two-pane layout is
+actually wanted — a single-pane flip was never asked for (`drillData.js:197-201`).
 
 ⚠ **One consequence is already filed:** BACKLOG #39 — a *guarded* wizard forked from a **placed op** loses its
 guard arms and refuses (loudly, correctly). Blast radius today is small precisely because only two forms are

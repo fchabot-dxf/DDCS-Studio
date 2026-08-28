@@ -3087,6 +3087,12 @@ a regression in `fork-parity-1593.spec.js`'s territory, not this entry.)
 
 ### ⭐ THE CONTEXT THAT MAKES THIS SMALLER THAN IT LOOKS
 
-Only **two** wizards have a declared `uiChildren` form at all today — drill (t2299) and pocket (t2301). Every
-other wizard reaches the fork through the pre-existing all-32 `CUSTOMIZE` path, which is unaffected. So this
-entry's blast radius is exactly: *guarded wizards, via one of two doors*. It grows as more forms are declared.
+⚠ **CORRECTED 2026-08-28.** This section first said *"only two wizards have a declared form"* — false, taken
+from a hand-back phrase rather than the code. **Measured: 32 of 33 dataOps files declare a `param_group`, so
+essentially every twin has a declared form.** Only two are pinned by a *reproduction ratchet spec* (drill
+t2299, pocket t2301), which is a different thing.
+
+⇒ **That makes this entry BIGGER than first written, not smaller.** Every twin has a form to lose, so the
+guard-arm loss is not gated behind a porting run that has barely started — it applies to any guarded wizard
+forked from a placed op, today. Every other wizard still reaches the fork losslessly through the pre-existing
+all-32 `CUSTOMIZE` path, which is unaffected — so the blast radius is *guarded wizards, via one of two doors*.
