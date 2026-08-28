@@ -22,6 +22,29 @@ cd DDCS-Studio && npm test        # both tiers, honest exit code
 Pushing is not the end of a change. **Check the run.** Six deploys went out on 2026-08-06 without
 anyone looking, and three of them never produced a desktop build.
 
+#### ⛔ 1b. A change to a SHARED RENDER PATH is not verifiable by targeted checks. Run the full suite BEFORE you believe it.
+
+⚠ **Paid for twice.** A shared CSS token once reached further than the smoke tier looked. Then on
+**2026-08-28 (t2371)** a fix that widened `hasTreeLayout()` passed every targeted check its author ran —
+and **regressed 21 tests**: blanked preview panes, and dropped section-grouping for surfacing, contour,
+slot and text. ⭐ **Nothing but the required full-suite run caught it.** It was reverted and replaced with
+a narrower fix touching zero lines of the tree/flat decision.
+
+**The files where this applies** — a change here is shared until proven otherwise:
+
+```
+ui/formWidgets.js      wizards/views/userOpView.js     blocks/blocksApp.js
+ui/paneAccordion.js    blocks/blockEmitter.js          styles.css tokens at :root
+```
+
+⇒ **The rule is about ORDER, not effort.** Targeted checks tell you your change works. They cannot tell
+you what else it reached — every one of those 21 tests exercised a wizard the author had no reason to
+open. ⭐ **Run the full suite before you conclude, not after** — a green targeted check on a shared
+render path is not evidence, and a fix you already believe in is the expensive kind to be wrong about.
+
+⭐ **A narrower fix that touches no shared decision beats a wider one that passes.** t2371's shipped fix
+mounts the widget directly in the path that needed it. Prefer that shape whenever it exists.
+
 ### 2. Never force-push a shared branch
 
 Three workstations sync through this repo, sequentially. A `--force` push silently discards whatever
