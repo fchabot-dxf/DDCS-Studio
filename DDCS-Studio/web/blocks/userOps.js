@@ -1191,6 +1191,13 @@ export function loadUserOps() {
  * ⚠ IT FAILS CLOSED. Each remapped binding is CHECKED against the fork's own stack (a block at that index, of the
  * same type, carrying the key) and ONE miss abandons the whole inheritance rather than write values into wrong
  * sockets: an empty form is a visible disappointment, a form silently wired to the wrong sockets is a wrong program.
+ *
+ * t2365 (OPTION C, fork-to-custom) — `forkChildren` must carry the SAME program-level progstart/progend the
+ * source's own `def.template` still has literally inside it (a def is a standalone builder, not part of any
+ * program) — a LIVE PLACED op's `.children` never does (opBuilders.js's `_framed` lifts them to top-level
+ * PROGRAM siblings). A spindle/retract binding legitimately targets progstart/progend (drill's own `rpm` does),
+ * so the caller (devMode.js's `prepareCandidate`) re-attaches the candidate's CURRENT program framing before
+ * calling this — omitting it does not crash, it just fails EVERY blockIndex binding closed, silently.
  */
 export function forkInheritance(srcDef, forkChildren) {
     if (!srcDef || !Array.isArray(srcDef.bindings) || !srcDef.bindings.length) return null;

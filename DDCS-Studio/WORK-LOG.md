@@ -60641,3 +60641,188 @@ trip).
 
 `tests/group-framing.spec.js` — rebaselined for the new, intended `( Hand-built )` title line.
 
+## t2365 — OPTION C: FORK-TO-CUSTOM. A placed op's `.children` and its own DEF's `.template` disagree about
+where progstart/progend live — `forkInheritance` had never been asked to bridge that, so every blockIndex-based
+binding past progstart silently failed to inherit, and "Save Custom Wizard" on drill/pocket registered a fully
+structured, completely EMPTY form. Full spec: `scratchpad/t2365-fork-to-custom.md` — read in full before
+starting. THE CUT stands: built-ins stay pristine and read-only; this fork produces an independent USER op.
+
+### THE ROOT DEFECT, found this turn not assumed
+
+`opBuilders.js`'s own `_framed` lifts progstart/progend OUT of a placed op's `.children` to top-level PROGRAM
+siblings the moment an op is placed — everywhere in this app. A DEF's own standalone `template` (never
+"placed") keeps them literally embedded inside `user_root.children`, at a specific interior position between
+declaration blocks and the real motion atoms. `forkInheritance` (`userOps.js`, t1593) compares the source
+def's `template` flatten against the candidate's `.children` flatten via `alignByType` — a type-sequence walk
+that fails CLOSED (returns the whole attempt as `null`) on any single mismatch. drill's own `rpm` binding is
+bound directly to progstart's blockIndex, which guaranteed the mismatch reached every single binding in the
+stack, not just the ones structurally near the frame.
+
+**Three designs, only the third survives a real op — found by driving the actual gesture, not reasoning from
+the diff:**
+
+1. **Skip progstart/progend inside `alignByType`.** Wrong: `rpm`'s binding legitimately targets progstart's
+   own blockIndex — skipping it left `map[45] = -1`, unresolvable.
+2. **Wrap `[progstart, ...opRec.children, progend]` at the outer array level.** Wrong position: debug output
+   (a scratch `tests/zzz-debug-fork.spec.js`, `window.__T2365_DEBUG`-gated `console.error`, removed before
+   finalizing) showed the source's own template has them NESTED inside `user_root.children` at an interior
+   index, not as outer siblings — the wrap put them at the wrong structural level entirely.
+3. **`reattachFraming(opChildren, framing, srcDef)`** (`devMode.js`, shipped) — splices the candidate's own
+   live progstart/progend back into `user_root.children` at the SAME relative index the source's own
+   `def.template`'s `user_root.children` has them (`srcKids.findIndex`), progend first at its own index minus
+   1 (to account for progstart's absence shifting later positions), then progstart at its own unshifted index.
+   Verified via the debug probe: `bindingCount` went from 0 to 37 (matching the source), and the live form
+   rendered 37 real fields with correct params — not just a structurally-plausible shape.
+
+`prepareCandidate(a, framing)` gained a `framing` param (`{start, end}`, the candidate's own program-level
+progstart/progend, found by the caller from `stack`) and now runs `forkInheritance` against
+`reattachFraming(...)`'s output rather than the bare `.children`. `saveAsCustomOp()`'s `startFor` closure
+computes `framing` once from the closure-captured `stack`; `authorFork` now stores the reattached shape as the
+fork's own template when inheritance succeeded (so the remapped blockIndex values point at real positions in
+what's actually saved) — falling back to the bare children, unchanged, when it didn't.
+
+An earlier addition — copying the source's `uiChildren` tree onto the fork explicitly (`srcUiTree`) — turned
+out unnecessary: A/B (reverting all of `devMode.js`) proved `a.opRec.children` already carries the declared
+tree verbatim (it's the live canvas's own rendering of a placed twin). Cleanly removed before finalizing;
+kept it would have double-wrapped `user_root` inside `user_root`.
+
+### TWO ENTRY POINTS — established, not assumed (BACKLOG item 3's own ask)
+
+**INSERT-then-SAVE** (place via the toolbar, then "Save Custom Wizard" from Blocks) is the gesture the
+dispatch's own verification steps describe. Fixed by `reattachFraming` for a plain (unguarded) wizard —
+drill, 37/37 bindings, proven live. A GUARDED wizard (pocket, whose form forks between structural arms) hits
+a SEPARATE, PRE-EXISTING refusal here: t1593's own "structural fork arms" guard (`userOps.js` ~888-914)
+counts `armBlocks` in the source vs. the fork's own template and REFUSES LOUDLY ("re-open the wizard in Blocks
+and save again") when the fork came back short, rather than silently registering a shorter, wrong program.
+Confirmed PRE-EXISTING, not introduced this turn, by A/B: stashed this turn's own `devMode.js`/`userOps.js`
+changes, re-ran the identical pocket INSERT-then-SAVE gesture against bare HEAD, got the byte-identical
+refusal message. This satisfies the dispatch's own "never crash, never a silent empty form" floor even though
+it isn't yet the lossless "indistinguishable" outcome for a guarded wizard via this specific door.
+
+**CUSTOMIZE** (`ddcsEditWizardDef`, loads the wizard's OWN template straight into Blocks — not a placed op's
+lifted shape) was ALREADY lossless for all 32 registered twins, guards included, per the pre-existing
+`fork-parity-1593.spec.js` ("the refused set is EMPTY") — untouched by this turn. Re-confirmed live for pocket
+specifically as this turn's own required SECOND wizard (39/39 bindings): it is the gesture that actually
+reaches a guarded wizard's declared form today.
+
+**The honest which-wizards-fall-back answer** (item 3): every wizard with a declared `uiChildren` form (drill
+t2299, pocket t2301 — the only two turned to data-twin form so far) forks losslessly via CUSTOMIZE; an
+unguarded one also forks losslessly via INSERT-then-SAVE; a guarded one via INSERT-then-SAVE hits the
+pre-existing, loud, non-silent refusal above until a separate turn addresses the guard-arm loss at its own
+root (judged too large to fold into this turn's scope — flagged, not fixed). No wizard without a declared form
+was tested this turn (none exists yet beyond drill/pocket per the wizards-as-data ratchet's own current
+frontier) — degrading gracefully for that case is therefore unverified, not claimed.
+
+### VERIFICATION — the real symptom, not just a test
+
+`tests/fork-to-custom-2365.spec.js` (new, 3 tests): (1) drill via INSERT-then-SAVE — inserts, saves as a fork,
+opens both fork and source, asserts field/section/label equality (37 fields, order preserved), edits `depth`
+in the fork's own live form, commits it via the real Insert path, confirms the committed op carries the edit,
+reopens the real source and confirms its own field values are untouched — the source's `depth` default is
+provably NOT the fork's edited value. (2) pocket via CUSTOMIZE — the required second wizard, proving the fix
+isn't drill-shaped (39/39 bindings, field/section parity). (3) pocket via INSERT-then-SAVE — captures the
+refusal alert's own message, asserts it names the reason, asserts the fork never registered. All 3 pass
+cleanly (34.4s total, single worker, no retries).
+
+Re-ran the ratchet (`drill-form-reproduction-2299.spec.js`, `pocket-form-reproduction-2301.spec.js`,
+`fork-parity-1593.spec.js`) together: 8/8 pass, zero regression to the pre-existing all-32-twins CUSTOMIZE
+proof.
+
+Screenshots at `verification/t2365-fork-to-custom/`: `1-drill-fork.png` (the Blocks-tab state right after
+opening/reading the fork and source forms), `2-drill-after-fork-edit.png` (the fork on canvas after the
+depth=17.25 edit committed via Insert — the Blocks tab's right panel tracks the CANVAS selection, not the
+`#wiz_user` modal the assertions themselves read, so this pair documents the canvas state at each checkpoint
+rather than a literal side-by-side modal comparison; the actual fork≡source proof is the field-array equality
+assertion above, not the screenshot), `3-pocket-customize-fork.png` (pocket's fork, CUSTOMIZE path).
+
+### THE TAIL — BACKLOG #25, the dirty dot's shape distinction (owner-ruled 2026-08-26, "i like your
+distinction"), committed separately per dispatch
+
+The dot could say "unsaved" but not distinguish "no file has EVER been saved here" (no backup exists anywhere
+— the more urgent state) from "a real file exists but has changed since" — both read as the same filled dot.
+`workspaceManager.js`'s own `renderCurrent()` (the workspace-manager MODAL's own state panel) already carried
+this three-state distinction (`is-never-saved`/`is-stale`/`is-saved`) from a prior turn; only the small
+persistent HEADER dot (`#hdrWsDirtyDot`, `fileSaveState.js`'s own `refresh()`) still tracked a binary `dirty`
+flag. Fixed by mirroring the modal's own precedent rather than inventing a new visual convention:
+`refresh()` now also reads `everSaved = !!fileSavedStem()`; shows the dot when `!everSaved || dirty` (not just
+`dirty`); adds an `is-never-saved` class distinct from the filled/stale state; sets the accessible name to
+"Never saved to a file" vs "Unsaved changes" accordingly. `styles.css` adds `.hdr-ws-dirty-dot.is-never-saved`
+— a transparent fill with a `color-mix` border (the SAME color value the filled state already uses), mirroring
+the modal's own `.wsm-state.is-never-saved::before` hollow-ring rule verbatim rather than inventing a second
+palette choice.
+
+Two PRE-EXISTING tests carried the stale assumption that a fresh, never-saved boot is the HIDDEN state — it
+is now, correctly, the MORE urgent visible one (a hollow ring), so both were REBASELINED, not silenced:
+`workspace-dirty-dot-2188.spec.js`'s own single "hidden when clean" test split into two ("...a HOLLOW RING
+...and a FILLED dot..." / "...hidden...only in the one genuinely clean state..."), reached via an explicit
+`window.ddcsMarkWorkspaceSaved(...)` call where the test needs the genuinely-clean (real file, no changes
+since) state specifically; its own WCAG contrast test likewise now marks a file saved first (measures the
+FILLED state; the ring's border uses the identical color-mix value, so its own contrast is equal by
+construction, needing no separate measurement — noted in a comment rather than asserted twice).
+`persistence-file-indicator.spec.js`'s own lifecycle test had the SAME assumption at its "clean" phase
+(renamed to `neverSaved`, asserts the ring) AND a second, subtler instance: its own "dirty" phase dirtied the
+workspace WITHOUT ever marking a file saved first, so under the new logic it correctly read "Never saved to a
+file" rather than the old "Unsaved changes" label the test still expected — fixed by marking a file saved
+before dirtying, matching what `workspace-dirty-dot-2188.spec.js` already did, so the "dirty" phase actually
+reaches the state its own label asserts.
+
+Swept the rest of the test suite for the same shape (`grep -rl hdrWsDirtyDot|is-never-saved|WorkspaceDirtyToFile
+tests/`, 13 files): the only other hits are `workspace-state-glyph-2303.spec.js` (the pre-existing, unrelated,
+ALREADY-correct `.wsm-state` modal glyph tests — not the header dot) and files that call
+`ddcsWorkspaceDirtyToFile()`/`is-never-saved` against that same modal glyph, not `#hdrWsDirtyDot`. Ran all of
+them (`workspace-state-glyph-2303`, `workspace-manager-1223`, `workspace-manager-truth-1231`,
+`workspace-save-open-1225`, `workspace-cloud-tab-1233`, `watermark-timing-2188`, `replace-confirm-2184`,
+`open-as-modal-1625`, `loading-feedback-1257`) together: 59/59 pass, zero collateral regression.
+
+### THE FOOTNOTE — deleting two provably-orphaned files, third separate commit
+
+t2363's own hand-back noted `wizards/ops/corner_title.js` (`cornerTitleBlock`) and `wizards/ops/probe_titles.js`
+(`edgeTitleBlock`/`middleTitleBlock`/`circularTitleBlock`) as dead declarations, flagged not removed. Re-
+verified at this turn's own time rather than trusting the prior finding: grepped the whole repo for both
+filenames and their exported block names — neither is imported by `wizards/ops/index.js`'s `PALETTE` (the
+"DNA" registry every real block must join to be reachable) or anywhere else; the only other hits are a
+`COMMENT-CHARACTERS.md`-citing comment in `surfaceraster.js` and a comment in
+`tests/comment-nesting-guard-2305.spec.js` that NAMES `probe_titles.js`'s `circular_title` as "unreferenced by
+any stack today" — itself confirming the orphan status rather than contradicting it; that test's own PALETTE
+iteration (`import { PALETTE } from '/wizards/ops/index.js'`) never actually reaches either block, since
+neither is IN the array it iterates. Deleted per no-legacy-burden.
+
+### FULL SUITE — run at the very end, after all of the above
+
+2852 passed / 6 failed / 31 flaky / 26 skipped (48.3m). FAILED COUNT attributable to t2365: **0** — all 6 are
+timeout/threshold misses under full-suite parallel load, on files this turn never touched (`corner-start-
+datum-drag.spec.js`'s own 240s mouse-drag sweep, `loading-feedback-1257.spec.js`'s 500ms controller-settle cap
+missed by 43ms, `middle-superset.spec.js`'s 60s 14336-combo sweep ×2 shards, `pane-visual-host-programmatic-
+1762.spec.js`'s drawer-handle click, `wcs-sync-gate-1906.spec.js`'s sync-field settle poll) — the "parallel
+suites → mass timeout reds" pattern this project's own convention already names, not a regression. Of the 31
+flaky, `fork-to-custom-2365.spec.js`'s own drill test flaked once (`window.ddcsSaveAsWizard is not a function`
+— `devMode.js`'s global attaching after `ddcsGetBlockProgram()` already reports content, under heavy parallel
+load), passed clean on retry (34.9s) and 3/3 in isolation earlier; hardened `saveAsFork` to wait for the
+function to exist rather than a bare timeout. `wizard-face-1599.spec.js`'s own CUSTOMIZE flake is the already-
+documented, pre-existing t1766 reproject-echo race (named in t2363's own WORK-LOG entry) — unrelated. Node
+tier: 238/238.
+
+### Files changed
+
+`web/blocks/devMode.js` — new `reattachFraming(opChildren, framing, srcDef)`; `prepareCandidate` gains the
+`framing` param and runs `forkInheritance` against its output; `saveAsCustomOp()`'s `startFor` computes
+`framing` once and threads it through; `authorFork` stores the reattached shape as the fork's template when
+inheritance succeeded.
+
+`web/blocks/userOps.js` — `forkInheritance`'s own JSDoc extended with the t2365 framing-reattachment
+requirement; the function body (`alignByType`, the binding-remap loop) is unchanged.
+
+`tests/fork-to-custom-2365.spec.js` (new, 3 tests, Playwright; `saveAsFork` hardened post-full-suite against the
+`ddcsSaveAsWizard`-attach race found there).
+
+`web/ui/fileSaveState.js` — `refresh()` now reads `everSaved` and drives the dot's visibility/shape/aria-label
+off the (`everSaved`, `dirty`) pair instead of `dirty` alone (BACKLOG #25).
+
+`web/styles.css` — `.hdr-ws-dirty-dot.is-never-saved` (BACKLOG #25).
+
+`tests/workspace-dirty-dot-2188.spec.js`, `tests/persistence-file-indicator.spec.js` — rebaselined for the
+three-state dot (BACKLOG #25); both pre-existing, not new this turn.
+
+`web/wizards/ops/corner_title.js`, `web/wizards/ops/probe_titles.js` — deleted, provably unreferenced (the
+footnote).
+

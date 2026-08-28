@@ -820,13 +820,41 @@ export function isMaintainedAsData(def) {
     return !def.bindingSpecs.every((s) => authored.has(s.param));
 }
 
+// t2365 (OPTION C, fork-to-custom) — reconstruct the PRE-LIFT shape `forkInheritance`'s block-sequence
+// comparison needs: a twin DEF's own `template` keeps progstart/progend LITERALLY INSIDE its `user_root`'s
+// `.children` (a def is a standalone builder, never "placed" — nothing ever lifts them out of it), while a
+// LIVE PLACED op's `.children` never has them there (opBuilders.js's `_framed` lifts them to top-level PROGRAM
+// siblings, everywhere in this app, the moment an op is placed) — found live: wrapping them AROUND the whole
+// `[user_root]` array (an earlier attempt) left `user_root.children` itself still short two entries in the
+// wrong place entirely, which still failed the alignment. `srcDef.template`'s own `user_root.children` says
+// EXACTLY where they belong (drill's own shape interleaves them among its real motion atoms, after its
+// declaration blocks) — splice the candidate's OWN live progstart/progend back into the SAME relative slots.
+// A source with no registered def, no framing, or a shape too foreign to place them cleanly → the ORIGINAL
+// children, unchanged (forkInheritance's own alignment then fails closed exactly as before this fix).
+function reattachFraming(opChildren, framing, srcDef) {
+    if (!framing || (!framing.start && !framing.end)) return opChildren;
+    const root = opChildren && opChildren[0];
+    if (!root || root.type !== 'user_root' || !Array.isArray(root.children)) return opChildren;
+    const srcRoot = srcDef && Array.isArray(srcDef.template) && srcDef.template.find((b) => b && b.type === 'user_root');
+    const srcKids = (srcRoot && Array.isArray(srcRoot.children)) ? srcRoot.children : [];
+    const startIdx = srcKids.findIndex((b) => b && b.type === 'progstart');
+    const endIdx = srcKids.findIndex((b) => b && b.type === 'progend');
+    if (startIdx < 0 && endIdx < 0) return opChildren;   // the source's own template doesn't frame this way either
+    const kids = root.children.slice();
+    // insert progend FIRST (its own index, shifted down by 1 for progstart's absence from `kids`) so
+    // progstart's OWN (unshifted, earlier) insertion below doesn't move it
+    if (framing.end && endIdx >= 0) kids.splice(Math.max(0, endIdx - (startIdx >= 0 ? 1 : 0)), 0, framing.end);
+    if (framing.start && startIdx >= 0) kids.splice(startIdx, 0, framing.start);
+    return [{ ...root, children: kids }];
+}
+
 // t2156 — everything ONE candidate op needs to become a save-able wizard: the guards (varErr, dangling
 // formfield), the fork wrap, bindings, panel/sim declarations, the editing/lockUpdate context. Extracted so it
 // runs per CANDIDATE (a workspace with a genuine choice has several) rather than once for whichever op used to
 // win a silent stack.find(). The guards move here too, since which op's guard failures matter can only be judged
 // once a specific op is being committed — a picker cannot pre-judge which pick the human is about to make.
 // Returns { ok:true, a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate, meta } or { ok:false, error }.
-function prepareCandidate(a) {
+function prepareCandidate(a, framing) {
     if (a.varErr) return { ok: false, error: `The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.` };
     // t1636 — a `formfield` whose Match Var names no block in the stack used to save SILENTLY (formfieldBindings'
     // own catch → [], read only by the live preview) as a wizard with NO PARAMETERS — the emitted program then runs
@@ -860,7 +888,12 @@ function prepareCandidate(a) {
     // EMPTY SHELL: 549 declared bindings, zero recovered. Inherited rows come FIRST so the copy keeps the wizard's
     // declared field ORDER; anything authored in the workspace is appended and WINS by param name (a pill the user just
     // plugged in is the newer declaration for that knob). A hand-built stack (no source opType) inherits nothing.
-    const inherited = forkInheritance(getUserDef(a.opRec.opType), a.opRec.children);
+    //
+    // t2365 — re-attach the candidate's own program-level progstart/progend before comparing against the
+    // source (see reattachFraming's own comment for the full account: a spindle/retract binding, e.g. drill's
+    // real `rpm`, can legitimately target one of them, and the fork's own flatten never has them without this).
+    const forkChildren = reattachFraming(a.opRec.children, framing, getUserDef(a.opRec.opType));
+    const inherited = forkInheritance(getUserDef(a.opRec.opType), forkChildren);
     const bindings = inherited
         ? [...inherited.bindings.filter((b) => !authoredBindings.some((x) => x.param === b.param)), ...authoredBindings]
         : authoredBindings;
@@ -886,6 +919,12 @@ function prepareCandidate(a) {
     // `getUserDef` is the ORIGINALLY-REGISTERED def, by the op's own opType, unaffected by the live-editing
     // session's own state — confirmed reliable where `editingDef.panel` was not.
     const registeredDef = getUserDef(a.opRec.opType);
+    // t2365 (OPTION C — fork-to-custom, the arc's payoff) — NO separate "copy the source's uiChildren tree" step
+    // needed: `a.opRec.children` (the LIVE canvas's own rendering of a placed twin) already IS `[user_root]`
+    // carrying its real declared tree verbatim — confirmed live (an A/B with this whole file reverted showed the
+    // identical structure before any fork-specific code ran). The gap was never the layout; it was that the
+    // bindings pointing INTO that tree (a `field_ref`'s only way to find its value) never survived the fork —
+    // see `forkChildren`, just above, for the actual fix.
 
     // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
     // has one to form2d, else the feature is silently hidden behind the form3d default. Still a DECLARATION: a `panel`
@@ -893,7 +932,7 @@ function prepareCandidate(a) {
     const hasNumberRole = bindings.some((b) => b.widget === 'point' || b.widget === 'nrect');
 
     return {
-        ok: true, a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate,
+        ok: true, a, bindings, inherited, forkChildren, blkPanel, blkSim, editingDef, lockUpdate,
         meta: {
             name: editingDef ? (editingDef.label || '') : '',
             panel: blkPanel || (editingDef && editingDef.panel) || (registeredDef && registeredDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
@@ -950,11 +989,15 @@ function saveAsCustomOp() {
     }).filter(Boolean);
     if (!candidates.length) { alert('No operation to save — insert an operation in Blocks first.'); return; }
 
+    // t2365 — the ONE program-level progstart/progend this candidate is currently framed by (a bare/hand-built
+    // candidate has none) — see prepareCandidate's own t2365 comment for why forkInheritance needs them.
+    const framing = { start: stack.find((b) => b && b.type === 'progstart') || null, end: stack.find((b) => b && b.type === 'progend') || null };
+
     const startFor = (opId, carryName) => {
         const cand = candidates.find((c) => c.id === opId) || candidates[0];
-        const prep = prepareCandidate(cand.a);
+        const prep = prepareCandidate(cand.a, framing);
         if (!prep.ok) { alert(prep.error); return; }
-        const { a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate, meta } = prep;
+        const { a, bindings, inherited, forkChildren, blkPanel, blkSim, editingDef, lockUpdate, meta } = prep;
 
         openSaveDialog({
             ...meta,
@@ -981,8 +1024,17 @@ function saveAsCustomOp() {
             // value sockets BY IDENTITY over its own pruned stack, exactly as the source does) and `forkedFrom` (which source
             // this copy came from — the provenance registerUserOp reads to re-attach the source's code hooks, since a function
             // cannot be stored on a def). Both are inert DATA on the def; neither is derivable from the template.
+            // t2365 — a placed twin's own `a.opRec.children` already carries its full declared `user_root`/
+            // uiChildren tree verbatim (confirmed live — see prepareCandidate's own comment), so no separate
+            // "copy the layout" step is needed for THAT. What the stored template DOES need, when bindings were
+            // successfully inherited, is `forkChildren` (not the bare `a.opRec.children`) — the SAME
+            // progstart/progend-reattached shape `forkInheritance` remapped its blockIndex values against
+            // (reattachFraming's own comment has the full account); storing the bare, un-reattached children
+            // would leave a spindle/retract binding (drill's own `rpm`) pointing at a position that isn't
+            // there. No successful inheritance → the original, unmodified children, exactly as before.
             const authorFork = (type, name) => {
-                const d = userOpFromStack(type, name, a.opRec.children, bindings, panel, sim);
+                const stack = inherited ? forkChildren : a.opRec.children;
+                const d = userOpFromStack(type, name, stack, bindings, panel, sim);
                 if (inherited) {
                     if (inherited.bindingSpecs) d.bindingSpecs = inherited.bindingSpecs;
                     d.forkedFrom = inherited.forkedFrom;
