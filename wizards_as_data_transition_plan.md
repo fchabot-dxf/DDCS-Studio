@@ -124,19 +124,33 @@
 > A half-declared node is not a missing feature, it is a crash that takes bystanders with it.
 > ⇒ Guarded since t2265 by `tests/node/uichildren-vocabulary-pairing.test.mjs`, proven non-vacuous.
 >
-> **THE REMAINING COST — for ALL 32 twins, not per twin** (surveyed t2267, all 15 shells read in full)
+> **THE REMAINING COST — for ALL 32 twins, not per twin** (surveyed t2267, all 15 shells read in full;
+> ⭐ **RE-MEASURED by the advisor 2026-08-28** — the t2267 list had gone stale in both directions, which is
+> this repo's known failure mode: *a document's own frontier list is the least trustworthy line in it*)
 > - ✅ `code_preview` — declared t2263
 > - ✅ `usage_text` — declared t2269. ⚠ Found that ATC Check's explanatory text was **already gone from
 >   the live app**; declaring it restores lost content rather than closing a measurement gap.
-> - ⏳ **Path Anchor picker** — 6 of 15 (mill ops). Binds by element id, not the `data-param` convention
->   every other field uses: a design decision, not a template fill-in.
-> - ❌ **The comm-screen mockup** — no existing node's shape is close.
-> - ❌ **Computed / dynamic text** — every text param today is a static string. A change to the
->   declaration FORMAT, not a node, and it needs its own design.
+> - ⏳ **Path Anchor picker — now 3 of 6** *(was "6 of 15", stale both ways: 6 shells mount the picker —
+>   `d_ p_ ct_ sl_ sf_ tx_`, index.html — and the `path_anchor` NODE has existed since t2271)*. Drill,
+>   surfacing and pocket declare it; **contour, slot and text do not yet.** Three declarations, no design
+>   work left — the node and its id-convention bridge already exist in `formWidgets.js`.
+> - ✅ **The comm-screen mockup** *(was "❌ no node's shape is close" — CLOSED, differently than surveyed)*:
+>   the comm twin carries the live screen preview via its declared `'commscreen'` PANEL type
+>   (`panelTypes.js:47`, t518; wired in `commData.js:160`), not a `uiChildren` node. The preview is
+>   declaration-driven today; no node needs inventing.
+> - ⏳ **Computed / dynamic text** — partially overtaken: `derived: '<expr>'` exists for computed field
+>   VALUES (`formWidgets.js:1092`, expr.js scope over live `[data-param]` values). ⚠ Whether it covers the
+>   surveyed *text* cases is **unmeasured** — establish before designing anything new.
 > - ⭐ **Two apparent gaps evaporated on inspection**: `form_action_btn` already covers ATC's settings
 >   button, and `whenGuard.js` already handles sibling-value conditional sub-panels — it evaluates
 >   against resolved params and already recurses into `uiChildren`. The largest item on the survey went
 >   to zero because someone checked before declaring it a gap.
+> - ⚠ **The PROOF side is the thin half** (established t2365→2026-08-28): essentially every twin declares
+>   a form (32/33 dataOps files carry a `param_group`), but only **two** are pinned by a reproduction
+>   ratchet spec — drill (t2299) and pocket (t2301). Extending the ratchet is batch work, family-sized:
+>   each spec hand-derives an `EXPECTED_ORDER` from its shell plus the orphan set (see
+>   `drill-form-reproduction-2299.spec.js` for the shape). Mill (contour/slot/surfacing/text) → probes →
+>   ATC → lathe.
 >
 > ### ⛔ THE GOVERNING DISCIPLINE: REPRODUCE, DO NOT HARMONISE
 >
