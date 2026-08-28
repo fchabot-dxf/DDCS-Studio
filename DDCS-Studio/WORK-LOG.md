@@ -60826,3 +60826,107 @@ three-state dot (BACKLOG #25); both pre-existing, not new this turn.
 `web/wizards/ops/corner_title.js`, `web/wizards/ops/probe_titles.js` — deleted, provably unreferenced (the
 footnote).
 
+## t2367 — CLOSE BACKLOG #39: THE GUARD-ARM LOSS IS STRUCTURAL, NOT A BUG. Investigated, established with a
+live measurement, and STOPPED per the dispatch's own explicit instruction rather than engineered around — no
+fix landed against #39 itself this turn. Full spec: BACKLOG #39 (own entry, written from t2365's hand-back) —
+read in full before starting. THE TAIL — BACKLOG #35 — closed separately, own commit, self-contained.
+
+### THE QUESTION, answered with evidence not code-reading alone
+
+Dispatch asked: does a guarded wizard's fork-arm loss (t2365's own KNOWN GAP, pocket via INSERT-then-SAVE)
+happen at LIFT (the placed op never carried the arms), COMPARE (`forkInheritance`/`alignByType` carries them
+but discards), or REGISTER (`validateUserOp` carries+compares but drops on the way in)? Explicit instruction:
+find the root before writing anything, and if genuinely structural, STOP and report rather than engineer
+around it.
+
+**Traced the actual call chain a real "Insert" click drives**, not assumed from t2365's own framing-fix
+context: `wizardManager.insert()` → `opSession.js`'s `buildActiveOpRecord()` → `opBuilders.js`'s `_framed(type,
+params)` → `builderOf(opType)(params)` → for a registered user twin, `userOps.js`'s `registerUserOp`'s own
+`builder` closure → `instantiate(def, resolved)` → `resolveArm(def, params)` → `pruneGuards(clone, p)`
+(`whenGuard.js`). `pruneGuards` **mutates its clone by `Array.splice`**: a falsified guard's whole subtree is
+removed (`blocks.splice(i, 1, ...continue)`); a satisfied one is UNWRAPPED (spliced back in without its
+wrapper) — either way, after prune, **no `guard` block survives anywhere in the tree**, by the function's own
+doc comment ("After prune, NO guard blocks remain — the tree is the concrete shape for `params`"). This runs
+at BUILD time, inside the SAME builder INSERT calls to get renderable/emittable blocks — before any fork/
+compare/register code exists to run at all.
+
+**Live-measured, not inferred** (a scratch debug spec, deleted before finalizing — the same discipline as
+t2365's own `window.__T2365_DEBUG` probes): pocket's own registered DEF template carries **77** blocks across
+its structural fork arms (`armBlocks`, t1593's own counter). A pocket op placed via the real toolbar "Insert"
+gesture — inspected immediately, before `saveAsFork`/`forkInheritance`/`validateUserOp` ever run — carries
+**0** guard blocks and **0** arm blocks in its own `.children`. The loss is complete and happens at **LIFT**,
+specifically at instantiate/build time, full stop — COMPARE and REGISTER never see any guard data to lose,
+because none survives that far.
+
+### THE FINDING IS STRUCTURAL, per the dispatch's own definition of that word
+
+A placed op's very *purpose*, in this builder architecture, is to be the CONCRETE, single-arm shape — that is
+what `pruneGuards`/`instantiate` exist to produce, and it is CORRECT for their real job: you cannot emit
+G-code for an unresolved conditional fork, so a placed op that is about to be committed to a program (or asked
+to render itself) MUST be pruned. `a.opRec.children` (what `saveAsFork`/`reattachFraming` reads) is downstream
+of that same pruning — there is no data left in it to recover, by any compare/register logic whatsoever. This
+is a different SHAPE of problem from t2365's own progstart/progend framing bug: that data was merely
+*repositioned* (still present, just structurally displaced — recoverable by splicing it back). This data is
+*deleted* (a JS `splice`, no trace left) as an intentional, load-bearing consequence of what "placing" an op
+means. Per the dispatch's own instruction, this STOPS the #39 portion of the turn — no fix attempted, no
+refusal widened or softened, no compare/register logic touched.
+
+**Noted, not built (a direction only, not a decision this turn's to make):** the one shape of fix that
+wouldn't touch compare/register at all is having `saveAsFork`, for a placed op whose `opType` is a REGISTERED
+user builder, source its fork body from `getUserDef(opType).template` (the def's own abstract, unpruned
+template — literally what CUSTOMIZE already reads) instead of from the placed instance's own pruned
+`.children` — using the placed op's own `params` only to seed default VALUES, not its block shape. That is a
+real design decision (does a fork's guard state match the DEF's registered template, or the placed instance's
+specific params-at-fork-time — these could disagree), not a bug patch, and is the advisor's/owner's call, not
+implemented here.
+
+### REGRESSION-CHECK, both doors, as the dispatch required
+
+`fork-to-custom-2365.spec.js` (3) + `fork-parity-1593.spec.js` (2), 5/5 pass, run together: drill via INSERT-
+then-SAVE still 37/37 bindings; pocket via CUSTOMIZE still lossless; `fork-parity-1593`'s own "the refused set
+is EMPTY" still holds across all 32 shipped twins; pocket via INSERT-then-SAVE still refuses loudly with the
+same t1593 message (unaffected — no code changed in either compare/register path this turn).
+
+### THE TAIL — BACKLOG #35, closed, self-contained, own commit
+
+Re-measured live rather than re-trusting the entry's own paraphrase: `grep -c 'class="pa-mount"' index.html`
+= 6 static shells, each its OWN DISTINCT prefix (`d_`/`p_`/`ct_`/`sl_`/`sf_`/`tx_`) — NOT all `'d_'` as the
+entry's own quoted t2293 comment read (that quote describes an EARLIER, since-diverged state; the ids visible
+in `index.html` today are per-wizard). The real collision is narrower than "seven same-prefix mounts": exactly
+TWO `.pa-mount[data-prefix="d_"]` elements coexist the moment anything creates a SECOND `'d_'`-prefixed mount
+alongside drill's own always-present static one — which is exactly what happens the instant drill's own twin
+(`user_drill_data`) opens, since `drillData.js`'s declared form reproduces the built-in's own `path_anchor`
+prefix faithfully. The 6 legacy static callers (`drillView.js` etc., all calling `mountPathAnchor(prefix)`
+with no `root`) stay OUT OF SCOPE — shipped, working classic-wizard code, no live symptom, not what this
+closure is for (the entry's own "Sketch of the fix, not a prescription" already hedged against touching them).
+
+`tests/pa-mount-scope-2367.spec.js` (new, 2 tests): the DOM precondition itself (6 static mounts at boot,
+exactly 1 using `'d_'`); opening the twin proves BOTH halves of the guarantee live — its own scoped mount
+gets built with real content (2 corner-grid pickers, not an empty wrapper — the "prove the fields, not the
+wrappers" discipline t2365's own KNOWN GAP work used), AND the ever-present static shell sharing its prefix
+stays untouched (`dataset.built` never set, no children). **Proven non-vacuous**: temporarily reverted
+`formWidgets.js`'s scoped `mountPathAnchor(prefix, container)` call to the unscoped `mountPathAnchor(prefix)`
+default and confirmed the second test fails 3/3 against it; restored immediately after, `git diff` confirmed
+clean before committing for real.
+
+### FULL SUITE
+
+2883 passed / 0 failed / 8 flaky / 26 skipped (23.4m). FAILED COUNT attributable to t2367: **0**. Of the 8
+flaky (all passed on retry): `middle-superset.spec.js` and `pane-visual-host-programmatic-1762.spec.js` are
+the SAME pre-existing timeout-class flakes already named at t2365's own full-suite run (unrelated files,
+untouched this turn); the other 6 (`clear-resets-model`, `collapse-on-delete-1948`, `editor-copy-feedback-
+2125`, `homing-refusal-reaches-twin-1898`, `pull-v41-wcs`, `viz3d-handle-theme-2155`) are new names this run
+but on files this turn never touched either (no production code changed — this turn's only shipped files are
+`tests/pa-mount-scope-2367.spec.js` and `BACKLOG.md`'s own #35 closure note), consistent with the project's own
+documented "parallel suites → mass timeout reds" pattern rather than a regression. Node tier: 238/238.
+
+### Files changed
+
+`tests/pa-mount-scope-2367.spec.js` (new, 2 tests, Playwright — BACKLOG #35's closure).
+
+`BACKLOG.md` — #35 marked closed with a t2367 correction-note (same pattern as #38's own correction), #39
+untouched (still open — the dispatch's own STOP applies; no fix to report against it).
+
+No changes to `web/blocks/devMode.js`, `web/blocks/userOps.js`, `web/blocks/whenGuard.js`, or any fork/build
+code — this turn's #39 work was investigation-only, per the dispatch's own explicit instruction.
+
