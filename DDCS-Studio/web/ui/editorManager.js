@@ -9,6 +9,7 @@ import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clea
 import { confirmDestructiveLoad } from '../blocks/saveStates.js';   // t1938 — the ONE destructive-load seam Clear routes through
 import { flattenOps } from '../blocks/programModel.js';   // t1978 — the one declared op enumeration
 import { stripCommentParens } from '../wizards/ops/comment.js';   // t2291 (BACKLOG #22) — the ONE declared "safe inside ( )" rule, not a hand-rolled one here
+import { isMarker } from '../blocks/opSchema.js';   // t2363 — the ONE declared "is this line a DDCS op marker" test, not a hand-rolled one here
 
 export class EditorManager {
     constructor() {
@@ -245,9 +246,23 @@ export class EditorManager {
         if (window.ddcsSerializeWithMarkers && _proj && code === _proj.text) code = window.ddcsSerializeWithMarkers();
 
         // Ensure first line of the exported code contains the title as a comment
+        //
+        // t2363 — a model-tracked op now emits its OWN accurate title as its own first projected line
+        // (blockEmitter.js's op-container branch, BACKLOG owner-report / north star principle 3): prepending
+        // THIS file-level title on top of it would be a visible, literal duplicate for any op whose params add
+        // a W×H suffix `_firstOpTitle` carries but the op's own simpler label does not. Detected structurally
+        // (not by re-deriving `_firstOpTitle`'s own gate here a second time): skip the DDCS marker line, if
+        // `serializeWithMarkers` inserted one, and look at the next real line — a `( ... )` comment there means
+        // the program already supplied its own title, so nothing more is prepended. `_firstOpTitle` is NOT
+        // fully redundant even so — it still derives the FILENAME below (with its own WxH enrichment), and its
+        // hand-edited-program fallback (raw first line / 'Program') is untouched: a program whose first real
+        // line ISN'T already a comment (hand-typed G-code with no header) still gets one prepended, exactly as
+        // before.
         const titleLine = `(${title})`;
         const lines = code.split(/\r?\n/);
-        if (lines.length === 0 || lines[0].trim() !== titleLine) {
+        const firstContentIdx = isMarker(lines[0]) ? 1 : 0;
+        const alreadyTitled = lines[firstContentIdx] != null && /^\s*\([^)]*\)\s*$/.test(lines[firstContentIdx].trim());
+        if (!alreadyTitled) {
             // Prepend title line and ensure a blank line after for readability
             code = titleLine + '\n' + code + '\n';
         }

@@ -60473,3 +60473,171 @@ the existing `.wizm-*`/`.wsm-*` chrome for everything else.
 `tests/filemenu-sections-2184.spec.js`, `tests/header-profile-menu.spec.js` — pinned Project-section row
 lists updated for the new tile.
 
+## t2363 — THE OP TITLE IS A MISSING DECLARATION. The fix was three lines; the DETECTION — "does this op
+already have a hand-pushed title" — took three wrong designs before the right one, each broken by a REAL op
+this repo already ships. Every wrong design is kept below, not smoothed over: each one is a live case the
+final version had to survive.
+
+Owner-reported ("second op has no title"), sharpened to "some wiz are not inserting titles" (contour, named),
+owner-ruled option A. Full spec: `scratchpad/t2363-op-titles.md` — read in full before starting.
+
+### THE FINDING, confirmed exactly as the dispatch stated it
+
+The leading `( … )` comment naming an op in the G-code was never a mechanism — four unrelated conventions
+(hand-pushed `comment` blocks in ~20 wizards + the whole lathe family; a borrowed `@work` banner in
+drill/pocket/surfacing/slot; nothing at all in contour/literal-slot/literal-pocket/edge/middle/wcs). Meanwhile
+`opBuilders.js`'s `makeOp` already stamps a friendly, never-empty `label` on EVERY op container — built-in or
+user — and `blockEmitter.js`'s op-container branch was the one place throwing it away (transparent-at-emit,
+children only). North star principle 3, verbatim.
+
+### THE JOB — emit the label; collapse the duplicates
+
+**Chose option (b)** from the dispatch's own three (a flag / a first-child check / promoting every hand-pushed
+title onto the SAME `op.label` seam) — **not** the preferred-if-reachable option (c). Reasoned through what (c)
+would actually cost: `op.label` is computed once, from `opType` alone, at `makeOp()` time — none of the ~20
+wizards' RICH per-instance titles (corner's `"Corner | FL OUTSIDE | X.. Y.. | Active WCS"`, params baked in)
+can ride that seam without either widening every builder's return shape (touches every caller of
+`builderOf(opType)(params)` across the repo — CAM slots, the toolbox, golden tests) or a second, parallel
+per-opType "rich title" registry duplicating what the wizard already computes inline. Both are a wide,
+risky refactor for a result BYTE-IDENTICAL to detection — so (b), done correctly, was the actually-simplest
+correct answer, not a corner cut. Said so explicitly, as the dispatch asked.
+
+**Detection went through three designs; only the third survives real ops:**
+
+1. **`children[0].type === 'comment'`** (block-shape). Broke live: every `userOpFromStack` twin wraps its real
+   body in `user_root` (often a `section` deeper still, BOTH transparent-at-emit) — a twin whose title sits two
+   wrappers deep (corner, alignment) never has `children[0]` be the comment, so the generic label fired ANYWAY
+   and doubled it. Found via a 4-pixel screenshot diff on corner's own G-code line-count readout
+   (`screenshot-baselines-1792.spec.js`) — the pixel budget (`maxDiffPixelRatio: 0`) was strict enough to catch
+   a single added line; a looser gate would have shipped this.
+2. **"is `out[0]`'s emitted TEXT comment-shaped"** (ground truth by re-emitting first, reading the real first
+   line). Fixed corner, broke TWO other real things: Mechanism B's own borrowed banners
+   (`( ---- AREA CLEARING… ---- )`) are ALSO `(...)`-shaped and got wrongly read as "already titled," silencing
+   the very ops item 3 of the JOB names (pocket/slot); separately, contour's own first atom happens to emit an
+   UNRELATED progress comment (`( Step Down z=-1.5 )`) before any motion, wrongly suppressing contour's OWN
+   generic title too — text shape cannot tell "an authored title" from "any other leaf's own comment that
+   happens to be first."
+3. **`firstRealLeaf` — a structural walk, by block TYPE, immune to both** (shipped). Walks the exact
+   transparent-at-emit chain `emit()` itself walks (`user_root`'s uiChildren-then-children order; the plain-
+   `children` five — param_group/guard/section/setup/safetraverse/opunit), additionally skipping two DECLARED
+   "produces no G-code" leaf families found along the way: the generic `emit: () => []` metadata blocks
+   (param_field/formfield/layoutwidget/cam_field/sim/panel/simstart) and `structCtl.js`'s own `sc_<param>`
+   authoring-only control blocks (`isStructCtlType`, reused rather than hand-listing corner's 8 `sc_*` types —
+   its own file header already says "EMIT NOTHING"). The first block that is neither a container nor one of
+   those two families is checked for `type === 'comment'` — a criterion that is neither shape nor position, so
+   neither Mechanism B's banner nor contour's stray comment nor any future wrapper depth can fool it again.
+   `tests/node/op-title-2363.test.mjs` pins all three failure shapes directly (corner via the raw builder AND
+   via its real `user_corner_data` twin — the twin case asserts the wrapper genuinely IS `user_root` at
+   `children[0]`, so the regression is provable if this shape ever changes; both Mechanism-B ops; the stray-
+   multi_step wrapper; the empty-op edge case) — 10/10 green, 6/10 fail against pre-turn code (the other 4 are
+   controls: cases the fix doesn't touch).
+
+**Mechanism B (pocket/slot) reads sensibly, per the JOB's own explicit check**: `( Pocket )` now sits above the
+DRILL-borrowed banner, `( Slot )` above the AREA-CLEARING-borrowed one — an improvement, confirmed by reading
+the actual emitted text, not assumed.
+
+### A second bug the fix's OWN verification surfaced: the wizard PREVIEW pane, not the fix itself
+
+`userOpView.js`'s live code-preview pane (`gcode`, feeding both the readable code box AND the wizard's own
+single-op Play/3D-preview `host.__gcode`) called `builderOf(opType)(params)` directly — the RAW, unwrapped
+stack, never through `makeOp`. `wizardManager.js`'s own whole-program CONTEXT preview (`host.__contextGcode`,
+BACKLOG #10/t2176) DOES wrap via `opFromMarker`→`makeOp`. Before this turn the two were coincidentally
+byte-identical (op containers were always transparent, so wrapping added nothing) — once op containers carry a
+title, they diverged, and `createPreviewPanel.js`'s own `code === lastRunCode` single-feed coherence gate
+(refreshes a RUNNING sim's per-pass starts on a live stock edit, without a full restart) started comparing two
+different strings and silently stopped firing. Found live: `passstarts-single-feed.spec.js` went from passing
+to deterministically failing (3/3) the moment the title fix landed, and passed again the moment it was
+reverted — a genuine causal link, not a flake (checked before touching anything, per project discipline).
+Fixed at the SAME seam the twin-detection bug lived: `gcode = emitMapped([makeOp(opType, params,
+_builderAtoms(opType, params))], …)` — `_builderAtoms`, the SAME "flatten to op.children granularity" step
+`opFromMarker`/`duplicateOp` already use, not a second unwrap re-derived by hand. The wizard's own code-preview
+pane now shows the SAME title the committed op will carry, which is itself a small, correct side benefit (a
+preview that under-promises what gets committed is its own bug class).
+
+### THE FOUR THINGS TO ESTABLISH — all established with the file in hand, none guessed
+
+1. **Sanitize the paren hazard.** Reused `stripCommentParens` (`wizards/ops/comment.js`, t2291/BACKLOG #22 —
+   already the ONE declared "safe inside a paren comment" rule, measured against 2,248+4,656 real vendor
+   comments, `bridge/controllers/COMMENT-CHARACTERS.md`) at the new emit seam, rather than a fifth hand-rolled
+   sanitizer. Pinned with a test feeding a label containing parens (`registerOpLabel(opType, 'Weird (label)
+   name')` → emits `( Weird label name )`, exactly one open/close paren each).
+2. **The lathe family's own labels — NOT a regression, established not assumed.** The dispatch worried
+   `OP_LABELS` (opBuilders.js:67-73) lists no lathe entries, so a lathe title might read `( lathe_odturn )`.
+   Traced: the 7 lathe ops are data-op TWINS (facing/odTurn/parting/polygon/centerDrill/faceProbe/odProbe),
+   registered via `registerUserOp` — which calls `registerOpLabel(def.opType, def.label)` — SEEDED for every
+   workspace at app boot (`app.js`'s own `registerUserOp(...)` sweep, commented "LATHE: seeded for every
+   workspace"). `USER_LABELS['lathe_odturn'] = 'OD Turn (lathe)'` etc are populated before any title could ever
+   be needed — real, friendly labels, not the raw-opType fallback. Confirmed, not assumed.
+3. **`_firstOpTitle`/`editorManager.js`'s export title — NOT fully redundant, the overlap closed not the whole
+   mechanism.** Once every op emits its own title, `_firstOpTitle`'s COMMENT-LINE role (prepending a file-level
+   `(Title)` above the code) becomes a literal duplicate for any op whose params add a W×H suffix the generic
+   per-op label doesn't carry (Surfacing 200×100 vs a bare `( Surfacing )`) — closed via a structural check
+   (skip the DDCS marker line if `serializeWithMarkers` inserted one, then: is the next real line ALREADY a
+   `( … )` comment? if so, don't prepend another). `_firstOpTitle` itself is UNTOUCHED and still does two real
+   jobs the per-op title doesn't: derives the export FILENAME (with its own WxH enrichment), and supplies a
+   title for a genuinely hand-edited program (`proj.text !== code`, no matching model) — that fallback path is
+   completely unaffected, verified via the pre-existing `export-title-975.spec.js` (4/4 green, including its
+   own multi_step-wrapper-naming test and its hand-edit-fallback test).
+4. **The marker ordering — decided, and the round-trip proved, not assumed.** `programModel.js`'s
+   `serializeWithMarkers` already inserts the `( @DDCS:1 {…} )` marker before "each op's first projected
+   line" — since the new title IS now that first line (for any op without its own comment already there),
+   marker-then-title happens for free, no code change needed. Proved the round-trip explicitly rather than
+   trusting the reasoning: built a real two-op program (contour then pocket, the owner's own named repro pair)
+   via the SAME window hooks `commitActiveOp`/`addActiveOp` use, exported via `ddcsSerializeWithMarkers()`,
+   reimported via `importMarkedNc` (the SAME function `ui/commandDeck.js`'s own "open a .nc file" gesture
+   calls), and confirmed the reconstructed program holds the same two ops in the same order — the
+   MARGINAL-LINE-COUNT boundary heuristic `importMarkedNc` uses (`programModel.js:498-512`, "t1920 — VERIFIED,
+   not assumed") stays accurate because BOTH the source text and the op's own re-emitted reconstruction
+   (`opFromMarker`→`makeOp`) carry the SAME extra title line symmetrically. Re-exporting the reimported program
+   still names both ops correctly, no drift. `tests/op-title-realsymptom-2363.spec.js`, 2 tests.
+
+### VERIFICATION — the real symptom, not just a test
+
+Built the owner's own named repro pair live (contour then pocket) and read the actual `.nc`: both ops visibly
+named exactly once, no doubling, the marker immediately above each title names the same op the title claims to
+be. Reran the pre-existing golden/coherence suites this turn's change could plausibly touch, one at a time,
+after each design iteration — `export-title-975.spec.js` (4/4), `group-framing.spec.js` (a hand-built `group`
+op now gets its own `( Hand-built )` title too — a genuine, intended behaviour change, REBASELINED not
+silenced: `wrap.gcode` now asserts `'( Hand-built )\n' + gcodeBefore`, one new line, nothing else different),
+`passstarts-single-feed.spec.js` (the preview-pane bug above), `screenshot-baselines-1792.spec.js` (corner's
+own modal + Blocks-pane, both green once the twin-detection bug was fixed) — plus the full node-tier suite
+(238/238, unaffected: every node-tier golden — including `dialect-emit-golden-2072.test.mjs`, the file the
+dispatch's own "goldens WILL go red, rebaseline never silence" warning was aimed at — tests the RAW
+`builderOf(opType)(params)` output directly, never wrapped through `makeOp`, so the title never reaches it;
+confirmed by reading the fixture's own construction, not assumed).
+
+### FULL SUITE — one run at the very end (after two mid-turn runs used to find the preview-pane bug and the
+### twin-detection bug above), 0 failed / 2911, 12 flaky (all pre-existing/unrelated — named screenshot/theme/
+### timing tests including `wizard-face-1599`'s own already-documented t1766 reproject-echo race), 26 skipped,
+### 2873 passed. FAILED COUNT attributable to t2363: **0**. Zero goldens needed rebaselining beyond the one
+### named above (`group-framing.spec.js`) — the dispatch's own "changes byte output broadly" warning turned out
+### narrower in practice than in prediction, because every OTHER golden this session touched tests raw builder
+### output, not committed op containers.
+
+### Noted, not touched: `wizards/ops/corner_title.js` (`cornerTitleBlock`) and `wizards/ops/probe_titles.js`
+### (`edgeTitleBlock`/`middleTitleBlock`/`circularTitleBlock`) declare per-op title EMIT functions that are never
+### referenced anywhere in the repo (`ops/index.js` doesn't register their types, no dataOps file uses them) —
+### pre-existing dead declarations, orphaned before this turn and unrelated to it. Flagged per "don't delete
+### unrelated dead code, mention it," not removed.
+
+### Files changed
+
+`web/blocks/blockEmitter.js` — the op-title emission itself (`firstRealLeaf`, the `TRANSPARENT_CONTAINERS`/
+`METADATA_ONLY_LEAVES` sets, the `'op'` branch's own title-unshift), plus the two new imports it needed
+(`stripCommentParens`, `isStructCtlType`).
+
+`web/ui/editorManager.js` — `buildProgram()`'s title-line prepend now skips when the program already supplies
+one (a new `isMarker`-aware structural check); `_firstOpTitle`/the filename derivation/the hand-edit fallback
+all untouched.
+
+`web/wizards/views/userOpView.js` — the wizard's own code-preview pane wraps via `makeOp`+`_builderAtoms`
+(matching `opFromMarker`'s own reconstruction) instead of the bare builder stack, fixing the preview/context
+coherence bug found live.
+
+`tests/node/op-title-2363.test.mjs` (new, 10 tests, node tier).
+
+`tests/op-title-realsymptom-2363.spec.js` (new, 2 tests, Playwright — the real-symptom two-op export/round-
+trip).
+
+`tests/group-framing.spec.js` — rebaselined for the new, intended `( Hand-built )` title line.
+

@@ -21,7 +21,8 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
-import { commentBlock } from '../wizards/ops/comment.js';   // t2289 — the ONE emitter an attached note reuses unchanged (see applyAttachedComments)
+import { commentBlock, stripCommentParens } from '../wizards/ops/comment.js';   // t2289 — the ONE emitter an attached note reuses unchanged (see applyAttachedComments); t2291 — the ONE declared "safe inside a paren comment" rule, reused by the op-title line below (t2363)
+import { isStructCtlType } from '../wizards/ops/structCtl.js';   // t2363 — the DECLARED "is this an sc_<param> authoring-only control block (emit: () => [])" test, reused by the op-title seam's own firstRealLeaf below rather than hand-listing every sc_* type
 import { UNRESOLVED } from '../wizards/ops/expr.js';   // t1577 — the failure sentinel a Set binding carries when its own value did not resolve
 import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ONE cut-entry source for the entry fold (shared with the marker)
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
@@ -47,6 +48,40 @@ export function newBlock(type) {
 // t640 — a line may carry a DECLARED cap requirement (from its source block's params.cap): applyLineSuppression folds it
 // to a comment when the active post lacks that cap (e.g. the ATC pneumatic/drawbar M-codes carry cap:'atc'). Only leaf emit tags a cap.
 const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
+
+// t2363 — the op-title seam's own structural lookup (see the 'op' branch below for the full account): the SAME
+// transparent-at-emit container types that branch handles elsewhere in this file (user_root's uiChildren-then-
+// children order; the plain-children five), plus two small DECLARED "produces no G-code" leaf families — the
+// generic `emit: () => []` metadata blocks (grep-confirmed: paramField.js/formField.js/layoutWidget.js/
+// camField.js/sim.js/panel.js/simstart.js) and structCtl.js's own `sc_<param>` authoring-only control blocks
+// (isStructCtlType, corner's own struct-param dropdowns — its OWN header calls these out: "EMIT NOTHING") —
+// together a twin's form-authoring presentation mouth, which must never be mistaken for "the real first
+// content" ahead of the execution mouth that actually carries it.
+const TRANSPARENT_CONTAINERS = new Set(['param_group', 'guard', 'section', 'setup', 'safetraverse', 'opunit']);
+const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'cam_field', 'sim', 'panel', 'simstart']);
+/** The first REAL (non-transparent-container, non-metadata-only) leaf block reachable by walking the SAME
+ *  structural chain emit() itself walks — so "does this op already open on a hand-pushed title" is answered by
+ *  a block's own declared TYPE, never by its position in `.children` (a twin's title can sit two wrappers
+ *  deep) or by its emitted TEXT (which can't tell a genuine title from an unrelated leaf's own progress
+ *  comment, or from Mechanism B's own borrowed banner — see the 'op' branch's own comment for the full case). */
+function firstRealLeaf(list) {
+    for (const b of (list || [])) {
+        if (!b) continue;
+        if (b.type === 'user_root') {
+            const found = firstRealLeaf(b.uiChildren) || firstRealLeaf(b.children);
+            if (found) return found;
+            continue;
+        }
+        if (TRANSPARENT_CONTAINERS.has(b.type)) {
+            const found = firstRealLeaf(b.children);
+            if (found) return found;
+            continue;
+        }
+        if (METADATA_ONLY_LEAVES.has(b.type) || isStructCtlType(b.type)) continue;
+        return b;
+    }
+    return null;
+}
 
 /**
  * t1579 — AN UNRESOLVABLE LOOP / STEP-DOWN BOUND, and why it needs its own shape.
@@ -223,9 +258,49 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     // op (grouping in Blocks + op-form editing). TRANSPARENT at emit: it just emits its children. Gating is done
     // PER LINE (applyLineSuppression below) — more honest than hiding a whole op: you see every line, with the ones the
     // active post can't run (or the human turned off) commented out. The op is always kept in the stack.
+    //
+    // t2363 (BACKLOG owner-report / north star principle 3) — THE TITLE IS A DECLARATION, not a per-wizard
+    // convention: `opBuilders.js`'s makeOp already stamps a friendly, never-empty `label` on EVERY op container,
+    // built-in or user — this is the ONE place that was discarding it. ~20 wizards ALSO hand-push their own,
+    // richer `comment` block as their stack's own first element (e.g. cornerWizard's
+    // "Corner | FL OUTSIDE | X.. Y.. | Active WCS", carrying params the generic label can't) — a hand-pushed
+    // title WINS where one exists (detected here, not duplicated); the generic label fills the gap everywhere
+    // else, including the two ops (drill/pocket's holecycle banner, surfacing/slot's surfaceraster banner) whose
+    // OWN internal banner can lie about what they are (pocket's too-small arm says "DRILL", slot's raster arm
+    // says "AREA CLEARING") — the correct generic label sitting above that banner is a readability improvement,
+    // not a duplicate, since neither banner is itself a `comment`-type block this check can see.
+    //
+    // `hasRealLabel`: makeOp's own label resolution (`OP_LABELS[opType] || USER_LABELS[opType] || opType`) falls
+    // all the way back to the RAW opType string when neither table has an entry — the one live case being
+    // `multi_step` (programModel.js's groupConsecutiveOps, an internal import-time wrapper around several real
+    // ops, never a user-facing identity of its own). Titling that wrapper literally `( multi_step )` would be a
+    // NEW, worse lie than the silence it replaces — found live via the reimport round-trip test, not assumed.
+    // `label !== opType` is the same test makeOp itself effectively makes, reused rather than a second lookup.
+    //
+    // `alreadyTitled`: does this op's body ALREADY open on a hand-pushed `comment` block? Answered structurally
+    // (`firstRealLeaf` below), NOT by `children[0].type` (every `userOpFromStack` twin wraps its real body in
+    // `user_root`, often another `section` deeper still — both TRANSPARENT-at-emit, so a twin whose hand-pushed
+    // title sits two wrappers deep, e.g. corner/alignment, never has `children[0].type === 'comment'` even
+    // though it genuinely opens on one), and NOT by re-deriving the answer from the emitted TEXT either (out[0]
+    // "looks like" a bare comment for Mechanism B's own borrowed banners — holecycle/surfaceraster — AND for
+    // plenty of ordinary progress comments a leaf emits first for unrelated reasons, e.g. contour's own
+    // "Step Down z=…" — neither is a hand-pushed TITLE, and a text-shape check cannot tell them apart from one
+    // that is). `firstRealLeaf` walks the SAME transparent-container chain `emit()` itself walks (`user_root`'s
+    // uiChildren-then-children order, then the plain-`children` set below) and additionally skips the small,
+    // DECLARED "metadata only — produces no G-code" leaf family (param_field/formfield/layoutwidget/cam_field/
+    // sim/panel/simstart, each block's own `emit: () => []`) — the presentation mouth a twin's form-authoring
+    // blocks live in, which would otherwise be mistaken for "the real first content" ahead of the execution
+    // mouth that actually carries it. Found live via a 4-pixel screenshot diff (corner's own line-count
+    // readout, screenshot-baselines-1792.spec.js) and the Mechanism-B/contour node-tier regressions a
+    // text-shape attempt introduced in between — both are pinned in tests/node/op-title-2363.test.mjs.
     if (block.type === 'op') {
         const out = [];
-        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
+        const kids = block.children || [];
+        kids.forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
+        const leafBlock = firstRealLeaf(kids);
+        const alreadyTitled = !!(leafBlock && leafBlock.type === 'comment');
+        const hasRealLabel = block.label && block.label !== block.opType;
+        if (!alreadyTitled && hasRealLabel && out.length) out.unshift(tag(`( ${stripCommentParens(block.label)} )`, own));
         return out;
     }
 

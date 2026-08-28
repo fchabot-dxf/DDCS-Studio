@@ -20,7 +20,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { renderOpForm, formBindings, renderUiTree, formSig, syncFormValues } from '../../ui/formWidgets.js';   // S5.2 — formBindings consumes the def's param_field rows when present; formSig/syncFormValues: t1740 — the SAME structure-unchanged check blocksApp.js's pane uses, shared not duplicated
 import { recordOp } from '../../blocks/opRecord.js';
-import { builderOf } from '../../blocks/opBuilders.js';
+import { builderOf, makeOp, _builderAtoms } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
 import { flattenBlocks, childrenOf, getUserStatusHint, getUserSimGcode, getUserPreviewVarSeed } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography); t2315: the ONE children/uiChildren shape normalization
@@ -571,7 +571,23 @@ export function createUserOpView(ns, opts) {
                 catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
             } else {
                 recordOp(_def.opType, params);                   // make it the active op → shared insert() commits/replaces it
-                try { gcode = emitMapped(builderOf(_def.opType)(params), activeDialectOpts()).text; }
+                // t2363 — wrapped via makeOp(opType, params, _builderAtoms(...)) — the SAME op-container shape
+                // opFromMarker (programModel.js) builds, NOT the bare builder(params) array: a twin's own builder
+                // self-wraps in a `user_root` container (every userOpFromStack twin does), so makeOp'ing the raw
+                // builder output directly nests THAT wrapper as the op's sole child — the alreadyTitled check
+                // below then can't see past it to a hand-pushed title buried inside (corner's own rich banner),
+                // so the generic label fired ANYWAY, genuinely doubling it (found live: a 4-pixel screenshot
+                // diff on corner's own line-count readout, screenshot-baselines-1792.spec.js). `_builderAtoms`
+                // is the declared "flatten to op.children granularity" step every other caller (opFromMarker,
+                // duplicateOp's own `_framed`+filter) already goes through — reused, not re-derived.
+                //
+                // The code preview pane and the single-op Play (host.__gcode) must show/run the SAME text the
+                // committed op will emit (title line included) — see wizardManager.js's own _contextGcode
+                // (host.__contextGcode), which already wraps its own draft this way. Before this, an op's PREVIEW
+                // (no title) and its whole-program CONTEXT preview (title, once #37/t2176 activates) could diverge
+                // byte-for-byte, silently breaking createPreviewPanel.js's `code === lastRunCode` single-feed gate
+                // (found live: passstarts-single-feed.spec.js, a live-Play stock-edit coherence check, went red).
+                try { gcode = emitMapped([makeOp(_def.opType, params, _builderAtoms(_def.opType, params))], activeDialectOpts()).text; }
                 catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
             }
             const codeEl = elNS('wiz_user_code');
