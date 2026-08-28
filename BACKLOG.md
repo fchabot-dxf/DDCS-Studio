@@ -2533,8 +2533,11 @@ AGENTS.md rule 8.)*
 
 *(found at t2305 while fixing the nested-paren defect; adjacent to that turn's scope, deliberately not touched)*
 
-`wizards/ops/probe_titles.js` and `corner_title.js` build their comment titles with a pipe:
-`( Corner | FL OUTSIDE | Seq: YX | … )`.
+⚠ **CITATIONS REFRESHED 2026-08-28**: this entry originally pointed at `wizards/ops/probe_titles.js` /
+`corner_title.js` — both **deleted at t2367 as provably orphaned dead code**. ⛔ The finding is NOT closed by
+that deletion: the pipe was never emitted from those files. The LIVE sources are the hand-pushed comment
+titles in `wizards/stacks/*.js` — e.g. `cornerWizard.js:248` `` `Corner | ${c} OUTSIDE | …` `` and `:72-73`'s
+settings lines — the probe/ATC/rotary/homing families throughout.
 
 ⚠ **`|` appears ZERO times inside a comment across the vendor corpora** measured in
 [`bridge/controllers/COMMENT-CHARACTERS.md`](bridge/controllers/COMMENT-CHARACTERS.md) — 2,248 vendor comments
@@ -2552,8 +2555,9 @@ and guarded (`comment-nesting-guard-2305.spec.js`).
 
 ⇒ **Low priority.** Filed so the finding is not lost, not because it is urgent.
 
-**STILL REAL IF:** `grep -c "| " DDCS-Studio/web/wizards/ops/probe_titles.js` → any hit means the pipe is
-still in the emitted titles.
+**STILL REAL IF:** `grep -n "Corner | " DDCS-Studio/web/wizards/stacks/cornerWizard.js` → any hit means the
+pipe is still in the emitted titles. *(The original check grepped `ops/probe_titles.js`, deleted at t2367 —
+it would have answered "not real" for the wrong reason.)*
 
 ---
 
