@@ -2684,7 +2684,7 @@ handle still writes two params.
 
 ---
 
-### 34. ⛔ OPENING A WIZARD TRIGGERS THE GOOGLE SIGN-IN — the flow is fine, the TRIGGER is the bug
+### 34. [✅ SHIPPED t2359 — `fa86f828`, V2026.08.28.1] ⛔ OPENING A WIZARD TRIGGERS THE GOOGLE SIGN-IN — the flow is fine, the TRIGGER is the bug
 
 *(reported by the owner from a phone, 2026-08-26, with a screenshot: `accounts.google.com/v3/si` — "Choose an
 account to continue to ddcs-studio.pages.dev")*
@@ -2995,7 +2995,7 @@ coordList / the canvas pads still have no `[data-param]`, still real.
 
 ---
 
-### 37. INSERT OP FROM PROJECT — the preset successor, ruled with the owner 2026-08-27
+### 37. [✅ SHIPPED t2361 — `be0e310f`, V2026.08.28.2] INSERT OP FROM PROJECT — the preset successor, ruled with the owner 2026-08-27
 
 *(the gap the preset removal (#34) leaves, found by the owner: "within a project, i might want to insert ops
 of different presets." A one-op project covers STARTING a job from saved values; this covers COMPOSING one.)*
