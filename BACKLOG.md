@@ -674,7 +674,13 @@ designs were argued and dropped in the same conversation — a program-scoped ca
 beside a component already doing the job) and an op selector inside the wizard modal (helps one host of three).
 ⛔ Do not resurrect either without new evidence.
 
-### 11. NOTHING CHECKS THE WORKSPACE'S DECLARED CONTROLLER AGAINST THE ONE ACTUALLY PLUGGED IN
+### 11. [✅ SHIPPED t2151 — confirmed by the advisor 2026-08-28, heading was never closed] NOTHING CHECKS THE WORKSPACE'S DECLARED CONTROLLER AGAINST THE ONE ACTUALLY PLUGGED IN
+
+> **VERIFIED 2026-08-28** against `ui/gatewayStatus.js:26-46`. The ruling shipped as written: `roleInfoFromDescriptor`
+> is ONE pure function demoting gateway→client when `descriptor().controller_profile_id` ≠ `getMachine().controllerId`,
+> and every caller that used to read a raw `.role` (admin.js `isClient`, status.js, gatewayPanel.js tab gating) routes
+> through it. ⭐ **All three named edges are handled:** unknown/absent `controller_profile_id` never demotes (edge 1);
+> no-daemon was already client (edge 2); `reason` exists so the role never flips to a bare word (edge 3).
 > ## ✅ RULED — ROLE IS WORKSPACE-RELATIVE: a mismatch means CLIENT, not a warning
 > *(human, 2026-08-22: "if im connected to a controller the worspace should be client unless the controller
 > match" — this SUPERSEDES the advisor's earlier framing of a lint/warning, and an intermediate misreading
@@ -2561,7 +2567,10 @@ it would have answered "not real" for the wrong reason.)*
 
 ---
 
-### 32. NO PINCH-TO-ZOOM ON ANY FEATURE CANVAS — mobile has no zoom at all
+### 32. [⚠ RE-VERIFIED STILL REAL 2026-08-28] NO PINCH-TO-ZOOM ON ANY FEATURE CANVAS — mobile has no zoom at all
+
+> **Checked 2026-08-28:** `viz/featureCanvas.js` has **zero** `touchstart`/`touches`/`pinch` handlers (only
+> `viz/gcodeViz3d.js` handles touch at all). Still live, unchanged.
 
 *(reported by the owner from a phone, 2026-08-26, while reviewing drill's wizard preview)*
 
