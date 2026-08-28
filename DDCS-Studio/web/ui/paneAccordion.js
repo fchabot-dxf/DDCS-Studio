@@ -347,7 +347,7 @@ function addVisualSizer(split) {
     sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
     split.appendChild(sp);   // BELOW the last pane (the feature canvas)
 
-    let dragging = false, stopFollow = null, startTopHeight = 0;
+    let dragging = false, stopFollow = null, startTopHeight = 0, startBottomHeight = 0;
     // t2345 — the pane list and their top/bottom order CANNOT change mid-drag (nothing else resizes this
     // split while a pointer is captured on it), so both are read ONCE at pointerdown and reused by every
     // onMove frame instead of re-querying + re-measuring on every pointermove (up to 120Hz on a phone) — that
@@ -406,7 +406,15 @@ function addVisualSizer(split) {
         let clampedTotalHeight = heightAt(y);
         applyVisualHeight(clampedTotalHeight, { visual, max: dragMaxHeight });   // t2353 — pin the SAME cap applyVisualHeight would otherwise re-derive live
         if (dragPanes.length > 1) {
-            let frac = startTopHeight / Math.max(1, clampedTotalHeight);
+            // t2357 — THE SIZER'S OWN SLAM (owner-captured, real desktop probe): f2 ratio 0.6935→0.2374 on a
+            // ~4px pointer delta, then perfectly smooth — the SAME shape as the ratio splitter's own cliff this
+            // turn already fixed, and the SAME cause: dividing by `clampedTotalHeight` (the WHOLE visual,
+            // chrome included — the section-label, the ratio bar, this very sizer bar) instead of
+            // `startTopHeight + startBottomHeight` (the two panes only, what the ratio actually splits between).
+            // Confirmed live: A/B against the pre-fix formula reproduced the owner's own numbers almost exactly
+            // (0.618→0.50 class of jump) on this handler too, at BOTH widths — this handler shares the sibling's
+            // own bug, not just its symptom shape; it was simply never fixed here in t2353's own pass.
+            let frac = startTopHeight / Math.max(1, startTopHeight + startBottomHeight);
             let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             applyPaneRatio(newRatio);
         }
@@ -434,7 +442,8 @@ function addVisualSizer(split) {
         setVisualHeight(clampedTotalHeight);
 
         if (dragPanes.length > 1) {
-            let frac = startTopHeight / Math.max(1, clampedTotalHeight);
+            // t2357 — same denominator fix as applyMove's own comment above.
+            let frac = startTopHeight / Math.max(1, startTopHeight + startBottomHeight);
             let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             setPaneRatio(newRatio);
         }
@@ -453,8 +462,10 @@ function addVisualSizer(split) {
         dragThreeDTop = panes.length > 1 && panes[0].getBoundingClientRect().top <= panes[1].getBoundingClientRect().top;
         if (panes.length > 1) {
             startTopHeight = panes[0].getBoundingClientRect().height;
+            startBottomHeight = panes[1].getBoundingClientRect().height;   // t2357 — see applyMove's own comment: the ratio's denominator needs BOTH panes, not the whole visual
         } else {
             startTopHeight = 0;
+            startBottomHeight = 0;
         }
         // t2349 — capture ONCE at pointerdown instead of re-reading every frame (`y - visual.top` every
         // pointermove, the original frame-based formula).

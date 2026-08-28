@@ -60110,3 +60110,91 @@ host under the `≤860px` media query (no real ceiling exists there — the moda
 expH tracks vis (every frame at desktop, settled state at narrow — the documented lag above), cross-gesture
 growth past a previous drag's own start, and the classic control.
 
+## t2357 — THE LAST SLAM. Two SEPARATE wrong-denominator bugs, found by enumerating a whole rule family rather than chasing one instance — and one t2355 hand-back finding CORRECTED along the way.
+
+Dispatch (no separate spec file this time; the note itself carried the full instructions): the owner's own
+post-t2355 desktop probe confirmed the container fix HOLDS — `expH == vis` on every single frame (472/472
+through 674/674), the pane genuinely grows on a down-drag, the ceiling stays fixed at 846. ONE remaining
+defect: the FIRST movement frame of a ratio-splitter drag slammed the applied ratio (0.6181 → 0.5016) on a
+~1px pointer delta, then tracked perfectly smoothly afterward. The advisor's own framing named the direction of
+the slam as the diagnosis (the capture now honestly reads rendered rects, so the first write snaps the STORED
+ratio to whatever was ACTUALLY rendered — meaning the tree's panes never reflected the stored ratio in the
+first place) and explicitly asked for the SAME "fix the family, not the instance" discipline t2355 used:
+enumerate every rule consuming `--pane-ratio`/`--viz-stack-h`/`--viz-explicit-h`, check EACH ONE's selector
+against the tree's own hierarchy, and report per rule what was actually observed — not assumed from reading
+alone.
+
+### THE ENUMERATION, and the CORRECTION it produced
+
+Grepped every `--pane-ratio` consumer (`styles.css` lines 2418-2419, 2506-2507, 2553-2554) and every
+`--viz-stack-h` consumer (2504, 2506-2507, 2509, 2552-2555) and checked each selector with `element.matches()`
+LIVE against the tree's own rendered panes — not by re-reading the selector text and reasoning about ancestor
+depth, which is exactly the mistake that produced the WRONG claim in t2355's own hand-back (BACKLOG #38: "the
+tree pane-bodies have no `--viz-stack-h`-consuming rule of their own"). CORRECTED here: they do.
+`.wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body` is a pure DESCENDANT chain (no `>` combinator until
+the very last step) — `.wiz-2pane` does not need to be an immediate ancestor, only AN ancestor, and it is one
+for the tree's own simBox too (several levels up, through `.wiz-controls`). Confirmed live: `--viz-stack-h` was
+present and correctly computed on the tree's own visual, and the pane-body driven by
+`calc(var(--viz-stack-h) * var(--pane-ratio))` measured 164.375px against a 0.618 ratio and a 266px stack —
+matching to three decimal places. The stacked (≤860px) layout's OWN ratio mechanism was never broken.
+
+### ROOT CAUSE 1 (desktop) — `.viz-split` itself never grew into its own parent's free space
+
+`.wiz-2pane > .wiz-visual > .viz-container, .wiz-2pane > .wiz-visual > .viz-split { flex: 1 1 auto; min-height:
+0; }` is the ONE rule in the whole family that uses a DIRECT-CHILD combinator (`.wiz-2pane > .wiz-visual`) — and
+the tree's own simBox is never an immediate child of `.wiz-2pane` (t2355's own finding: it sits through
+`.wiz-controls` → the split's own `.ui-split-horiz` → `.ui-split-pane`). This one rule structurally cannot
+reach the tree. Confirmed live: `.viz-split` measured `flex: 0 1 auto` (the plain browser default) and stayed
+content-sized at 364px, while its two panes sat pinned at their SHARED 160px minimum — despite a CORRECTLY
+computed 61.8/38.2 flex-grow split between them (the `--pane-ratio` rules themselves DO reach the tree,
+descendant-only chains, confirmed via the same `.matches()` method) — there was simply zero free space to
+distribute, because `.viz-split` itself never grew past its own children's combined minimum. Manually forcing
+`flex: 1 1 auto; min-height: 0` grew it to 522px and the panes to 294/184 (0.615/0.385, matching 0.618 almost
+exactly) — confirming both the diagnosis and the fix in one experiment before writing any CSS. Shipped as a
+parallel, tree-scoped rule (`.ui-split-pane > .wiz-visual > .viz-container, .ui-split-pane > .wiz-visual >
+.viz-split { flex: 1 1 auto; min-height: 0; }`) rather than widening the original selector — a third instance
+of the exact "classic markup/CSS reused by the tree, authored at a DOM depth only classic actually has" shape
+t2355 already named twice.
+
+### ROOT CAUSE 2 (a SEPARATE bug, found via a mid-task amendment) — the SIZER handle had its OWN copy of t2353's own wrong-denominator bug
+
+A mid-task amendment reported two more owner probe captures: the SIZER handle showed the SAME slam shape,
+LARGER (0.6935 → 0.2374 on a ~4px delta), while the CLASSIC sizer control was slam-free from its very first
+frame. Root cause 1's fix alone did NOT close this — verified live, the sizer's own slam survived it
+unchanged. Traced to `addVisualSizer`'s own ratio branch: `frac = startTopHeight / clampedTotalHeight` —
+dividing by the WHOLE visual total (chrome included: the section-label, the ratio bar, this very sizer bar)
+instead of `startTopHeight + startBottomHeight` (the two panes only) — the EXACT SAME wrong-denominator shape
+`addPaneSplitter`'s own ratio branch had at t2353 (fixed there, in that same turn) but never carried over to
+this SIBLING handler in that pass — an oversight, not a new mechanism. Fixed identically: captured
+`startBottomHeight` alongside the already-captured `startTopHeight` at pointerdown, divided by their sum in
+both `applyMove` and the authoritative `onUp` write.
+
+### CLASSIC PATH — proven byte-identical at every step, both fixes
+
+A/B'd real classic (contour) splits against the pre-t2357 `styles.css`: `514px / [181, 289]` before AND after
+the CSS fix, exact match. The `addVisualSizer` denominator fix is scoped entirely inside the `dragPanes.length
+> 1` branch's own local `frac` computation — no change to any call site classic's own drag path shares
+differently, and the classic sizer control was already slam-free before this turn (confirmed by the owner's
+own second probe capture), unaffected either way.
+
+### FULL SUITE — one run, everything attributable, nothing new
+
+Both new/extended test files (`pane-ratio-slam-2357.spec.js`, 10 tests) proven non-vacuous by A/B against the
+pre-t2357 files: 5 of 10 fail there, at exactly the numbers the owner's own probe reported (0.618 → ~0.50 class
+of jump, both the ratio splitter AND the sizer, desktop; narrow width's own tests correctly pass even pre-fix,
+confirming it was never broken there). Re-ran the full pane suite (`pane-container-2355`, `pane-ratchet-2353`,
+`pane-sizer-mobile-1468`, `pane-splitter-790`, `pane-sizer-1353`) — 38/38 clean, no regressions from either
+fix. [Project-wide full suite result pending at time of writing — see the pass note for the actual count.]
+
+### Files changed
+
+`web/styles.css` — one new rule: `.ui-split-pane > .wiz-visual > .viz-container, .ui-split-pane > .wiz-visual >
+.viz-split { flex: 1 1 auto; min-height: 0; }`, mirroring the classic-scoped rule immediately above it.
+
+`web/ui/paneAccordion.js` — `addVisualSizer`: added `startBottomHeight` capture at pointerdown; both `applyMove`
+and `onUp`'s own ratio `frac` now divide by `startTopHeight + startBottomHeight` instead of the whole visual
+total.
+
+`tests/pane-ratio-slam-2357.spec.js` (new) — 10 tests, both widths: at-rest split matches the stored ratio, no
+first-frame slam (both handles), touch-release still inert, classic control.
+

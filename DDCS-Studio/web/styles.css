@@ -2404,6 +2404,24 @@ button.primary:hover {
 /* the 3D preview (and the drill 2D layout) grow to fill the visual pane's height */
 .wiz-2pane > .wiz-visual > .viz-container,
 .wiz-2pane > .wiz-visual > .viz-split { flex: 1 1 auto; min-height: 0; }
+/* t2357 — SAME RULE, TREE-REACHING: a `split_horizontal`/`split_vertical` node's own visual (formWidgets.js's
+   simBox/pnlBox) is a DIRECT CHILD of its `.ui-split-pane` mouth wrapper, never of `.wiz-2pane` (that shell
+   sits several levels further up — `.wiz-controls` → `#wiz_user_form` → the split's own `.ui-split-horiz` →
+   `.ui-split-pane` → the visual). The rule above's `.wiz-2pane >` requirement structurally can never match it,
+   so `.viz-split` fell back to the browser default (`flex: 0 1 auto`) instead of growing to fill the visual's
+   own available height — CONFIRMED live (WORK-LOG): `.viz-split` measured `flex: 0 1 auto`, height 364px,
+   while its two panes sat pinned at their shared 160px floor DESPITE a correctly-computed 61.8/38.2 flex-grow
+   split between them (the `--pane-ratio` rules below DO reach the tree — only THIS rule, giving `.viz-split`
+   itself room to grow into, did not) — manually forcing `flex: 1 1 auto; min-height: 0` on it grew the split to
+   522px and the panes to 294/184, matching the stored ratio almost exactly. This is what produced the
+   advisor's own reported "slam": at REST the tree's panes sat at their shared minimum regardless of the stored
+   ratio, and the first drag frame's write suddenly gave `.viz-split` real room, snapping the panes from their
+   floor straight to the true ratio in one frame. Same family, same fix shape as t2355's own two container
+   findings (an inline style / a too-deep DOM query, both because the tree's markup structurally cannot satisfy
+   a selector authored for the classic shell's own DOM depth) — this is a third instance of it, not a new bug
+   class. */
+.ui-split-pane > .wiz-visual > .viz-container,
+.ui-split-pane > .wiz-visual > .viz-split { flex: 1 1 auto; min-height: 0; }
 .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 200px; }
 .wiz-2pane .wiz-visual .viz-canvas { min-height: 0; }
 /* drill: stack the 2D layout above the 3D in the tall pane; each fills half */
