@@ -359,7 +359,7 @@ explicit opt-in list for keys that must NOT resurrect (e.g. t2139's retired `ind
 whitelist a future key could fall through by accident. The bug class this entry described (a whitelist that
 drops the next unlisted setting) cannot recur the same way.
 
-### 7. The header shows the VERSION where it should show the WORKSPACE
+### 7. [✅ CLOSED t2369 — already shipped across t2145/t2147/t2149/t2184, verified live, never re-built] The header shows the VERSION where it should show the WORKSPACE
 > ⭐ **DO THIS TOGETHER WITH ITEM 1** *(human, 2026-08-22)* — same popover, same file. The menu gets its
 > final shape once: theme chips OUT (to Settings), version IN (footer), workspace name OUT (to the header).
 *(human, 2026-08-22: "i think the workspace should be visible instead of the version number, and version
@@ -454,6 +454,29 @@ to get workspace actions is the obvious gesture; the chevron then becomes a seco
 
 **Files:** `web/index.html` (move the span out of the anchor), `web/ui/headerPost.js` (menu head + version
 footer, `Workspace:` line is at :151), `web/styles.css` (truncation).
+
+> **#7 CLOSED (t2369) — ALREADY SHIPPED, across t2145/t2147/t2149/t2184, never marked closed here.** Dispatched
+> as a build task; live-driven verification (not code-reading alone) found every requirement already met.
+> Checked against the entry's own list, one by one: the brand is a `<button>` now (t2149), not an `<a href>` —
+> THE TRAP this entry warns about no longer applies, the workspace navigates nowhere either way; the workspace
+> name (`.hdr-ws-name-txt`) sits in the header OUTSIDE the brand, confirmed via `brandAnchor.contains()`; the
+> `<span class="ver">` is `hidden` in `index.html`, exactly where bump-version.cjs/check-version-sync.cjs still
+> find it by raw-text regex; theme chips are gone from both menus (t2147, `#set_theme` in Settings); the CUTS
+> are honored — no standalone "not saved to a file" row, no filename row, live-checked via the menu's own HTML;
+> the quick menu's `hq-saved-line` reads "Saved 03:35 PM" (locale time, the mockup's "14:22" was the author's
+> own 24-hour locale, not a literal format requirement) with the full today/yesterday/older honesty rule
+> (`headerPost.js:311-315`) and a `title` naming WHERE ("Saved to this PC only" / "…to your cloud…"), sourced
+> from a local icon function, not `wizIcons.js`; the version footer is selectable (`user-select` override on
+> that one row) and reads the live `.ver` text. **The one real divergence from the mockup, and it's
+> architectural not missing:** the mockup drew ONE quick menu holding both the Saved line AND the version
+> footer; t2149 later split the header into TWO menus (the workspace/file menu, `#hdrPostBtn`, vs. the
+> brand/app menu, `#hdrAppBtn`) — the Saved line lives in the first, the version footer in the second. Both
+> exist, both are reachable, the split is a later, deliberate, well-reasoned decision (BACKLOG #9's own
+> "clicking your workspace name" vs. "the app's own identity" split), not a gap. Header-name-click-opens-menu
+> is satisfied by construction: the whole chip (name + chevron) is one button
+> (`header-workspace-name-2147.spec.js`'s own "it IS the chevron button, not a second click target"). Nothing
+> built this turn for #7 — closed as found, not re-built, per this project's own standing "grep for the
+> capability, not the file's claim" discipline.
 
 ### 8. [✅ REMOVAL SHIPPED t2143 — mostly stale, confirmed t2219] ⛔ `M6.rc` is offered as an EDITABLE G-code file — it is a compiled GUI resource
 *(human, 2026-08-22: "is m6.rc the right filename? not .nc?" — the name is right; the classification is not)*
