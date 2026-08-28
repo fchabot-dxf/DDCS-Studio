@@ -8,11 +8,9 @@ import { test, expect } from '@playwright/test';
  * (`<button data-optype=…>`). Every action this surface offers is per-wizard, so a menu on the group button would
  * have had nothing to act on. The menu therefore opens over an OPEN dropdown — which is what this spec drives.
  *
- * ── PRESETS ARE ABSENT ON PURPOSE, AND THAT IS ASSERTED ──────────────────────────────────────────────────────────
- * `openTemplatesPopover` needs `wm._activeType` — a wizard that is OPEN — because a preset saves *the values
- * currently in the form*. From the bar there is no form, so a "Presets…" entry could only mean "open the wizard",
- * which `▶ Open` already is. Asserting the absence keeps that a decision rather than something that quietly drifts
- * back in; the same restraint as not re-adding Duplicate/Delete beside Blockly's.
+ * ── "PRESET" IS ASSERTED ABSENT FROM THE MENU — t2359: the feature itself is gone (BACKLOG #34), so this is now
+ * a trivially-true string check, not the design assertion it originally was. Left in rather than pulled: it still
+ * correctly documents that the bar's three actions (Open / Wizard settings / Reset values) are the whole menu.
  */
 test.use({ viewport: { width: 1500, height: 950 } });
 
@@ -53,9 +51,9 @@ test('THE ENTRY carries the menu — three actions, and PRESETS deliberately not
     expect(all, 'Open, naming the wizard').toMatch(/Open/);
     expect(all, 'the wizard-settings-class entry').toMatch(/Wizard settings/);
     expect(all, 'and reset values').toMatch(/Reset values/);
-    // ⚠ THE MEASURED ABSENCE. A preset saves the values in an OPEN form; from the bar there is none, so the entry
-    // could only duplicate Open. Asserted so the decision cannot quietly reverse.
-    expect(all, 'Presets is NOT offered from the bar — it needs an open wizard').not.toMatch(/Preset/i);
+    // t2359 — the preset feature itself is gone (BACKLOG #34); this now just confirms the menu stays exactly
+    // the three actions above and nothing named "Preset" ever crept back in.
+    expect(all, 'no leftover Preset entry').not.toMatch(/Preset/i);
     await page.screenshot({ path: 'test-results/t1458-shots/wizard-bar-menu.png' });
     await testInfo.attach('t1458-wizard-bar-menu', { path: 'test-results/t1458-shots/wizard-bar-menu.png', contentType: 'image/png' });
 });

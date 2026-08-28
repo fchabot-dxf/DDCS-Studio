@@ -13,15 +13,34 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dial
 
 const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh', NAME = 'ddcs_cloud_name';
 const PIC = 'ddcs_cloud_pic';   // t2077 — the avatar, from Drive's own about.get (no extra OAuth scope)
+const EXPIRY = 'ddcs_cloud_token_expiry';   // t2359 — see this key's own writers in cloud/googleDrive.js
 
+/**
+ * t2359 (BACKLOG #34's own rider) — `connected` used to mean ONLY "a token string exists in localStorage",
+ * true forever after the FIRST successful connect even hours past the ~1h token's real expiry — which is
+ * EXACTLY the stale-but-"connected" state t2343 traced the wizard-open sign-in prompt to (a caller asked
+ * `cloudConnected()`, got true, then a real network call 401'd and silently tried to re-authenticate). Now
+ * VALIDATED where we actually know: a stored `EXPIRY` timestamp (written at every mint/refresh — see
+ * `cloud/googleDrive.js`'s own `connectGoogle`/`silentRefresh`) makes `connected` false once past it. A
+ * MISSING expiry (a token minted before this fix shipped, or via the desktop/gateway path if it doesn't
+ * forward `expires_in` — unverified, not assumed) still reads as connected, same as always — this only ever
+ * makes the check MORE honest where real data exists, never fabricates data it doesn't have. `expired: true`
+ * is exposed separately so a caller (the header chip, say) can distinguish "never connected" from "was
+ * connected, the session lapsed" — `connected` alone collapses that distinction on purpose for simple truthy
+ * callers (`if (!getAccount().connected)`).
+ */
 export function getAccount() {
     try {
-        return { connected: !!localStorage.getItem(TOK), provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '', name: localStorage.getItem(NAME) || '', picture: localStorage.getItem(PIC) || '' };
-    } catch (e) { return { connected: false, provider: '', email: '', name: '', picture: '' }; }
+        const tok = localStorage.getItem(TOK);
+        const expiryRaw = localStorage.getItem(EXPIRY);
+        const expiry = expiryRaw ? Number(expiryRaw) : null;
+        const expired = !!tok && expiry != null && Date.now() >= expiry;
+        return { connected: !!tok && !expired, expired, provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '', name: localStorage.getItem(NAME) || '', picture: localStorage.getItem(PIC) || '' };
+    } catch (e) { return { connected: false, expired: false, provider: '', email: '', name: '', picture: '' }; }
 }
 
 export function disconnect() {
-    try { [TOK, PROV, EMAIL, REFRESH, NAME, PIC].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
+    try { [TOK, PROV, EMAIL, REFRESH, NAME, PIC, EXPIRY].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
@@ -86,9 +105,10 @@ export async function connect(provider = 'google') {
 async function connectGoogleFlow() {
     try {
         const { connectGoogle } = await import('./cloud/googleDrive.js');
-        const tok = await connectGoogle(clientId('google'));
-        localStorage.setItem(TOK, tok);
+        const { access_token, expires_in } = await connectGoogle(clientId('google'));   // t2359 — was a bare string; expires_in now carried through
+        localStorage.setItem(TOK, access_token);
         localStorage.setItem(PROV, 'google');
+        if (expires_in) localStorage.setItem(EXPIRY, String(Date.now() + Number(expires_in) * 1000)); else localStorage.removeItem(EXPIRY);
         window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));   // show "Connected" now
         captureGoogleIdentity();                                       // fill in name + email when it resolves
     } catch (e) {
@@ -112,7 +132,10 @@ async function connectGoogleDesktop() {
         let t = {};
         try { t = await (await fetch('/api/oauth/google/token', { headers: { 'X-DDCS-Local': '1' } })).json(); } catch (e) { /* keep polling */ }   // X-DDCS-Local: the token GET is CSRF-guarded (a Drive credential); same-origin Studio sends it
         if (t.access_token) {
-            try { localStorage.setItem(TOK, t.access_token); localStorage.setItem(PROV, 'google'); } catch (e) { /* */ }
+            // t2359 — store expiry ONLY if the gateway's own response actually carries one (unverified whether
+            // bridge/bridge-app/fairy/oauth.py forwards `expires_in` — not assumed); no expiry here means
+            // `getAccount()`'s own fallback keeps treating the token as trusted, same as before this turn.
+            try { localStorage.setItem(TOK, t.access_token); localStorage.setItem(PROV, 'google'); if (t.expires_in) localStorage.setItem(EXPIRY, String(Date.now() + Number(t.expires_in) * 1000)); } catch (e) { /* */ }
             window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
             captureGoogleIdentity();   // resolve + cache the account name + email
             return;

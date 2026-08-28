@@ -12,12 +12,22 @@ const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
-const TOK = 'ddcs_cloud_token', FOLDER_KEY = 'ddcs_gdrive_folder';
+const TOK = 'ddcs_cloud_token', FOLDER_KEY = 'ddcs_gdrive_folder', EXPIRY = 'ddcs_cloud_token_expiry';
 
 const token = () => { try { return localStorage.getItem(TOK) || ''; } catch (e) { return ''; } };
 
-/** Current Google access token (for the Picker, which takes the OAuth token directly). */
+/** Current Google access token (for the Picker, which takes the OAuth token directly). Deliberately NOT
+ *  validity-checked — the Picker just needs the string, expired or not; it handles its own auth failure. */
 export const getAccessToken = () => token();
+
+/** t2359 — is the stored token both PRESENT and, where we actually know an expiry (written by `connectGoogle`/
+ *  `silentRefresh` below), not yet past it? A caller that means "is this account actually usable right now"
+ *  (unlike `getAccessToken`, which means "hand me whatever string is there") should ask this, not `!!getAccessToken()`
+ *  — see `cloudAccount.js`'s own `getAccount().connected`, the same fix, for the fuller reasoning. */
+export const isTokenValid = () => {
+    const tok = token(); if (!tok) return false;
+    try { const e = localStorage.getItem(EXPIRY); return !(e && Date.now() >= Number(e)); } catch (_) { return true; }
+};
 
 /** Adopt a user-chosen folder as the projects root (move-safe, tracked by id). Picked via the Google Picker —
  *  drive.file then has access to it, so the app lists/saves its own .mjson projects there. '' clears → back to
@@ -36,13 +46,15 @@ function loadGis() {
     });
 }
 
-/** GIS token-model sign-in → resolves an access token (no secret, no server). */
+/** GIS token-model sign-in → resolves { access_token, expires_in } (no secret, no server). t2359 — `expires_in`
+ *  (seconds, GIS's own field, previously discarded) lets the caller store WHEN the token actually expires, so
+ *  `cloudConnected()`-style checks can mean validated instead of "a token string exists". */
 export async function connectGoogle(clientId) {
     await loadGis();
     return new Promise((resolve, reject) => {
         const client = window.google.accounts.oauth2.initTokenClient({
             client_id: clientId, scope: SCOPE,
-            callback: (r) => (r && r.access_token) ? resolve(r.access_token) : reject(new Error((r && r.error) || 'no token')),
+            callback: (r) => (r && r.access_token) ? resolve({ access_token: r.access_token, expires_in: r.expires_in }) : reject(new Error((r && r.error) || 'no token')),
             error_callback: (e) => reject(new Error((e && e.type) || 'sign-in cancelled')),
         });
         client.requestAccessToken();
@@ -69,7 +81,17 @@ async function silentRefresh() {
     if (window.pywebview && window.pywebview.api) {
         let t = {};
         try { t = await (await fetch('/api/oauth/google/token', { headers: { 'X-DDCS-Local': '1' } })).json(); } catch (e) { /* */ }   // X-DDCS-Local: the token GET is CSRF-guarded (a Drive credential); same-origin Studio sends it
-        if (t.access_token) { try { localStorage.setItem(TOK, t.access_token); } catch (e) { /* */ } return; }
+        if (t.access_token) {
+            try {
+                localStorage.setItem(TOK, t.access_token);
+                // t2359 — desktop/gateway path: store expiry ONLY if the gateway's own response actually carries
+                // one (unverified whether bridge/bridge-app/fairy/oauth.py forwards `expires_in` — not assumed).
+                // No expiry stored here → `getAccount()`'s own fallback treats the token as still trusted, same
+                // as before this turn, rather than fabricating a number this path may not actually have.
+                if (t.expires_in) localStorage.setItem(EXPIRY, String(Date.now() + Number(t.expires_in) * 1000));
+            } catch (e) { /* */ }
+            return;
+        }
         throw new Error('silent-fail');
     }
     await loadGis();
@@ -78,7 +100,12 @@ async function silentRefresh() {
     return new Promise((resolve, reject) => {
         const c = window.google.accounts.oauth2.initTokenClient({
             client_id: cid, scope: SCOPE,
-            callback: (resp) => { if (resp && resp.access_token) { try { localStorage.setItem(TOK, resp.access_token); } catch (e) { /* */ } resolve(); } else reject(new Error('no token')); },
+            callback: (resp) => {
+                if (resp && resp.access_token) {
+                    try { localStorage.setItem(TOK, resp.access_token); if (resp.expires_in) localStorage.setItem(EXPIRY, String(Date.now() + Number(resp.expires_in) * 1000)); } catch (e) { /* */ }
+                    resolve();
+                } else reject(new Error('no token'));
+            },
             error_callback: () => reject(new Error('silent-fail')),
         });
         c.requestAccessToken({ prompt: '' });   // '' = silent grant when the user already consented

@@ -680,11 +680,9 @@ export class CommandDeck {
      * this surface offers is per-wizard, so a menu on the group would have nothing to act on. The menu therefore
      * opens over the group's open dropdown, which is ordinary (a file manager does the same over an open folder).
      *
-     * ⚠ PRESETS ARE DELIBERATELY ABSENT, and the reason is measured rather than an omission. `openTemplatesPopover`
-     * requires `wm._activeType` — a wizard that is OPEN — because a preset saves *the values currently in the form*.
-     * From the bar there is no form, so a "Presets…" entry could only mean "open the wizard", which `▶ Open` already
-     * is. That is the same restraint as not re-adding Duplicate/Delete beside Blockly's on the Blocks canvas: a
-     * second entry doing an existing entry's job is a thing that must agree with it forever.
+     * ⚠ t2359 — presets (and the "Presets deliberately absent" reasoning this comment used to carry) are GONE —
+     * BACKLOG #34's own ruling: values-for-a-job is a PROJECT (which can be one op), an identity fork is a CUSTOM
+     * WIZARD; presets were a duplicate middle ground. Struck rather than left stale.
      *
      * RULE 1 for the three that ARE here: `▶ Open` is the entry's own click; `↺ Reset values` is the per-wizard button
      * in Settings → Wizard bar (t1437); `⚙ Wizard settings…` opens that same library row. None is the only path.

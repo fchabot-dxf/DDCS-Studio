@@ -7,7 +7,7 @@
  * window.pywebview.api, so persistence carries over with no rework.
  */
 import { getSettings, applySettings, replaceSettings } from '../ui/settingsPanel.js';
-import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
+import { isTokenValid, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
 import { getActiveProfile, setActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the bundle's name/controller ARE this workspace's machine
 import { dlgConfirm } from '../ui/dialog.js';   // t1219 — an explicit confirm before a destructive swap
@@ -165,7 +165,10 @@ export async function importProfile() {
 
 // --- Cloud (BYO Google Drive): named profiles in a "Profiles" subfolder of the app's Drive root. ---
 //     Pull at the machine → save here → load on a remote PC for a faithful sim. See [[controller-import-remote-sim]].
-function cloudConnected() { try { return !!getAccessToken(); } catch (e) { return false; } }
+// t2359 — was `!!getAccessToken()` (a token STRING exists, never checked for validity) — the same
+// stale-but-"connected" shape BACKLOG #34 traced the wizard-open sign-in prompt to. `isTokenValid()` is the
+// SAME source (`cloud/googleDrive.js`, which owns the token/expiry keys) actually checking the stored expiry.
+function cloudConnected() { try { return isTokenValid(); } catch (e) { return false; } }
 
 // Never publish secrets to the cloud: the profile bundle is settings + user-vars (no tokens today), but scrub
 // defensively before upload — a cloud profile is effectively published.

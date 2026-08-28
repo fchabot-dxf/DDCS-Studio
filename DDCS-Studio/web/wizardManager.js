@@ -16,7 +16,6 @@ import { sfx } from './ui/sound.js';  // themed earcon suite (t2125)
 import { toast } from './ui/gateway/util.js';   // the shared transient toast (round-trip discoverability hint)
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
-import { openTemplatesPopover, closeTemplatesPopover, mountPresetRow } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud); t794 the form-top preset row
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
 import { makePanesCollapsible } from './ui/paneAccordion.js';   // t752 — individually collapsible preview/code panes (per-theme motion)
 import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
@@ -118,8 +117,6 @@ export class WizardManager {
         const box = this.wizardElement.querySelector('.wiz-box');
         const head = box && box.querySelector('.wiz-head');
         if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close' });
-
-        // t794 P3 — presets moved from the header 📑 button to the adaptive form-top row (mountPresetRow on open).
 
         // Settings (stock/probe/machine) changed — if a wizard is open, re-run its update() so the
         // preview + the inferred spindle start track the new values live (e.g. editing stock size via
@@ -224,8 +221,7 @@ export class WizardManager {
         // non-blocking prompt instead of opening. "Open anyway" re-enters with bypassPrereq, so the gate is a
         // thin pass-through when the hardware is present (or the user already chose to proceed).
         if (needsPrereqPrompt(type, variant, bypassPrereq)) return;
-        this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
-        closeTemplatesPopover();
+        this._activeType = type;   // the currently-open op type (read by the block-edit notice fallback label)
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
         // t1625 — a real open always clears the preview chrome: the class AND the banner title (nothing else ever
         // writes #wizTitle, so the preview's banner would otherwise outlive the preview).
@@ -284,7 +280,6 @@ export class WizardManager {
             wizElem.inert = false;   // t800 P7 — the fronting form is the ONLY interactable wizard panel
 
             frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
-            mountPresetRow(this, wizElem);  // t794 P3 — the adaptive preset row at the form top (retires the header 📑 button)
             makePanesCollapsible(wizElem);  // t752 — collapsible preview/code panes (idempotent; state app-wide per kind)
             this._setupSplitter(wizElem);   // draggable form/preview divider (all two-pane wizards)
             // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one
@@ -453,7 +448,6 @@ export class WizardManager {
         if (isCancel && this._formSnapshot) {
             this._restoreForm(this._formSnapshot);
         }
-        closeTemplatesPopover();
         // Hide overlay and clear active state
         this.wizardElement.classList.remove('active');
         this.wizardElement.style.display = 'none';

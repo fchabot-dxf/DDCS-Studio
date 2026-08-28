@@ -103,9 +103,13 @@ export function renderHeaderAccount() {
         // header is dense, and a word here would be the only one of its kind among icon controls.
         // The silhouette is FILLED (not an outline) so it reads as an avatar placeholder rather than a button
         // glyph — an outline ring reads as "icon", a filled bust reads as "person".
+        // t2359 — `expired` (a real, VALIDATED distinction now — cloudAccount.js's own comment) means this was a
+        // real session that lapsed, not a first-time visitor; say so rather than collapsing both into "Sign in"
+        // with no context, the exact silent-reauth shape BACKLOG #34 named as the thing to stop doing.
+        const label = acct.expired ? 'Session expired — sign in again' : 'Sign in';
         host.className = 'hdr-acct signed-out';
         host.innerHTML =
-            `<button type="button" class="hdr-acct-btn" aria-label="Sign in" title="Sign in — save projects to your own cloud, and send jobs to the machine from anywhere">`
+            `<button type="button" class="hdr-acct-btn" aria-label="${esc(label)}" title="${esc(label)} — save projects to your own cloud, and send jobs to the machine from anywhere">`
             + `<span class="hdr-acct-slot" aria-hidden="true">`
             + `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">`
             + `<circle cx="12" cy="8.6" r="3.9"/><path d="M12 13.6c-3.6 0-6.6 2.2-7.7 5.3a10 10 0 0 0 15.4 0c-1.1-3.1-4.1-5.3-7.7-5.3z"/>`

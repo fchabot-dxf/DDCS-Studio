@@ -60198,3 +60198,158 @@ total.
 `tests/pane-ratio-slam-2357.spec.js` (new) — 10 tests, both widths: at-rest split matches the stored ratio, no
 first-frame slam (both handles), touch-release still inert, classic control.
 
+## t2359 — REMOVE THE PRESET FEATURE (BACKLOG #34's own ruling), and make cloudConnected() mean VALIDATED
+
+Owner-ruled 2026-08-27, full context in BACKLOG #34 (RULED section) and #37 (the successor, explicitly NOT
+built this turn). The taxonomy: values for a job are a PROJECT (can be one op, already exists); a new identity
+is a CUSTOM WIZARD fork (already exists); presets were the hand-rolled July middle ground (t794), covered from
+both sides — a duplicate concept. Removing it also kills the wizard-open Google sign-in AT THE ROOT: t2343
+traced the trigger to `mountPresetRow`'s background Drive check running on every wizard open — deleting the
+feature removes the caller, not just quiets its symptom.
+
+### THE REMOVAL — swept by filename AND by every export name, whole repo, tests included
+
+`ui/wizardTemplates.js` deleted whole (`mountPresetRow`, `listTemplates`/`saveTemplate`/`deleteTemplate`,
+`cloudRead`/`cloudFileRef`/`cloudWrite`, its own local `cloudConnected`, the templates popover). Confirmed via
+grep for every exported name individually (not just the filename — a scoped-by-filename grep is exactly what
+t2295's own doc-cleaning missed a test with, per the dispatch's own warning) that zero repo-wide references
+survived after the edit, WORK-LOG.md's own historical entries excepted (append-only, correctly untouched).
+
+**Consumers found and handled:**
+- `wizardManager.js` — the import, the mount call (`open()`), and two `closeTemplatesPopover()` calls
+  (`open()`/`close()`) removed. `this._activeType = type` KEPT (its own comment updated) — it has a second,
+  unrelated reader (`showBlockEditNotice`'s fallback label, line ~513) that survives the preset removal.
+- `ui/commandDeck.js` — a historical comment explaining why the wizard-bar right-click menu deliberately never
+  offered Presets; trimmed (the reasoning is moot once the feature doesn't exist) rather than left stale.
+- Two DEDICATED test files (`tests/wizard-templates.spec.js`, `tests/preset-row-794.spec.js`) — deleted whole,
+  100% preset content.
+- `tests/smalls-696.spec.js` — ONE test ("(b4) PRESETS affordance") removed; the file's other, unrelated test
+  ((a) autostart staleness) kept untouched.
+- `tests/context-menu-wizbar-1458.spec.js` — the assertion itself ("Preset" absent from the menu) still holds
+  and was kept (now trivially true rather than a live design decision) — its stale reasoning comments updated.
+- `web/styles.css` — the `.wiz-preset-row`/`.wpr-*` and `.wiz-tpl-pop`/`.wt-*` rule blocks removed; the
+  UNRELATED `.has-field-link`/`.field-link-gear` block sitting between them (a different feature, t796) left
+  untouched — confirmed by reading the file's own boundaries before cutting, not by pattern-matching alone.
+
+**What was checked and DELIBERATELY left alone**, per the dispatch's own explicit instruction (orphaned stored
+data is harmless; a migration is scope creep):
+- `web/data/backup.js`'s own `{ id: 'presets', ...lsPrefix('ddcs_tpl_') }` registry row — NOT the preset
+  feature's own code, just a declared backup/export row that continues to round-trip any `ddcs_tpl_*` keys a
+  user may already have saved. Removing it would silently stop backing up existing data going forward, which
+  is a step past "leave it alone." Several UNRELATED tests (`workspace-manager-1223` etc.) write synthetic
+  `ddcs_tpl_zzz_*` keys purely to exercise this SAME generic backup-dirty-detection machinery — confirmed they
+  still pass, unaffected either way.
+- `web/data/wizardLastValues.js` — a SEPARATE, similarly-shaped "last inserted values" feature (`ddcs_lastvals_
+  <type>`, not `ddcs_tpl_*`); its own comment merely analogizes to the preset key shape. No dependency, no
+  change needed.
+- localStorage `ddcs_tpl_*` keys themselves — never touched by this turn at all, exactly as asked.
+
+### VERIFIED — the dispatch's own explicit criterion, run live
+
+Opened all 32 wizard types (`getLibrary()`'s own enumeration, not a hand-picked sample) as a RETURNING user
+(a stored `ddcs_cloud_token` + `ddcs_cloud_provider='google'`, simulating the exact stale-but-"connected" state
+t2343 traced) with `accounts.google.com`/`www.googleapis.com`/`gsi/client` network calls blocked and recorded.
+Boot-time calls (the header avatar's own `backfillIdentity()` — BACKLOG #34's own separately-named, already-
+known, once-per-load mechanism, untouched by this turn) were let through and reset BEFORE the measurement
+window, so only calls attributable to the wizard-open loop itself count. Result: **zero** blocked calls, zero
+auth-related console errors, across all 32 opens. Non-vacuous: the same suite run against the pre-t2359 tree
+(the feature still present) fails 5 of the 7 total new tests at exactly the traced call
+(`googleapis.com/drive/v3/about`).
+
+### ALSO IN SCOPE (the #34 rider) — cloudConnected() means VALIDATED, not "a token string exists"
+
+`cloudAccount.js`'s `getAccount().connected` was `!!localStorage.getItem(TOK)` — true forever after the first
+connect, even hours past the token's real ~1h expiry, which is EXACTLY the state that let `mountPresetRow`'s
+own check pass and then hit a real 401→silentRefresh→visible-chooser. No expiry was ever stored anywhere
+client-side — GIS's own token response carries `expires_in` (seconds), previously discarded at every mint
+point. Now captured and stored (`ddcs_cloud_token_expiry`) at all THREE places a token is minted/refreshed:
+`connectGoogle()`'s own resolution (its return shape changed from a bare string to `{access_token,
+expires_in}` — its ONE caller, `cloudAccount.js`'s `connectGoogleFlow`, updated to match), `silentRefresh()`'s
+GIS branch, and `silentRefresh()`'s desktop/gateway branch (conditionally — see below) plus
+`connectGoogleDesktop()`'s own poll (same conditional).
+
+`getAccount()` now returns `connected: !!token && !expired` plus a separately-exposed `expired` boolean, so a
+caller can tell "never connected" from "was connected, the session lapsed" without collapsing both into one
+generic false. A MISSING expiry (a token minted before this fix shipped, or the desktop/gateway path if it
+turns out not to forward `expires_in` — genuinely unverified, not assumed either way since `bridge/bridge-app/
+fairy/oauth.py` is outside `web/` and wasn't read this turn) still reads as connected, unchanged from before —
+this only ever makes the check MORE honest where real data now exists, never fabricates data it doesn't have.
+
+**Established who else calls the pattern**, as asked: THREE separate local `cloudConnected()` implementations
+existed. `savePrefs.js`'s own delegates straight to `getAccount().connected` — inherits the fix for free, no
+code change needed. `wizardTemplates.js`'s own is gone with the file. `data/profileStore.js`'s own was
+SEPARATE and bypassed `cloudAccount.js` entirely (`!!getAccessToken()`, reading the raw token string via
+`googleDrive.js` directly) — fixed by exporting a new `isTokenValid()` from `googleDrive.js` itself (the
+module that actually owns the token/expiry keys) and switching `profileStore.js` to it; its now-unused
+`getAccessToken` import removed (that function's OTHER, legitimate caller-shape — the Google Picker, which
+needs the raw string regardless of validity — is untouched, still exported, still bare).
+
+**Header chip surfaces the distinction**, per the dispatch's own suggestion: `headerAccount.js`'s signed-out
+render now checks `acct.expired` and labels the button "Session expired — sign in again" instead of the
+generic first-time "Sign in" — a real, if small, UX improvement that falls out of the same fix rather than
+needing its own mechanism.
+
+**Noted, not touched** (pre-existing, unrelated to this turn): `profileModal.js:70` calls
+`SP.preferredSaveTarget()` on the dynamically-imported `savePrefs.js` module — but `savePrefs.js`'s own header
+comment (t1265) states that function was RETIRED along with the save-location preference. This reads as a
+stale, dead call site (presumably a no-op via `SP.preferredSaveTarget` being `undefined` and the `&&` chain
+short-circuiting) — flagged per "don't delete unrelated dead code, mention it" rather than fixed, since it is
+outside this turn's own scope and untouched by anything here.
+
+### FULL SUITE — one run, 15 failed / 2864, ALL triaged, ZERO attributable
+
+One REAL hit, already fixed: `screenshot-baselines-1792.spec.js`'s own `modal-corner-win32.png` baseline — the
+preset row's removal genuinely shortened every wizard form by its own height, exactly as expected. Confirmed
+by reading the diff image (the old "★ Save preset" line ghosted at the top, every field below it shifted up)
+before touching anything, then regenerated with `--update-snapshots` and re-verified green. This is the
+CORRECT new baseline, not a symptom to chase.
+
+The other 14: isolated in a batch (12 files) — 37/38 individual tests passed clean on the first re-run. The
+lone straggler, `probe-port-gate-1880.spec.js`'s own 6-op sweep, kept failing even alone (`port field never
+settled a gate state`, then a bare 90s boot timeout) — traced its own poll to `userOpView.js`'s `_probePortOk`
+computation, zero code-path connection to anything this turn touched (presets, cloud auth, panes). Proved it
+definitively with an A/B: STASHED every t2359 source change and re-ran the SAME test against bare HEAD — it
+STILL failed, this time timing out at boot itself before any app code ran. This session has been running
+continuous Playwright invocations for many hours straight; the failure is this machine's own accumulated
+resource pressure, not a regression, confirmed by reproducing it on code this turn never touched. Restored the
+stash immediately after. `middle-superset`'s own two pre-known-heavy shard timeouts (named in every recent
+turn's own WORK-LOG) and `wizard-face-1599`'s one failure (its own error message explicitly names the
+pre-existing, already-documented t1766 reproject-echo race, not this turn) round out the rest. FAILED COUNT
+attributable to t2359: **0**.
+
+Two new test files (`preset-removal-2359.spec.js`, 2 tests; `cloud-connected-validated-2359.spec.js`, 5 tests)
+both proven non-vacuous by A/B against the pre-t2359 tree (7/7 fail there — the preset-removal suite's own
+network-call assertion, and every cloudConnected-validation assertion including the header-label one and
+`profileStore`'s own `isTokenValid` call, which doesn't even exist pre-fix). Re-ran the full cloud/account
+regression corpus (13 files, 59 tests) plus the edited preset-adjacent files — all green, no regressions.
+
+### Files changed
+
+`web/ui/wizardTemplates.js` — DELETED (the whole preset feature).
+
+`web/wizardManager.js` — import + 3 call sites removed; `_activeType`'s own comment updated (kept, second
+reader survives).
+
+`web/ui/commandDeck.js` — a stale historical comment about presets trimmed.
+
+`web/styles.css` — `.wiz-preset-row`/`.wpr-*` and `.wiz-tpl-pop`/`.wt-*` rule blocks removed.
+
+`web/ui/cloudAccount.js` — `getAccount()` now validates a stored expiry (`ddcs_cloud_token_expiry`), exposing
+`expired`; `disconnect()` clears the new key too; `connectGoogleFlow`/`connectGoogleDesktop` capture and store
+`expires_in` where their own source provides it.
+
+`web/ui/cloud/googleDrive.js` — `connectGoogle()`'s return shape changed (string → `{access_token,
+expires_in}`); `silentRefresh()`'s both branches store expiry where available; new export `isTokenValid()`.
+
+`web/data/profileStore.js` — `cloudConnected()` switched from `!!getAccessToken()` to `isTokenValid()`; the
+now-unused `getAccessToken` import removed.
+
+`web/ui/headerAccount.js` — the signed-out button's label distinguishes an expired session from a fresh one.
+
+`tests/wizard-templates.spec.js`, `tests/preset-row-794.spec.js` — DELETED.
+
+`tests/smalls-696.spec.js`, `tests/context-menu-wizbar-1458.spec.js` — preset-specific test/comments removed,
+unrelated tests in the same files kept.
+
+`tests/preset-removal-2359.spec.js` (new), `tests/cloud-connected-validated-2359.spec.js` (new).
+

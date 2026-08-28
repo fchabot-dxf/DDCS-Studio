@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-/** t696 — small independent items: (a) autostart staleness fingerprint, (b4) the wizard "Presets" affordance.
- *  (c) the projects-drawer resize handle was retired at t2190 with the drawer itself (ui/projects/projectModal.js's
- *  openOpenDrawer() is deleted — see ui/projects/projectManager.js's header for the replacement). */
+/** t696 — small independent items: (a) autostart staleness fingerprint.
+ *  (b4) the wizard "Presets" affordance was removed at t2359 (BACKLOG #34 — presets were a duplicate concept;
+ *  a one-op project or a custom-wizard fork cover the same ground). (c) the projects-drawer resize handle was
+ *  retired at t2190 with the drawer itself (ui/projects/projectModal.js's openOpenDrawer() is deleted — see
+ *  ui/projects/projectManager.js's header for the replacement). */
 test.use({ viewport: { width: 1200, height: 900 } });
 
 test('(a) autostart STALENESS FINGERPRINT: a homing-config change flags the stored body; regenerate clears it; persists', async ({ page }) => {
@@ -27,20 +29,4 @@ test('(a) autostart STALENESS FINGERPRINT: a homing-config change flags the stor
     await page.reload();
     await page.waitForFunction(() => window.ddcsGetSettings);
     expect(await page.evaluate(() => window.ddcsGetSettings().autostartGenSig), 'the fingerprint persists (stored with the body)').toBeTruthy();
-});
-
-test('(b4) PRESETS affordance: the form-top preset row (header button retired) opens the popover with terse copy', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
-    await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
-    await page.waitForSelector('#wiz_drill', { state: 'visible' });
-    // t794 — Presets moved from the header to an adaptive form-top row; the header .wiz-templates is retired.
-    expect(await page.locator('.wiz-templates').count(), 'the header Presets button is retired').toBe(0);
-    await page.waitForSelector('#wiz_drill .wiz-preset-row .wpr-save', { timeout: 5000 });
-    expect(await page.evaluate(() => document.querySelector('#wiz_drill .wiz-preset-row .wpr-save').textContent), 'a labeled Save-preset affordance in the form row').toMatch(/preset|save/i);
-    await page.click('#wiz_drill .wiz-preset-row .wpr-save');
-    await page.waitForSelector('.wiz-tpl-pop .wt-save', { timeout: 5000 });
-    expect(await page.evaluate(() => document.querySelector('.wt-head').textContent), 'popover titled Presets').toMatch(/Presets/i);
-    expect(await page.evaluate(() => document.querySelector('.wt-save').textContent), 'terse save copy').toMatch(/preset/i);
-    expect(await page.evaluate(() => (document.querySelector('.wt-note') || {}).textContent || ''), 'a line distinguishes it from Save-as-custom-wizard').toMatch(/custom wizard/i);
 });
