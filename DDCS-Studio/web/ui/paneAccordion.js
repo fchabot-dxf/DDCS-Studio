@@ -269,7 +269,16 @@ function stackChrome(v) {
     return Math.max(0, Math.round(vh - sum));
 }
 
-function applyVisualHeight(h) {
+// t2353 — `dragCap` ({visual, max}) lets an in-progress drag override the PER-FRAME `visualMaxHeight(v)` read
+// below for the ONE visual it's actively resizing. Without it, hoisting the cap to pointerdown in the drag
+// handlers (addVisualSizer/addPaneSplitter, see their own t2353 comments) was not enough: this function is
+// what applyMove ultimately calls, and it was ALSO re-deriving `cap` fresh from the live DOM on every single
+// invocation — the very read the handlers' own hoist was meant to remove, just one level down. In the tree's
+// stacked layout that live re-derivation still tracked the visual's own just-written height every frame,
+// re-imposing the ratchet on top of an already-fixed caller. Every OTHER mounted `.wiz-visual` (cross-wizard
+// sync, the non-drag `h===undefined` heal path) keeps deriving its own cap fresh, unchanged — only the ONE
+// visual actively being dragged borrows the caller's frozen number.
+function applyVisualHeight(h, dragCap) {
     const px = h === undefined ? getVisualHeight() : h;
     let healed = null;
     document.querySelectorAll('.wiz-visual').forEach((v) => {
@@ -278,7 +287,7 @@ function applyVisualHeight(h) {
         // has since been resized) must not reopen every wizard with its handle buried — so a visual that cannot take
         // the stored height takes what it can, and the smallest such fit is written back below. Reopening broken is
         // the part the user actually felt: the clamp alone would fix the drag and leave the damage in localStorage.
-        const cap = visualMaxHeight(v);
+        const cap = (dragCap && dragCap.visual === v) ? dragCap.max : visualMaxHeight(v);
         const fit = Math.min(px, cap);
         if (fit < px) healed = healed == null ? fit : Math.min(healed, fit);
         // derive the stacked share from the CLAMPED height (never the request), BEFORE the write moves the rects
@@ -323,20 +332,49 @@ function addVisualSizer(split) {
     // layout under it — the advisor's own suspected mechanism, e.g. browser scroll anchoring reacting to
     // content growth), so a request computed against a moving reference frame can silently diverge from the
     // pointer's actual on-screen travel. Captured once at pointerdown instead: `dragStartY` (the pointer's own
-    // Y) and `dragStartHeight` (EXACTLY what the old formula computed at that instant — `y - visual.top`, NOT
-    // the visual's own rendered height, which is a subtly different quantity whenever the pointer isn't
-    // sitting precisely on the visual's own bottom edge — the sibling handler below hit this as a real bug,
-    // see its own comment) — `heightAt(y)` is then a pure `dragStartHeight + (y - dragStartY)`, which only
+    // Y) and `dragStartHeight` — `heightAt(y)` is then a pure `dragStartHeight + (y - dragStartY)`, which only
     // ever depends on how far the POINTER itself has moved since pointerdown, never on where anything else
     // drew itself in between. Not confirmed this was the owner's own creep (the specific scroll-anchoring
     // theory was tested and found not to reproduce in this harness — see WORK-LOG), but it closes a real class
     // of fragility either way and needs no new read: the capture already happens once per drag either way.
+    // (`dragStartHeight`'s own SOURCE changed at t2353 — see the pointerdown handler's own comment below for
+    // why it is now the visual's exact rendered height, not the pointer-offset this paragraph originally used.)
     let dragStartY = 0, dragStartHeight = 0;
-    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(dragStartHeight + (y - dragStartY))));
+    // t2353 — THE RATCHET: visualMaxHeight(visual) was still called fresh on EVERY frame here, the one
+    // per-frame layout read the t2345/t2349 hoists missed. In the TREE (a split_horizontal-wrapped visual,
+    // e.g. the flipped drill, STACKED/mobile layout specifically — confirmed live, see WORK-LOG: at 412px
+    // `visualMaxHeight` tracked the visual's OWN current height to within 1px the entire drag, both shrinking
+    // AND growing, because its `host` (visual.parentElement, the split pane wrapper) is CONTENT-SIZED BY the
+    // visual in that layout — there is no independent ceiling to ask. Every frame's write therefore fed the
+    // NEXT frame's own "room available" reading back to itself: shrinking left ~0 headroom to grow back into,
+    // and Math.floor bled a pixel here and there on top. Desktop was NOT reproducible (.ui-split-pane2 there
+    // gets a real, independent row height from its own layout context — max stayed flat while height moved
+    // freely both ways) — this is a stacked-layout-specific mechanism, not universal.
+    // FIX: seed the ceiling at pointerdown, then let it only ever GROW during the drag — never shrink back down.
+    // A pure one-time snapshot (captured once, never touched again) was tried first and reverted: it broke an
+    // EARLIER, already-shipped fix (pane-sizer-mobile-1468.spec.js, t1468) — verified live (WORK-LOG): right
+    // after a separate prior drag on a STACKED (412px) twin, the freshly-opened drag's very first ceiling
+    // reading can be a TRANSIENT UNDER-count (measured: 305 while the true settled ceiling was north of 500) —
+    // the "below" siblings' layout (the form, in stacked mode) hadn't finished reflowing from the PRIOR drag's
+    // own write yet. The old (pre-t2353) code re-read fresh every frame and so self-corrected as reflow caught
+    // up mid-drag; a frozen snapshot has no way back once it locks in the transient low number. Monotonic max
+    // keeps that same self-correcting property — the read still happens every frame, but only a LARGER fresh
+    // reading is ever adopted, never a smaller one — so a genuine ratchet (a CONTENT-DRIVEN host echoing the
+    // visual's own just-shrunk height back at itself, see above) still cannot lower the room available for the
+    // REST of this same drag, while a real settle-driven increase (t1468's case) still gets picked up as soon as
+    // any frame observes it. Verified BOTH stay fixed together (WORK-LOG): the drill ratchet recovers fully
+    // within one drag, AND t1468's cross-drag grow (a separate, later pointerdown after a separate shrink) is
+    // unbroken again.
+    let dragMaxHeight = VIZH_MAX;
+    const heightAt = (y) => {
+        const fresh = visualMaxHeight(visual);
+        if (fresh > dragMaxHeight) dragMaxHeight = fresh;
+        return Math.max(VIZH_MIN, Math.min(dragMaxHeight, Math.round(dragStartHeight + (y - dragStartY))));
+    };
     let rafId = null, pendingY = null;
     const applyMove = (y) => {
         let clampedTotalHeight = heightAt(y);
-        applyVisualHeight(clampedTotalHeight);
+        applyVisualHeight(clampedTotalHeight, { visual, max: dragMaxHeight });   // t2353 — pin the SAME cap applyVisualHeight would otherwise re-derive live
         if (dragPanes.length > 1) {
             let frac = startTopHeight / Math.max(1, clampedTotalHeight);
             let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
@@ -388,12 +426,25 @@ function addVisualSizer(split) {
         } else {
             startTopHeight = 0;
         }
-        // t2349 — capture EXACTLY what the old per-frame formula computed (`y - visual.top`), just once
-        // instead of every frame: NOT `visual.getBoundingClientRect().height` (a different quantity — the
-        // pointer sits approximately, not exactly, at the visual's own bottom edge; this one-off approximation
-        // error mattered, verified: it stuck the ratio in the sibling handler below, see that fix's own note).
+        // t2349 — capture ONCE at pointerdown instead of re-reading every frame (`y - visual.top` every
+        // pointermove, the original frame-based formula).
+        // t2353 — the OWNER's second observation ("on touch it slightly increases size then just reduces"):
+        // the captured baseline used to be `e.clientY - visual.top` (pointer distance from the visual's own
+        // top edge) rather than the visual's own rendered height — the sizer's grab point sits at its own
+        // vertical CENTER, a few px below the visual's true bottom edge (half the grip's own height), so a
+        // zero-movement touch fed a baseline a few px short of the real height straight back into
+        // applyVisualHeight, shrinking it the instant the drag started (verified live: ~2px at both 412px and
+        // desktop). The sibling handler below hit the SAME class of gap at a much larger magnitude (the ratio
+        // splitter sits a whole pane-boundary away from the visual's edge, not just a grip's-width away) — see
+        // its own fix for the full reasoning. Captured as the visual's OWN exact rendered height here instead:
+        // this handler's `heightAt` treats the baseline as the TOTAL requested height directly (unlike the
+        // sibling's top/bottom split), so there is no separate "chrome" term to add back — the exact height IS
+        // the whole quantity. (The old comment here warned this exact swap "stuck the ratio" — that bug lived
+        // in the SIBLING handler's own top/bottom split math, not in this one, which never derives a ratio from
+        // dragStartHeight; unaffected, and this fix's own acceptance test below confirms no ratio regression.)
         dragStartY = e.clientY;
-        dragStartHeight = e.clientY - visual.getBoundingClientRect().top;
+        dragStartHeight = visual.getBoundingClientRect().height;
+        dragMaxHeight = visualMaxHeight(visual);   // t2353 — seeded once; see the comment above heightAt for why it then only ever GROWS, never re-derives fresh
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
@@ -445,10 +496,16 @@ function addPaneSplitter(split) {
     // (the top pane's / the whole visual's height at that same instant) replace every mid-drag
     // `visual.getBoundingClientRect().top` read — the request now depends only on how far the POINTER has
     // moved since pointerdown, never on where anything else drew itself in between.
-    let dragStartY = 0, dragStartTopHeight = 0, dragStartVisualHeight = 0;
+    let dragStartY = 0, dragStartTopHeight = 0, dragStartVisualHeight = 0, dragStartChrome = 0;
+    // t2353 — same fix, same evidence as addVisualSizer's own comment above (including the t1468 cross-drag
+    // regression that ruled out a pure one-time snapshot): the ceiling is seeded at pointerdown, then only ever
+    // GROWS for the rest of this drag — never shrinks — via `freshenMax()`, called once per frame from
+    // `applyMove` below (both branches) and once more from `onUp`'s own authoritative write.
+    let dragMaxHeight = VIZH_MAX;
+    const freshenMax = () => { if (visual) { const fresh = visualMaxHeight(visual); if (fresh > dragMaxHeight) dragMaxHeight = fresh; } };
     const heightAt = (y) => {
         if (!visual) return getVisualHeight();
-        return Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(dragStartVisualHeight + (y - dragStartY))));
+        return Math.max(VIZH_MIN, Math.min(dragMaxHeight, Math.round(dragStartVisualHeight + (y - dragStartY))));
     };
     // t2345 — same shape/fix as addVisualSizer's onMove above: the a/b (preview3d/layout2d) top-order test is
     // invariant for the duration of a drag (they cannot swap position mid-drag), so it is read ONCE at
@@ -457,16 +514,42 @@ function addPaneSplitter(split) {
     let dragThreeDTop = false;
     let rafId = null, pendingY = null;
     const applyMove = (y) => {
+        freshenMax();   // t2353 — may only raise dragMaxHeight, never lower it; see its own comment above
         if (actsAsSizer) {
-            applyVisualHeight(heightAt(y));
+            applyVisualHeight(heightAt(y), { visual, max: dragMaxHeight });   // t2353 — same pin as addVisualSizer's own applyMove
         } else {
             let requestedTopHeight = dragStartTopHeight + (y - dragStartY);
-            let requestedTotalHeight = requestedTopHeight + startBottomHeight;
-            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
-            let actualTopHeight = clampedTotalHeight - startBottomHeight;
-            let frac = actualTopHeight / clampedTotalHeight;
+            let requestedTotalHeight = requestedTopHeight + startBottomHeight + dragStartChrome;
+            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(dragMaxHeight, requestedTotalHeight));
+            // t2353 — `dragStartChrome` reconstructs the TOTAL exactly (fixes both the stationary-touch height
+            // jump AND, confirmed live on the flipped drill at desktop width — see WORK-LOG — a real ~0.09
+            // ratio cliff on release even with zero pointer movement, since tree mode carries MORE chrome inside
+            // one `.viz-split` than the classic shell: the "VISUALIZATION" label above it, the ratio bar AND the
+            // bottom sizer bar both living inside the same split). UNSATURATED (the common case — nothing hit
+            // VIZH_MIN/dragMaxHeight), subtract it here too so the ratio's own split reconstructs exactly.
+            // SATURATED (the drag pushed past the ceiling), fall back to the OLD chrome-blind subtraction: a
+            // clamped classic drag was verified (WORK-LOG A/B, exact number 0.44342291371994347 both before and
+            // after this change) to land on a DIFFERENT ratio once chrome is subtracted there too — a real
+            // behavior change the dispatch's "classic path byte-identical" requirement rules out shipping
+            // without a dedicated look at how a ratio-splitter SHOULD rebalance once there's no more room to
+            // give (a design question this turn didn't open). Both branches use the SAME already-exact
+            // `clampedTotalHeight`, so only which quantity comes OUT of it changes, not the total itself.
+            let saturated = clampedTotalHeight !== requestedTotalHeight;
+            let actualTopHeight = saturated ? (clampedTotalHeight - startBottomHeight) : (clampedTotalHeight - startBottomHeight - dragStartChrome);
+            // t2353 — THE REAL cliff, found via live numbers (WORK-LOG): `frac` used to divide by
+            // `clampedTotalHeight` (the WHOLE visual, chrome included) instead of `actualTopHeight +
+            // startBottomHeight` (the two PANES only — what `--pane-ratio` actually splits between; chrome
+            // like the section-label and the two grab bars doesn't participate in the ratio at all). Measured
+            // on the flipped drill at desktop width: top=160, bottom=160, chrome=72, visual=392 — the OLD
+            // `160/392=0.408` against a starting ratio of 0.5, on a drag that never moved the pointer at all.
+            // `160/(160+160)=0.5` — exact. In the SATURATED branch this is a pure no-op: there `actualTopHeight
+            // + startBottomHeight` algebraically reduces to `clampedTotalHeight` (actualTopHeight is already
+            // `clampedTotalHeight − startBottomHeight`), so the classic saturated-clamp landing this turn
+            // proved byte-identical (WORK-LOG A/B) is untouched — only the UNSATURATED, chrome-subtracted
+            // branch's own denominator was ever wrong.
+            let frac = actualTopHeight / (actualTopHeight + startBottomHeight);
             let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
-            applyVisualHeight(clampedTotalHeight);
+            applyVisualHeight(clampedTotalHeight, { visual, max: dragMaxHeight });   // t2353 — pin the SAME cap, not a fresh per-frame re-derive
             applyPaneRatio(newRatio);
         }
     };
@@ -485,16 +568,20 @@ function addPaneSplitter(split) {
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
+        freshenMax();   // t2353 — the authoritative final write gets the same chance to pick up a late-settling ceiling
         if (actsAsSizer) {
             setVisualHeight(heightAt(e.clientY));
         } else {
             // t2349 — same delta-based math and the SAME dragThreeDTop every onMove frame used (not a fresh
             // re-query): the authoritative final write must land exactly where the last frame showed.
+            // t2353 — and the SAME captured dragMaxHeight, not a fresh visualMaxHeight(visual) read. Same
+            // saturated/unsaturated chrome split as applyMove's own non-sizer branch above — see that comment.
             let requestedTopHeight = dragStartTopHeight + (e.clientY - dragStartY);
-            let requestedTotalHeight = requestedTopHeight + startBottomHeight;
-            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
-            let actualTopHeight = clampedTotalHeight - startBottomHeight;
-            let frac = actualTopHeight / clampedTotalHeight;
+            let requestedTotalHeight = requestedTopHeight + startBottomHeight + dragStartChrome;
+            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(dragMaxHeight, requestedTotalHeight));
+            let saturated = clampedTotalHeight !== requestedTotalHeight;
+            let actualTopHeight = saturated ? (clampedTotalHeight - startBottomHeight) : (clampedTotalHeight - startBottomHeight - dragStartChrome);
+            let frac = actualTopHeight / (actualTopHeight + startBottomHeight);   // t2353 — see applyMove's own comment above
             let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, dragThreeDTop ? frac : 1 - frac));
             setVisualHeight(clampedTotalHeight);
             setPaneRatio(newRatio);
@@ -531,12 +618,37 @@ function addPaneSplitter(split) {
         // top edge sits above chrome (the "VISUALIZATION" section-label) the pane's own box does not include,
         // so that approximation was measurably wrong and stuck the ratio at 412px (verified: 0.5 → 0.5 across
         // a whole real-mouse drag with the height-based capture, vs the correct capture below moving it the
-        // same amount the frame-based original did). Both start values are the identical `y - visual.top`
-        // quantity, just feeding two different downstream formulas (the ratio branch adds startBottomHeight to
-        // it; the actsAsSizer branch below in `heightAt` uses it directly as the requested total) — kept as
-        // two named variables rather than one shared value, matching how the original two call sites read.
+        // same amount the frame-based original did).
         dragStartY = e.clientY;
-        if (visual) { const startOffset = e.clientY - visual.getBoundingClientRect().top; dragStartTopHeight = startOffset; dragStartVisualHeight = startOffset; }
+        if (visual) { const startOffset = e.clientY - visual.getBoundingClientRect().top; dragStartVisualHeight = startOffset; }   // actsAsSizer branch only — unchanged
+        // t2353 — the OWNER's second observation ("on touch it slightly increases size then just reduces"):
+        // `dragStartTopHeight` used to be the SAME `startOffset` as dragStartVisualHeight above (pointer
+        // distance from the VISUAL's own top edge) — a stand-in for the top pane's height that is only exact
+        // when the pointer sits precisely at the pane's own bottom edge. It doesn't: the splitter's grab point
+        // is its own vertical CENTER, sitting ~half the splitter's own height below the pane boundary, and the
+        // visual's top edge carries chrome the offset never counted — the "VISUALIZATION" section-label ABOVE
+        // the split, and (once both handles are mounted) the SIZER bar itself sitting below the last pane. A
+        // stationary touch (pointerup at the SAME y as pointerdown) fed that same wrong baseline back unchanged
+        // — reproducing the gap as a real, measured jump the instant the drag started (verified live: a
+        // zero-movement press-release at 412px moved the ratio-split visual by up to 29px).
+        // Fix: capture the TOP PANE's own exact rendered height (exact, by construction — no offset to be
+        // wrong about) PLUS `dragStartChrome`, everything else in the visual's total that ISN'T the two panes
+        // or the already-exact `startBottomHeight` (the label, the ratio bar's own height, the sizer bar, any
+        // gaps) — measured as one opaque leftover (`visual height − top pane − bottom pane`) rather than
+        // enumerated piece by piece, so it stays correct even if the chrome changes shape later. Added back on
+        // both the request AND the un-request (`actualTopHeight = clamped − bottom − chrome`) so a zero-move
+        // drag reconstructs the CURRENT total exactly. Pure pointer delta (y - dragStartY) still drives every
+        // subsequent frame — additive to t2349's own delta fix, not a reversion of it: t2349's bug was reading
+        // `topPane.height` and the pointer-offset `startOffset` as ONE shared quantity across BOTH this branch
+        // and the actsAsSizer branch above, which need genuinely different baselines (a pane's own height here
+        // vs the visual's own extent there) — kept as separately-sourced variables this time, each exact for
+        // what IT measures, with the leftover chrome accounted for explicitly instead of silently absorbed.
+        if (visual && allPanes.length > 0) {
+            const topH = allPanes[0].getBoundingClientRect().height;
+            dragStartTopHeight = topH;
+            dragStartChrome = visual.getBoundingClientRect().height - topH - startBottomHeight;
+        }
+        dragMaxHeight = visual ? visualMaxHeight(visual) : VIZH_MAX;   // t2353 — captured once; see heightAt's own comment above
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');

@@ -59858,3 +59858,125 @@ scope beyond what was dispatched.
 
 `tests/wizard-face-1599.spec.js` + 13 other files listed above — one wait condition each, no other changes.
 
+## t2353 — THE 3D PANE ONLY SHRINKS. The advisor's own ratchet spec was RIGHT but NARROWER than diagnosed (desktop clean, stacked confirmed) — and driving it live surfaced a second, larger, previously-invisible bug (a ratio cliff on every touch) the spec's own acceptance criterion was specifically designed to catch.
+
+Full spec at (now-deleted) `DDCS-Studio/scratchpad/t2353-ratchet-spec.md`: `visualMaxHeight(visual)`
+(`paneAccordion.js`) asks `visual.parentElement` how much room a pane-resize drag has — a real, stable ceiling
+on the classic shell (`.wiz-2pane`), but on the flipped drill's tree render the parent is the `split_horizontal`
+pane wrapper, whose OWN height the advisor suspected was content-driven by the visual itself — a self-feeding
+ceiling. Dispatch's own explicit instruction: verify live before trusting it (the advisor's own words — "the
+last one was wrong at the site level"), build the two-layer fix, prove the classic path byte-identical, add the
+owner's own free acceptance criterion (touch without moving = zero px change), and run the full suite.
+
+### VERIFY FIRST — the mechanism was real, but NOT where first measured
+
+Built a scratch Playwright probe reproducing `visualMaxHeight`'s own formula from outside (no source edits
+needed) and logged it + the visual's rect height per rAF flush during a real synthetic drag, tree-mode drill vs
+classic contour as the control, at both viewports the dispatch named.
+
+- **Desktop (1280px)**: NO ratchet. `visualMaxHeight` stayed flat at 846 (tree) / 707 (classic) through a full
+  shrink-then-grow drag on BOTH the ratio splitter and the bottom sizer — `.ui-split-pane2` gets a genuinely
+  independent row height on desktop's side-by-side layout, not an echo of the visual's own extent.
+- **412px (stacked)**: CONFIRMED. `visualMaxHeight` tracked the visual's own current height to within 1px the
+  ENTIRE drag, shrink and grow alike — a shrink-then-grow sizer drag that should have recovered ~150px of a
+  ~180px shrink instead crept back only a handful of pixels (max never gave more room than "wherever you already
+  are"), matching the spec's own predicted signature exactly.
+
+This matters because a MID-TASK AMENDMENT later reported the owner reproducing the bug on DESKTOP too, with the
+advisor's own separate `?debug=drag` instrument finding `ceil` constant at 846 on a real desktop drag — i.e. the
+advisor's OWN live data agreed with mine: the ratchet itself is not what's on desktop. What IS on desktop is a
+different, larger bug (below) that LOOKS like "it only shrinks" from the outside but isn't the ratchet at all.
+
+### FIX layer 1 — hoist the ceiling to pointerdown, in BOTH handlers, at BOTH call sites
+
+`applyMove`'s own per-frame `visualMaxHeight(visual)` calls (in `addVisualSizer` AND `addPaneSplitter`, both the
+live-frame and the release-frame math) were the read the t2345/t2349 turns' own hoists had missed. Captured as
+`dragMaxHeight`, set at pointerdown. But `applyMove` calls `applyVisualHeight()`, and THAT function ALSO
+re-derived its own `cap = visualMaxHeight(v)` fresh on every single invocation, one level down — the hoist at
+the call site alone didn't reach it. Gave `applyVisualHeight` an optional `dragCap` override ({visual, max}):
+the ONE visual actively being dragged borrows the caller's own number; every other mounted `.wiz-visual`
+(cross-wizard sync, the `h===undefined` heal path) keeps deriving its own cap live, unchanged.
+
+**A pure one-time snapshot was the first attempt, and it was wrong** — caught by re-running an EARLIER,
+already-shipped regression test (`pane-sizer-mobile-1468.spec.js`, t1468's own "grey band" fix) rather than
+just my own new suite. That test does two SEPARATE drags (shrink, release, then grow) on a different stacked
+twin (`user_surfacing_data`) and failed against my snapshot fix — not against HEAD. Instrumented the failure:
+right after the FIRST drag's release, the SECOND drag's very first `visualMaxHeight` reading was a TRANSIENT
+UNDER-count (305px measured, while the true settled ceiling was north of 500) — the stacked form below hadn't
+finished reflowing from the prior drag's own write yet. The OLD (unfixed) code re-read fresh every frame and so
+self-corrected as reflow caught up mid-drag; a frozen snapshot has no way back once it locks in the transient
+low number. Fixed by making `dragMaxHeight` MONOTONIC instead of frozen: still re-read every frame, but only
+ever RAISED, never lowered (`if (fresh > dragMaxHeight) dragMaxHeight = fresh`). This keeps both properties: a
+shrinking, content-driven host can't ratchet the stored ceiling down (nothing lowers it), while a genuinely
+settling layout can still raise it mid-drag. Verified both stay fixed TOGETHER: the drill ratchet recovers fully
+within one continuous drag (412px AND desktop), and `pane-sizer-mobile-1468.spec.js`'s own cross-drag scenario
+passes clean again, all 3 of its tests.
+
+### FIX layer 2 — NOT the spec's own version (ambiguous host), but a REAL, larger bug the acceptance criterion found instead
+
+Built the owner's own free acceptance criterion first (touch the splitter WITHOUT moving = 0px change on any
+pane) and it failed — not on height (that part was already fine), but I'd extended the assertion to the RATIO
+too once the mid-task amendment's live numbers arrived. The advisor's own `?debug=drag` instrument, driven live
+against the flipped drill on desktop, found the REAL signature: a stationary touch (pointerdown → pointerup,
+zero pixels moved) moved `--pane-ratio` from 0.5 to 0.408 — an 18% relative swing on a gesture that never moved
+at all. Reproduced and root-caused directly: `addPaneSplitter`'s ratio math computed
+`frac = actualTopHeight / clampedTotalHeight` — the top pane's share of the WHOLE VISUAL, when chrome (the
+"VISUALIZATION" section-label, the ratio bar, the bottom sizer bar — none of which participate in the ratio)
+sits inside that same denominator. Measured live: top=160, bottom=160, chrome=72, visual=392 —
+`160/392=0.408` vs the correct `160/(160+160)=0.5`. This was NEVER actually about the ratchet at all — it is a
+denominator bug that predates t2353 entirely, on BOTH classic and tree (a few px on classic's smaller chrome,
+large enough on drill's own bigger chrome — a section-label AND both grab bars sharing one `.viz-split` — to be
+what the owner actually felt as "on touch it slightly increases size then just reduces"). Fixed the denominator
+to `actualTopHeight + startBottomHeight` (the two panes only), and separately fixed `dragStartTopHeight` itself
+off the old pointer-offset approximation (exact only when the pointer sits precisely at the pane boundary, which
+grab handles structurally never do) onto the pane's own exact rendered height, with the remainder captured once
+as `dragStartChrome` (one opaque leftover — `visual height − top pane − bottom pane` — rather than enumerated
+piece by piece, so it survives future chrome changes).
+
+**Classic-path byte-identical, proven not assumed**: A/B'd a real classic (contour) drag that saturates the
+ceiling (visual already at max height) against the pre-t2353 file — exact number `0.44342291371994347` — before
+AND after every single change made this turn, including the final monotonic-max version. The saturated branch
+of `actualTopHeight` deliberately stays on the OLD chrome-blind subtraction (verified live that subtracting
+chrome there too lands a DIFFERENT ratio once already at max — a real behavior change, not a rounding nicety,
+that a ratio splitter's own "what happens with no room left" design wasn't this turn's to open). The new
+denominator fix is a provable NO-OP in that same saturated branch (`actualTopHeight + startBottomHeight`
+algebraically reduces to `clampedTotalHeight` there, by construction) — so only the unsaturated, common case
+changed.
+
+### What did NOT ship: the spec's own "layer 2" (redefining what the tree ceiling means)
+
+The spec's own second layer — re-deriving the ceiling to mean "room the split pane COULD give" rather than
+"the visual's own extent echoed back" — was never built. The monotonic-max fix above already removes the
+practical ratchet a user would feel (both within-drag and, via t1468's own regression coverage, cross-drag), and
+picking the "right" ancestor to measure against for an ARBITRARY future `split_horizontal`/`split_vertical` tree
+is genuinely ambiguous without baking in drill's own specific DOM depth — exactly the spec's own named escape
+hatch ("if layer 2 is ambiguous, ship layer 1 alone and say so").
+
+### FULL SUITE — two runs, everything attributable, nothing new
+
+**Run 1**: 18 failed / 2838 passed. **Run 2** (after the monotonic-max fix, run again clean): 21 failed / 2835
+passed — a LARGELY DIFFERENT set both times (2838 vs 2835 total is itself just JSON-summary/skip-count noise
+across runs), the classic contention-flake shape this arc's own t2351 turn already characterized. Re-ran every
+non-timeout failure from run 2 together in isolation (`--workers=1`): 14 of 16 cleared immediately. The 2
+stragglers (`tooltable-gate-1890`, `undo-reproject-echo`) got individual re-runs with `--repeat-each=2` plus a
+direct A/B against the pre-t2353 file: `tooltable-gate-1890` passed clean on ORIG (a one-off flake);
+`undo-reproject-echo`'s third test fails IDENTICALLY, deterministically, on ORIG too — a genuine pre-existing
+defect in undo/redo block-value editing with zero code-path connection to `paneAccordion.js`. `middle-superset`'s
+own shard-3/4 timeout appeared in both runs — an already-known-heavy 14336-combo structural sweep (already split
+into shards specifically because it's slow), unconnected to this turn's own files. FAILED COUNT attributable to
+this turn: **0**.
+
+### Files changed
+
+`web/ui/paneAccordion.js` — `applyVisualHeight` gains an optional `dragCap` override param; `addVisualSizer` and
+`addPaneSplitter` each gain a monotonic `dragMaxHeight` (seeded at pointerdown, re-read but only ever raised per
+frame) replacing every per-frame `visualMaxHeight(visual)` call; `addPaneSplitter`'s ratio branch gains
+`dragStartChrome` (captured once) and a corrected `frac` denominator, with a `saturated` fallback to the old
+chrome-blind subtraction preserving classic's exact clamped-ceiling landing.
+
+`tests/pane-ratchet-2353.spec.js` (new) — 8 tests: the acceptance criterion (stationary touch, both handles,
+both viewports, tree AND classic), the owner's own ratio-cliff repro (same criterion, ratio instead of height),
+and the shrink-then-grow recovery guard, both viewports. Proved non-vacuous by A/B against the pre-t2353 file:
+7 of 8 fail there (the 8th — desktop's own grow-recovery test — correctly passes on both, since desktop never
+had the ratchet to begin with).
+
