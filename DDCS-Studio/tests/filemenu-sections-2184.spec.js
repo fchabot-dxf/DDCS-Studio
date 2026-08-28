@@ -34,10 +34,12 @@ test('four labelled sections, in order, each carrying the right acts', async ({ 
     );
     // t2184 amendment 16 — Workspace is now a 2x2 (Save/Open/Wizards/Settings), no odd-item-spans-full-width
     // case; amendment 17 — G-code's save action (fileExport, "Save as…") leads, Open (fileLoad) follows.
+    // t2361 (BACKLOG #37) — Project gains a third tile, Insert op… (projInsert), wrapping to its own row in the
+    // 2-column grid (same "an extra tile wraps" shape Reference already has when checklist is hidden).
     expect(sections).toEqual([
         { title: 'Workspace', acts: ['wsSave', 'wsOpen', 'wizards', 'settings'] },
         { title: 'G-code', acts: ['fileExport', 'fileLoad'] },
-        { title: 'Project', acts: ['projSave', 'library'] },
+        { title: 'Project', acts: ['projSave', 'library', 'projInsert'] },
         { title: 'Reference', acts: ['setupSheet', 'checklist'] },
     ]);
 });

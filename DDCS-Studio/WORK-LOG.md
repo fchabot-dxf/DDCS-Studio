@@ -60353,3 +60353,123 @@ unrelated tests in the same files kept.
 
 `tests/preset-removal-2359.spec.js` (new), `tests/cloud-connected-validated-2359.spec.js` (new).
 
+## t2361 — BUILD #37: INSERT OP FROM PROJECT, the preset successor. One storage concept (projects), a new
+gesture over it — plus the ONE named hazard, resolved with the codebase's own existing precedent in hand,
+not guessed.
+
+BACKLOG #37 read in full (byte-identical to the reading at t2359, no drift). THE FEATURE: from the quick
+menu, browse this workspace's saved projects, expand one to see its ops individually, pick ONE, it's
+inserted into the CURRENT program with its saved params — a one-op project then behaves exactly as a preset
+did, and so does any op in any past job, which is strictly more than presets ever offered. Projects stay the
+ONLY store of values (the owner's own framing); this is a READ of one project from inside another.
+
+### THE HAZARD, decided with the file in hand
+
+BACKLOG #37 named it but left it to decide at build time: does a `user_*` op's custom def travel inside the
+project's own `.mjson`, or does an op whose type isn't registered in THIS workspace need a refusal? Traced
+`blocks/programFile.js`'s `serializeProject` — a project's `stack` is `window.ddcsGetBlockProgram()` itself,
+an array of `{id, type:'op', opType, params, children, comment?}` op CONTAINERS (`opBuilders.js`'s `makeOp`)
+— never a def. **The def does not travel.** Confirmed against the codebase's OWN existing precedent for
+exactly this gap, found by reading rather than guessing: `data/stackToSlot.js:39` and
+`data/subStackToSlot.js:106` (Universal CAM, reading a saved op whose custom def isn't locally registered)
+already fail this identical situation with `"op def not found … deleted or is not registered on this
+machine"` rather than dropping or guessing a substitute. Built the SAME shape: the picker checks
+`builderOf(op.opType)` per row and greys any op that fails it, with the reason inline (never a silent skip);
+`insertOpFromRecord` (below) checks it again itself before ever touching the program — the guard held twice,
+once for the UI and once for the mechanism, so a caller that skips the picker can't slip an unregistered type
+through either.
+
+### THE MECHANICS — reused, not reinvented
+
+`blocks/opSession.js`'s `duplicateOp` was the exact template: rebuild an op's blocks from `{opType, params}`
+via `_framed`/`makeOp` (fresh id), the SAME reconstruction the marker-import codec (`opFromMarker`,
+`programModel.js`) already trusts. New `insertOpFromRecord(rec)` mirrors it but ADDS via
+`window.ddcsAddOperation` (the same door `addActiveOp` already uses for "add this op as a further operation
+in the current program") instead of `insertOpAfterId` — the op is arriving from OUTSIDE the current program,
+not being duplicated in place within it. Purely additive: no existing line in `opSession.js` touched.
+
+A project's per-op attached COMMENT (t2289 — the same note the Blocks canvas shows) rides straight off each
+`stack` entry's own `.comment` field, no new plumbing — confirmed live in the picker before writing a single
+line of UI, by reading `blocks/blockly/stackBridge.js`'s `toRecord`, which already sets it. The one-line
+params summary (`ui/projects/insertOpSummary.js`, new, pure) has two paths: a `user_*` op reads its own
+DECLARED binding labels (`getUserDef(opType).bindings`, the same labels its form renders); a built-in op has
+no single label registry (every wizard hand-builds its own form), so a small declared priority-key list
+(pattern/dia/depth/w/h/count/…, drawn from `opSchema.js`'s own SCHEMA vocabulary) stands in — cheap, as the
+dispatch asked, not a per-op label lookup this turn would have had to invent 30+ of. No per-op thumbnails
+(explicitly out of scope this turn) — the text summary carries it.
+
+Projects are enumerated via `projectStore.js`'s existing `exportAllEntries()` (already used for the
+whole-workspace backup) rather than the folder-scoped `list()` the Save/Open manager uses — the picker shows
+EVERY project flat regardless of folder, since browsing folder structure isn't this feature's job.
+`multi_step` wrappers (a multi-op import's own grouping, `programModel.js`'s `groupConsecutiveOps`) are
+expanded one level so their individual steps are pickable too, same as any other op — not treated as one
+opaque row.
+
+### ENTRY POINT — the quick menu only, owner-ruled
+
+A third tile, "Insert op…", added to the FILE menu's existing Project section (`ui/headerPost.js`) —
+alongside Save as…/Open…, wrapping to its own row in the 2-column grid (the SAME "an extra tile wraps"
+shape Reference already uses when Setup checklist is hidden; no CSS change needed for the wrap itself).
+Reused the `insert` HQ_ICONS glyph, declared since before t2173 but orphaned since that turn's Insert-row
+removal — this is a genuine, correctly-scoped revival, not a coincidence: the file's own icon vocabulary
+already had the right shape waiting.
+
+### Verified live, not assumed
+
+Booted the real app, saved a project with a real built-in op (`pocket`, real params + a comment) and a
+second project with a made-up `user_*` opType no def anywhere claims. Opened the quick menu, clicked Insert
+op…, expanded both projects: the real op showed its label/summary/comment and an Insert button; the fake one
+showed greyed with "Not available in this workspace — … is a custom op whose definition is not registered
+here." Clicked Insert on the real one — program grew by exactly one op, carrying the SAVED params (not
+defaults), toast confirmed, the picker stayed open (picking again is just picking again, per the dispatch).
+
+New spec `tests/insert-op-from-project-2361.spec.js` (4 tests) — the menu row opens the picker; a project
+expands to TYPE label + summary + comment; Insert grows the program with saved params and leaves the modal
+open; the hazard row is refused, never silently dropped. Proven non-vacuous by A/B: stashed every t2361
+source change (including the two new files, `git stash -u`) and re-ran against bare pre-turn code — 4/4 fail
+there (the menu row doesn't exist yet). Restored immediately, re-verified 4/4 green.
+
+### Two PRE-EXISTING pinned-row-list tests updated, not silenced
+
+`tests/filemenu-sections-2184.spec.js` and `tests/header-profile-menu.spec.js` each hardcode the Project
+section's exact act list / row count — both broke the moment the third tile existed, exactly as their own
+comments say a row-count change should ("a count change has to be explained, not just re-numbered"). Both
+updated to include `projInsert` in the expected list, with a comment naming this turn; re-ran each file in
+full afterward (11/11 and 2/2) including the 390px overflow-fit and 44px-touch-floor assertions in
+filemenu-sections — the third tile doesn't push the popover past its own height cap at any width tested.
+
+### FULL SUITE — one run, 2 failed / 2909, both triaged, ZERO attributable after the fix above
+
+One was the `header-profile-menu.spec.js` pinned-row-list failure above — fixed, not just excused. The other,
+`undo-reproject-echo.spec.js`'s own "a real block-value edit is undoable" test, is unrelated: my only edit to
+`opSession.js` is the new, purely additive `insertOpFromRecord` (no existing line touched, `loadedSig` never
+read or written by it), and this test's own flow never touches the project-insert feature at all. Confirmed
+via A/B (stashed every t2361 change, re-ran against bare pre-turn code — passed clean) and by re-running it
+isolated twice more on the CURRENT tree afterward: pass, then flaky (fails once, passes on Playwright's own
+retry) — a `page.waitForFunction` timeout after Undo/Redo clicks, the shape of a timing-sensitive wait under
+load, not a deterministic break tied to this turn's diff. Consistent with this session's own long-documented
+resource pressure (many continuous hours of Playwright in one session); reported as unreliable rather than
+ground on, per this turn's own dispatch note. The 7 "flaky" items the suite itself already separated out
+(field-help-798, formfield-loud-mismatch-1636, middle-superset's shard 3/4, pane-header-1768,
+pocket-cavity-2d, tooltable-gate-1890 x2) are all named, pre-existing, unrelated to anything this turn
+touched. FAILED COUNT attributable to t2361: **0**.
+
+### Files changed
+
+`web/blocks/opSession.js` — new export `insertOpFromRecord(rec)`, purely additive.
+
+`web/ui/headerPost.js` — Project section gains a third tile (`projInsert`, "Insert op…"), reusing the
+already-declared `insert` icon.
+
+`web/styles.css` — `.iop-ops`/`.iop-op-row-disabled` (the picker's indent + greyed-refusal styling), reusing
+the existing `.wizm-*`/`.wsm-*` chrome for everything else.
+
+`web/ui/projects/insertOpPicker.js` (new) — the picker modal.
+
+`web/ui/projects/insertOpSummary.js` (new, pure) — the one-line params summary.
+
+`tests/insert-op-from-project-2361.spec.js` (new, 4 tests).
+
+`tests/filemenu-sections-2184.spec.js`, `tests/header-profile-menu.spec.js` — pinned Project-section row
+lists updated for the new tile.
+

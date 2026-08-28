@@ -152,6 +152,11 @@ function runQuickAction(act) {
         // t2190 — opens the SAME manager as Open, with the save prompt fired immediately (promptSave) — Save and
         // Open are one surface now, not two separate modals.
         case 'projSave': openProjectManager({ promptSave: true }); break;
+        // t2361 (BACKLOG #37) — INSERT OP FROM PROJECT, the preset successor: browse this workspace's saved
+        // projects, pick ONE op from any of them, it's inserted into the CURRENT program with its saved params.
+        // Projects stay the only store of values; see ui/projects/insertOpPicker.js's own header for the full
+        // ruling (incl. the unregistered-user-op-type hazard and how it's resolved).
+        case 'projInsert': import('./projects/insertOpPicker.js').then((m) => m.openInsertOpPicker()); break;
     }
 }
 
@@ -384,7 +389,11 @@ export function initHeaderPost() {
         // writes a known file and never asks; G-code and Project both always ask, so both say Save as… now.
         const projectGrid = grid(
             wsBtn('projSave', 'save', 'Save as…', 'Save the current program into this workspace, as a project (.mjson) — name it and pick a folder inside this workspace'),
-            wsBtn('library', 'open', 'Open…', 'Your saved projects, embedded in this workspace — not raw G-code files, see Save as/Open above')
+            wsBtn('library', 'open', 'Open…', 'Your saved projects, embedded in this workspace — not raw G-code files, see Save as/Open above'),
+            // t2361 (BACKLOG #37) — the preset successor: insert ONE op from ANY saved project into the current
+            // program, with its saved params. Third tile in this section (amendment 16's grid wraps it to its own
+            // row, same as Reference does when Setup checklist is hidden — no CSS change needed).
+            wsBtn('projInsert', 'insert', 'Insert op…', 'Insert a single operation from one of your saved projects into the current program')
         );
 
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);

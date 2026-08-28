@@ -149,7 +149,8 @@ test('the FILE menu: identity line (name·controller, ↧) + four labelled secti
         'hq-identity-line', 'hq-saved-line',
         'hq-ws-row:wsSave+wsOpen+wizards+settings',
         'hq-ws-row:fileExport+fileLoad',
-        'hq-ws-row:projSave+library',
+        // t2361 (BACKLOG #37) — Project gains a third act, projInsert ("Insert op…", the preset successor).
+        'hq-ws-row:projSave+library+projInsert',
         'hq-ws-row:setupSheet+checklist',
     ]);
     // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 shrank it —

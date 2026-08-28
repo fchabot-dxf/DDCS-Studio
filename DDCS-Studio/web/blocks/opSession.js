@@ -607,6 +607,30 @@ export function duplicateOp(opId) {
     return true;
 }
 
+/** BACKLOG #37 — insert a COPY of an op from ANOTHER saved project's stack into the CURRENT program, as a further
+ *  operation. `rec` = one op entry from a project's own `stack` ({ opType, params, … } — the same shape
+ *  ddcsGetBlockProgram()/serializeProject already carry, so a project's saved op is exactly as portable as the
+ *  live program's own). Fresh id/blocks rebuilt from the SAME params the marker held (duplicateOp's own
+ *  reconstruction), but ADDS rather than replaces — window.ddcsAddOperation, the same door addActiveOp uses —
+ *  since the op arrives from OUTSIDE the current program, not from editing it in place.
+ *  Returns false when the op's type has no builder registered in THIS workspace (a user_* op whose custom def
+ *  lives only in the project's ORIGIN workspace) — the named hazard: the .mjson carries opType+params only, never
+ *  the def, so an unregistered type must refuse rather than silently drop or guess. The picker (ui/projects/
+ *  insertOpPicker.js) checks builderOf() itself before ever offering the row — this is the same guard held twice,
+ *  once for the UI (grey the row) and once here (never trust the caller alone). */
+export function insertOpFromRecord(rec) {
+    if (!rec || !rec.opType || !builderOf(rec.opType)) return false;
+    const framed = _framed(rec.opType, rec.params);
+    const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    const opC = makeOp(rec.opType, rec.params, bare);                  // fresh id
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    if (typeof window === 'undefined' || !window.ddcsAddOperation) return false;
+    const added = window.ddcsAddOperation(cur, opC);
+    if (!added || !added.length) return false;
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(added);
+    return true;
+}
+
 /**
  * #headline — wrap a CONTIGUOUS run of LOOSE top-level atoms (a hand-built run with no op wrapper) into ONE editable
  * `group` op, so the editor's line→op map finds it (`findOpInStack` matches `type==='op'`) → the hover ✎ chip appears
