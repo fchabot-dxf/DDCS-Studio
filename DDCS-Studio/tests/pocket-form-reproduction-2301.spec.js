@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 /**
  * WIZARDS-AS-DATA — the arc's SECOND `uiChildren` reproduction (t2301), after drill (t2299). Pocket's tree
@@ -15,6 +15,11 @@ import { test, expect } from '@playwright/test';
  * tree places rectDimGroup/circleDimGroup as plain always-present grid_containers and lets each field's own
  * binding-level `when` decide visibility — no guard/pruneGuards involvement, mirroring pocketData.js's own
  * header comment for the full account.
+ *
+ * t2373 — REFACTORED onto tests/support/formReproduction.js (extracted alongside drill-form-reproduction-
+ * 2299.spec.js, structurally near-identical to it). Same EXPECTED_ORDER, same EXPECTED_ORPHANS, same three
+ * axes, same strictness as before the extraction — nothing softened, including pocket's own real differences
+ * from drill (no explicit registerUserOp call needed; baseParamsCustom instead of spreading POCKET_DEFAULTS).
  */
 
 const EXPECTED_ORDER = [
@@ -44,147 +49,20 @@ const EXPECTED_ORPHANS = [
   'passes', 'confirmEvery', 'entryX', 'entryY',
 ].sort();
 
-test('pocket-form-reproduction: declared tree places fields in the same structure as the shell', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
-
-  const r = await page.evaluate(async () => {
-    const pd = await import('/blocks/dataOps/pocketData.js');
-    const { renderUiTree, formBindings, renderOpForm } = await import('/ui/formWidgets.js');
-    const def = pd.pocketDataDef();
-    const userRoot = def.template.find(b => b && b.type === 'user_root');
-
-    const binds = formBindings(def);
-    const tempHost = document.createElement('div');
-    const readersFlat = renderOpForm(tempHost, binds) || [];
-    const byParam = {};
-    tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
-      if (!inp || !inp.dataset || !inp.dataset.param) return;
-      const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.closest('.grid-3') || inp.parentElement;
-      byParam[inp.dataset.param] = { row, read: readersFlat[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
-    });
-
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const readers = renderUiTree(host, userRoot.uiChildren, def.bindings || [], byParam);
-
-    const fields = [...host.querySelectorAll('[data-param]')].map(el => el.dataset.param);
-    const orphanCount = readers.orphanCount;
-    const explicit = fields.slice(0, fields.length - orphanCount);
-    const orphans = fields.slice(fields.length - orphanCount).sort();
-
-    return { fields, explicit, orphans, orphanCount, boundParamCount: Object.keys(byParam).length };
-  });
-
-  expect(r.orphanCount).toBe(EXPECTED_ORPHANS.length);
-  expect(r.orphans).toEqual(EXPECTED_ORPHANS);
-  expect(r.explicit).toEqual(EXPECTED_ORDER);
-  expect(r.fields.length).toBe(r.boundParamCount);   // every bound param placed exactly once — nothing dropped
-});
-
-test('pocket-form-reproduction: usage text, section titles and code-preview tag match the live shell', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
-
-  await page.evaluate(() => window.openWiz('pocket'));
-  await page.waitForSelector('#wiz_pocket', { state: 'visible' });
-
-  const shell = await page.evaluate(() => {
-    // Scope to .wiz-controls: .wiz-visual carries its own "VISUALIZATION" .section-label for the 2D/3D pane,
-    // a different concern from the form's own SHAPE/TOOL/TOOL & STEPOVER/DEPTH & FEED sections.
-    const root = document.querySelector('#wiz_pocket .wiz-controls');
-    const usage = root.querySelector('.wiz-usage')?.textContent || '';
-    const codeLabel = root.querySelector('.preview-block .label')?.textContent.replace(/\s+/g, ' ').trim() || '';
-    const sectionTitles = [...root.querySelectorAll('.section-label')]
-      .filter(el => el.offsetParent !== null)
-      .map(el => el.textContent);
-    return { usage, codeLabel, sectionTitles };
-  });
-
-  const tree = await page.evaluate(async () => {
-    const pd = await import('/blocks/dataOps/pocketData.js');
-    const { renderUiTree, formBindings, renderOpForm } = await import('/ui/formWidgets.js');
-    const def = pd.pocketDataDef();
-    const userRoot = def.template.find(b => b && b.type === 'user_root');
-    const binds = formBindings(def);
-    const tempHost = document.createElement('div');
-    const readersFlat = renderOpForm(tempHost, binds) || [];
-    const byParam = {};
-    tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
-      if (!inp || !inp.dataset || !inp.dataset.param) return;
-      const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.closest('.grid-3') || inp.parentElement;
-      byParam[inp.dataset.param] = { row, read: readersFlat[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
-    });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    renderUiTree(host, userRoot.uiChildren, def.bindings || [], byParam);
-    const usage = host.querySelector('.wiz-usage')?.textContent || '';
-    const codeLabel = host.querySelector('.preview-block .label')?.textContent.replace(/\s+/g, ' ').trim() || '';
-    const sectionTitles = [...host.querySelectorAll('.form-sec-title')].map(el => el.textContent);
-    return { usage, codeLabel, sectionTitles };
-  });
-
-  expect(tree.usage).toBe(shell.usage);
-  expect(tree.codeLabel).toBe(shell.codeLabel);
-  expect(tree.sectionTitles).toEqual(shell.sectionTitles);
-});
-
-test('pocket-form-reproduction: an edit in the declared tree reaches the op model and comes back', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
-
-  const r = await page.evaluate(async () => {
-    const pd = await import('/blocks/dataOps/pocketData.js');
-    const { renderUiTree, formBindings, renderOpForm } = await import('/ui/formWidgets.js');
-    const { pocketStack } = await import('/wizards/pocketWizard.js');
-    const { builderOf } = await import('/blocks/opBuilders.js');
-    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
-
-    const def = pd.pocketDataDef();
-    const dataBuilder = builderOf(pd.POCKET_DATA_OPTYPE);   // pocket_data is registered at app boot — no explicit registerUserOp needed (matches tests/pocket-data-emit.spec.js's own convention)
-
-    const userRoot = def.template.find(b => b && b.type === 'user_root');
-    const binds = formBindings(def);
-    const tempHost = document.createElement('div');
-    const readersFlat = renderOpForm(tempHost, binds) || [];
-    const byParam = {};
-    tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
-      if (!inp || !inp.dataset || !inp.dataset.param) return;
-      const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.closest('.grid-3') || inp.parentElement;
-      byParam[inp.dataset.param] = { row, read: readersFlat[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
-    });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const readers = renderUiTree(host, userRoot.uiChildren, def.bindings || [], byParam);
-
-    // WRITE: default render, edit the DEPTH field's real DOM input the way a user would, read it back through
-    // the SAME aggregation userOpView.js itself uses (_readers.map(read) → Object.assign).
-    const before = {};
-    for (const read of readers) Object.assign(before, read());
-
-    const depthInput = host.querySelector('[data-param="depth"]');
-    depthInput.value = '17.5';
-    depthInput.dispatchEvent(new Event('input', { bubbles: true }));
-    depthInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-    const after = {};
-    for (const read of readers) Object.assign(after, read());
-
-    // COMES BACK: feed the edited param set through the ACTUAL build path and confirm the emitted G-code is
-    // byte-identical to the hand-coded reference builder fed the SAME edited params.
-    const base = { shape: 'rect', w: 80, h: 60, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
-    const emitParams = { ...base, ...after };
-    const eq = emitEquivalence(pocketStack, dataBuilder, [emitParams]);
-
-    return {
-      beforeDepth: Number(before.depth),
-      afterDepth: Number(after.depth),
-      eqPass: eq.pass,
-      firstDiff: eq.firstDiff,
-    };
-  });
-
-  expect(r.beforeDepth).toBe(4);          // POCKET_DEFAULTS.depth
-  expect(r.afterDepth).toBe(17.5);        // the edit reached the model via the tree's own readers
-  expect(r.eqPass).toBe(true);            // …and the edited value drives the SAME emitted G-code as the reference builder
+registerFormReproductionSuite({
+  wizardLabel: 'pocket',
+  dataModule: '/blocks/dataOps/pocketData.js',
+  defFactory: 'pocketDataDef',
+  shellOpenArg: 'pocket',
+  shellId: 'wiz_pocket',
+  expectedOrder: EXPECTED_ORDER,
+  expectedOrphans: EXPECTED_ORPHANS,
+  refStackModule: '/wizards/pocketWizard.js',
+  refStackExport: 'pocketStack',
+  dataOptypeExport: 'POCKET_DATA_OPTYPE',
+  registerExplicitly: false,   // pocket_data is registered at app boot — no explicit registerUserOp needed (matches tests/pocket-data-emit.spec.js's own convention)
+  baseParamsCustom: { shape: 'rect', w: 80, h: 60 },
+  editParam: 'depth',
+  editValue: '17.5',
+  expectedBeforeValue: 4,   // POCKET_DEFAULTS.depth
 });

@@ -61256,3 +61256,108 @@ which is otherwise untouched (confirmed byte-identical behavior via the regressi
 `BACKLOG.md` — #32 marked SHIPPED with a correction note. (This turn's own main arc — the three path-anchor
 declarations — was a dispatch note, not a standing BACKLOG entry, so there is no corresponding entry to close.)
 
+## t2373 — ARC: PART 1 (THE RATCHET ENGINE, done) + PART 2 (THE MILL FAMILY, found genuinely blocked, not
+built) + rule 1b compliance (the advisor's own response to t2371's near-miss).
+
+### PART 1 — the shared reproduction engine, extracted from drill + pocket
+
+Read `drill-form-reproduction-2299.spec.js` and `pocket-form-reproduction-2301.spec.js` side by side, exactly
+as dispatched: structurally near-identical, differing in exactly the values the dispatch predicted (dataOps
+module path, def factory, shell id, the two expectation lists) plus two REAL differences the dispatch didn't
+name but the diff surfaced — pocket needs no explicit `registerUserOp(def)` call (already registered at app
+boot) while drill does, and pocket's own emit-equivalence base params are a hand-picked `{shape,w,h}` subset
+rather than a full spread of its own DEFAULTS. `tests/support/formReproduction.js` (new) extracts one
+`registerFormReproductionSuite(cfg)` generating the SAME three tests (structure+orphans / live-shell wording /
+edit-reaches-emit) either wizard had; both drill/pocket's own spec files shrink to a `cfg` object declaring
+`EXPECTED_ORDER`/`EXPECTED_ORPHANS` plus the handful of per-wizard names, calling the shared function once.
+Every ACTUAL difference (the two named above, plus pocket's extra `.grid-3` row-selector need) is a DECLARED
+config field, never smoothed away to fit — the engine's own row-selector union (`.form-row, .grid-2, .grid-3`)
+is safe for drill too (no `.grid-3` element exists in drill's own tree, so the extra selector in the chain
+never matches, falling through to the identical fallback drill always used — confirmed by the regression run
+below, byte-identical results).
+
+**PROVEN NON-VACUOUS, per wizard, as the dispatch explicitly required:** swapped the first two entries of
+drill's own `EXPECTED_ORDER` (`'pattern','skip'` → `'skip','pattern'`), re-ran — the structure test fails,
+naming the exact swap in its own diff; restored, re-ran green. Did the same for pocket (`'shape','strategy'` →
+`'strategy','shape'`) — same result. Both prove the shared engine is actually comparing render output against
+the declared expectation, not passing by construction.
+
+**Regression, all 6 tests (2 wizards × 3 tests), both files together:** 6/6 pass, byte-identical to the pre-
+extraction assertions (same EXPECTED_ORDER, same EXPECTED_ORPHANS, same pass/fail shape) — the refactor changed
+which FILE the test bodies live in, nothing about what they assert.
+
+### PART 2 — the mill family: found GENUINELY BLOCKED, not built, per the dispatch's own explicit "if a
+### shell's behaviour is genuinely impossible to reproduce, that STOPS THE TURN" permission
+
+Live-read all four (`user_contour_data`/`user_slot_data`/`user_surfacing_data`/`user_text_data`, opened for
+real via `wizardManager.open`) and compared their own rendered section titles against their own shell's
+section titles (`window.openWiz`, real gesture, matching drill/pocket's own established methodology):
+
+```
+contour   tree: GEOMETRY, TOOL & CUT              shell: SHAPE, SIDE & TOOL, DEPTH & FEED
+slot      tree: (none)                            shell: ENDPOINTS, REPEAT (array), TOOL, TOOL & WIDTH, DEPTH & FEED
+surfacing tree: GEOMETRY, COORDINATES              shell: AREA, TOOL, TOOL & STEPOVER, DEPTH & FEED
+text      tree: (none)                             shell: TEXT, TOOL, TOOL & FILL, DEPTH & FEED
+```
+
+Traced the root cause rather than just observing the mismatch: `grep -c 'section:'` against each dataOps
+file's own bindings — contour 25 (of ~29), slot **2** (of ~30), surfacing **2** (of ~30), text **0** (of ~30).
+The mill family's own bindings carry almost NO `section:` metadata matching their shells' own section design
+at all — this is not a labeling drift a rename would fix, it is the near-total ABSENCE of the data a
+reproduction test would need to compare against. Field ORDER is similarly scrambled relative to BOTH the
+shell's own order AND the raw binding-declaration array order — `entryX`/`entryY` (appended LAST in every
+file's own binding array, via `entryBindingsFor`) render FIRST live for slot/surfacing/text, and even
+`passes` (spliced "immediately after stepdown" per `withPassesField`'s own doc comment) renders LAST for
+contour, not where the array puts it — `renderOpForm`'s own section-bucketing groups ungrouped ("no `section`
+declared") bindings into their own bucket, rendered ahead of every named section, which is WHY the array
+position and the rendered position diverge; established live, not assumed from reading the array (the
+"passes" position alone contradicts what a plain source read would predict).
+
+**This is pre-existing, not introduced by t2371 or this turn** — t2371's own field-SET verification (unaffected
+either way) never checked field ORDER or section titles for these four; nothing about adding `path_anchor`
+changed this mismatch, which has existed since each dataOps file was first written.
+
+⇒ **Writing a mill-family reproduction spec on drill/pocket's own methodology (hand-derive EXPECTED_ORDER from
+the shell, compare against the tree's own render) would either (a) assert the CURRENT scrambled order — which
+defeats the whole point, since it would not be comparing anything to the shell in any meaningful sense — or
+(b) require rewriting `section:` metadata (and likely re-checking field-declaration order too) across ~90+
+binding declarations spanning 4 files to actually match 4 shells' own designs, a SEPARATE, much larger-scoped
+content-alignment task than "declare a reproduction test," and one this turn's own dispatch never asked for.**
+Per the dispatch's own explicit STOP condition, this is reported as a finding rather than built around: NOT
+built, per the dispatch's own permission for exactly this situation. `tests/support/formReproduction.js`'s own
+engine was deliberately NOT extended with a speculative 'flat'-mode branch for this — nothing would exercise
+or verify it this turn, and half-building an unverified branch violates the same discipline the extraction
+itself is meant to uphold.
+
+### RULE 1b COMPLIANCE — the advisor's own response to t2371's near-miss, read and applied
+
+`AGENTS.md` #1b (added this turn, citing t2371 by name) names `ui/formWidgets.js`/`wizards/views/userOpView.js`
+among the files where a full-suite run must happen BEFORE concluding, not after. This turn touches NEITHER —
+`tests/support/formReproduction.js` and the two refactored spec files are TEST-ONLY, no production render code
+changed — so the specific near-miss class Rule 1b names does not apply here by construction (nothing shared was
+touched). Ran the full suite anyway, as the dispatch's own "regardless" makes explicit.
+
+### FULL SUITE
+
+2883 passed / 1 failed / 14 flaky / 26 skipped (27.2m). FAILED COUNT attributable to t2373: **0** — the one
+"failed" entry (`wizard-face-1599.spec.js`'s own "CUSTOMIZE renders the wizard's form — for a fork-only twin
+too") is the SAME pre-existing `waitForEmpty`/t1766 reproject-echo race documented at t2365/t2367/t2369/
+t2371's own full-suite runs, exhausting its 3 retries this run under load; re-ran in ISOLATION and it flaked
+again (failed once, passed on retry) — consistent with the race's own documented "rarely, only under sustained
+load" nature, not a regression. Of the 14 flaky (all passed on retry), `middle-superset`, `pane-visual-host-
+programmatic-1762`, `pull-v41-wcs`, `tooltable-gate-1890`, `viz3d-handle-theme-2155`, `wizardbar-panel-2196`
+repeat named flakes from earlier turns' own full-suite runs; the remaining 8 are new names but on files this
+turn never touched (this turn's own shipped files are `tests/support/formReproduction.js` and the two
+refactored spec files — no production code changed at all, see PART 2 above for why). Node tier: 238/238.
+
+### Files changed
+
+`tests/support/formReproduction.js` (new) — the shared reproduction-test engine.
+
+`tests/drill-form-reproduction-2299.spec.js`, `tests/pocket-form-reproduction-2301.spec.js` — refactored onto
+the shared engine; assertions byte-identical to before (proven via the regression run + the non-vacuity
+perturbation of each).
+
+No production code changed this turn — the mill-family blast radius (contour/slot/surfacing/text) was
+established as OUT OF THIS TURN's REACH (see PART 2 above), not touched.
+
