@@ -120,7 +120,9 @@ const TEXT_EXEC_BINDINGS = [
 // t2301 (BACKLOG 20) — dropped from 4 to 3: 'panel' removed from uiChildren below (id-collided with sim's own
 // layout2d pane, see that node's own comment). Exactly the hazard t2257 caught on atcWarmupData.js — a stale
 // hardcoded wrap left after panel's removal breaks every binding — caught here before committing, not after.
-const WRAP_PREFIX_COUNT = 3;   // user_root + sim + param_group
+// t2371 — bumped 3 to 4: `path_anchor` inserted into uiChildren BEFORE param_group (see below) shifts every
+// flatten index after it by one — the same hazard, same discipline, this time on an ADDITION not a removal.
+const WRAP_PREFIX_COUNT = 4;   // user_root + sim + path_anchor + param_group
 export const TEXT_BINDINGS = TEXT_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
 export const TEXT_DATA_OPTYPE = 'user_text_data';
@@ -135,6 +137,15 @@ export function textDataDef() {
             // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
             // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            // t2371 — the dual stock-attach/path-datum corner picker. Text's own static shell (index.html:832)
+            // mounts it at prefix "tx_" — copied verbatim, not re-derived (a wrong prefix binds the picker to
+            // another wizard's mount — the exact collision class pinned at t2367,
+            // `pa-mount-scope-2367.spec.js`). See surfacingData.js's own t2271 comment (the arc's pilot) for how
+            // formWidgets.js's 'path_anchor' branch reproduces the widget's getElementById convention without
+            // touching ui/pathAnchorField.js, and for why the stockAttach/pathDatum dropdown rows (this file's
+            // own declared bindings, below) end up hidden rather than left visible — the shell shows the
+            // picker only, no text fallback.
+            { type: 'path_anchor', params: { prefix: 'tx_' } },
             {
                 type: 'param_group',
                 params: { group: 'Text' },

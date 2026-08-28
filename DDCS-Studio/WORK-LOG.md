@@ -61059,3 +61059,200 @@ verification for pocket via INSERT-then-SAVE, including the guard-flip and param
 `BACKLOG.md` — #39 marked CLOSED (built, verified); #7 marked CLOSED (found already shipped, verified, nothing
 built).
 
+## t2371 — ARC: THE LAST THREE PATH-ANCHOR PICKERS (contour/slot/text), plus a genuine finding that widened the
+scope beyond "declare three nodes" — surfacing's own t2271 "pilot" declaration had never actually rendered.
+TAIL: BACKLOG #32 — pinch-to-zoom on every feature canvas.
+
+### THE DECLARATIONS — copied verbatim, exactly the precedent
+
+`{ type: 'path_anchor', params: { prefix: 'ct_' } }` / `'sl_'` / `'tx_'` added to `contourData.js`/`slotData.js`/
+`textData.js`'s own `uiChildren` (sibling of `sim`, before `param_group`), each prefix taken VERBATIM from
+`index.html` (`grep -n 'class="pa-mount"'` — lines 578/654/832), matching `surfacingData.js:247`'s own t2271
+precedent exactly. `WRAP_PREFIX_COUNT` bumped 3→4 in `contourData.js`/`textData.js` (the frozen blockIndex
+offset past the wrapper) — inserting a new uiChildren sibling BEFORE `param_group` shifts every exec-stack
+flatten index after it by one, the exact "hardcoded wrap-offset drift" hazard these same two files' own t2301/
+t2257 comments already name, this time from an ADDITION not a removal; caught by running
+`contour-data-emit.spec.js` before/after and seeing it fail first. `slotData.js` is `bindingSpecs`-driven
+(identity-by-type, re-derived every build) — immune by construction, nothing to bump.
+
+### A GENUINE FINDING, established live not assumed: `path_anchor` had never rendered for ANY def without a
+### split node — including surfacing's own already-shipped t2271 declaration
+
+Opened `user_contour_data` after declaring its picker: `#wiz_user` carried ZERO `.pa-mount` elements. Traced to
+`userOpView.js`'s own `hasTreeLayout(template)` — the function deciding whether a def gets `renderUiTree`
+(where `path_anchor`'s own render branch lives, `formWidgets.js`) or the FLAT `renderOpForm` (which never even
+looks at uiChildren node types, only flat bindings) — recognized ONLY `split_horizontal`/`split_vertical` as
+tree-mode triggers. Checked the ACTUAL precedent this turn was told to copy: `surfacingData.js` has NO split
+node anywhere in its uiChildren. Live-confirmed (both via a plain `wizardManager.open('user_surfacing_data')`
+AND via `ddcsEditWizardDef`): 0 `.pa-mount` elements, both routes, before this turn's fix. **Surfacing's own
+t2271 "the pilot" declaration has been dead code — present in the template, never once rendered in the live
+app — since it was written.** Not something this turn broke; something this turn's own verification discipline
+(drive the app, don't trust the template) surfaced.
+
+**FIRST FIX ATTEMPT — extended `hasTreeLayout` to recognize `path_anchor`, WRONG, reverted after the full
+suite caught it.** Reasoned it was a safe completion of an incomplete detection (a def carrying `path_anchor`
+categorically cannot render any other way) and checked `param_group`'s own `renderUiTree` branch was
+deliberately TRANSPARENT (t1605 — "decides only WHERE the rows land, never what they contain"), so the FIELD
+SET looked unaffected — confirmed live for all four ops. That check was real but incomplete: `render()`'s own
+`isTree` branch does MORE than choose a renderer — it unconditionally hides the GENERIC outer `.wiz-visual`
+pane and sets the form to full width (`vis.style.display='none'`, `controls.flex:'1 1 100%'`), because drill's
+own tree OWNS its visualization internally (a `split_horizontal` wrapping its own 2D/3D pane) — the outer pane
+would be a redundant second preview. Surfacing/contour/slot/text have NO split anywhere; their uiChildren is
+just `[sim, path_anchor, param_group]`, with no internal visualization to replace what got hidden. Flipping
+them into tree mode blanked their entire preview pane and (separately) dropped the flat renderer's own
+section-grouping (`renderUiTree`'s transparent `param_group` pass-through never buckets rows by `section` the
+way `renderOpForm`'s own t820 mechanism does) — TWO real, undetected regressions, not one. **Caught by the
+turn's own required full-suite run, not by targeted verification**: 21 failed / 16 flaky on the first full run
+— `pane-sizer-1353`/`pane-sizer-mobile-1468`/`pane-surface-scroll-1766` (preview-pane sizing/scroll, now
+blanked), `form-kernel-720` (every twin), `surfacing-skim-form-986`/`param-group-rows-1605`/`surfacing-start-
+position-1648` (surfacing-specific, section grouping gone), `mill-start-translate-716` (slot, same cause). A
+serious enough blast radius, on files this turn's own targeted checks never exercised, to STOP and re-plan
+rather than patch around it further.
+
+**ACTUAL FIX — path_anchor renders directly in the FLAT path; `hasTreeLayout`/`isTree`/`renderUiTree` are
+completely untouched.** Reverted `hasTreeLayout` to its exact original (split-only) shape — byte-identical
+diff to before this turn. Added `findTopLevelPathAnchor(template)` (does this def's uiChildren carry a bare
+`path_anchor` sibling, the surfacing/contour/slot/text shape — NOT drill's, whose own `path_anchor` sits nested
+inside a hand-authored `grid_container` and stays on the EXISTING, unchanged tree path) and
+`mountFlatPathAnchor(host, prefix)` (the same hide-the-dropdown-rows-and-mount-the-real-picker behavior
+`formWidgets.js`'s tree branch gives a tree-rendered one, applied directly to `renderOpForm`'s own already-
+rendered flat rows). `render()`'s flat (`else`) branch calls this ONE new line after `renderOpForm` runs; the
+tree branch, the `isTree` decision, the vis-pane/section-grouping behavior for EVERY op (drill included) are
+untouched — confirmed by diff (only additive changes, zero lines removed from the pre-existing logic) and by
+re-running every test the first attempt broke: all now pass, plus the original picker/field-set tests still
+pass unchanged.
+
+### EMIT PROVEN BYTE-IDENTICAL (a FORM-only change), not assumed
+
+`contour-data-emit.spec.js` (byte-diff ZERO, side × 4 shapes × a scalar/placement/wcs sweep), `slot-as-data
+.spec.js` + `text-as-data.spec.js` (byte-identical G-code + cross-dialect, both arms where relevant) — all
+green, unchanged, after every edit this turn made (the uiChildren addition, the WRAP_PREFIX_COUNT bump, and —
+since the shipped fix touches only `render()`'s FORM rendering, never `def.template`'s own `children`/exec
+stack — the flat-mode `path_anchor` mount).
+
+### THE bore/tap FINDING (established, not built — per the dispatch's own explicit instruction)
+
+`boreData.js`/`tapData.js` carry `stockAttach`/`pathDatum` as plain dropdown bindings, no `path_anchor`. Traced
+rather than assumed "presumably dropdown rows": neither has ANY classic hand-written shell at all — no
+`boreView.js`/`tapView.js`, no static `index.html` markup under a `bo_`/`tp_` prefix (grepped, zero hits both
+ways), and neither is reachable from the classic Mill toolbar (only via the `mill_datawiz` dev palette; bore
+exists only as drill's own internal `array(bore)` composition). There is no shell for their dropdown exposure
+to diverge FROM — not a gap in this arc, a fact for the plan.
+
+### VERIFIED THE REAL SYMPTOM — live, screenshotted, and non-vacuous
+
+`tests/path-anchor-contour-slot-text-2371.spec.js` (new, 3 tests): contour/slot/text each render 2 real corner-
+grid SVGs in their own scoped mount, `dataset.built==='1'`, stockAttach/pathDatum rows hidden (matching drill/
+pocket/surfacing's own established shape) — test 1; surfacing's own picker now also renders, the fix's own
+side effect, pinned — test 2; field SETS unchanged for all three — test 3. Proven non-vacuous AGAINST THE
+ACTUAL SHIPPED CODE (the first attempt's own non-vacuous proof was against the since-reverted `hasTreeLayout`
+approach and no longer speaks to what shipped — redone rather than left stale): stashed `userOpView.js`'s
+`findTopLevelPathAnchor`/`mountFlatPathAnchor` addition, re-ran — tests 1 and 2 fail 3/3 (test 3 correctly
+still passes, unaffected either way); restored, `git diff` confirmed clean, re-ran green. Screenshots at
+`verification/t2371-path-anchor-contour-slot-text/` — a full-form view for each of the three (the picker
+itself is a small, visually subtle grey 3×3 grid pair easy to miss at a glance — a close-up crop is included
+specifically to make it legible).
+
+Regression, run TWICE (once against the reverted `hasTreeLayout` attempt — 21 failed / 16 flaky, the finding
+that forced the revert; once against the actual shipped flat-mode mount — clean): `fork-parity-1593.spec.js` +
+`drill-form-reproduction-2299.spec.js` + `pocket-form-reproduction-2301.spec.js` + `fork-to-custom-2365
+.spec.js` (userOpView.js is shared by all 32 twins), plus the full set the first attempt broke —
+`clearing-cluster-800`, `form-kernel-720`, `form-section-collapse-820`, `mill-start-translate-716`,
+`pane-sizer-1353`, `pane-sizer-mobile-1468`, `pane-surface-scroll-1766`, `param-group-rows-1605`,
+`surfacing-skim-form-986`, `surfacing-start-position-1648`, `text-atom-708` — all green against the shipped
+code, only 2 flaky (the SAME pre-existing Pocket-CUSTOMIZE boot-timing flake documented at t2365/t2367/t2369,
+and `clearing-cluster-800`'s own P7 test — confirmed clean 4/4 in isolation, purely a resource-pressure flake
+from running many files together).
+
+**One legitimate rebaseline, not a regression:** `pane-surface-scroll-1766.spec.js` picked contour's own
+"Attach to Stock" dropdown LABEL as its scroll-target fixture (a field "far down the form, past the old 640px
+cap") — that field is now correctly hidden behind the new picker, exactly as dispatched, so the fixture is
+genuinely gone from view. The test's own assertion never depended on WHICH field was scrolled to (only on
+`#blk_wiz_user`'s own paint/scroll CSS properties once scrolled there) — rebaselined to the form's own LAST
+`[data-param]` field instead of a hardcoded label, more robust against future field churn too. Confirmed
+non-vacuous by construction: this is the exact test that caught the FIRST (wrong) attempt's regression, so its
+own sensitivity to the real behavior is already established.
+
+### THE TAIL — BACKLOG #32, pinch-to-zoom, own commit
+
+`viz/featureCanvas.js`'s own `_bind()` had exactly pointerdown/pointermove/pointerup/wheel — desktop zoomed via
+the wheel, mobile had no two-pointer path at all (confirmed: `grep -c pointerdown` finds hits, no pinch code
+anywhere). Added `_pointers` (a `Map`, by pointerId): ONE pointer keeps today's drag/pan path completely
+unchanged; a SECOND pointer always switches to pinch — cancels whatever single-pointer gesture was running (a
+handle drag fires its own real `onDragEnd`, exactly like a normal release), then anchors `_pinch` at that
+instant (`dist0`/`scale0` for the zoom ratio, `w0` = the world point under the two-finger midpoint). Every
+subsequent move re-solves `cxw`/`cyw` to keep `w0` fixed under the CURRENT midpoint at the CURRENT scale — the
+same "keep the point under the gesture fixed" shape the pre-existing `wheel` handler already uses for a
+stationary cursor, reused rather than re-invented, just anchored to a drifting midpoint instead of a fixed
+cursor position; one formula covers pan-by-drift and zoom-by-distance-ratio together. `_userAdjusted` set,
+matching wheel/pan, so a pinch also stops the auto-fit fighting the user. `touch-action: none` was ALREADY set
+on `.feature-canvas` (`_mount()`'s own inline style, pre-dating this turn) — the CSS half of the conflict the
+entry's own text warns about was already resolved; the gesture handler was the only missing piece. A pinch
+ending (either finger lifting) never hands off to a resumed single-pointer drag/pan — the surviving finger
+needs its own fresh `pointerdown`, avoiding ambiguity about which gesture a lone remaining pointer means.
+
+No native multi-touch API in Playwright (`page.touchscreen` is single-point only) — `tests/feature-canvas-
+pinch-zoom-2371.spec.js` (new, 4 tests) dispatches synthetic two-pointer `PointerEvent`s (`pointerType:
+'touch'`) directly at the SVG, the exact events a real two-finger touch produces: pinch-out (fingers spreading)
+measurably increases `getTransform().scale`; pinch-in decreases it; a plain single-pointer handle drag still
+writes its field both BEFORE and immediately AFTER a pinch (no stuck state); a second finger arriving MID-DRAG
+cancels the drag cleanly (the pinch still changes scale — the cancel didn't swallow the gesture) and a fresh
+drag right after still works. Proven non-vacuous: reverted `featureCanvas.js`, re-ran — the two pinch-direction
+tests fail 3/3 (as expected, no pinch code exists), the mid-drag test comes back FLAKY (without any pinch
+gating, the second pointer's own independent pointerdown/pointermove logic non-deterministically overwrites
+`this.active`/`this.pan`, an unguarded race — a genuinely worse, undefined-order failure mode than a clean
+miss, consistent with "pinch was never implemented" rather than "pinch is being swallowed"), the untouched
+single-pointer-only test correctly still passes either way. Restored, re-confirmed green, `git diff` clean
+before committing for real.
+
+Regression: `atc-setup-canvas.spec.js`, `coord-list-block.spec.js`, `coord-list-widget.spec.js`, `corner-
+selector.spec.js`, `corner-viz-polish.spec.js`, `lathe-pilot-1271.spec.js`, `align-rotate-gui.spec.js`,
+`census-finding2-emits-teal-1684.spec.js`, `canvas-handle-writable-1804.spec.js`, `custom-op-form2d-drag
+.spec.js`, `alignment-canvas-refit-732.spec.js`, `group-canvas-drag.spec.js`, `corner-data-drag.spec.js`,
+`canvas-widgets.spec.js` — 40/40, every drag/pan/refit/handle-registry path this turn's own shared-file change
+could plausibly touch, unaffected.
+
+BACKLOG #32 marked SHIPPED with a correction note (same pattern as #35/#38/#39's own).
+
+### FULL SUITE
+
+Run against the ACTUAL shipped code (the flat-mode fix, not the reverted `hasTreeLayout` attempt): 2889 passed
+/ 0 failed / 9 flaky / 26 skipped (23.1m). FAILED COUNT attributable to t2371: **0**. Named individually per
+the dispatch's own request: of the 9 flaky (all passed on retry), `middle-superset.spec.js`, `pane-visual-
+host-programmatic-1762.spec.js`, and `pull-v41-wcs.spec.js`/`tooltable-gate-1890.spec.js` repeat the SAME
+pre-existing timeout-class flakes already named at t2365/t2367/t2369's own full-suite runs; the other 5
+(`blocks-live-form`, `formfield-block`, `plane-guarantee-961`, `probe-port-gate-1880`, `viz3d-handle-theme-
+2155`) are new names this run but on files this turn never touched (this turn's own shipped files are
+`web/blocks/dataOps/contourData.js`, `slotData.js`, `textData.js`, `web/wizards/views/userOpView.js`,
+`web/viz/featureCanvas.js`, `tests/path-anchor-contour-slot-text-2371.spec.js`, `tests/feature-canvas-pinch-
+zoom-2371.spec.js`, `tests/pane-surface-scroll-1766.spec.js`) — consistent with the project's own documented
+"parallel suites → mass timeout reds" pattern, not a regression. Node tier: 238/238 (re-run after the revert
+too, unaffected either way).
+
+### Files changed
+
+`web/blocks/dataOps/contourData.js`, `web/blocks/dataOps/slotData.js`, `web/blocks/dataOps/textData.js` — the
+three new `path_anchor` declarations; `WRAP_PREFIX_COUNT` bumped 3→4 in the first and third (slot is
+bindingSpecs-driven, immune).
+
+`web/wizards/views/userOpView.js` — `hasTreeLayout()` is UNCHANGED (byte-identical to before this turn, after
+reverting the first, wrong attempt). New, purely additive: `findTopLevelPathAnchor()` + `mountFlatPathAnchor()`,
+called once from `render()`'s existing flat (`else`) branch — mounts the picker directly into the flat-rendered
+form (also makes surfacing's own t2271 declaration render for the first time, since surfacing takes the same
+flat path). Zero lines removed from the pre-existing tree/flat decision or either render path.
+
+`tests/path-anchor-contour-slot-text-2371.spec.js` (new, 3 tests, Playwright).
+
+`tests/pane-surface-scroll-1766.spec.js` — rebaselined: its own scroll-target fixture (contour's "Attach to
+Stock" label) is now correctly hidden behind the new picker; switched to the form's own last `[data-param]`
+field, which the test's actual assertion never depended on the identity of.
+
+`web/viz/featureCanvas.js` — `_pointers`/`_pinch` state + `_pinchGeom`/`_pinchStart`/`_pinchMove`; pointerdown/
+pointermove/the shared `end` handler each gained a pinch branch ahead of the existing single-pointer logic,
+which is otherwise untouched (confirmed byte-identical behavior via the regression suite above).
+
+`tests/feature-canvas-pinch-zoom-2371.spec.js` (new, 4 tests, Playwright).
+
+`BACKLOG.md` — #32 marked SHIPPED with a correction note. (This turn's own main arc — the three path-anchor
+declarations — was a dispatch note, not a standing BACKLOG entry, so there is no corresponding entry to close.)
+

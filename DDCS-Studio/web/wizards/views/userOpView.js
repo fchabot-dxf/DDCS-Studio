@@ -122,6 +122,42 @@ function hasTreeLayout(template) {
     return checkNodes(root.uiChildren);
 }
 
+// t2371 — a `path_anchor` node OUTSIDE a tree layout (surfacing/contour/slot/text: a bare uiChildren sibling of
+// `sim`/`param_group`, no split anywhere) cannot reach `formWidgets.js`'s own path_anchor branch — that branch
+// lives ONLY inside `renderUiTree`, which `hasTreeLayout` never routes these ops to (correctly: forcing tree
+// mode on them was tried first and reverted — it also hides the outer `.wiz-visual` pane and drops the flat
+// renderer's own section-grouping, a much bigger behavior change than "add a picker", found live via the full
+// suite before shipping). So the picker is mounted here instead, directly into the FLAT-rendered form, leaving
+// the render-mode decision and everything else about these four ops' forms completely untouched. Drill's own
+// `path_anchor` (nested inside a hand-authored `grid_container`, needing the tree walker to reach its exact
+// position) is UNCHANGED — this only fires for a def whose uiChildren carries the node OUTSIDE tree mode.
+function findTopLevelPathAnchor(template) {
+    if (!Array.isArray(template)) return null;
+    const root = template.find((b) => b && b.type === 'user_root');
+    if (!root || !Array.isArray(root.uiChildren)) return null;
+    return root.uiChildren.find((n) => n && n.type === 'path_anchor') || null;
+}
+
+/** Mount a path_anchor picker into an already-rendered FLAT form (`renderOpForm`'s own output, already in
+ *  `host`) — the same behavior formWidgets.js's tree-mode branch gives a tree-rendered one (hide the
+ *  stockAttach/pathDatum rows, mount the real picker in their place), reached here without touching the
+ *  render path those rows came from. */
+function mountFlatPathAnchor(host, prefix) {
+    const rows = [];
+    for (const key of ['stockAttach', 'pathDatum']) {
+        const inp = host.querySelector(`[data-param="${key}"]`);
+        const row = inp && (inp.closest('.form-row') || inp.parentElement);
+        if (row) rows.push(row);
+    }
+    if (!rows.length) return;
+    const mount = document.createElement('div');
+    mount.className = 'pa-mount';
+    mount.dataset.prefix = prefix;
+    rows[0].before(mount);   // takes over the stockAttach row's own visual slot
+    for (const row of rows) row.style.display = 'none';
+    import('../../ui/pathAnchorField.js').then((m) => m.mountPathAnchor(prefix, host)).catch(() => {});
+}
+
 /** The machine ENVELOPE reach in the WCS/stock frame (the stock corner sits at the WCS origin): a WCS coord `w` maps to
  *  machine `workOrigin + w`, reachable while `0 ≤ workOrigin + w ≤ span` → `w ∈ [-workOrigin, span - workOrigin]`. Null if
  *  the stock's PLACEMENT in the machine is not DECLARED (then the drag is unbounded — the stock is never the bound).
@@ -389,6 +425,11 @@ export function createUserOpView(ns, opts) {
             _readers = _def.bindings && _def.bindings.length
                 ? renderOpForm(host, binds)
                 : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);
+            // t2371 — a path_anchor OUTSIDE tree mode (surfacing/contour/slot/text): mount it directly into the
+            // flat-rendered form. See findTopLevelPathAnchor's own comment for why this def stays flat rather
+            // than being routed through renderUiTree.
+            const pa = findTopLevelPathAnchor(_def.template);
+            if (pa) mountFlatPathAnchor(host, (pa.params && pa.params.prefix) || '');
         }
         // one delegated listener: any widget input/change (incl. canvas pickers, which dispatch a bubbling input) re-runs update().
         // t808 — a focused form field emitting 'input' (a held stepper / live typing = a continuous gesture) THROTTLES the heavy
@@ -613,7 +654,10 @@ export function createUserOpView(ns, opts) {
             // …), which nothing below ever targeted. Real geometry kept drawing into the pane render() had just
             // hidden. vizBase resolves every viz-family base id to the right one for whichever mode is active;
             // FLAT mode (isTree false) resolves to the exact same bare id every existing call already used —
-            // byte-identical, proven live (tests/geometry-seam-tree-mode-2323.spec.js).
+            // byte-identical, proven live (tests/geometry-seam-tree-mode-2323.spec.js). t2371 — surfacing/
+            // contour/slot/text's own `path_anchor` stays OFF this path entirely (mounted directly in the flat
+            // form instead, `findTopLevelPathAnchor`/`mountFlatPathAnchor`), so `isTree` here is unaffected by
+            // this turn — the exact function it always was.
             const isTree = hasTreeLayout(_def.template);
             const vizBase = (base) => (isTree ? `${base}_tree` : base);
             const vid = (base) => id(vizBase(base));

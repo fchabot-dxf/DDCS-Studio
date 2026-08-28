@@ -182,6 +182,15 @@ function slotDataStack(defaults) {
             // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
             // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            // t2371 — the dual stock-attach/path-datum corner picker. Slot's own static shell (index.html:654)
+            // mounts it at prefix "sl_" — copied verbatim, not re-derived (a wrong prefix binds the picker to
+            // another wizard's mount — the exact collision class pinned at t2367,
+            // `pa-mount-scope-2367.spec.js`). See surfacingData.js's own t2271 comment (the arc's pilot) for how
+            // formWidgets.js's 'path_anchor' branch reproduces the widget's getElementById convention without
+            // touching ui/pathAnchorField.js, and for why the stockAttach/pathDatum dropdown rows (this file's
+            // own declared bindings, below) end up hidden rather than left visible — the shell shows the
+            // picker only, no text fallback.
+            { type: 'path_anchor', params: { prefix: 'sl_' } },
             {
                 type: 'param_group',
                 params: { group: 'Slot' },

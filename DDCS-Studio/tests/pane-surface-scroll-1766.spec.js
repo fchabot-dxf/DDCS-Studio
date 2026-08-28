@@ -11,9 +11,16 @@ import { stopLiveSim, dismissToasts } from './support/simControls.js';
 // this fix and never caught the gap. #blk-formpane (the pane's outer sidebar column) already has its own
 // `overflow:auto` — the fix removes #blk_wiz_user's redundant inner cap so IT becomes the sole scroll container
 // and the background covers everything that scrolls, by construction (no new selector, a removed conflicting
-// cap). Pins: a field FAR down a long form (contour's "Attach to Stock", well past the old 640px cap) is
-// painted, not raw black, across all 5 themes; and #blk_wiz_user no longer internally scrolls at all
-// (scrollHeight === clientHeight) — the outer pane owns scrolling instead.
+// cap). Pins: a field FAR down a long form (contour's LAST field, well past the old 640px cap) is painted, not
+// raw black, across all 5 themes; and #blk_wiz_user no longer internally scrolls at all (scrollHeight ===
+// clientHeight) — the outer pane owns scrolling instead.
+//
+// t2371 — the fixture field used to scroll to used to be "Attach to Stock" (contour's own stockAttach dropdown
+// label); it is now hidden behind a declared path_anchor picker (BACKLOG's own arc, matching drill/pocket/
+// surfacing's already-established shape) — genuinely gone from view, not a bug in that change. Rebaselined to
+// the form's own LAST `[data-param]` field instead of a hardcoded label: this test's own assertion never
+// depended on WHICH field was scrolled to (only on #blk_wiz_user's paint/scroll properties once scrolled),
+// and the last field is the most robust "far down the form" anchor regardless of future field churn.
 //
 // t1784 ADDITION 5 — REPOINTED onto the real bar->entry->INSERT->Blocks-tab chain (tests/primary-route-real-
 // gesture-1776.spec.js's own pattern), replacing window.openWiz/insertWiz/showApp. Addition 2 (t1778) proved
@@ -50,7 +57,7 @@ for (const theme of THEMES) {
     await stopLiveSim(page, '#blk_userViz3dBox');
     await dismissToasts(page);
 
-    const target = page.locator('#blk_wiz_user_form span', { hasText: 'Attach to Stock' }).first();
+    const target = page.locator('#blk_wiz_user_form [data-param]').last();
     await target.scrollIntoViewIfNeeded();
     await page.waitForTimeout(200);
 
