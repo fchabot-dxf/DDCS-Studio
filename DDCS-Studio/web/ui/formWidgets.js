@@ -1398,7 +1398,39 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // `.wiz-2pane > .wiz-visual { min-height: 0 }`, plus each child's own real content minimum) —
                 // this box now matches that, exactly as intended ("construct the viz-split structure exactly
                 // as it is in index.html for Corner", just below).
-                simBox.style.cssText = 'width:100%; height:100%; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                // t2355 — SAME CLASS OF BUG, ONE PROPERTY OVER. `height:100%` (and `flex-basis:100%` via the
+                // `flex: 1 1 100%` shorthand) is ALSO inline, and inline ALWAYS wins over the stylesheet's own
+                // `.wiz-visual { height: var(--viz-explicit-h, auto) }` (desktop) — but that only became visible
+                // once a REAL stored preference exists (`ddcs_visual_height` in localStorage): a FIRST-EVER open
+                // has no stored height, so `applyVisualHeight()`'s own bootstrap call (paneAccordion.js,
+                // `px==null` branch) strips `height`/`flex` from every mounted `.wiz-visual` as part of its
+                // "collapse to auto" cleanup — silently removing the inline coupling as a SIDE EFFECT, which is
+                // exactly why a fresh Playwright session (no stored pref) never showed this. A RETURNING user
+                // (i.e. everyone who has ever dragged the handle before) skips that cleanup entirely: the
+                // bootstrap call passes a REAL px, and the inline `height:100%`/`flex:1 1 100%` stays live
+                // forever after, locking the RENDERED height to 100% of the split-pane wrapper's own extent —
+                // CONFIRMED live (devtools-style, not assumed): with a stored pref set, `--viz-explicit-h` moved
+                // between 250px and 650px while the rendered height stayed pinned at the wrapper's own 846px on
+                // BOTH writes. Every subsequent drag write landed in a var nobody was reading — the advisor's
+                // own "phantom world" (dragProbe: declared height fell 843→548 while the rendered box held 846
+                // on every single frame). Dropped `height:100%` (the stylesheet's `var(--viz-explicit-h, auto)`
+                // now genuinely governs, same selector/specificity class the classic shell already relies on)
+                // and swapped `flex: 1 1 100%` → `flex: 1 1 auto`: per the flexbox spec, an explicit `height` on
+                // a column flex item WITH `flex-basis:auto` supplies the item's effective flex-basis directly —
+                // so a set `--viz-explicit-h` still governs exactly. ⚠ TRIED `flex: 1 1 auto` first (grow:1,
+                // matching classic's own `flex: 1 1 0` at a glance) — VERIFIED WRONG, not assumed: with
+                // `--viz-explicit-h` set to 250px it still rendered 846px, same stuck symptom as `100%`. The
+                // difference from the classic shell: `.wiz-2pane` lays its visual out as a ROW item (flex
+                // governs WIDTH, height comes from cross-axis stretch, which an explicit `height` can override
+                // cleanly), but this box's own parent (`.ui-split-pane`, split_horizontal/vertical) is a COLUMN
+                // (`flex-direction: column`) — height is THIS container's MAIN axis, so `flex-grow:1` there
+                // redistributes free space on the very same axis the explicit height tries to set, and grow
+                // wins (846px of free space in the pane, entirely consumed regardless of the requested basis).
+                // `flex-grow:0` (the plain CSS default — devtools-verified with NO flex/height at all: an unset
+                // `--viz-explicit-h` sized correctly to CONTENT at 392px, matching this twin's own established
+                // default height throughout every earlier turn's own testing) needs no `100%`/`auto` grow
+                // fallback at all — content sizing already does the right thing when nothing is explicit.
+                simBox.style.cssText = 'width:100%; display:flex; flex-direction:column; position:relative; flex: 0 1 auto;';
 
                 // t2257 (BACKLOG 20) — layout2d: false is a NEW, additive opt-out: a 3D-only sim (ATC — no
                 // param_field/block ever declares 2D geometry for it, so a layout2d pane was always empty
@@ -1433,7 +1465,9 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 const pnlBox = document.createElement('div');
                 pnlBox.className = 'wiz-visual';
                 // t2347 — same fix as simBox just above: no inline min-height (it fought the drag/stylesheet).
-                pnlBox.style.cssText = 'width:100%; height:100%; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                // t2355 — same fix as simBox's own comment above: no inline height, and flex-grow:0 (not 1) —
+                // a COLUMN parent makes height the main axis, where grow fights an explicit height directly.
+                pnlBox.style.cssText = 'width:100%; display:flex; flex-direction:column; position:relative; flex: 0 1 auto;';
                 
                 pnlBox.innerHTML = `
                 <span class="section-label">FEATURE CANVAS</span>

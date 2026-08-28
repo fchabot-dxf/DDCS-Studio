@@ -208,8 +208,38 @@ function updateSplitOn(split) {
  * cross-wizard sync below can safely walk every mounted visual including the ones nobody can see.
  */
 function visualMaxHeight(visual) {
-    const host = visual && visual.parentElement;
+    let host = visual && visual.parentElement;
     if (!host) return VIZH_MAX;
+    // t2355 — a `split_horizontal`/`split_vertical` node's own pane wrapper (`.ui-split-pane`, e.g. the
+    // flipped drill's own RIGHT mouth) holds ONLY the visual — unlike the classic shell's `.wiz-2pane`, which
+    // holds BOTH the visual AND its sibling controls pane. Asking `.ui-split-pane` directly "how much room is
+    // there" asks a box that exists ONLY to contain this one thing — an ECHO of the visual's own extent, not a
+    // ceiling (t2353's diagnosed ratchet; confirmed further at t2355: a stored 300px preference measured back
+    // at 172px on the very FIRST render, no drag involved, because the "ceiling" was the pane's own
+    // pre-explicit-height natural size). The structural match for `.wiz-2pane` is one level up: `.ui-split`
+    // (the split's own row/column), which holds BOTH mouths as siblings — the same shape `.wiz-2pane` already
+    // gives `.wiz-visual` + `.wiz-controls`. Climbing there lets the `below` loop below see the OTHER mouth's
+    // real height when it is genuinely stacked below (narrow width, `.ui-split-horiz` goes column) — and stays
+    // a no-op at wide width, where the other mouth sits BESIDE (not below) the visual, so the loop's own
+    // `sb.top >= vb.top + 1` position check already excludes it (verified live both ways, WORK-LOG).
+    let climbed = false;
+    if (host.classList.contains('ui-split-pane') && host.parentElement) { host = host.parentElement; climbed = true; }
+    // t2355 — the climb above still lands on `.ui-split-horiz`, and AT NARROW WIDTH that container is ALSO
+    // `height: auto` (it stacks into a column there) — its own height is the SUM of both mouths' content, so
+    // subtracting one mouth's height from it is STILL an echo, just of two things summed instead of one.
+    // Measured live: a stored 300px preference clamped to ~172-204px on the very first render (no drag), the
+    // "ceiling" tracking whatever the OTHER mouth's own current form height happened to be. Unlike desktop —
+    // where t1353's own ORIGINAL ceiling exists because the classic MODAL has a fixed height there
+    // (`.wiz-box.two-pane { height: min(93dvh, 1000px) }`) and a too-tall visual pushes the CANCEL/INSERT
+    // footer off it — the modal itself goes `height: auto` at ≤860px (`.wiz-box.two-pane { height: auto }`):
+    // the footer simply moves down with the page's own scroll, so there is no real ceiling to protect at
+    // narrow width at all, only the absolute VIZH_MAX sanity bound. Scoped to the CLIMBED (tree-only) case —
+    // the classic shell's own narrow-width ceiling computation is UNCHANGED, so its behavior there (already
+    // shipping, never proven byte-identical for a large stored preference on a long-form wizard) stays exactly
+    // what it always was; only the newly-climbed tree path adopts this relaxation.
+    if (climbed) {
+        try { if (window.matchMedia && window.matchMedia('(max-width: 860px)').matches) return VIZH_MAX; } catch (_) { /* */ }
+    }
     const hb = host.getBoundingClientRect(), vb = visual.getBoundingClientRect();
     if (!(hb.height > 0) || !(vb.width > 0)) return VIZH_MAX;   // not laid out / not visible → no opinion
     let below = 0;

@@ -59980,3 +59980,133 @@ and the shrink-then-grow recovery guard, both viewports. Proved non-vacuous by A
 7 of 8 fail there (the 8th — desktop's own grow-recovery test — correctly passes on both, since desktop never
 had the ratchet to begin with).
 
+## t2355 — THE HANDLE BUG'S REAL ROOT: the tree's CONTAINER, not the drag code. t2353 fixed real, confirmed symptoms — but every t2353 verification opened a FRESH browser session, and that alone hid the actual defect from every test written that turn.
+
+Full spec at (now-deleted) `DDCS-Studio/scratchpad/t2355-divergence-spec.md`. The advisor's own framing, which
+survived the owner's own skepticism: the SAME drag handlers are healthy in the classic container at every
+width, and broken in the tree container at every width — so the drag code was never the bug; the tree's own
+CONTAINER is. Evidence: five owner-captured `?debug=drag` probe runs (the advisor's own instrument, built for
+this exact purpose) showing declared height falling while rendered height held flat (a "phantom write"), a
+ratio slamming on the FIRST touch of an already-diverged state, and a stacked-mode cross-gesture ratchet
+distinct from the wide-mode divergence.
+
+### WHY t2353 NEVER SAW THIS: a Playwright session starts with empty localStorage
+
+`makePanesCollapsible`'s own bootstrap call (`applyVisualHeight()`, no arg → `px = getVisualHeight()`) strips
+`height`/`flex` from EVERY mounted `.wiz-visual` when there is no stored `ddcs_visual_height` preference
+(`px == null`) — a real, deliberate cleanup (t2113's own comment: "the heal is no longer persisted"), but with
+a side effect nobody had traced: on a totally fresh session it also silently removes whatever inline styling a
+freshly-created `.wiz-visual` (like the flipped drill's own simBox) happened to carry. Every t2353 test — and
+my own initial t2355 verification probe, which found NOTHING at first and nearly convinced me the advisor's
+spec didn't reproduce — ran with empty localStorage, so this cleanup ran on EVERY open and quietly erased the
+real bug before any drag could ever exercise it. A RETURNING user (i.e. everyone who has ever dragged the
+handle before — virtually every real user, including the owner) skips that cleanup entirely, because the
+bootstrap call passes a real stored px instead of null. Reproduced this directly by setting
+`localStorage.ddcs_visual_height` before opening the wizard, which is what finally surfaced the mechanism the
+advisor's own probe had already found on the owner's real, long-used machine.
+
+### ROOT CAUSE 1 (wide width) — an inline style the stylesheet could never override, one property over from t2347
+
+`formWidgets.js`'s `sim`/`panel` branches gave the tree's own `.wiz-visual` (simBox/pnlBox) an inline
+`height:100%; flex: 1 1 100%;`. Inline always wins over the stylesheet's own
+`@media (min-width:861px) { .wiz-visual { height: var(--viz-explicit-h, auto) } }` — so `applyVisualHeight`
+kept writing `--viz-explicit-h` correctly on every drag, but the RENDERED height stayed pinned to 100% of the
+split-pane wrapper's own extent regardless. Confirmed directly (devtools-style, not assumed): with a stored
+preference in place, swapping `--viz-explicit-h` between 250px and 650px left the rendered height parked at the
+wrapper's own fixed 846px on BOTH writes. The classic shell's own `.wiz-visual` carries no such inline style —
+it is a ROW item there (`.wiz-2pane` has no `flex-direction` override), so `flex:1 1 0` only ever governs its
+WIDTH; height comes from cross-axis stretch, which an explicit `height` cleanly overrides. The tree's simBox is
+a COLUMN item instead (`.ui-split-pane` declares `flex-direction: column`) — height there IS the flex main
+axis. First attempt at the fix (`flex: 1 1 auto`, matching classic's own grow:1 "at a glance") was VERIFIED
+WRONG before shipping: still rendered 846px regardless of the explicit height, because `flex-grow:1` on a
+COLUMN item redistributes the wrapper's own free space onto the SAME axis the explicit height was trying to
+set, and grow wins. Dropped to `flex: 0 1 auto` (grow:0) — devtools-verified that with NO flex/height at all, an
+unset `--viz-explicit-h` already sizes correctly to CONTENT (392px, this twin's own established default
+throughout every earlier turn's testing), so grow:0 needs no `100%`/`auto` fallback for the "nothing stored"
+case either.
+
+### ROOT CAUSE 2 (narrow width) — `visualMaxHeight`'s own host was one DOM level too deep for the tree
+
+Fixing root cause 1 alone still left a stored preference clamped hard on the very first render at narrow width
+(300px requested → 172px rendered, no drag involved). `visualMaxHeight(visual)` asks `visual.parentElement` how
+much room is available — for the tree that is `.ui-split-pane` (the split's own single-mouth wrapper, holding
+ONLY the visual), not `.wiz-2pane` (the classic shell's own host, which holds BOTH the visual AND its sibling
+controls pane as children). Asking a box that exists ONLY to contain the one thing being measured is an echo,
+not a ceiling — the SAME shape as t2353's own diagnosed ratchet, just triggered at bootstrap instead of
+mid-drag. The structural match for `.wiz-2pane` is one level up: `.ui-split` (the split's own row/column),
+which holds BOTH mouths as siblings — the exact shape `.wiz-2pane` already gives `.wiz-visual` +
+`.wiz-controls`. Climbing there when the immediate host is a `.ui-split-pane` lets the existing `below`-sibling
+loop see the OTHER mouth's real height once it is genuinely stacked below (narrow width, `.ui-split-horiz` goes
+column) — and is a proven no-op at wide width, where the other mouth sits BESIDE (not below) the visual, so the
+loop's own position check (`sb.top >= vb.top + 1`) already excludes it.
+
+Even after the climb, narrow width still under-measured: `.ui-split-horiz` is ALSO `height: auto` there (it
+stacks into a column), so its own height is just the SUM of both mouths' content — subtracting one mouth from
+it is still an echo, of two things summed instead of one. Unlike DESKTOP — where t1353's own original ceiling
+exists because the classic MODAL has a genuinely fixed height there and a too-tall visual pushes the
+CANCEL/INSERT footer off it — the modal itself is `height: auto` at ≤860px too: the footer just moves down with
+the page's own scroll, so there is no real ceiling to protect at narrow width, only the absolute `VIZH_MAX`
+safety bound. Scoped this relaxation to the CLIMBED (tree-only) branch specifically — the classic shell's own
+narrow-width ceiling computation is completely UNTOUCHED by this change, so whatever behavior it already ships
+(never proven byte-identical for a large stored preference on a long-form wizard — a genuinely separate,
+unopened question) stays exactly what it always was.
+
+### CLASSIC PATH — proven byte-identical, not assumed, at every step of this turn's own iteration
+
+A/B'd a real classic (contour) drag against the pre-t2355 tree, including every intermediate version of the fix
+tried along the way: the saturated-ceiling exact ratio number from t2353's own A/B (`0.44342291371994347`)
+reproduced identically before and after every change this turn made, since the narrow-width ceiling relaxation
+is scoped to the climbed branch only and the wide-width inline-style fix touches `formWidgets.js`'s tree-only
+code paths, neither of which the classic shell's own hand-written `#wiz_contour` markup ever runs through.
+
+### WHAT REMAINS OPEN, NAMED RATHER THAN SMOOTHED OVER
+
+- **A smaller per-frame settling lag at narrow width, in-motion only.** The tree's own pane-bodies (the
+  `[data-viz-pane] > .wiz-pane-body` elements inside simBox) have NO `--viz-stack-h`-consuming CSS rule of their
+  own — only `.wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body` exists (classic-only), and the
+  `height: var(--viz-explicit-h, auto)` rule that governs the outer box directly is itself gated to
+  `@media (min-width: 861px)`. So at narrow width the outer box's rendered height is reached INDIRECTLY, via its
+  own content's natural sizing, and can lag a handful of px behind the declared value on a MID-DRAG frame before
+  settling correctly on release. This is NOT the phantom-write/self-referential-ceiling bug this turn closed
+  (that pinned the render regardless of the request, unboundedly, on every frame including the settled one) —
+  it is ordinary settling lag, bounded to single-digit pixels, gone by release. Filed as a follow-up: wire
+  `--viz-stack-h` for the tree's own pane-bodies, mirroring the classic-only rules verbatim.
+- **Run D from the advisor's spec (a 1px rounding leak on a zero-motion touch+release)** — could not be
+  reproduced: 5 repeated zero-movement touch+release cycles on both handles, both widths, showed exact,
+  unchanging values every time. Plausibly already closed by t2353's own discontinuity fix (which this turn's
+  own acceptance tests reuse and re-verify), or a hardware-jitter artifact of the owner's own real mouse/touch
+  that a scripted gesture cannot reproduce. Not fixed further given no reproduction; noted rather than guessed
+  at.
+- **Item 3 from the spec's own fix shape** ("a capture taken while diverged must not slam" — an explicit guard
+  for legacy diverged state self-healing on first touch) was not added as separate code: after root causes 1
+  and 2, divergence between declared and rendered height should be structurally impossible going forward (both
+  drag handlers already capture their baselines from LIVE rendered rects, not from the declared var), so the
+  scenario the guard was meant to protect against no longer has a path to occur. Not verified against an
+  actually-diverged legacy state in the field (no such state exists in a fresh session to construct one from) —
+  named as an assumption, not proven.
+
+### FULL SUITE — one run, everything attributable, nothing new
+
+18 tests total in this turn's own two new/extended files (`pane-container-2355.spec.js`, 10; the rest are
+`pane-ratchet-2353.spec.js`'s own 8, re-verified against every intermediate version of this turn's fix) — all
+green, non-vacuous (A/B against pre-t2355: 8/10 of the new file's own tests fail there). Project-wide: 10
+failed / 2856 passed. Two touch this turn's own files directly (`pane-sizer-1353.spec.js`, `pane-splitter-
+790.spec.js`) — both re-ran clean in isolation AND under `--repeat-each=2` (14/14). The other 8 (unrelated
+files: `blocks-roundtrip`, `formfield-loud-mismatch-1636`, `tap-twin-778`, `tooltable-gate-1890` ×2,
+`workspace-manager-1223`, plus `middle-superset`'s own two pre-known-heavy shard timeouts) all re-ran clean in
+isolation except the two `middle-superset` shards, an already-documented slow structural sweep unconnected to
+any file this turn touched. FAILED COUNT attributable to this turn: **0**.
+
+### Files changed
+
+`web/ui/formWidgets.js` — `simBox`/`pnlBox`'s inline `cssText`: dropped `height:100%`, changed
+`flex: 1 1 100%` → `flex: 0 1 auto`.
+
+`web/ui/paneAccordion.js` — `visualMaxHeight(visual)`: climbs from a `.ui-split-pane` host to its own parent
+`.ui-split` before measuring (mirrors classic's `.wiz-2pane` shape); returns `VIZH_MAX` outright for a climbed
+host under the `≤860px` media query (no real ceiling exists there — the modal itself is `height:auto`).
+
+`tests/pane-container-2355.spec.js` (new) — 10 tests, both widths: initial render honors a stored preference,
+expH tracks vis (every frame at desktop, settled state at narrow — the documented lag above), cross-gesture
+growth past a previous drag's own start, and the classic control.
+
