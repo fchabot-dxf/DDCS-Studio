@@ -3028,7 +3028,7 @@ nothing is lost in the interim. This entry exists so the gap does not fall betwe
 
 ---
 
-### 38. TREE PANE-BODIES HAVE NO `--viz-stack-h` RULE OF THEIR OWN — a small in-motion settling lag at narrow
+### 38. [⛔ DIAGNOSIS REFUTED t2357 — the rule DOES reach the tree, verified live to three decimals] the narrow settling-lag observation
 
 *(found at t2355 while fixing the container coupling; named in the hand-back, filed here so it does not live
 only in a WORK-LOG entry. LOW priority — single-digit pixels, in-motion only, gone by release.)*
@@ -3044,3 +3044,9 @@ is invisible to any release-state assertion.
 
 **STILL REAL IF:** at a stacked width, mid-drag probe rows show the pane rect lagging `expH` by more than a
 pixel while moving, converging only at ▲ up.
+
+> **#38 CORRECTION (t2357):** the worker refuted its own t2355 diagnosis by checking the selector against the
+> live tree via `element.matches()` — the `--viz-stack-h` pane-body rule is a pure descendant chain and DOES
+> reach tree pane-bodies (confirmed 164.375px against a 0.618 ratio). Narrow consumes the ratio through its
+> own already-working mechanism. The single-digit-px in-motion lag observed at t2355 is now unexplained and
+> unreproduced — if it resurfaces on a real device, re-file with fresh probe rows rather than this diagnosis.
