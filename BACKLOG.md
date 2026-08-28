@@ -2896,7 +2896,7 @@ means still real.
 
 ---
 
-### 35. DORMANT — SEVEN `.pa-mount[data-prefix="d_"]` ELEMENTS COEXIST IN THE DOCUMENT — an unscoped query would find the wrong one
+### 35. [⭐ PINNED t2367 — the DOM precondition + the one in-scope path are now a live regression test] SEVEN `.pa-mount[data-prefix="d_"]` ELEMENTS COEXIST IN THE DOCUMENT — an unscoped query would find the wrong one
 
 *(found at t2333 while root-causing BACKLOG-adjacent Finding 3 — the "Path Datum invisible" report — never a
 failure on its own; filed here rather than left in a WORK-LOG entry nobody will re-read)*
@@ -2928,6 +2928,23 @@ prefix-agnostic) — never a bare `.pa-mount[data-prefix="..."]` against `docume
 
 **STILL REAL IF:** `document.querySelectorAll('.pa-mount').length` measures > 1 with any wizard open → still
 real (the multiple static-shell instances are baked into `index.html` and are not going away on their own).
+
+> **#35 CLOSURE (t2367):** re-measured live rather than re-trusting this entry's own paraphrase — the 6 static
+> shells (`index.html`, `grep -c 'class="pa-mount"'` = 6) each carry their OWN DISTINCT prefix (`d_`/`p_`/`ct_`/
+> `sl_`/`sf_`/`tx_`), not all `'d_'` as the quoted t2293 comment above reads; the real collision is narrower and
+> sharper than "seven same-prefix mounts" — exactly TWO `.pa-mount[data-prefix="d_"]` elements coexist the
+> moment ANY code creates a second `'d_'`-prefixed mount alongside drill's own always-present static one, which
+> is precisely what happens the instant drill's own TWIN (`user_drill_data`) is opened (`drillData.js`'s
+> declared form reproduces the built-in's `path_anchor` prefix faithfully). The 6 legacy static callers
+> (`drillView.js` etc., all `mountPathAnchor(prefix)` with no `root`) stay OUT OF SCOPE — shipped, working
+> classic-wizard code, no live symptom, touching them is not what this closure is for. What's now PINNED, not
+> just documented: `tests/pa-mount-scope-2367.spec.js` — one test measures the DOM precondition itself (6 static
+> mounts at boot, exactly 1 using `'d_'`), the other opens the twin and proves BOTH halves of the guarantee live
+> — the twin's own scoped mount gets built with real content (2 corner-grid pickers), AND the ever-present
+> static shell sharing its prefix stays untouched (`dataset.built` never set, no children) — proven non-vacuous
+> by temporarily reverting `formWidgets.js`'s scoped call to the unscoped default and confirming the second test
+> fails 3/3 (the diff was restored immediately after, verified clean). This closes the ONE path wizards-as-data
+> forms actually reach; the dormant hazard in the 6 legacy static callers remains dormant, by design, unfixed.
 
 ---
 
