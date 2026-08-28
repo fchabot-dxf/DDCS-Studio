@@ -3025,3 +3025,22 @@ Insert-op-from-project joins the quick menu's actions; no other entry point unle
 
 ⚠ Sequencing: the preset REMOVAL (#34) proceeds independently — the owner has never saved a preset, so
 nothing is lost in the interim. This entry exists so the gap does not fall between two turns.
+
+---
+
+### 38. TREE PANE-BODIES HAVE NO `--viz-stack-h` RULE OF THEIR OWN — a small in-motion settling lag at narrow
+
+*(found at t2355 while fixing the container coupling; named in the hand-back, filed here so it does not live
+only in a WORK-LOG entry. LOW priority — single-digit pixels, in-motion only, gone by release.)*
+
+During a narrow-width (stacked) drag on a TREE twin, the pane bodies lag the drag by a few pixels while in
+motion, settling correctly on release. The worker's diagnosis: the `--viz-stack-h` CSS rule that gives the
+classic shell's pane bodies their in-motion height is **classic-only** — the tree's pane bodies have no
+equivalent rule, so they settle via layout rather than tracking the variable directly.
+
+⭐ The fix shape is declared-and-known: give the tree's pane bodies the same stylesheet rule the classic ones
+have, in the tree's own selectors. ⚠ Verify with the dragProbe (in-motion rows, not just release) — this lag
+is invisible to any release-state assertion.
+
+**STILL REAL IF:** at a stacked width, mid-drag probe rows show the pane rect lagging `expH` by more than a
+pixel while moving, converging only at ▲ up.
