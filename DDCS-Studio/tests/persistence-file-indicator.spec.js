@@ -20,24 +20,35 @@ async function ready(page) {
 /**
  * t2188 (amendment 1) — SUPERSEDES the old "one disk button" indicator (t1223): #fileSaveChip is deleted, its
  * STATE job now carried by #hdrWsDirtyDot on the workspace chip itself — always PRESENT in the DOM (its slot
- * never disappears), clean = hidden (visually and from assistive tech), dirty = shown with an accessible name.
- * No filter/opacity cross-fade any more (that was the old chip's own artwork treatment); the dot's own contrast
- * and reflow properties are covered by tests/workspace-dirty-dot-2188.spec.js — this test stays focused on the
- * LIFECYCLE (clean → dirty → saved) this file's own PERSISTENCE-A scope is about.
+ * never disappears), dirty = shown with an accessible name. No filter/opacity cross-fade any more (that was
+ * the old chip's own artwork treatment); the dot's own contrast and reflow properties are covered by
+ * tests/workspace-dirty-dot-2188.spec.js — this test stays focused on the LIFECYCLE (never-saved → dirty →
+ * saved) this file's own PERSISTENCE-A scope is about.
+ *
+ * BACKLOG #25 (owner-ruled 2026-08-26) — "clean" at a fresh boot is NOT the hidden state any more: no .ddcs
+ * has EVER been written here, which is the MORE urgent of the two problem states this dot now distinguishes
+ * (workspace-dirty-dot-2188.spec.js has the full shape-distinction account) — rebaselined below, not silenced,
+ * since a never-saved workspace genuinely has no backup regardless of whether THIS session happens to match
+ * its own localStorage watermark.
  */
-test('the workspace dot: always present, hidden when clean, shown when dirty, hidden again after a real save', async ({ page }) => {
+test('the workspace dot: always present, a HOLLOW RING before any save, FILLED once dirty, hidden again after a real save', async ({ page }) => {
   await ready(page);
-  const clean = await page.evaluate(() => {
+  const neverSaved = await page.evaluate(() => {
     const dot = document.getElementById('hdrWsDirtyDot');
-    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), exists: dot !== null, isOn: dot.classList.contains('is-on'), ariaHidden: dot.getAttribute('aria-hidden') };
+    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), exists: dot !== null, isOn: dot.classList.contains('is-on'), isNeverSaved: dot.classList.contains('is-never-saved'), ariaHidden: dot.getAttribute('aria-hidden') };
   });
-  expect(clean.dirty, 'a freshly-baselined workspace is not dirty').toBe(false);
-  expect(clean.savedAt, 'it has never been saved to a .ddcs file yet').toBe(null);
-  expect(clean.exists, 'the dot\'s own slot is ALWAYS present in the DOM').toBe(true);
-  expect(clean.isOn, 'clean reads as no visible fill').toBe(false);
-  expect(clean.ariaHidden, 'clean is removed from the accessibility tree too').toBe('true');
+  expect(neverSaved.dirty, 'a freshly-baselined workspace is not dirty (a separate fact from having no file)').toBe(false);
+  expect(neverSaved.savedAt, 'it has never been saved to a .ddcs file yet').toBe(null);
+  expect(neverSaved.exists, 'the dot\'s own slot is ALWAYS present in the DOM').toBe(true);
+  expect(neverSaved.isOn, 'visible — a hollow ring, not hidden: no file anywhere is the more urgent state').toBe(true);
+  expect(neverSaved.isNeverSaved, 'the hollow-ring shape class').toBe(true);
+  expect(neverSaved.ariaHidden, 'exposed to assistive tech').toBeNull();
 
+  // BACKLOG #25 — "Unsaved changes" is the label for a REAL file gone stale, not for never-having-saved at
+  // all (that's the ring, asserted above with its own label) — so a real file must exist first, THEN dirty it.
   await page.evaluate((k) => {
+    window.ddcsMarkWorkspaceSaved('m350-shop.ddcs');
+    window.ddcsFileSaveState.refresh();
     localStorage.setItem(k, JSON.stringify([{ n: 1 }]));   // a change to the 'presets' backup store
     window.ddcsFileSaveState.refresh();
   }, KEY);

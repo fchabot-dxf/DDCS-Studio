@@ -46,12 +46,26 @@ function dismissSaved() { try { document.getElementById('fileSaveSaid')?.remove(
  * ACCESSIBLE NAME lives on the dot itself (`aria-label`), not on the button's own `title` — that stays
  * headerPost.js's single-writer fact (see the ⚠ two-owners note that used to live here, still true of the
  * button's title; just no longer true of this dot, which this module owns outright).
+ *
+ * BACKLOG #25 (owner-ruled 2026-08-26, "i like your distinction") — `dirty` (this SESSION's edits vs its own
+ * localStorage watermark) and `everSaved` (has a .ddcs file EVER been written) are separate facts that used to
+ * both collapse into this same ON/OFF dot — a workspace with no file at all read IDENTICALLY to one with a
+ * real, merely-stale file, even though the first has NO backup anywhere and the second merely has an old one.
+ * `ui/workspaceManager.js`'s own detail panel (`renderCurrent`) already carries the three-state distinction
+ * (`.wsm-state.is-never-saved`/`.is-stale`/`.is-saved`, styles.css) — this dot now agrees with it: a FILLED
+ * dot for stale-but-real, a HOLLOW RING for no file at all (styles.css's own `.hdr-ws-dirty-dot.is-never-saved`,
+ * mirroring `.wsm-state`'s shape distinction so the two surfaces read the same problem the same way). No-file
+ * wins outright, regardless of `dirty` — a fresh, unedited, never-saved workspace still has no backup and still
+ * shows the ring; hidden only in the one genuinely clean case, a real file with no changes since.
  */
 function refresh() {
     const dirty = isWorkspaceDirtyToFile();
+    const everSaved = !!fileSavedStem();
     if (dot) {
-        dot.classList.toggle('is-on', dirty);
-        if (dirty) { dot.setAttribute('aria-label', 'Unsaved changes'); dot.removeAttribute('aria-hidden'); }
+        const show = !everSaved || dirty;
+        dot.classList.toggle('is-on', show);
+        dot.classList.toggle('is-never-saved', !everSaved);
+        if (show) { dot.setAttribute('aria-label', everSaved ? 'Unsaved changes' : 'Never saved to a file'); dot.removeAttribute('aria-hidden'); }
         else { dot.removeAttribute('aria-label'); dot.setAttribute('aria-hidden', 'true'); }
     }
     // t2147 (BACKLOG #7) — THE HEADER WORKSPACE CHIP'S NAME TEXT: the stem, not the full filename with its

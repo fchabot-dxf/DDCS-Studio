@@ -864,6 +864,16 @@ html, body { overflow-x: clip; }
     opacity: 0; transform: scale(.4); transition: opacity .15s ease, transform .15s ease;
 }
 .hdr-ws-dirty-dot.is-on { opacity: 1; transform: scale(1); }
+/* BACKLOG #25 (owner-ruled, "i like your distinction") — the SAME shape distinction `.wsm-state` already uses
+   (above): a filled dot (the default, unmodified) for a real-but-stale file, a HOLLOW RING for no file at all
+   — the MORE urgent state (no backup exists anywhere), so it must not read as "milder" than the filled dot. A
+   colour ramp alone reads as "worse"; a different SHAPE reads as "different kind of problem", visible even to
+   a viewer who can't distinguish the colours. Same fixed slot, same size — only the fill/border swaps. */
+.hdr-ws-dirty-dot.is-never-saved {
+    background: transparent;
+    border: 1.5px solid color-mix(in srgb, var(--accent, #f0b429) 28%, var(--text-main, #1a1a1a) 72%);
+    box-sizing: border-box;
+}
 
 /* t2182 (amendments 6/9/10, unifying the TWO header menu triggers — logo + filename chip) — Human, across
    three messages: "logo should lose the border... and that would allow to be a bit bigger" / "sorry the logo

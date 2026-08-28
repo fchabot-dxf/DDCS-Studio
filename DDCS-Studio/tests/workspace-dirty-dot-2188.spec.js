@@ -24,28 +24,50 @@ test('#fileSaveChip is gone entirely — not hidden, deleted', async ({ page }) 
     expect(exists, 'no #fileSaveChip element at all').toBe(false);
 });
 
-test('the dot is hidden (visually and from assistive tech) when clean, shown with an accessible name when dirty', async ({ page }) => {
+// BACKLOG #25 (owner-ruled 2026-08-26) — a fresh, never-saved-to-a-file workspace is NOT "clean" any more: it
+// has no backup anywhere, which this dot now says with a hollow ring (rebaselined below, not silenced — a
+// plain page.goto() genuinely has no .ddcs yet, so this is the new, correct default, not a stale assumption).
+// The one truly SILENT state is a REAL file with no changes since — reached only by marking one saved first.
+test('the dot shows a HOLLOW RING (never saved) at a fresh boot, and a FILLED dot (stale) once a file exists but has changed', async ({ page }) => {
     await ready(page);
-    const clean = await page.evaluate(() => {
+    const neverSaved = await page.evaluate(() => {
         const dot = document.getElementById('hdrWsDirtyDot');
-        return { isOn: dot.classList.contains('is-on'), ariaHidden: dot.getAttribute('aria-hidden'), ariaLabel: dot.getAttribute('aria-label') };
+        return { isOn: dot.classList.contains('is-on'), isNeverSaved: dot.classList.contains('is-never-saved'), ariaHidden: dot.getAttribute('aria-hidden'), ariaLabel: dot.getAttribute('aria-label') };
     });
-    expect(clean.isOn, 'no visible fill when clean').toBe(false);
-    expect(clean.ariaHidden, 'removed from the accessibility tree when clean').toBe('true');
-    expect(clean.ariaLabel, 'no accessible name when there is nothing to announce').toBeNull();
+    expect(neverSaved.isOn, 'visible (a hollow ring) — no file anywhere is the MORE urgent state, never hidden').toBe(true);
+    expect(neverSaved.isNeverSaved, 'the hollow-ring shape class, distinct from a stale-but-real file').toBe(true);
+    expect(neverSaved.ariaHidden, 'exposed to assistive tech').toBeNull();
+    expect(neverSaved.ariaLabel, 'an accessible name that SAYS no file, not relying on shape/colour alone').toBe('Never saved to a file');
 
+    // Mark a real file saved (the exact fact `everSaved` reads, `data/backup.js`'s own SAVED_NAME_KEY), THEN
+    // dirty the workspace — now a real file exists AND is stale: the FILLED dot, not the ring.
     const dirty = await page.evaluate(async () => {
+        window.ddcsMarkWorkspaceSaved('Test Rig.ddcs');
         const m = await import('/ui/settingsPanel.js');
         const s = m.getSettings();
         s.units = s.units === 'mm' ? 'in' : 'mm';
         m.saveSettings();
         window.ddcsFileSaveState.refresh();
         const dot = document.getElementById('hdrWsDirtyDot');
-        return { isOn: dot.classList.contains('is-on'), ariaHidden: dot.getAttribute('aria-hidden'), ariaLabel: dot.getAttribute('aria-label') };
+        return { isOn: dot.classList.contains('is-on'), isNeverSaved: dot.classList.contains('is-never-saved'), ariaHidden: dot.getAttribute('aria-hidden'), ariaLabel: dot.getAttribute('aria-label') };
     });
-    expect(dirty.isOn, 'visible fill when dirty').toBe(true);
+    expect(dirty.isOn, 'visible fill when a real file exists but is stale').toBe(true);
+    expect(dirty.isNeverSaved, 'the FILLED shape now (a real file exists) — not the hollow ring').toBe(false);
     expect(dirty.ariaHidden, 'exposed to assistive tech when dirty').toBeNull();
     expect(dirty.ariaLabel, 'an accessible name that SAYS unsaved, not relying on shape/colour alone').toBe('Unsaved changes');
+});
+
+test('the dot is hidden (visually and from assistive tech) only in the one genuinely clean state — a real file, no changes since', async ({ page }) => {
+    await ready(page);
+    const saved = await page.evaluate(() => {
+        window.ddcsMarkWorkspaceSaved('Test Rig.ddcs');   // records the name AND re-baselines the dirty watermark
+        window.ddcsFileSaveState.refresh();
+        const dot = document.getElementById('hdrWsDirtyDot');
+        return { isOn: dot.classList.contains('is-on'), ariaHidden: dot.getAttribute('aria-hidden'), ariaLabel: dot.getAttribute('aria-label') };
+    });
+    expect(saved.isOn, 'no visible fill when a real file exists and nothing has changed since').toBe(false);
+    expect(saved.ariaHidden, 'removed from the accessibility tree when genuinely clean').toBe('true');
+    expect(saved.ariaLabel, 'no accessible name when there is nothing to announce').toBeNull();
 });
 
 test('the dot occupies a FIXED slot — the chip does not reflow between clean and dirty', async ({ page }) => {
@@ -79,9 +101,15 @@ test('the dot occupies a FIXED slot — the chip does not reflow between clean a
     expect(dirtyNameX, 'the name text does not shift sideways when the dot shows').toBe(cleanNameX);
 });
 
+// BACKLOG #25 — measures the FILLED (stale-file) dot specifically (window.ddcsMarkWorkspaceSaved first, so
+// `everSaved` is true and the shape is the fill, not the hollow ring) — the ring uses the IDENTICAL color
+// value as a BORDER instead of a fill (styles.css's own `.is-never-saved`, `color-mix(...)` copied verbatim),
+// so its own contrast against the same background is the same number by construction; no separate measurement
+// needed for it.
 test('the dot clears WCAG AA (4.5:1) composited over the real header, all 5 themes', async ({ page }) => {
     await ready(page);
     await page.evaluate(async () => {
+        window.ddcsMarkWorkspaceSaved('Test Rig.ddcs');
         const m = await import('/ui/settingsPanel.js');
         const s = m.getSettings();
         s.units = s.units === 'mm' ? 'in' : 'mm';
