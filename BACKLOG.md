@@ -3533,10 +3533,15 @@ field below defaults to a string, so typos are invisible until the machine runs 
 ### ✅ SCOPE RULED — owner, 2026-08-28: *"we don't need to verify everything, but a var block should at
 least use the match search result gui, go to as well."*
 
-⇒ **Build items 1 and 2 only**: the GOTO family gets a picker of the stack's own labels, and the VAR-NAME
+⇒ **Build items 1 and 2 first**: the GOTO family gets a picker of the stack's own labels, and the VAR-NAME
 fields get the searchable match-result picker — `assign` is the pilot (the #1 most-used block), and the other
-var fields take the SAME field type only where it drops in trivially. ⛔ Items 3 and 4 (tool/pin numbers,
-`flip.setup`) are OUT of scope for now — recorded here, not licensed. No sweeping verification layer.
+var fields take the SAME field type only where it drops in trivially.
+
+⭐ **SCOPE WIDENED — owner, later the same day, after the declare/reference + traffic-light design resolved
+the forbids-new-content concern: "ok i'm willing to have verification."** Items 3 and 4 (tool/pin numbers →
+the already-existing tool-library/declared-IO pickers; `flip.setup` → the stack's setup indices) are LICENSED
+as the follow-up tier — build them AFTER 1-2 ship and prove the field type, reusing it verbatim. ⛔ The
+traffic-light rule governs everywhere: verification INFORMS, it never hard-blocks.
 
 ### ⭐⭐ DECLARE vs REFERENCE — owner-surfaced 2026-08-28 ("wouldn't verifying forbid users from making new
 content") and it reshapes the build. Three field kinds, three behaviours:
