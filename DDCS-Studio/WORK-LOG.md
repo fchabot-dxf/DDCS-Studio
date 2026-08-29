@@ -62017,3 +62017,105 @@ own chrome) + `.editor-find-chip` (the toggle's chip styling, matching `.time-es
 
 `DDCS-Studio/verification/t2383-editor-find-chip-closed.png`, `...-editor-find-bar.png` (new).
 
+## t2385 — BACKLOG #42 PIECE 1 ONLY (param_field goes dynamic + human labels): TWO pre-existing bugs found
+and fixed in the SHARED extension mechanism, not a variation on the dispatch — RATCHETED, the other 6 pieces
+NOT started
+
+BACKLOG #42's own piece 1 asked for `param_field` to go dynamic like `formfield` (`ddcs_dynfields`, widget
+`''` = inherit-from-type per t1562), flagging its own known risk up front: "bridge.js:408's `ddcs_dynfields`
+hides VALUE-SOCKET inputs via `getInput` — inline fields may not be hidable by that path... if so, say what
+mechanism you used instead." That risk was real, and finding + fixing it (twice — two independent bugs, not
+one) consumed the whole turn. Reporting honestly rather than rushing the remaining 6 pieces, per the dispatch's
+own explicit permission ("hand back the pieces you finished WELL with the count").
+
+### BUG 1 (pre-existing, in bridge.js, not mine): `getInput(name).setVisible()` was a SILENT NO-OP for every
+inline field
+
+`jsonDef()`'s own block-shape builder packs every field of one `message0` row into a SINGLE shared Blockly
+Input — confirmed live (`formfield`'s own `inputList.length === 1` for the whole 29-field block). So
+`registerDynExtension`'s `getInput(FN(f))` could never find a NAMED input for a bare inline field (text/
+dropdown/checkbox — everything but a true value socket), and did nothing. This meant `formfield`'s own
+`dynamic: ['bindMode','widget']` had NEVER actually worked, despite its own header comment claiming it did —
+confirmed by toggling its WIDGET field through the real event pipeline and seeing zero visibility change.
+Fixed by switching to `Block.getField(name).setVisible(...)` — a strict superset (finds a field whether or
+not it has its own Input), confirmed live to toggle `display:none` on the field's own SVG root.
+
+### BUG 2 (pre-existing, in bridge.js, not mine, only surfaced because param_field combines TWO extensions):
+`Block.prototype.setOnChange` is a SINGLE-SLOT assignment, not a listener list
+
+With bug 1 fixed, `formfield` (dyn-only) worked in isolation, but `param_field` (dyn + the `ddcs_camfield`
+read-only-PARAM lock) still didn't toggle. A `defDiag` live check proved the new `paramField.js` def itself
+was 100% correct (`dynamic`, `fieldsFor`, `labels` all read back right), isolating the bug to the RUNTIME
+extension-composition layer. Root cause: `registerCamFieldExtension` calls `self.setOnChange(...)` directly,
+which SILENTLY OVERWRITES whatever `registerDynExtension` had just installed with its own `setOnChange` call —
+Blockly's own `setOnChange` replaces, it doesn't chain. Fixed with a new shared `addOnChange(block, fn)`
+composition helper (bridge.js, just above `registerDynExtension`): composes callbacks onto
+`block._ddcsOnChangeChain`, ONE real `setOnChange` call iterating the chain with per-callback try/catch.
+Applied to all FOUR existing direct `setOnChange` callers found by grep (`ddcs_dynfields`, `ddcs_camfield`,
+`ddcs_seccolor`, `ddcs_opunit`) — not just the one instance tripped over, since the same clobbering would hit
+any future block combining two of these extensions.
+
+### My own bug, caught before shipping: `dynamic: ['widget']` alone missed the `type`-only case
+
+`fieldsFor` resolves the effective widget from `widget` (explicit) OR `type` (t1562 inherit-when-empty). With
+only `widget` watched, changing `type` alone (leaving `widget` at `''`) never re-ran `apply()` — `ddcs_dynfields`'s
+own onChange only re-checks fields NAMED in `dynamic`. Fixed by widening to `dynamic: ['widget', 'type']`.
+
+### `WIDGET_BY_TYPE` extracted to one source (`blocks/userOps.js`)
+
+`formWidgets.js`'s own `DEFAULT_BY_TYPE` (render-time widget resolution) and the new `paramField.js`'s
+`fieldsFor` (authoring-time) both need the SAME type→widget map — declared once in `userOps.js`, `formWidgets.js`
+now aliases it (`const DEFAULT_BY_TYPE = WIDGET_BY_TYPE`, byte-identical runtime value).
+
+### Human labels — the second half of piece 1
+
+Added `labels: { dflt: 'default', nmin: 'min', nmax: 'max', nstep: 'step' }` to both `paramField.js` and
+`formField.js` (a PER-DEF map, deliberately not the shared bare-field-name `DESCRIPTIONS` tooltip map, which
+dozens of unrelated blocks reuse verbatim). `jsonDef()` now consults `def.labels[f] || f` when building each
+field's face caption; the storage key never changes. Verified two ways, not just `toString()`: a live
+screenshot of both blocks on the canvas (`param_field` reads "...type number **default** [ ] section [ ] help
+[ ] options min [ ] max [ ] step [ ] units..."; `formfield` reads "...label [ ] **default** [ ]
+bindMode...", both correct) — string serialization alone was flagged as insufficient and a DOM/visual check
+was done instead.
+
+### VERIFIED, twice, at increasing scope
+
+1. Isolated: `_scratch-verify-paramfield.spec.js` (deleted after use) — a fresh `param_field` block's
+   `OPTIONS`/`NMIN` field visibility for the default state, an inherited type-only change (number→enum), and
+   an explicit widget-only change (→dropdown). Ran BEFORE bug 2's fix (proved the def was right but runtime
+   toggling was still broken: `enumInheritState`/`explicitDropdownState` both wrongly showed
+   `{options:false,nmin:true}`) and AFTER (both now correctly show `{options:true,nmin:false}`).
+2. Full suite, run ONCE covering BOTH bridge.js fixes together (Rule 1b: shared file, full suite before
+   trusting any change there) — **2922 passed, 0 failed, 11 flaky (all recovered on retry), 26 skipped,
+   24.0m**. Confirms every form-reproduction ratchet and the t2381 registry invariant stayed green untouched —
+   this turn changed the authoring surface only, not register-time output.
+
+### Files changed
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — new `addOnChange(block, fn)` helper; `registerDynExtension`
+switched `getInput→getField`; all four `setOnChange` callers routed through `addOnChange`; `jsonDef()` now
+reads `def.labels[f] || f` for each field's face caption.
+
+`web/blocks/userOps.js` — new exported `WIDGET_BY_TYPE`.
+
+`web/ui/formWidgets.js` (Rule 1b, shared) — `DEFAULT_BY_TYPE` now aliases `WIDGET_BY_TYPE`.
+
+`web/wizards/ops/paramField.js` — rewritten: `dynamic: ['widget','type']`, `fieldsFor`, `labels`, importing
+`WIDGET_BY_TYPE`; header comment documents both bridge.js bugs found while building this block.
+
+`web/wizards/ops/formField.js` — added `labels` (same map); its own header's matchvar/atomType free-text note
+is UNCHANGED this turn (piece 6, exact-name pickers, not started — updating that comment before the picker
+exists would be premature).
+
+### NOT started this turn (pieces 2–7 of BACKLOG #42)
+
+Human labels + dynamic-per-def (piece 1) is the only piece shipped. Options editor (piece 2, a genuinely new
+custom Blockly field, no existing precedent), sentence-shaped show-when (piece 3), the Block▸ context-menu
+submenu + custom popup fallback (piece 4 — confirmed no submenu support in the vendored Blockly, grepped, zero
+hits), exact-name pickers for matchvar/atomType/whenparam (piece 6 — needs a new stack-enumeration reducer,
+no precedent, built on `flattenBlocks`), and the section/units combo-dropdown (piece 7) are all UNSTARTED —
+none begun, nothing half-built. Reason: piece 1 alone surfaced two independent, pre-existing bugs in code
+shared by every dynamic/cam-locked block in the app (Rule 1b: bridge.js and the blocks render path are
+shared), each requiring live isolation before the fix could be trusted; rushing straight into 6 more new
+mechanisms on the same turn risked exactly the kind of unverified shared-file change Rule 1b warns against.
+

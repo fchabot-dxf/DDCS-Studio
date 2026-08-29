@@ -68,6 +68,9 @@ export const formFieldBlock = {
         gate: '', optionGate: '',
     },
     allFields: ['param', 'widget', 'label', 'dflt', 'bindMode', 'matchvar', 'atomType', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'options', 'nmin', 'nmax', 'nstep', 'units', 'derived', 'writes', 'formHidden', 'group', 'role', 'relToRow', 'gate', 'optionGate'],
+    // t2385 (BACKLOG #42 piece 1) — the same per-def label map param_field's own block gained, for the same two
+    // storage-key families both blocks share (see paramField.js's own header comment for the full account).
+    labels: { dflt: 'default', nmin: 'min', nmax: 'max', nstep: 'step' },
     fieldsFor(p) {
         const w = (p && p.widget) || 'number';
         const mode = (p && p.bindMode) || 'assign';

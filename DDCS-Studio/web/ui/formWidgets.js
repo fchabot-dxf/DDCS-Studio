@@ -19,7 +19,7 @@ import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';
 import { factsOf, factMm, factLabel, unitOf } from '../data/latheTools.js';   // t1325 — the tool's quick facts, and the ONE conversion for its unit   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool, toolsOfKinds } from '../wizards/toolPicker.js';   // t1325 — toolsOfKinds: an op offers only the kinds it declares it can hold   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
-import { paramFieldsFromStack, childrenOf } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present; t2315 — the ONE children/uiChildren shape normalization, shared with flattenBlocks
+import { paramFieldsFromStack, childrenOf, WIDGET_BY_TYPE } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present; t2315 — the ONE children/uiChildren shape normalization, shared with flattenBlocks; t2385 — the type->widget-key map, shared with paramField.js's own block-face fieldsFor
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
 import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
@@ -893,7 +893,7 @@ export const FORM_WIDGETS = {
 // widgets that bind a GROUP of params (the form renders ONE widget for the whole group, not one per binding).
 export const MULTI_WIDGETS = new Set(['xy-pad', 'rect']);
 
-const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };
+const DEFAULT_BY_TYPE = WIDGET_BY_TYPE;   // t2385 — extracted to blocks/userOps.js, shared with paramField.js's own block-face fieldsFor
 
 /** Pick the form widget for a binding: its declared `widget`, else a sensible default for its `type`. */
 export function resolveFormWidget(b) {

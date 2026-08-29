@@ -248,7 +248,15 @@ function jsonDef(def) {
     if (isOpunit) args0.push({ type: 'field_label', name: 'OPUNIT_LABEL', text: def.label });   // filled per-instance from opType by ddcs_opunit; the routing key (opType/defV) follows READ-ONLY
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
-        message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${f} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
+        // t2385 (BACKLOG #42 piece 1) — a def MAY declare its own `labels: {field: 'friendly text'}` map so
+        // the block FACE reads a human word (e.g. `dflt` -> "default") while the STORAGE key never changes —
+        // `def.labels` is per-def, not the shared bare-field-name `DESCRIPTIONS` map above (that one is keyed
+        // by field name ACROSS every block kind — e.g. 'value'/'type'/'dwell' are reused by dozens of
+        // unrelated blocks — so widening IT would relabel every one of them, not just the def that asked).
+        // Absent `labels` (every pre-existing def), this falls back to the raw field name — byte-identical
+        // face text for every block that doesn't opt in.
+        const faceLabel = (def.labels && def.labels[f]) || f;
+        message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${faceLabel} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
         const desc = getDesc(f);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
@@ -388,8 +396,41 @@ let _Blockly = null;
 export const getBlockly = () => _Blockly;   // stackBridge needs the serialization API to render blocks (v11)
 const DEF_BY_TYPE = {}; PALETTE.forEach((d) => { DEF_BY_TYPE[d.type] = d; });
 
+// t2385 — a SECOND mechanism limit, live-caught the same way as the one below: `Block.prototype.setOnChange`
+// is a SINGLE-SLOT assignment, not a listener list — a block with TWO extensions that each call `setOnChange`
+// (param_field carries both `ddcs_dynfields`, below, AND `ddcs_camfield`, further down, which locks its own
+// `PARAM` field read-only) silently lets the LATER extension's call overwrite the EARLIER one's handler
+// entirely. Confirmed live: with both extensions applied (as `jsonDef()` already does for every `param_field`/
+// `cam_field`), `ddcs_dynfields`'s own visibility-toggling onChange never fired at all — `ddcs_camfield`
+// registered second and clobbered it, even though `ddcs_dynfields`'s OWN logic was already correct (proven
+// firing standalone on `formfield`, which carries no camfield lock). `addOnChange` below COMPOSES instead of
+// overwriting — any extension that wants an onChange hook calls this, never `block.setOnChange` directly, so
+// a third future extension composes cleanly too instead of re-discovering this same bug.
+function addOnChange(block, fn) {
+    if (!block._ddcsOnChangeChain) {
+        block._ddcsOnChangeChain = [];
+        block.setOnChange(function (e) {
+            for (const cb of block._ddcsOnChangeChain) { try { cb.call(this, e); } catch (err) { /* one bad link doesn't break the rest */ } }
+        });
+    }
+    block._ddcsOnChangeChain.push(fn);
+}
+
 // Dynamic block extension: show only the fields the current `dynamic` value calls for (e.g. array → only the
 // chosen pattern's fields). Degrades safely — if anything throws, all fields stay visible (still editable).
+//
+// t2385 — FIXED a mechanism limit live-caught before it shipped a SECOND silently-broken consumer (BACKLOG #42
+// piece 1): `jsonDef()` (this file's own block-shape builder) packs every `args0` field of one message0 ROW
+// into a SINGLE shared Blockly Input (confirmed live: a fresh `formfield` block has `inputList.length === 1`
+// holding all 29 of its own fields) — `getInput(FN(f))` can therefore never find a NAMED input for a bare
+// inline field (`field_input`/`field_dropdown`/`field_checkbox`/etc, i.e. everything `fieldKind()` does NOT
+// classify as `region`/`boolean`/the numeric `value` fallback), so `inp.setVisible(...)` below was silently a
+// no-op for every one of them — `formfield`'s own `dynamic: ['bindMode','widget']` never actually hid
+// anything, contradicting its own header comment's claim, undetected until this turn's own live probe.
+// `Block.getField(name)` (confirmed live: `hasSetVisible: true`, and toggling it actually sets the field's own
+// SVG root to `display:none` after a render) searches every field on the block regardless of which Input (if
+// any) wraps it — a strict superset of what `getInput` could ever reach, so switching to it fixes the true
+// no-op (formfield, and now param_field) with zero regression risk for anything `getInput` already reached.
 function registerDynExtension(Blockly) {
     try {
         Blockly.Extensions.register('ddcs_dynfields', function () {
@@ -405,11 +446,11 @@ function registerDynExtension(Blockly) {
                     const params = { ...def.defaults };
                     for (const df of dynFields) params[df] = this.getFieldValue(FN(df));
                     const show = new Set(def.fieldsFor(params).map(FN));
-                    all.forEach((f) => { const inp = this.getInput(FN(f)); if (inp) inp.setVisible(show.has(FN(f))); });
+                    all.forEach((f) => { const fld = this.getField(FN(f)); if (fld) fld.setVisible(show.has(FN(f))); });
                     if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
                 } catch (e) { /* degrade to all-fields-visible */ }
             };
-            this.setOnChange(function () {
+            addOnChange(this, function () {
                 if (this.isInFlyout || !this.workspace) return;
                 const v = dynFields.map((df) => this.getFieldValue(FN(df))).join('|');
                 if (v === this._ddcsDyn) return;
@@ -431,7 +472,7 @@ function registerSecColorExtension(Blockly) {
             const apply = () => { try { const c = self.data ? JSON.parse(self.data).color : null; if (c) { self.setColour(c); self._ddcsSecColored = true; } } catch (_) { /* keep style */ } };
             apply();                        // paste / programmatic create (data already set)
             setTimeout(apply, 0);           // JSON load sets `data` after init → colour on the next tick
-            self.setOnChange(function () { if (!self._ddcsSecColored) apply(); });   // fallback until it lands
+            addOnChange(self, function () { if (!self._ddcsSecColored) apply(); });   // fallback until it lands — t2385: composed, not a raw setOnChange (see addOnChange's own header note)
         });
     } catch (e) { /* already registered */ }
 }
@@ -460,7 +501,7 @@ function registerOpunitExtension(Blockly) {
             };
             apply();
             setTimeout(apply, 0);           // JSON load sets fields/shadows AFTER init → re-derive the label + re-lock
-            self.setOnChange(function () { if (!self._ddcsOpunit) { self._ddcsOpunit = true; apply(); } });   // fallback until the field/shadow lands
+            addOnChange(self, function () { if (!self._ddcsOpunit) { self._ddcsOpunit = true; apply(); } });   // fallback until the field/shadow lands — t2385: composed, not a raw setOnChange
         });
     } catch (e) { /* already registered */ }
 }
@@ -477,7 +518,7 @@ function registerCamFieldExtension(Blockly) {
             const apply = () => { try { lock(self.getField('PARAM')); } catch (_) { /* keep the raw chip */ } };
             apply();
             setTimeout(apply, 0);   // JSON load / dynfields rebuild sets fields AFTER init → re-lock on the next tick
-            self.setOnChange(function () { lock(self.getField('PARAM')); });   // re-lock after a mode toggle rebuilds the fields
+            addOnChange(self, function () { lock(self.getField('PARAM')); });   // re-lock after a mode toggle rebuilds the fields — t2385: was self.setOnChange, which silently overwrote ddcs_dynfields' own handler on a block (param_field) carrying both extensions
         });
     } catch (e) { /* already registered */ }
 }

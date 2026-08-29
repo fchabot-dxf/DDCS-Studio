@@ -64,6 +64,13 @@ export function getUserDef(opType) { return USER_DEFS.get(opType) || null; }
 // `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
 export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string', 'list']);   // 'list' = a structured/array value (e.g. a coordinate-list positioner) — not a scalar socket
 
+// t2385 (BACKLOG #42 piece 1) — EXTRACTED from ui/formWidgets.js's own `DEFAULT_BY_TYPE` (its `resolveFormWidget`
+// still owns the actual widget LOOKUP — `FORM_WIDGETS[...]` — this only supplies the type->widget-KEY mapping),
+// so `wizards/ops/paramField.js`'s own block-face `fieldsFor` can resolve param_field's own `widget: ''` (t1562,
+// "inherit, derive from type") the SAME way the form renderer will, without a second hand-copied map that could
+// drift — ONE source, read from both the authoring surface (blocks) and the render surface (ui).
+export const WIDGET_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };
+
 // t1704 (cycle ACT 2) — CAN THIS PARAM ACCEPT A LIVE CONTROLLER TOKEN (`#500`) INSTEAD OF A FIXED NUMBER? Declared
 // per binding, beside its other fields, FAIL-CLOSED: absence of `tokenEligible: true` means NOT eligible — a token's
 // numeric value does not exist until the machine runs the program, so a param the wizard's own JS needs a real
