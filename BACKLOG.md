@@ -3508,6 +3508,41 @@ and culling/renaming Blockly's native context-menu entries. The canvas keeps its
 
 ---
 
+### 46. THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+
+*(owner-reported live 2026-08-28: **"in wiz preview moving the feature gui move the block value but not the
+gui"** — the Blocks tab's Wizard View pane. Ruled the same day: **"complete the loop."**)*
+
+**The half-state is the bug.** Dragging a feature handle on the pane's 2D canvas silently writes the block's
+value while the canvas never follows the finger — silent mutation with dead feedback, the worst half of each.
+
+⚠ **Root is INFERRED, not observed — observe before fixing:** the form↔block writeback deliberately mutes
+re-renders while a write is in flight (the t2287 echo machinery, so typing doesn't clobber itself); a canvas
+drag riding that same writeback would land the value and lose the repaint. Confirm that is the mechanism.
+
+### ✅ THE RULING — complete the loop, commit on release
+
+```
+during the drag    the GUI follows the finger — live, canvas-only, NOTHING written
+on release         ONE write lands in the block  →  one undo step
+```
+
+- The pane is ALREADY a writing surface — the form beside the canvas writes back by design. One pane, one rule.
+- Same gesture means the same thing in every tab: in the wizard itself a handle drag writes the value.
+- Commit-on-release is the house drag pattern (the pane-splitter saga's authoritative `onUp` write): no
+  mid-drag value churn, no undo spam, no echo fighting the finger.
+- ⛔ Full-inert was considered and REJECTED — it fixes the silence by killing the best input surface in the
+  one tab where authors live. And ⛔ never ship the current half-state anywhere else: a control either works
+  or is visibly inert.
+
+### VERIFY (the real gesture)
+
+In Blocks → Wizard View on a twin with a 2D canvas (drill/surfacing): drag a handle — the canvas follows
+live; release — the block field updates ONCE; one undo restores both; no mid-drag jitter. ⚠ The wizard
+modal's own canvas behaviour is UNTOUCHED — regression-check it.
+
+---
+
 ### 43. FORM ↔ BLOCK REVEAL — tap a form row, see its block; a block's "Show in form"
 
 *(owner-approved 2026-08-28, from the new-user sweep. The hardest new-user question in the Blocks tab is
