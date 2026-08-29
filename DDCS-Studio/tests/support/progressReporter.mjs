@@ -152,7 +152,16 @@ function renderMd(d, pct) {
     // t2409 (owner: "compact the progress md ui to be less tall") — NO TABLE: a markdown table cannot be
     // short, and its empty header row rendered as a blank strip. Four lines carry every number the ten-row
     // table did. The bar keeps its backticks: monospace is what makes the block glyphs align in the preview.
-    return `\`${barChars(pct)}\` **${pct.toFixed(1)}%** · **${d.completed} / ${d.total}** · ${d.status}
+    //
+    // (owner, same session: "can it show the ratio instead") — a bare bold **failed** on a 2934/2935 run read
+    // as a crash at a glance. The VERDICT LINE is now a PASS RATIO, so the two states that matter are never
+    // confusable: a completed run with reds says "2934/2935 passed", a run that DIED still says "running"
+    // with a stale heartbeat. `status` itself stays in the .json for tooling; humans get the ratio.
+    const ran = d.passed + d.failed;
+    const verdict = d.status === 'running'
+        ? `running · ${d.passed}/${ran || 1} passing`
+        : `${d.passed}/${ran || 1} passed${d.failed ? ` · **${d.failed} failed**` : ''}`;
+    return `\`${barChars(pct)}\` **${pct.toFixed(1)}%** · **${d.completed} / ${d.total}** · ${verdict}
 
 ✅ ${d.passed} · ❌ ${d.failed} · ⚠ ${d.flaky} · ⊘ ${d.skipped} · ⏱ ${fmtDuration(d.elapsedSec * 1000)} · ETA ${eta}
 
