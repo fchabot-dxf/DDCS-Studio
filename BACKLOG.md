@@ -3189,3 +3189,69 @@ all-32 `CUSTOMIZE` path, which is unaffected — so the blast radius is *guarded
 > holds for all 32 twins (1.3m run, unaffected), drill's own 37/37 unchanged. `tests/fork-to-custom-2365.spec.js`
 > rebaselined — its own KNOWN-GAP test (asserting the now-closed refusal) replaced with a positive lossless
 > verification.
+
+---
+
+### 40. THE SIM IGNORES THE OUTPUT TABLE THE USER ALREADY FILLED IN — "stage 3", declared and never finished
+
+*(surfaced 2026-08-28 from a community post — an M350 V2 owner running a two-head machine who drives his DUST
+COLLECTOR from `M151`. We are not solving his problem; his post made ours visible. ⭐ Third "gap" that
+afternoon which turned out to already exist — same as `commscreen` and the `path_anchor` node.)*
+
+**The user can already organise their outputs. Nothing reads the result.**
+
+```
+settings.outputs[]         USER-EDITABLE, per-machine, persisted, has a `custom` type
+  { type, label, pin, onCode, offCode }      ioTable.js:23-30
+  exposed by getOutputs()                    settingsPanel.js:533
+                          ⇣
+                  ✂  nothing connects these
+                          ⇡
+ATC_DIALECT + HANDSHAKES   HARDCODED, drives the simulation
+  150 → OUT_GRIPPER_OPEN → asserts IN_GRIPPER_OPEN @450ms
+  GcodeExecutionEngine.js:36-63 · virtualIO.js:171-199
+```
+
+⭐ **The code says this was always the plan.** `settingsPanel.js:253`: *"syncFlatFromIO() mirrors edits back to
+the flat fields so the sim + wizards keep working **until they read the arrays directly (stage 3)**."*
+⇒ Not a missing design — **a declared seam with an unfinished consumer.**
+
+### WHY IT MATTERS — a FALSE GREEN, not a wrong label
+
+Layer 1 (M-code → intent) is the VENDOR's dialect and is right to hardcode. Layer 3 (pin → physical port) is
+the USER's and we correctly never touch it. ⛔ **Layer 2 is the bug**: "M151 fires an output" is a fact about
+the dialect; *"…and 450ms later a gripper-closed sensor asserts"* is a claim about **that machine's wiring**,
+made from the M-code alone.
+
+```
+program   M151        (his dust collector off)
+          M306        (wait: gripper closed)
+sim       asserts IN_GRIPPER_CLOSED @450ms  →  proceeds  ✅
+machine   no gripper on that head           →  parks forever
+```
+
+⚠ The simulation is confident and the machine hangs — the wrong direction for a wrong answer to point.
+
+### THE WORK — three parts, the last two trivial
+
+1. **The sim reads `settings.outputs[]` before falling back to `ATC_DIALECT`.** The label follows for free, and
+   the handshake stops asserting a sensor the machine never declared. ⛔ **Outputs only** — not inputs, not the
+   whole stage-3 model.
+2. **Add the gripper row to `OUTPUT_TYPES`** — drawbar, dust cover and carousel are all catalogued; `M150/M151`
+   simply are not. One row.
+3. Establish whether the OPEN-LOOP family (`M156-M161`: locating pin, vacuum, pusher) needs the same, since it
+   has no handshake to get wrong — likely a no-op, but check rather than assume.
+
+⛔ **THIS IS NOT THE BABYSITTING RULE.** We would infer nothing, correct nothing, overwrite nothing. The fix is
+to **stop inventing a sensor nobody told us exists** — declining to assert, not asserting harder.
+⚠ And model no opinion about WHICH output someone should repurpose: a closed-loop gripper output is an odd
+choice for a dust collector, and that is entirely the machine owner's call.
+
+### STILL REAL IF
+
+`grep -n "getOutputs" DDCS-Studio/web/engine/*.js` → no hits means the engine still ignores the user's table.
+
+### ⭐ TESTABLE ON THE BENCH V4.1, READ-ONLY
+
+The bench at `10.0.0.50` has **no ATC at all**, so anything the sim claims about gripper or drawbar sensors
+there is provably invented. No writes needed to observe it.
