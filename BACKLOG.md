@@ -3630,7 +3630,39 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 46. THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [⏸ NOT REPRODUCED t2391 — owner re-check needed on ≥V2026.08.29.3 before any further work] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+
+> **t2391 (no code changed):** extensive live drag testing (surfacing + corner, both routes, paced + rapid)
+> could NOT reproduce the dead-GUI symptom — the canvas followed. The worker tried the ruled fix anyway, saw
+> it possibly break canvas live-redraw in one run, and REVERTED rather than ship unverified. ⚠ **Not-reproduced
+> is NOT not-real**: the t2345-t2357 drag saga failed to reproduce for five turns because the bug lived in
+> RETURNING-USER state the harness never has — and t2385-t2389 reworked this exact render path since the
+> report, so the symptom may also have been fixed incidentally. ⇒ **Next action is the OWNER's ten-second
+> check on the current build**, not more harness testing. If it still happens: reopen with the device, the
+> wizard, and whether the session was fresh or returning. If it does not: close as incidentally-fixed-by-#42.
+> ⭐ A real adjacent finding came out of the attempt — see #50.
+
+---
+
+### 50. RAPID INPUT-ONLY WRITES ARE INVISIBLE TO UNDO
+
+*(found t2391 while chasing #46, isolated with a clean control: a TYPED edit undoes fine; 8 rapid input-only
+writes to a field leave undo blind — 6 undo presses, zero effect. Worker-found, repro in hand, no code
+changed.)*
+
+Any burst of programmatic/rapid `input` events on a field — canvas or not — never becomes an undo state.
+This is the t2287 territory (gesture batching, the `__ungrouped__` sentinel, `GESTURE_QUIET_MS`) — the same
+recording path that turn already patched once for direct field writes.
+
+⚠ **Why it matters beyond tidiness:** #46's ruled commit-on-release design lands its write as exactly this
+kind of programmatic write — if built while this gap exists, the drag's one-write-one-undo contract would be
+silently unkeepable. **Sequence this BEFORE #46's fix, if #46 reopens.**
+
+⭐ Worker's own suggested next step, recorded verbatim: instrument `saveStates.js` directly against the
+rapid-input repro — smaller and faster than drag testing.
+
+**STILL REAL IF:** fire 8 rapid `input` events with value changes at any form field, press undo — if the
+values survive undo, still real.
 
 *(owner-reported live 2026-08-28: **"in wiz preview moving the feature gui move the block value but not the
 gui"** — the Blocks tab's Wizard View pane. Ruled the same day: **"complete the loop."**)*
