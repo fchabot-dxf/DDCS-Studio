@@ -730,6 +730,44 @@ export function formfieldMatchReport(children) {
     return { total: specs.length, matched: specs.length - unmatched.length, unmatched };
 }
 
+// t2395 (BACKLOG #47 item 1) — the goto family's own field name per block type (mirrors bridge.js's
+// `LABEL_TARGET_FIELDS`, declared independently here rather than imported: this file is the MODEL side, reads
+// the plain `{type,params}` shape and must stay import-clean of the Blockly-facing bridge.js — the same
+// direction every other model/bridge boundary in this codebase already keeps).
+const GOTO_TARGET_FIELDS = { goto: 'n', ifgoto: 'goto', probecheck: 'goto', confirm: 'cancel', hmiconfirm: 'cancel' };
+
+/** t2395 — WHICH goto-family targets name a `label` block's `n` actually declared in this stack, and which
+ *  don't. The picker (pickerField.js, `allowNew`) is FORWARD-AUTHORABLE by design — "people place the jump
+ *  before the label" — so a target with no match YET is not necessarily wrong; this is the backstop that nets
+ *  the ones still unmatched once the whole stack is built. ⛔ INFORMATIONAL ONLY (BACKLOG #47's own ruling:
+ *  "verification INFORMS, it never gates") — unlike `formfieldMatchReport` just above, the caller must NEVER
+ *  turn this into a blocking `ok:false`; it exists to be surfaced (a toast), never to refuse a save. A
+ *  non-numeric target (`ifgoto.goto`'s own documented symbolic-string override, t1581) is out of scope here —
+ *  only a target that LOOKS like a plain label number and doesn't match one is a genuine candidate defect. */
+export function gotoTargetReport(children) {
+    const flat = flattenBlocks(children);
+    const labels = new Set();
+    for (const b of flat) {
+        if (!b || b.type !== 'label') continue;
+        const n = Number(b.params && b.params.n);
+        if (Number.isFinite(n)) labels.add(n);
+    }
+    const unmatched = [];
+    let total = 0;
+    for (const b of flat) {
+        if (!b) continue;
+        const key = GOTO_TARGET_FIELDS[b.type];
+        if (!key) continue;
+        const raw = b.params && b.params[key];
+        if (raw == null || raw === '') continue;
+        const n = Number(raw);
+        if (!Number.isFinite(n)) continue;   // a symbolic override (ifgoto's own documented case) — not this check's concern
+        total++;
+        if (!labels.has(n)) unmatched.push({ type: b.type, field: key, target: n });
+    }
+    return { total, matched: total - unmatched.length, unmatched };
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);

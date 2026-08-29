@@ -23,6 +23,35 @@ const UNITS_FIXED = ['mm', 'mm/min', 'in', 'deg', 'rpm', '%'];
 // suggestion combo is the middle ground: the two real scope names as type-ahead candidates, free expressions
 // still first-class, exactly piece 7's own "spelling aid, not a gate" precedent.
 const SCOPE_NAMES = ['z', 'by'];
+// t2395 (BACKLOG #47 item 2, the DECLARE side of the ladder) — `assign.var` (the pilot; the #1 most-used
+// block) is where a macro var is BORN, so typing stays FULLY OPEN — never a gate, unlike pickerField.js's
+// must-match/forward-authorable modes for REFERENCES. The suggestion list is "known ranges, scratch bands,
+// vars already in the stack" (BACKLOG's own words); the TRAFFIC LIGHT (owner-refined: "variables are still
+// only available in a certain range") is the other half — `getText()` below appends a visible warning, read
+// from `data/varMap.js`'s own `classify()`/`RESERVED` (the DECLARED, per-dialect-someday register map — today
+// Expert/M350-only, per that file's own header), NEVER a hard block: `classify()` always resolves to SOME
+// tier for any in-range number, and every tier still lets the value through — "the app's own blocks
+// deliberately write system registers... every 'forbidden' write has a proven legitimate use."
+import { classify, RESERVED, RANGES } from '../../data/varMap.js';
+const VAR_SUGGESTIONS = [`#${RANGES.uservar.min}`, `#${RANGES.scratch.min}`];
+/** null (clean: scratch/uservar) | a short warning string naming the register class, or the SPECIFIC one if
+ *  `RESERVED` tracks it — never for a value that isn't a bare `#NNN` (an expression stays uninspected, exactly
+ *  the same "don't gate what you can't cleanly parse" call `radiuscomp`'s own defensive boolean checks make). */
+function varTrafficTag(v) {
+    const m = /^#(\d+)$/.exec(String(v == null ? '' : v).trim());
+    if (!m) return null;
+    const n = Number(m[1]);
+    // t2395 — live-caught before shipping: #520 (the safe-Z margin) sits WITHIN the general uservar range
+    // (100-549) but is individually reserved — `classify()` alone reads it as plain 'uservar' (clean) and
+    // says nothing, so RESERVED must be checked FIRST, regardless of which tier the number's RANGE falls in,
+    // not merely as a fallback label for an already-flagged tier.
+    const named = RESERVED[n];
+    if (named) return `⚠ ${named.split(' — ')[0]}`;
+    const k = classify(n);
+    if (k === 'scratch' || k === 'uservar') return null;
+    if (k === 'other') return '⚠ outside the tracked var map — not a scratch/persistent register on this dialect';
+    return `⚠ ${k} register — not free scratch/user space`;
+}
 let uid = 0;
 
 export function installComboField(Blockly) {
@@ -38,6 +67,18 @@ export function installComboField(Blockly) {
         _candidates() {
             if (this.comboKind === 'units') return UNITS_FIXED;
             if (this.comboKind === 'z' || this.comboKind === 'by') return SCOPE_NAMES;   // t2393 — comboKind is the field's own bare name (jsonDef()'s existing convention), not a synthetic kind
+            if (this.comboKind === 'var') {
+                // t2395 — every DISTINCT #NNN already assigned somewhere in this stack (reusing an existing
+                // declaration is a legitimate, common thing to suggest), plus one "next clean slot" pointer
+                // into each of the two writable-by-convention bands (scratch/uservar) — never exhaustive, a
+                // spelling aid, not an allocator.
+                const blk = this.getSourceBlock();
+                const ws = blk && blk.workspace;
+                const used = ws ? ws.getAllBlocks(false)
+                    .filter((b) => b.type === 'assign')
+                    .map((b) => b.getFieldValue('VAR')).filter((v) => /^#\d+$/.test(String(v || ''))) : [];
+                return [...new Set([...used, ...VAR_SUGGESTIONS])];
+            }
             if (this.comboKind === 'section') {
                 const blk = this.getSourceBlock();
                 const ws = blk && blk.workspace;
@@ -47,6 +88,16 @@ export function installComboField(Blockly) {
                 return [...new Set([...SECTION_CANON, ...own])];
             }
             return [];
+        }
+
+        // t2395 — the TRAFFIC LIGHT's visible half: a reserved/persistent/out-of-map value shows a warning
+        // suffix right on the block face, not just in a hover tooltip (a "visible" warning per the ruling's
+        // own wording) — a plain scratch/uservar value stays exactly as typed, no decoration.
+        getText() {
+            const v = this.getValue();
+            if (this.comboKind !== 'var') return v;
+            const tag = varTrafficTag(v);
+            return tag ? `${v}  ${tag}` : v;
         }
 
         widgetCreate_() {

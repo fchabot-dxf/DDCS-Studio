@@ -30,6 +30,14 @@ import { opLabelOf } from '../opBuilders.js';   // t1071 — the opunit chip's f
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
 // stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
 const CORNER_COLOUR = { stockAttach: '#4ab3ff', pathDatum: '#ffcf3a' };
+// t2395 (BACKLOG #47 item 1) — the GOTO FAMILY: each of these five blocks names a `label` block's own `n` by
+// ONE field, but the field's own NAME differs per block (goto.n, ifgoto.goto, probecheck.goto, confirm.cancel,
+// hmiconfirm.cancel — the same collision risk `SELECTS`' bare-name keying already has to guard against
+// elsewhere in this file), so a `(def.type, field)` table is the declared, unambiguous source rather than a
+// name-based guess. FORWARD-AUTHORABLE (BACKLOG #47's own reference-not-declaration rung): the picker lists
+// the stack's own labels but a typed NEW number still commits (`allowNew`, pickerField.js) — "people place the
+// jump before the label."
+const LABEL_TARGET_FIELDS = { goto: 'n', ifgoto: 'goto', probecheck: 'goto', confirm: 'cancel', hmiconfirm: 'cancel' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],
@@ -237,12 +245,22 @@ export function fieldKind(def, field) {
         if (field === 'section' || field === 'units') return 'combo';
     }
     if (def.kind === 'formfield' && (field === 'matchvar' || field === 'atomType' || field === 'whenparam')) return 'picker';
+    if (LABEL_TARGET_FIELDS[def.type] === field) return 'picker';   // t2395 (BACKLOG #47 item 1) — the goto family, see LABEL_TARGET_FIELDS' own header
     // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
     // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
     // scope" — a signal genuinely unique to this pattern (an ordinary numeric Z field defaults to a NUMBER,
     // never the literal string 'z'), so this is narrow by construction without needing a `def.kind`/`def.type`
     // allowlist across the 8 files that use it.
     if ((field === 'z' || field === 'by') && def.defaults && def.defaults[field] === field) return 'combo';
+    // t2395 (BACKLOG #47 item 2) — `assign.var`, THE PILOT: a DECLARATION site (typing stays open — see
+    // comboField.js's own header for the full declare-vs-reference account). Scoped narrowly to `assign` only
+    // this turn, on purpose — several OTHER blocks also carry a bare `var` field with the same macro-var
+    // meaning (count.var, hmi's two, macro.var, measure's two, and the `.*`/saveVar/workClear/addrVar family
+    // BACKLOG #47 itself names) and are real candidates for the SAME treatment, but "wire assign as the pilot…
+    // other var fields ONLY where the field type drops in trivially" is the dispatch's own scoping — left
+    // uncovered this turn, named in WORK-LOG rather than blanket-matched here without individually confirming
+    // each one's own shape first.
+    if (def.type === 'assign' && field === 'var') return 'combo';
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
     if (sock === 'region') return 'region';
@@ -319,6 +337,11 @@ function jsonDef(def) {
         // whenparam; section/units) — the field class reads live candidates from the workspace at popup-open
         // time using that name to pick which enumeration to run (pickerField.js/comboField.js's own headers).
         else if (k === 'optionseditor') args0.push({ type: 'field_optionseditor', name: FN(f), value: String(def.defaults[f] ?? ''), tooltip: desc });
+        // t2395 (BACKLOG #47 item 1) — the goto family's own field NAME varies per block (goto.n vs ifgoto.goto
+        // vs confirm/hmiconfirm.cancel — see LABEL_TARGET_FIELDS' own header), so `pickKind` can't be the bare
+        // field name the way matchvar/atomType/whenparam's already is; routed to the shared 'label' enumeration
+        // instead, with `allowNew` (forward-authorable: a typed number with no matching label still commits).
+        else if (k === 'picker' && LABEL_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'label', allowNew: true, tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });

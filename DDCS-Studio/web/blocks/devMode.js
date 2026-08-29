@@ -15,7 +15,8 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance, armBlocks } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, gotoTargetReport, getUserDef, instantiate, materializeParamGroup, forkInheritance, armBlocks } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2395 — gotoTargetReport: the goto-family backstop, INFORMATIONAL only (never gates, unlike formfieldMatchReport)
+import { toast } from '../ui/gateway/util.js';   // t2395 (BACKLOG #47) — the app's existing global toast; gotoTargetReport surfaces through it rather than a new notification path
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -870,6 +871,17 @@ function prepareCandidate(a, framing) {
                 + `must name an atom type present exactly once in THIS stack. Fix it, or tick "optional" if the field `
                 + `is meant to be absent in some states, then save again.`,
         };
+    }
+
+    // t2395 (BACKLOG #47 item 1) — the goto-family backstop, INFORMATIONAL ONLY: unlike the block above, this
+    // NEVER returns `ok:false` — the ruling is explicit ("verification INFORMS, it never gates") because the
+    // picker is forward-authorable (a jump target can legitimately name a label placed LATER in the stack, not
+    // yet built when this runs in some authoring orders). A toast names the still-unmatched targets; the save
+    // proceeds regardless.
+    const gotoReport = gotoTargetReport(a.opRec.children);
+    if (gotoReport.unmatched.length) {
+        const list = gotoReport.unmatched.map((u) => `${u.type}→${u.target}`).join(', ');
+        toast(`${gotoReport.unmatched.length} jump target${gotoReport.unmatched.length === 1 ? '' : 's'} name no label in this stack: ${list} — saved anyway; add the label or fix the number.`, true);
     }
 
     // t1075 (Part C) — a placed RECOGNIZED op opened in Blocks DIRECTLY (not via Customize) and saved would fork as

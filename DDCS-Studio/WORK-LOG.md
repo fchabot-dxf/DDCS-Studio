@@ -62658,3 +62658,100 @@ on retry), 26 skipped, 24.1m.**
 Item 5 (the remaining mode-gated families) is next if the turn has room — partial credit explicitly
 sanctioned by the dispatch ("do as many as fit WELL, report which").
 
+## t2395 — BACKLOG #47 TIER 1: the goto-target picker (REFERENCE, forward-authorable) and the assign.var
+pilot (DECLARATION, open + traffic-light) — the same field type wearing both halves of the ladder
+
+Read the entry's own three-layer refinement in full before building anything (declare-vs-reference, then the
+owner's own further refinement that "open" still means "checked against the dialect's declared register map,
+never gated"). Both pieces reuse t2389's field machinery rather than rebuilding it, per the dispatch's own
+explicit instruction — the write-up below says exactly how each mode was expressed in the SAME field class.
+
+### Piece 1 (goto family) — REFERENCE, forward-authorable: `pickerField.js` gains `allowNew`
+
+`goto.n` / `ifgoto.goto` / `probecheck.goto` / `confirm.cancel` / `hmiconfirm.cancel` each name a `label`
+block's own `n` by a DIFFERENT field name per block — a `LABEL_TARGET_FIELDS` `(def.type → field)` table
+(bridge.js, mirroring `SELECTS`'s own bare-name-collision guard) routes all five to `pickKind: 'label'`. The
+picker lists every `label` block's `n` in the stack (live, via `ws.getAllBlocks`) — **AND still commits a
+typed value with no match**: `allowNew` (new field-level config) adds a `"+ use "<text>""` row when the typed
+filter matches nothing, plus Enter-commits-directly in the filter box — "typing filters where referencing,
+typing commits where declaring," expressed as ONE additive branch inside the SAME `showEditor_()` the
+must-match pieces (`matchvar`/`atomType`/`whenparam`) already use unmodified (the non-`allowNew` path is
+byte-identical — confirmed by NOT changing the initial-render/empty-filter behaviour, after a first draft
+that pre-filled the filter with the current value and would have silently narrowed those three pickers' own
+opening candidate list).
+
+Structural note, checked before wiring: `label.n` is a VALUE SOCKET (`math_number` shadow), not a Blockly
+Field — `_candidates()`'s first draft called `getFieldValue('N')` on the label block itself (returns nothing)
+before being corrected to read the shadow's own `NUM` field, the same shape `devMode.js`'s
+`writeAuthoredValue` already reads/writes for a value-socket target. Live-caught by the verification test
+itself, not assumed.
+
+`gotoTargetReport` (userOps.js, new — `tests/goto-target-report-2395.spec.js` pins it, 5 tests, all proven
+non-vacuous: a dangling target flags, a matched one doesn't in EITHER array order, the jump-family's own
+per-block field names are all checked, a symbolic `ifgoto.goto` override is correctly out of scope) is the
+save-time backstop — but ⛔ **INFORMATIONAL ONLY**, wired into `devMode.js`'s save flow via the app's own
+existing `toast()` (reused, not a new notification path), placed right after `formfieldMatchReport`'s
+BLOCKING check but never itself returning `ok:false` — the ruling is explicit ("verification INFORMS, it
+never gates") because the picker is deliberately forward-authorable.
+
+### Piece 2 (assign, the pilot) — DECLARATION: `comboField.js` gains a `var` combo kind + the traffic light
+
+`assign.var` stays fully open typing (`comboField.js`'s existing free-text-first-class shape, unmodified) —
+suggestions are every DISTINCT `#NNN` already used by an `assign` block elsewhere in the stack, plus one
+pointer into each of the two writable-by-convention bands (`#100`/`#1`, from `varMap.js`'s own `RANGES`).
+
+The traffic light: `getText()` appends a VISIBLE (not just hover-tooltip) warning suffix when the typed value
+resolves to something other than clean scratch/uservar space, read from `data/varMap.js`'s existing
+`classify()`/`RESERVED` — never a gate, `doClassValidation_` accepts anything, only the FACE decorates. A
+real bug live-caught before shipping: `#520` (the safe-Z margin) sits WITHIN the general uservar RANGE
+(100-549) but is individually reserved — `classify()` alone reads it as plain `'uservar'` (clean) and says
+nothing, so `RESERVED` must be checked FIRST, unconditionally, not merely as a fallback label for a tier
+`classify()` had already flagged. Confirmed the decoration never leaks into the stored/emitted value —
+`workspaceToStack` reads `getFieldValue()`/`getValue()` (the raw string), never `getText()` (the decorated
+face) — a `#520` assign still emits `#520`, byte-identical.
+
+### VERIFIED
+
+Screenshots: `t2395-1-goto-picker-labels.png` (the popup listing real labels `10`/`20`, placeholder reading
+"filter, or type a new number…"); `t2395-2-assign-reserved-warning.png` ("Set # var #520 ⚠ safe-Z margin
+(t822) value 0 no…" — the warning visible on the collapsed face, not just on hover); `t2395-3-assign-clean-
+typed.png` (a second block, `#175` typed clean, no decoration — the gate-free path proven alongside the
+warned one in the SAME screenshot). All four traffic-light tiers checked live: clean (`#150`, no tag),
+individually-reserved-within-range (`#520`), generic system tier (`#1600`, no `RESERVED` entry — falls back
+to the classify()-based tier name), outside the tracked map (`#9999`), plus free non-`#` text (`SOME_TEXT`,
+uninspected, accepted verbatim).
+
+Full suite (Rule 1b — bridge.js/pickerField.js/comboField.js/userOps.js/devMode.js all shared): **2925
+passed, 0 failed, 13 flaky (all recovered on retry), 26 skipped, 25.5m.**
+
+### Files changed
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — `LABEL_TARGET_FIELDS`, the goto-family `fieldKind()`/
+`jsonDef()` routing (`pickKind:'label'`, `allowNew:true`), `assign.var`'s own `fieldKind()` routing to combo.
+
+`web/blocks/blockly/pickerField.js` (Rule 1b, shared) — `allowNew` mode (config, the `"+ use…"` row, Enter-
+commits), the `label` pickKind's candidate enumeration (with the value-socket/shadow fix).
+
+`web/blocks/blockly/comboField.js` (Rule 1b, shared) — the `var` combo kind (suggestions + the traffic light,
+with the #520-in-uservar-range fix), importing `classify`/`RESERVED`/`RANGES` from `data/varMap.js`.
+
+`web/blocks/userOps.js` — `gotoTargetReport` (new, exported, informational).
+
+`web/blocks/devMode.js` — wired `gotoTargetReport` into the save flow, non-blocking, via the existing `toast`.
+
+`tests/goto-target-report-2395.spec.js` (new) — 5 tests, all proven non-vacuous.
+
+`DDCS-Studio/verification/t2395-{1,2,3}-*.png` (new).
+
+### What's covered, what's left — counted, per the dispatch's own request
+
+Covered: the goto family (5 blocks, all 5 field-name variants), `assign.var` (the pilot). NOT covered this
+turn: every other `var`-shaped field BACKLOG #47 itself names (`proberead.var`, `count.var`, `hmi.js`'s two,
+`macro.var`, `measure.js`'s two, `radiuscomp.*`, `safehop`/`clearlift.saveVar`/`workClear`, `wcswrite.addrVar`,
+`tooloffset.tool`/`value`, `setworkoffset.value`) — several share the EXACT same bare `var` field name and
+macro-var-shaped default (grepped, confirmed), making them real candidates for the identical `comboField.js`
+'var' treatment already built, but the dispatch's own scoping ("wire assign as the pilot… other var fields
+ONLY where the field type drops in trivially") asked for the pilot first, not a blanket match — left
+uncovered rather than rushed. Items 3/4 of #47 (tool/pin numbers, `flip.setup`) are the dispatch's own
+explicit next tier, licensed but not started. BACKLOG #48 item 5 (the tail) also not started.
+
