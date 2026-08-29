@@ -24,6 +24,7 @@ import { installPickerField } from './pickerField.js';   // t2389 (BACKLOG #42 p
 import { installOptionsEditorField } from './optionsEditorField.js';   // t2389 (BACKLOG #42 piece 2) — the options DSL's editor
 import { installComboField } from './comboField.js';   // t2389 (BACKLOG #42 piece 7) — section/units suggestion combo
 import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
+import { LAYOUT_TYPES, PANEL_TYPES } from '../../wizards/ops/panelTypes.js';   // t2393 (BACKLOG #48 item 2) — the ONE declared source for layout.kind/panel.panel's dropdowns (below), not a hand-copied subset
 import { opLabelOf } from '../opBuilders.js';   // t1071 — the opunit chip's friendly per-instance label (opType → the twin's registered label)
 
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
@@ -203,8 +204,19 @@ const optionsFor = (def, field) => {
     // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
     if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];
     if (field === 'frame' && def.type === 'layoutwidget') return ['stock-min', 'datum'];
-    if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form3d+2d', 'form'];   // the GUI panel-type declaration
-    if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
+    // t2393 (BACKLOG #48 item 2, the t1520 iron rule) — LIVE-CONFIRMED data loss before this fix (WORK-LOG
+    // t2393): these two dropdowns hand-copied a SUBSET of their declaring table's own keys (panel: 4 of 5,
+    // missing `commscreen`; layout: 2 of 14) — a block loaded with any of the missing values (a REAL
+    // `def.panel`/`def.layout` value, not hypothetical) got silently rewritten to option[0] the instant it
+    // deserialized. Sourced from the SAME table (`panelTypes.js`) every consumer already reads, so a THIRD
+    // panel/layout type added there needs no matching edit here — it just works, and can't silently drift out
+    // of sync again the way the hand-copied lists did.
+    if (field === 'panel' && def.type === 'panel') return Object.keys(PANEL_TYPES);   // the GUI panel-type declaration
+    if (field === 'kind' && def.type === 'layout') return Object.keys(LAYOUT_TYPES);
+    // t2393 (BACKLOG #48 item 2) — flip is modeled on xform (transform.js's own header: "axis = flip about
+    // X|Y"): NARROWED from the generic `SELECTS.axis` (X/Y/Z/A/B/C, shared by many unrelated blocks) to the
+    // two values flip actually means — Z/A/B/C were offered and pickable but did nothing coherent.
+    if (field === 'axis' && def.type === 'flip') return ['X', 'Y'];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
     return SELECTS[field] || null;
 };

@@ -62436,3 +62436,46 @@ clean via `git status`) and did not carry it forward.
 Per the dispatch's own explicit permission ("if the drag fix eats the turn, hand back without the tail and say
 so") — the investigation above consumed the full turn. Zero lines of #44 written.
 
+## t2393 ITEM 1 (own commit, per the dispatch's own explicit "ship this separately" instruction) —
+BACKLOG #48 item 2: THE t1520 IRON RULE, still violated in three dropdowns — real data loss, proven then fixed
+
+Failing-test-first, per the dispatch's own explicit instruction. `layout.kind` offered 2 of `LAYOUT_TYPES`'
+14 declared kinds (`bridge.js`'s own hardcoded `['none','corner']` vs `panelTypes.js`'s 14-key table);
+`panel.panel` offered 4 of `PANEL_TYPES`' 5 (missing `commscreen`, the Comm/MDI twin's own panel type);
+`flip.axis` offered the generic 6-value `SELECTS.axis` (X/Y/Z/A/B/C) though `transform.js`'s own header says
+flip only ever means X or Y.
+
+### The data loss, proven live BEFORE any fix landed
+
+A Blockly `field_dropdown` rejects an out-of-list value the instant a block state carrying one deserializes —
+confirmed via `Blockly.serialization.blocks.append({type:'layout', fields:{KIND:'drill'}}, ws)`:
+`getFieldValue('KIND')` came back `'none'`, silently. Same for `{type:'panel', fields:{PANEL:'commscreen'}}` →
+`'form3d'`. `'drill'`/`'commscreen'` are REAL `def.layout`/`def.panel` values (14/5 real kinds/panels
+respectively) — any wizard whose canvas round-trips through Blockly with either set to a non-offered value
+silently loses it, exactly BACKLOG's own framing ("a wizard silently loses its 2D layout TODAY"). New spec
+`tests/dropdown-domain-2393.spec.js`, 5 tests, all 5 confirmed RED against the pre-fix code (both the direct
+domain-comparison checks and the live round-trip checks) before the fix landed.
+
+### The fix
+
+`bridge.js`'s `optionsFor()`: `layout.kind` and `panel.panel` now return `Object.keys(LAYOUT_TYPES)` /
+`Object.keys(PANEL_TYPES)` — sourced from `panelTypes.js`'s own declared tables (the SAME ones every other
+consumer already reads), not a hand-copied subset that can silently drift out of sync again. `flip.axis` gets
+its own `def.type === 'flip'` check (mirroring the existing `def.type`-scoped precedents just above it —
+`layoutwidget`'s anchor/frame, `panel`'s panel, the old `layout`'s kind) returning `['X','Y']` only, checked
+BEFORE the generic `SELECTS.axis` fallback so it wins for this one block without touching the shared `axis`
+vocabulary every other block using that field name still gets.
+
+All 5 pinning tests confirmed GREEN after the fix. Full suite (Rule 1b, bridge.js is shared): **2925 passed,
+0 failed, 14 flaky (all recovered on retry), 26 skipped, 23.8m.**
+
+### Files changed (this commit only)
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — the three dropdown fixes above, new `LAYOUT_TYPES`/
+`PANEL_TYPES` import from `wizards/ops/panelTypes.js`.
+
+`tests/dropdown-domain-2393.spec.js` (new) — 5 tests, proven non-vacuous (red before, green after).
+
+Item 2 (holecycle's dead dynamic + param.js) is next, its own commit — this data-loss item stands alone per
+the dispatch's own instruction, shippable even if the rest of the turn stalls.
+
