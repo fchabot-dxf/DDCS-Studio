@@ -3649,10 +3649,12 @@ checks stay (dangling still needs catching).
 ### 46. [⛔ REOPENED 2026-08-29 — OWNER-CONFIRMED on ≥V2026.08.29.8: "no handle wont follow my movement." The harness (t2391, extensive) cannot reproduce what the owner's device shows — DEVICE/STATE-DEPENDENT, the t2345-t2357 pattern again] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
 
 > ⭐ **The reproduction gap IS the lead.** t2391 drag-tested with the harness's pointer and saw the canvas
-> follow; the owner's real gesture does not. Prime suspect: **touch vs mouse** — the harness has no real
-> multi-touch, t2371's own pinch tests had to synthesize PointerEvents, and a touch drag may ride a different
-> event path whose redraw half is broken while the writeback half works. Second suspect: returning-user
-> state (the t2345 class). ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
+> follow; the owner's real gesture does not. ⭐ **TOUCH ELIMINATED 2026-08-29 — owner: "drag on desktop."**
+> The failing drag is a MOUSE on the PC, so the axis is not the input kind. Prime suspect is now
+> **returning-user state** (the t2345 class exactly: the harness's fresh profile passes, the owner's
+> long-lived browser breaks — bootstrap/localStorage-dependent). Discriminator the owner can run in ten
+> seconds: the same drag in an INCOGNITO window — follows there = state-dependent confirmed; still dead
+> there = environment/build, and say which browser. ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
 > feature canvas (the `?debug=drag` dragProbe pattern that cracked the splitter saga — passive listeners,
 > on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
 > writes) still sequences BEFORE the commit-on-release fix, per its own entry.
