@@ -2380,6 +2380,34 @@ a generator built for a different changer. ⭐ **NOT the owner** — their workf
 single slot T1* (`ROADMAP.md`), and their `T.nc` is still the vendor one-liner. This is a defect for the
 magazine-owning part of the user base.
 
+#### ⭐⭐ NEW EVIDENCE, 2026-08-28 — FROM OUTSIDE, UNSOLICITED. Read before ruling.
+
+A community post (M350 **V2**, two-head machine: one ATC with 10 tools, one pneumatic spindle on T11) shows the
+owner **hand-editing `slib-g.nc` at line 1007** to fire his dust collector for the second head. His screenshot
+matches our own factory copy structurally line-for-line (`assets/community/modbus-slave-2025-12-11/USB-READY/
+install/slib-g.nc:935-951`, including the stock `IF #1993==1 GOTO4;` / `M150`) — so he is editing the FACTORY
+file, in place, with English-translated comments.
+
+⭐ **The vendor DOES ship a user-extension seam — and it does not reach this case.** `slibuser.nc` ships nearly
+empty with a single example (`O9199(G199)` → one G01), clearly meaning *"define your own G-codes here."* But it
+is for **new standalone macros**. Breno's change must land **inside the existing tool-change flow**, between
+`#1300 = #1` and `M150`. There is no hook for that.
+
+```
+vendor ships     T.nc / slib-g.nc     written for the vendor's assumed topology
+vendor offers    slibuser.nc          NEW macros only — no hook into the ATC flow
+therefore        a non-standard ATC   MUST edit the factory files directly
+                 or a second head
+```
+
+⇒ ⛔ **Hand-editing the ATC macros is not a hack these users chose. It is the ONLY available path**, because
+the vendor's own extension seam does not reach into the tool-change sequence. **So overwriting `T.nc` would not
+clobber a file someone happened to edit — it would clobber the only place that customization can live.**
+
+⚠ Also worth noting for scope: on DDCS even `M3.nc`/`M8.nc`/`M9.nc` are files on the controller disk (`M8.nc`
+is literally one line, `M8`). **The dialect is data on a disk, not behaviour in a binary** — which is what makes
+any generated overwrite higher-stakes here than on a conventional post.
+
 #### THE OPTIONS
 
 ```
