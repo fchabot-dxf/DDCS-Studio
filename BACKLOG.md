@@ -3945,7 +3945,13 @@ widened condition reproduces the exact `NO_LBL_FIELD` gap on a previously-broken
 
 ### 54. [✅ SHIPPED t2407 — 530KB→2.8KB stdout, three surfaces live. ⏳ ONE FOLLOW-UP BELOW: compact the md] THE FULL SUITE HAS NO PROGRESS SURFACE — and its current reporter burns the worker's context
 
-> ### ⏳ FOLLOW-UP — owner, 2026-08-29 watching it run: *"compact the progress md ui to be less tall."*
+> ### ✅ FOLLOW-UP DONE (`c29e1d10`) — ⛔ WORKER: do NOT rebuild this, it is already shipped.
+> **Advisor-authored directly** at the owner's ask ("sorry you cant do that yourself?") — test infrastructure,
+> not product code, same exception as `debug/dragProbe.js`. `renderMd` now emits the four compact lines below;
+> the table and its blank header row are gone; the bar keeps its backticks (monospace is what aligns the block
+> glyphs). `node --check` clean. ⚠ `progress.html` was left ALONE — it has more room and the owner did not ask.
+>
+> *(original ask, owner 2026-08-29 watching it run: "compact the progress md ui to be less tall")*
 >
 > The six-row vertical table renders very tall (a full screen for six numbers). Collapse to **four lines**,
 > and drop the table entirely — a markdown table cannot be short:
