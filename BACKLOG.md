@@ -3750,3 +3750,56 @@ engine really does.
   file in hand and say which.
 
 **VERIFY:** snippets still drag in and run in the sim; the learner-library spec stays green.
+
+---
+
+### 51. TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+
+*(owner, 2026-08-29, while testing the t2371 pinch-zoom: "2finger pinch should act as pan.")*
+
+t2371 shipped pinch-to-zoom on the feature canvas (#32) but only the SPREAD half of the standard two-finger
+gesture. The MIDPOINT half — moving both fingers together — should PAN the view, simultaneously with the
+zoom, the way every touch map/canvas behaves. Today touch has NO pan at all: one finger is taken by the drag
+handles, so a zoomed-in canvas cannot be moved.
+
+⭐ One gesture, two continuous outputs: spread → zoom, midpoint delta → pan. Not modes, not a toggle.
+⚠ Establish with the t2371 code in hand how the pinch anchor point works today — a pan that fights the zoom
+anchor feels broken; the combined transform is the standard fix.
+
+**VERIFY:** on a real touch device (the owner can), zoom in then move around with two fingers; one-finger
+handle drags unaffected; desktop wheel/drag behaviour unchanged.
+
+---
+
+### 52. "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+
+*(owner, 2026-08-29, with a Windows Explorer screenshot: "right click submenu should be like this." Refines
+#42 piece 4's shipped fallback — the vendored Blockly has no native submenus (established t2389), so t2387
+built a popup at the cursor. The owner wants the popup to be an ANCHORED CASCADE instead.)*
+
+The reference behaviour, from the screenshot:
+
+```
+│ …                    │
+│ Block              ▸ │──▸ ┌────────────────────┐   flyout ADJACENT to the parent
+│ ──────────────       │    │ ❄ Freeze value     │   row, top-aligned with it —
+│ Duplicate            │    │ ⊘ Disable          │   visually attached, not a
+│ Delete               │    │ ──                 │   detached popup at the cursor
+└──────────────────────┘    │ + help text        │
+                            │ + limits           │
+                            │ + show-when        │
+                            │ + units            │
+                            └────────────────────┘
+```
+
+- **Desktop:** opens on HOVER (small open delay, generous close delay so the diagonal into the flyout does
+  not close it — the classic cascade tolerance); click also works.
+- **Touch:** tap the row toggles the flyout; a second tap elsewhere closes.
+- The t2387 popup already owns the list and its actions — this is a POSITIONING + TRIGGER upgrade of the
+  same custom element, not a rebuild. ⚠ Screen-edge flip (open leftward near the right edge) or the flyout
+  is unusable on phones.
+- Per-entry icons like Explorer's are OPTIONAL — only if the codebase's existing glyph conventions cover
+  them for free; do not draw an icon set for this.
+
+**VERIFY:** screenshots desktop hover + touch tap; near-right-edge flip shown; the existing entries all
+still fire.
