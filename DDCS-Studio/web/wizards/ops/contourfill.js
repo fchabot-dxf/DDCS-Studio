@@ -39,6 +39,14 @@ export const contourFillBlock = {
     type: 'contourfill', label: 'Contour', kind: 'leaf', category: 'Toolpaths',
     defaults: { shape: 'rect', x: 0, y: 0, w: 80, h: 60, dia: 50, sides: 6, side: 'outside', tool: 6, entry: 'plunge', rampAngle: 3, by: 'by', z: 'z', feed: 2000, plunge: 200, clearance: 5 },
     fields: ['shape', 'x', 'y', 'w', 'h', 'dia', 'sides', 'side', 'tool', 'entry', 'rampAngle', 'by', 'z', 'feed', 'plunge', 'clearance'],
+    // t2401 (BACKLOG #48 item 5) — the PHANTOM HELIX OFFER: `entry` is a bare field name, and bridge.js's global
+    // domain table offers plunge/ramp/HELIX for any block with a field of that name (pocketfill/slot/surfaceFill
+    // genuinely support helix, via their own helixDia/helixPitch fields). contourfill declares neither field and
+    // its own emit (below) coerces anything but 'ramp' to 'plunge' — a contour has no interior to helix down into
+    // without gouging the profile — so the dropdown offered a choice that silently did nothing. `selects` is the
+    // established per-atom override (t1520's own "the atom's own vocabulary wins" rule, bridge.js:189) — narrows
+    // this ONE block's own dropdown without touching the shared 'entry' domain every other consumer still uses.
+    selects: { entry: ['plunge', 'ramp'] },
     extent: (p) => contourExtent(p),   // live extent → PlaceOnStock tracks shape/size (byte-identical: == contourBBox)
     emit: (p) => {
         const rg = contourRegion({ region: regionDesc(regionFromFlat(p)), side: p.side || 'outside', tool: num(p.tool, 6) });

@@ -63133,3 +63133,52 @@ tap_data/bore_data exception entries removed (closed); header comment updated wi
 
 `DDCS-Studio/verification/t2401-tap-sectioned.png` (new).
 
+## t2401 TAIL (own commit) — BACKLOG #48 item 5: 2 of 6 remaining families closed
+
+Scoped down given the turn's own size already (both registry-closure pieces above) — 2 well-scoped items
+landed, verified live, non-vacuity proven; the other 4 (slot/surfaceraster/pocketfill/surfacefill entry-fields,
+region/pocketfill shape) NOT attempted, named plainly rather than left silent.
+
+### contourfill's phantom helix offer
+
+`entry` is a bare field name — `bridge.js`'s global domain table offers plunge/ramp/HELIX for ANY block with
+a field of that name (pocketfill/slot/surfaceFill genuinely support helix via their own `helixDia`/
+`helixPitch` fields). `contourfill.js` declares neither field, and its own emit already coerces anything but
+`'ramp'` to `'plunge'` (a deliberate, pre-existing, well-commented guard — "a contour has no interior to helix
+down into without gouging the profile") — so the dropdown offered a choice that silently did nothing. Fixed
+with the ESTABLISHED per-atom override (`selects`, t1520's own "the atom's own vocabulary wins" rule,
+bridge.js:189 — read before reaching for anything else) rather than touching the shared 'entry' domain every
+other consumer still needs: `selects: { entry: ['plunge', 'ramp'] }`. Confirmed live (`fieldOptions
+(contourFillBlock, 'entry')` → `['plunge','ramp']`) and non-vacuous (removed the line, confirmed the same
+check fails with `helix` back in the list, restored). The twin (`user_contour_data`) was ALREADY correctly
+scoped — an existing test (`depth-entry-everywhere-842.spec.js`) already pinned "offers plunge+ramp (no
+helix)" for the TWIN's own form; this fix closes the gap on the raw Blockly canvas atom, the piece that test
+never covered.
+
+### tap.rigid → dwell, the second half of BACKLOG's own naming
+
+`dwell` is read ONLY in `tap.js`'s own floating-holder branch (`tapCycle`, line 119: `...dwellLines`) — the
+rigid G84 branch never reads it (M29 synchronizes the spindle to Z directly, no separate stabilize pause). A
+dead field once the cycle actually runs rigid. Greyed (not hidden — `gate`, matching `rigid`'s own already-
+established mechanism, not a new one) on a COMPOUND condition mirroring `tap.js`'s own `rigidOk = !!p.rigid &&
+rigidAttested(dialect)`: `gate: { all: [{param:'rigid',is:true}, {param:'_rigidOk',is:true}], tip:'...' }` —
+the checkbox ticked AND the machine capability holds (`_rigidOk`, the SAME derived param `rigid`'s own gate
+already reads, confirmed by reading `userOpView.js`). Ticking `rigid` alone on an incapable machine still
+degrades to the floating-holder cycle, where dwell stays genuinely live — the compound condition is the whole
+point, a single-condition gate would have greyed it wrongly in that fold case.
+
+Verified live via `window.ddcsEditWizardDef('user_tap_data')` (the same technique `probe-port-gate-1880.spec.js`
+established) across 3 scenarios: Expert+tapCapable+rigid-ticked → greyed (`disabled:true`, the tip text
+present); Expert+tapCapable+rigid-NOT-ticked → live; V4.1 (not tapCapable)+rigid-ticked → still live (rigid's
+OWN gate blocks the tick in the first place, so it never reaches true — confirmed `rigidVal:false` in the
+probe). Non-vacuity proven: removed the gate, confirmed the live probe times out waiting for a `data-op-gated`
+state that never appears, restored.
+
+### Files changed
+
+`web/wizards/ops/contourfill.js` — `selects: { entry: ['plunge', 'ramp'] }` added to `contourFillBlock`.
+
+`web/blocks/dataOps/tapData.js` — `dwell`'s own binding gains a compound `gate`.
+
+No test spec persisted (same precedent as t2399's own tail — verified live during the turn).
+

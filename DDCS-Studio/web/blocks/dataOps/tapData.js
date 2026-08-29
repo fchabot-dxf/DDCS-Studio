@@ -58,7 +58,15 @@ const TAP_EXEC_BINDINGS = [
     },
     { param: 'depth', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'depth', type: 'number', default: TAP_DEFAULTS.depth, label: 'Depth (mm)', help: 'Thread depth from engagement — roughly 1–1.5× the major Ø for a blind hole (leave room at the bottom for the tap chamfer + chips).', section: 'TOOL & CUT' },
     { param: 'rpm', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'rpm', type: 'number', default: TAP_DEFAULTS.rpm, label: 'RPM', help: 'Low — 300–500 rpm. The pitch-locked feed is derived from this.', section: 'TOOL & CUT' },
-    { param: 'dwell', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'dwell', type: 'number', default: TAP_DEFAULTS.dwell, label: 'Stabilize dwell (s)', help: 'A brief pause after the spindle starts, before feeding in.', section: 'TOOL & CUT' },
+    // t2401 (BACKLOG #48 item 5, "tap.rigid → dwell") — `dwell` is read ONLY in tap.js's own floating-holder
+    // branch (tapCycle: `...dwellLines` at its own line 119) — the rigid G84 branch (`if (rigidOk)`) never
+    // reads it at all; M29 synchronizes the spindle to Z directly, no separate stabilize pause. A dead field
+    // once the cycle actually runs rigid. Greyed (not hidden — `gate`, not `when`, matching `rigid`'s own
+    // established mechanism) on the COMPOUND condition that mirrors emit's own `rigidOk = !!p.rigid &&
+    // rigidAttested(dialect)`: the checkbox ticked AND the machine capability holds (`_rigidOk`, the SAME
+    // derived param `rigid`'s own gate already reads) — ticking `rigid` alone on an incapable machine still
+    // degrades to the floating-holder cycle, where dwell stays live.
+    { param: 'dwell', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'dwell', type: 'number', default: TAP_DEFAULTS.dwell, label: 'Stabilize dwell (s)', help: 'A brief pause after the spindle starts, before feeding in.', section: 'TOOL & CUT', gate: { all: [{ param: 'rigid', is: true }, { param: '_rigidOk', is: true }], tip: 'Unused when the rigid (G84) cycle actually runs — M29 synchronizes the spindle to Z directly, no separate stabilize pause.' } },
     // rigid: picks between two structurally different cycles (a 7-line G84 canned cycle vs. a 9-line floating-holder
     // M3/M4 sequence, tap.js:21-43) — different line count/content, hardware-safety-gated. Categorical, not deferrable.
     {

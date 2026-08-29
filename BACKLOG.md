@@ -3586,7 +3586,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 48. [✅ ITEMS 1-4 SHIPPED t2393 — 4 commits, each suite-gated. ✅ item 5's `progend` retract/park + `drillcycle.cycle` families SHIPPED t2399 (own commit). OPEN: item 5's remaining mode-gated families (slot/surfaceraster/pocketfill/surfacefill entry · region/pocketfill shape · tap.rigid · contourfill's helix offer) — same tail-sized fieldsFor pass] THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
+### 48. [✅ ITEMS 1-4 SHIPPED t2393 — 4 commits, each suite-gated. item 5: ✅ `progend` retract/park + `drillcycle.cycle` SHIPPED t2399; ✅ `contourfill`'s helix offer + `tap.rigid`→`dwell` SHIPPED t2401 (own commit). OPEN: item 5's remaining mode-gated families (slot/surfaceraster/pocketfill/surfacefill entry-fields · region/pocketfill shape → dia/sides vs w/h) — same tail-sized fieldsFor pass] THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
 
 *(same sweep. These are places the canvas shows something false or silently destroys a value.)*
 
@@ -3608,8 +3608,11 @@ checks stay (dangling still needs catching).
    `radiuscomp.js:17` vs `:22`) and `clearlift.planeFellBack` (a BOOLEAN — typing "false" is truthy,
    `saferetract.js:101-102`,`:122`). Also `waitinput.var` is rendered and read by nothing (`cnc.js:98,103-115`).
 5. The mode-gated families (`slot`/`surfaceraster`/`pocketfill`/`surfacefill` entry → ramp/helix fields;
-   `region`/`pocketfill` shape → dia/sides vs w/h; `tap.rigid` → dwell) — same dynamic treatment, and
-   `contourfill` offers `helix` its emit silently coerces to plunge (`contourfill.js:52`). ✅ `progend`
+   `region`/`pocketfill` shape → dia/sides vs w/h) — same dynamic treatment. ✅ `contourfill`'s own `helix`
+   offer (its emit silently coerced it to plunge, `contourfill.js:52`) SHIPPED t2401 — `selects: {entry:
+   ['plunge','ramp']}` on `contourFillBlock` (the established t1520 per-atom override), not a shared-domain
+   edit. ✅ `tap.rigid` → `dwell` SHIPPED t2401 — a compound `gate` (rigid ticked AND `_rigidOk`, mirroring
+   `tap.js`'s own `rigidOk` predicate) greys it, since the rigid G84 cycle never reads it. ✅ `progend`
    retract/park and `drillcycle.cycle` → q/dwell SHIPPED t2399 (`program.js`/`cnc.js`, `dynamic`+`fieldsFor`+
    `allFields`) — live-caught a second bug landing them: `fieldsFor` is fed RAW `getFieldValue()` results by
    bridge.js's `apply()`, and a Blockly checkbox reads back uppercase `'TRUE'`/`'FALSE'` — reusing the file's
