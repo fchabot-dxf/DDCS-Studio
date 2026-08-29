@@ -3387,3 +3387,86 @@ from the start.
 ### STILL REAL IF
 
 Open any wizard in Blocks, delete a `formfield` block, and look at the form. **Row still there = STILL REAL.**
+
+---
+
+### 42. THE FORM-FIELD BLOCKS ARE A WALL OF BOXES — dynamic fields, human labels, an options editor, and on-block enablers
+
+*(owner-requested 2026-08-28 from a screenshot of a twin's Parameter Group: "options just looks like coding,
+or cryptic, we should have a better gui." Design settled with the owner the same day; one ruling still open.)*
+
+**THE DEFECT UNDER THE UGLINESS — two sibling blocks, one got the fix.** The screenshot's blocks are
+`param_field` (what every built-in twin materializes into its Parameter Group, t1111 — the highest-traffic
+authoring surface). `paramField.js:27` declares a STATIC field list: all 12 fields render always, so a number
+row still shows `options` and a dropdown row still shows `nmin/nmax/nstep/units` — **half the boxes are
+impossible to fill meaningfully for that row's widget.** Its sibling `formfield` already solved this
+(`dynamic: ['bindMode','widget']` + `fieldsFor`, formField.js:71-78); `param_field` was never given it.
+
+### THE DESIGN — four pieces, all owner-approved
+
+1. **`param_field` goes dynamic + human labels.** Same `ddcs_dynfields` treatment as formfield. ⚠ Establish
+   with the file in hand: param_field's `widget: ''` means *derive from `type`* (t1562) — `fieldsFor` must
+   resolve the EFFECTIVE widget, not the raw field. Labels: the block face prints raw storage keys
+   (`bridge.js:251` — `dflt`, `nmin`, `nstep`); add a declared per-def label map (the `getDesc` shape) so the
+   face reads `default · min · max · step` while storage keys never change.
+
+2. **`options` gets a real editor — a popup list, not a DSL.** Today: `Front Left=nn, Front Center=cnp, …`
+   parsed by `parseParamOptions` (userOps.js:154). The codebase ALREADY ships custom clickable fields
+   (`field_cornergrid`, `field_regionpick`, `field_coordlist` — bridge.js:253-255); an option-list field is
+   the same species. Face shows a compact summary (`choices [9 ▸ Front Left, …]`); click opens Label|Value
+   rows with add/remove. ⭐ **STORAGE STAYS THE EXISTING STRING** — only the editor changes: zero migration,
+   parser untouched, round-trip identical.
+
+3. **Sentence-shaped condition.** `whenparam □ whenis □` renders as `show when [param] is [value]`. Same two
+   fields, phrased as what they mean.
+
+4. **⭐ BLOCK OPTIONS — one "Block ▸" line in the CONTEXT MENU opening a SUBMENU; NOTHING added to the block
+   face.** Owner-ruled 2026-08-28, refined across three messages: ⛔ no new UI on the block itself (*"no more
+   ui on blocks .. less please"*); ⭐ inside the right-click menu, ONE line with an arrow opens the
+   block-specific submenu, **kept separate from the normal entries** (Edit/Duplicate/Delete):
+
+   ```
+   right-click →   ✎ Edit Surfacing          ← the existing entries, untouched
+                   Duplicate / Delete / …
+                   ────────────────
+                   Block            ▸ │ ❄ Freeze value (#41)
+                                      │ ⊘ Disable
+                                      │ ──
+                                      │ + help text
+                                      │ + limits (min/max/step)
+                                      │ + show-when condition
+                                      │ + units
+   ```
+
+   Reachable as right-click on desktop, double-tap-and-hold on the owner's phone — a gesture they already use.
+   - Registration rides the `ContextMenuRegistry` precedent (blocksApp.js:966 — per-block scope, precondition
+     `hidden` where inapplicable; the "Block" line itself hides when the submenu would be empty).
+   - ⚠ **Establish with the build in hand whether this vendored Blockly's context menu supports a SUBMENU.**
+     If it does not, the fallback is one "Block options…" entry opening the same list as a small popup at the
+     cursor — same result, custom-rendered. Say which you shipped.
+   - ⭐ **"Shown" = "non-empty" — NO new stored state.** An enabler sets the field and focuses it; a field
+     cleared back to empty hides again on the next render. The declaration stays the only truth; the ratchets
+     never see a difference. (Worker establishes focus-after-reveal in this Blockly build.)
+   - ⚠ Field visibility now has TWO drivers — the effective widget AND emptiness. They compose as ONE function
+     (applicable AND set), never two mechanisms fighting.
+
+### ⛔ DELIBERATELY LEFT ALONE
+
+- `gate` / `optionGate` raw JSON blobs — they reuse existing gate mechanisms; GATE CONSOLIDATION is its own
+  project, and prettifying the blob now hardens a shape consolidation may change.
+- `matchvar` / `atomType` free text — a RECORDED decision (formField.js header: typos are caught loudly at
+  save by t1636's `formfieldMatchReport`). Do not re-litigate.
+
+### ⏳ THE ONE OPEN RULING
+
+`section` and `units`: **combo dropdown-with-custom-entry** (advisor lean — section offers the canonical
+IDENTITY/GEOMETRY/TOOL & CUT + the def's own names; units offers mm/in/°/rpm/%; both accept anything typed)
+vs **free text as today**. Pure dropdown is wrong (12 known legitimate shell-dictated section names — the
+t2381 invariant's own exception list); free text is where the typos come from. Owner rules at dispatch.
+
+### VERIFY
+
+The mill-family twins' Parameter Groups, before/after screenshots. ⭐⭐ Register-time output UNCHANGED:
+`bindingsFromStack`/`paramFieldsFromStack` must produce byte-identical specs for an untouched canvas — this
+turn changes the AUTHORING SURFACE, never the declaration it produces. The t2381 registry invariant and all
+seven form-reproduction ratchets stay green untouched.
