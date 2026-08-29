@@ -27,7 +27,8 @@ import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
-import { openMenu } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation
+import { openMenu, attachLongPress } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation; t2397 — attachLongPress: "long-press IS right-click, declared once" (BACKLOG #43's own form-row reveal gesture)
+import { toast } from '../ui/gateway/util.js';   // t2397 (BACKLOG #43) — the app's existing global toast; a param with no single declared source says so through it, never a dead gesture
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
 import { applyProgramIntent, opSimContext } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview; opSimContext (t1872) — this op's OWN frame intent, tagged per contributed hint below
@@ -711,9 +712,69 @@ async function buildWorkspace() {
     host.inert = !!readOnly;
     if (readOnly) host.title = BLK_READONLY_REASON; else host.removeAttribute('title');
   }
+  // t2397 (BACKLOG #43) — the meta/wrapper block kinds NEVER themselves own a form param by a bare field name
+  // (mirrors pickerField.js's own `META_TYPES` exclusion for the SAME reason, declared independently here —
+  // this file's own def-shape check, not that field's candidate list).
+  const REVEAL_META_TYPES = new Set(['formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group', 'panel', 'layout', 'sim', 'simstart', 'user_root', 'op']);
+  const revealDefByType = {}; PALETTE.forEach((d) => { revealDefByType[d.type] = d; });
+  // t2397 (BACKLOG #43) — FORM → BLOCK: given a form row's own `data-param`, find the block that DECLARES it.
+  // TWO shapes, checked in order: (1) a `param_field`/`formfield` whose own PARAM field names it — the
+  // COMPOSABLE-AUTHORING shape (surfacing, corner, most twins); (2) live-caught verifying on drill (tree
+  // mode) — NO param_field exists there at all: `holecycle` (and any atom like it) carries its OWN 28 fields
+  // directly, so a TREE-PLACED row's param IS the atom's own bare field name — the "Op Param" bind shape
+  // `formField.js`'s own header already documents, just without a formfield WRAPPER in this twin's case. Pan
+  // + glow the atom itself when its OWN declared fields include the name (excluding the meta/wrapper kinds,
+  // which never own a param this way). Absent either shape — a genuinely un-owned param (the older pill/
+  // socket mechanism, no named declaring block at all) — says so plainly via toast rather than a silent
+  // no-op ("hides or explains, never a dead click": the gesture always fires, there's just nothing to reveal).
+  function revealInBlocks(param) {
+    let blk = ws.getAllBlocks(false).find((b) => (b.type === 'param_field' || b.type === 'formfield') && b.getFieldValue('PARAM') === param);
+    if (!blk) {
+      blk = ws.getAllBlocks(false).find((b) => {
+        if (REVEAL_META_TYPES.has(b.type) || b.type.endsWith('_op') || b.type.startsWith('user_')) return false;
+        const def = revealDefByType[b.type];
+        return def && (def.allFields || def.fields || []).includes(param);
+      }) || null;
+    }
+    if (!blk) { toast(`"${param}" isn't declared by a single block on this canvas (bound another way — nothing to jump to).`, true); return; }
+    try { ws.centerOnBlock(blk.id); } catch (_) { /* best-effort pan */ }
+    // t2397 — LIVE-CAUGHT: the CSS `@keyframes` route (`.ddcs-block-glow`, styles.css) that works cleanly on
+    // the FORM ROW's own `.ddcs-reveal-glow` (confirmed: `getComputedStyle` reports the animation running,
+    // exactly 2× the theme's own `--edit-glow-speed`) does NOT reliably run on a Blockly block's SVG `<g>` root
+    // in this build — confirmed live: `getComputedStyle(root).animationName` came back EMPTY on the SAME class
+    // applied to the SAME rule, and the class was gone well before one theme-paced iteration could have
+    // finished. Rather than chase an SVG `animation`-shorthand quirk further, this is a DIRECT, timer-driven
+    // highlight instead — same colour tokens (`--accent`/`--edit-glow-rgb`), no dependency on CSS keyframe
+    // timing on an element type this build doesn't animate that way reliably.
+    const root = blk.getSvgRoot && blk.getSvgRoot();
+    if (root) {
+      clearTimeout(root._ddcsGlowTimer);
+      root.style.filter = 'drop-shadow(0 0 3px var(--accent, #0ea5e9)) drop-shadow(0 0 10px rgba(var(--edit-glow-rgb, 14,165,233), .9))';
+      root._ddcsGlowTimer = setTimeout(() => { root.style.filter = ''; root._ddcsGlowTimer = null; }, 1800);
+    }
+  }
+
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
+    // t2397 (BACKLOG #43) — the FORM → BLOCK gesture, wired ONCE on the STABLE pane (survives every re-render
+    // of its own content, flat-mode `formHost` or tree-mode `#blk_wiz_user_form` alike — both live inside this
+    // one ancestor). "Long-press IS right-click, declared once" (opContextMenu.js's own doctrine): a real
+    // desktop right-click on a `.form-row` fires 'contextmenu' natively; `attachLongPress` synthesizes the
+    // SAME event on a touch long-press — ONE listener serves both inputs, no second gesture to maintain. A
+    // plain click/tap is UNTOUCHED (still focuses the field for typing — this never calls preventDefault on
+    // anything but the menu-suppression path a real right-click would already trigger).
+    if (!pane.__revealWired) {
+      pane.__revealWired = true;
+      pane.addEventListener('contextmenu', (e) => {
+        const row = e.target && e.target.closest && e.target.closest('.form-row');
+        const fieldEl = row && row.querySelector('[data-param]');
+        if (!fieldEl) return;
+        e.preventDefault();
+        revealInBlocks(fieldEl.dataset.param);
+      });
+      attachLongPress(pane);
+    }
     const blkHost = document.getElementById('blk_wiz_user');
     // t1744 ACT 1b-ii — default every render to the OLD host visible / the new scaffold hidden; only the flat-
     // bindings branch at the bottom (the ONE case createUserOpView('blk') now owns) flips this before it returns.
@@ -1034,14 +1095,44 @@ async function buildWorkspace() {
       // means one extra click, never a broken field.
       if (fld && typeof fld.showEditor === 'function') { try { fld.showEditor(); } catch (_) { /* reveal still worked */ } }
     };
+    // t2397 (BACKLOG #43) — BLOCK → FORM: "Show in form," the list's own extensibility (t2387's own comment:
+    // "a future entry is just another item pushed onto `items`") cashed in. Only for param_field/formfield —
+    // the ONLY block kinds that name a form row by a PARAM field in the first place. `formfield.formHidden`
+    // is a DECLARED "bound but no visible row" fact (t2133) — never a dead click, so hidden outright rather
+    // than shown-then-doing-nothing; `param_field` has no such flag (it always materializes a row) but the
+    // ACTUAL row is still checked for, so a stack that hasn't rendered a form at all (Preview face) or a
+    // param whose row genuinely isn't there degrades to "not offered," not a silent miss.
+    const activeFormHost = () => {
+      const blkHost = document.getElementById('blk_wiz_user');
+      if (blkHost && blkHost.style.display !== 'none') return document.getElementById('blk_wiz_user_form') || blkHost;
+      return document.getElementById('blk-form');
+    };
+    const formRowFor = (blk) => {
+      if (!blk || (blk.type !== 'param_field' && blk.type !== 'formfield')) return null;
+      if (blk.type === 'formfield' && blk.getFieldValue('FORMHIDDEN') === 'TRUE') return null;
+      const param = blk.getFieldValue('PARAM');
+      if (!param) return null;
+      const host = activeFormHost();
+      const fieldEl = host && host.querySelector(`[data-param="${window.CSS ? CSS.escape(param) : param}"]`);
+      return fieldEl && fieldEl.closest('.form-row');
+    };
+    const showInForm = (blk) => {
+      const row = formRowFor(blk);
+      if (!row) { toast('This field has no visible form row right now.', true); return; }
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.remove('ddcs-reveal-glow'); void row.offsetWidth;
+      row.classList.add('ddcs-reveal-glow');
+      row.addEventListener('animationend', () => row.classList.remove('ddcs-reveal-glow'), { once: true });
+    };
     try { CMR.registry.unregister('ddcsBlockOptions'); } catch (_) { /* first run */ }
     CMR.registry.register({
       id: 'ddcsBlockOptions', weight: 200, scopeType: CMR.ScopeType.BLOCK,
-      preconditionFn: (scope) => (pendingEnablers(scope.block).length ? 'enabled' : 'hidden'),
+      preconditionFn: (scope) => (pendingEnablers(scope.block).length || formRowFor(scope.block) ? 'enabled' : 'hidden'),
       displayText: () => 'Block options…',
       callback: (scope, menuOpenEvent, menuSelectEvent, location) => {
         const blk = scope.block;
         const items = pendingEnablers(blk).map((en) => ({ label: `+ ${en.label}`, fn: () => reveal(blk, en) }));
+        if (formRowFor(blk)) items.push({ label: 'Show in form', fn: () => showInForm(blk) });
         openMenu(items, location.x, location.y);
       },
     });

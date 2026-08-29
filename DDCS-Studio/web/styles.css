@@ -1366,6 +1366,17 @@ html, body { overflow-x: clip; }
    desaturate it a touch so the FRONT/current level reads as the most saturated and this one as a "level back". */
 .wiz-box.editing.glow-behind { filter: saturate(.5); }
 
+/* t2397 (BACKLOG #43) — FORM<->BLOCK REVEAL, the FORM ROW half: a brief FLASH (finite iterations, JS removes
+   the class on `animationend`), reusing the SAME edit-glow tokens/keyframes rather than inventing a second
+   palette — "the existing glow convention," not a new one. Box-shadow works natively on a plain DOM element,
+   so this rides `editGlow` (above) directly. ⚠ The CANVAS half (glowing a Blockly BLOCK — an SVG `<g>`, where
+   `box-shadow` doesn't apply) does NOT use a CSS class/keyframes the same way — live-caught before shipping:
+   `getComputedStyle` never reported the animation as running on an SVG root in this build, unlike this same
+   rule's own HTML row (confirmed working, exactly 2 theme-paced iterations). blocksApp.js's own
+   `revealInBlocks` sets `style.filter` directly with a plain `setTimeout` instead — same colour tokens, no
+   CSS-animation dependency for that half. */
+.ddcs-reveal-glow { animation: editGlow var(--edit-glow-speed, 1.5s) ease-in-out 2; border-radius: 6px; }
+
 /* Per-theme glow colour (rgb so the halo can take an alpha) + pace. */
 [data-theme="normal"]     { --edit-glow-rgb: 74,144,226;  --edit-glow-speed: 1.9s; }   /* flat, calm blue */
 [data-theme="studio"]     { --edit-glow-rgb: 22,104,255;  --edit-glow-speed: 1.5s; }   /* clean electric-blue */

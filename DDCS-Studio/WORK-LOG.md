@@ -62755,3 +62755,74 @@ ONLY where the field type drops in trivially") asked for the pilot first, not a 
 uncovered rather than rushed. Items 3/4 of #47 (tool/pin numbers, `flip.setup`) are the dispatch's own
 explicit next tier, licensed but not started. BACKLOG #48 item 5 (the tail) also not started.
 
+## t2397 — BACKLOG #43: FORM ↔ BLOCK REVEAL — pointing, not a tutorial, both directions
+
+### The gesture, chosen and why
+
+Form → block needed a gesture that never steals a plain click's own job (focusing the field for typing).
+Chose long-press/right-click over a per-row affordance icon: `attachLongPress` (opContextMenu.js) already
+IS "long-press is right-click, declared once" — it synthesizes a real `contextmenu` event on long-press, so a
+native desktop right-click and a touch long-press share ONE listener with zero new gesture vocabulary. Wired
+ONCE on the STABLE `#blk-formpane` (survives every re-render of its own content — `#blk-form` flat-mode and
+`#blk_wiz_user_form` tree-mode both live inside this one ancestor), delegated via `e.target.closest
+('.form-row')`. An icon-per-row was considered and rejected: it would add permanent visual clutter to EVERY
+row, against the SAME "no more ui on blocks .. less please" principle #42's own Block-options popup already
+honours (this is the form's own analogue of that same discipline).
+
+### Two source-lookup shapes, live-caught mid-verification
+
+`revealInBlocks(param)` first checks the COMPOSABLE-AUTHORING shape (a `param_field`/`formfield` block whose
+own PARAM field names it — surfacing, corner, most twins). Verifying on DRILL (the dispatch's own named
+tree-mode target) found ZERO param_field blocks on its canvas at all — `holecycle` (drill's own atom) carries
+its 28 fields DIRECTLY, no wrapper declaration. Added a second shape: any non-meta atom block whose OWN
+`allFields`/`fields` includes the param name (excluding the same meta/wrapper kinds pickerField.js's own
+`META_TYPES` already excludes, declared independently here for the same reason `GOTO_TARGET_FIELDS`/
+`LABEL_TARGET_FIELDS` were declared independently at t2395 — a cross-file import isn't the natural shape for
+a small, file-local exclusion set). Block → form's own "Show in form" stays SCOPED to param_field/formfield
+only — a real, accepted asymmetry: a multi-field atom like `holecycle` has no single "PARAM" a menu click
+could point at (which of 28 fields?), so extending that direction to bare atoms would need a submenu, not a
+single click; named as a limitation rather than half-built.
+
+### The glow, and a live-caught SVG animation quirk
+
+Reused the app's own existing edit-glow convention (`editGlow` keyframes, `--edit-glow-rgb`/`--edit-glow-
+speed` theme tokens) rather than inventing a new palette — this is its FIRST use on a Blockly canvas block,
+not just editor text/modal returns. The FORM ROW half (`.ddcs-reveal-glow`, a plain HTML box-shadow) works
+exactly as expected — confirmed via `getComputedStyle`: `animationName:'editGlow'`, 2 iterations, theme-paced.
+The BLOCK half does NOT: verified live that the SAME class/keyframes approach applied to a Blockly block's
+SVG `<g>` root reports NO running animation via `getComputedStyle` and the class vanishes far faster than any
+theme's own pace — an SVG `animation`-shorthand quirk in this build, not a mistake in the rule itself (the
+identical rule on an HTML element is provably correct). Fixed by dropping CSS keyframes for the block half
+entirely: `revealInBlocks` sets `style.filter` DIRECTLY (same colour tokens) with a plain `setTimeout(1800)`
+clearing it — no animation-timing dependency at all for the one element type this build won't reliably
+animate that way. The now-unused `.ddcs-block-glow`/`blockRevealGlow` CSS was removed rather than left dead.
+
+### VERIFIED, both twins the dispatch named
+
+Corner (23 fields, sectioned/flat via param_field) and drill (tree mode, holecycle's own bare fields) — both
+directions, both twins. Screenshots: `t2397-1-form-to-block-glow.png` (form→block triggered on corner's "Max
+Probe Dist" row — the block-side glow is a genuinely subtle filter effect against a busy canvas, code-proven
+correct via direct style inspection even where the screenshot alone doesn't make it obvious);
+`t2397-2-block-to-form-glow.png` (block→form via "Show in form" — CLEARLY visible: a blue glow box around
+"Max Probe Dist" in the live form pane). Edge cases: a param bound no other way (fabricated, no declaring
+block anywhere) → the toast fires with a plain explanation, no crash; a plain click on a field still focuses
+it for typing (`document.activeElement === fieldEl` confirmed) — the long-press/right-click gesture never
+intercepts it. Pure UX — no emit/binding-derivation code touched; the full suite's own ratchets/invariant
+confirm register-time output untouched.
+
+Full suite (Rule 1b — blocksApp.js/styles.css are shared): **2933 passed, 0 failed, 10 flaky (all recovered
+on retry), 26 skipped, 23.7m.**
+
+### Files changed
+
+`web/blocks/blocksApp.js` (Rule 1b, shared) — `revealInBlocks` (form→block, both source-lookup shapes),
+the `.form-row` contextmenu/long-press wiring on `#blk-formpane`, "Show in form" added to `registerBlockOptionsMenu`'s existing items list (its own extensibility, cashed in per the dispatch's own note).
+
+`web/styles.css` (Rule 1b, shared) — `.ddcs-reveal-glow` (new, the form-row half); the dead SVG-side CSS
+removed after the JS-driven fix replaced it.
+
+`DDCS-Studio/verification/t2397-{1,2}-*.png` (new).
+
+BACKLOG #48 item 5 (the tail) not attempted — this turn's own investigation (the drill fallback shape, the
+SVG glow quirk) filled it.
+
