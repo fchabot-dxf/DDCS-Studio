@@ -2351,7 +2351,16 @@ checking whether the symptom exists — the same error as promoting the other se
 to a product direction hours earlier the same day. **A confidently-worded backlog entry is a CLAIM, and the
 question "which moment did that number come from?" applies to it exactly as it does to a measurement.**
 
-### 28. HELD — `T.nc` OVERWRITES THE ATC DISPATCHER [⭐ ADVISOR ANALYSIS 2026-08-26 — options below, owner's ruling still needed]
+### 28. [✅ RULED 2026-08-28 — OWNER: LEAVE AS-IS ("enough"). No guard, no disclosure flow, nothing to build] `T.nc` OVERWRITES THE ATC DISPATCHER
+
+> **THE RULING, and its reasoning — reached across a full owner walkthrough 2026-08-28:** the Macro tab
+> already shows `T.nc`'s current content plainly to anyone who looks; a user generating an ATC macro can be
+> expected to know their own tool-change file. Consistent with the house line: the machine is the user's —
+> Studio doesn't babysit its configuration. Options A (detect+refuse), the amended A (detect+confirm), and
+> "join the existing viewer into the generate flow" were each walked through and DECLINED in favour of D.
+> ⚠ If a real magazine owner ever reports a clobbered dispatcher, reopen HERE — the analysis below and the
+> 2026-08-28 evidence block stay valid, and "join it" (reuse the Macro-tab viewer at overwrite time) was the
+> agreed next-cheapest shape.
 
 *(carried forward from `VENDOR-PACK-FIXES-PLAN.md`, HELD item H1 — the plan's own file is deleted, t2295.)*
 
