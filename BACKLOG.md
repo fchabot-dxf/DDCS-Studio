@@ -3676,9 +3676,15 @@ checks stay (dangling still needs catching).
 >   featProbe hooks* never fires, while some other render path runs. The frozen `handle:` numbers prove the
 >   VISUAL never updates either way, so the bug is real — but the fix depends on which function should have
 >   been called.
-> - ⭐⭐ **THE CONTROL EXISTS: the wizard MODAL's own canvas drag.** If that one updates live for the owner,
->   diffing the two paths' redraw wiring locates this immediately — same handles, same canvas code, one
->   works. Establish that first; it is likely a five-minute answer.
+> - ⭐⭐ **THE CONTROL IS CONFIRMED WORKING — owner, 2026-08-29: "yes the handle works on the wizard in
+>   editor."** The SAME handle on the SAME feature canvas updates live in the WIZARD's own view and is frozen
+>   in the BLOCKS tab's Wizard View pane. ⇒ ⛔ **This is not a canvas bug, a handle bug, or a browser bug —
+>   it is a WIRING difference between two hosts of the same component.** Diff the two mounts: what does the
+>   wizard host pass/subscribe that the Blocks pane does not (the redraw callback, an onChange, a render
+>   subscription, a manager instance). ⭐ `blocksApp.js`'s `blkMgr()` is the prime suspect by construction —
+>   it is a STUB manager whose `update()` is deliberately a no-op with the comment "blocksApp already
+>   re-renders the pane reactively on canvas change"; the capture says that reactive re-render does not
+>   happen for a drag. Start there.
 > - ⚠ **t2405 reproduced neither symptom locally** (it saw lag-and-catch-up, i.e. redraws DID fire) —
 >   so something differs between the harness/localhost and the deployed build. That difference is a second
 >   finding worth naming even after the fix.
