@@ -234,7 +234,18 @@
                      and broke `.op-chip-row`'s sizing — flex:1 in a row means grow sideways, the same rule in a
                      column means grow tall; verified live before shipping this shape, not assumed). -->
                 <div class="editor-strip">
-                    <div class="editor-strip-chrome"></div>
+                    <div class="editor-strip-chrome">
+                        <!-- t2383 AMENDMENT 2 (owner-ruled placement, supersedes amendment 1's toolbar-row
+                             placement) — the strip's own chip cluster, right of the duration chip
+                             (#time-estimate-chip) and the pre-flight badge (#preflight-badge — both JS-
+                             inserted, timeChip.js/preflightBadge.js, `order:2`/`order:1`), same chip styling
+                             as those neighbours (a small pill, not a toolbar-btn). `order:2` (styles.css) so
+                             it sits between them and the growable op-chip-row (`order:3`) regardless of DOM
+                             position — the SAME ordering convention timeChip.js's own comment already states
+                             ("order:2 in CSS places it between the badge and the toolbar regardless of DOM
+                             position"). See ui/editorFind.js. -->
+                        <button id="editor-find-btn" type="button" class="editor-find-chip" title="Find in program (Ctrl+F)" aria-label="Find in program"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                    </div>
                     <!-- t2078 — ONE REAL TOOLBAR ROW (human: "there is a whole row unused above the editor … we can put
                          all of the cluster buttons inside this row"). Every one of these used to be its own
                          absolutely-positioned button with a hand-computed `left`/`bottom`, stacked over the editor's
@@ -264,6 +275,16 @@
                 <div class="editor-code">
                     <pre id="editor-highlight" class="editor-layer" aria-hidden="true"></pre>
                     <textarea id="editor" class="editor-layer" spellcheck="false" inputmode="none" placeholder="( System Ready )"></textarea>
+                    <!-- t2383 — the editor find bar (ui/editorFind.js): Ctrl+F or the toolbar button opens it,
+                         Enter/Shift+Enter or the arrow buttons cycle matches, Esc closes. Search only — no
+                         replace (a separate feature with its own overwrite hazards). Case-insensitive default. -->
+                    <div id="editor-findbar" class="editor-findbar hidden" role="search" aria-label="Find in program">
+                        <input type="text" id="editor-find-input" class="editor-find-input" placeholder="Find…" aria-label="Find text" autocomplete="off" autocapitalize="off" spellcheck="false">
+                        <span id="editor-find-count" class="editor-find-count">0/0</span>
+                        <button type="button" id="editor-find-prev" class="toolbar-btn editor-find-nav" title="Previous match (Shift+Enter)" aria-label="Previous match"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg></button>
+                        <button type="button" id="editor-find-next" class="toolbar-btn editor-find-nav" title="Next match (Enter)" aria-label="Next match"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+                        <button type="button" id="editor-find-close" class="toolbar-btn editor-find-close" title="Close (Esc)" aria-label="Close find bar">✕</button>
+                    </div>
                 </div>
                 <div id="editor-statusbar" class="editor-statusbar hidden">
                     <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
@@ -1424,6 +1445,10 @@
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();
             } catch (err) { console.error('editor op-hover init failed', err); }
+            try {
+                const { installEditorFind } = await import('./ui/editorFind.js');
+                installEditorFind();              // t2383 — Ctrl+F / the toolbar button: find bar for the G-code editor
+            } catch (err) { console.error('editor find init failed', err); }
             try {
                 const { initEditorAutocomplete } = await import('./ui/editorAutocomplete.js');
                 initEditorAutocomplete();         // phone-autocorrect-style caret bar (gated by compose.autocomplete)

@@ -1229,6 +1229,20 @@ html, body { overflow-x: clip; }
     border: 1px solid var(--border, #30363d); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
 .editor-container .time-estimate-chip[hidden] { display: none; }
+/* t2383 AMENDMENT 2 — the find-bar TOGGLE chip, same pill shape/size as its strip-chrome neighbours
+   (.time-estimate-chip/.preflight-badge-label) rather than the bordered .toolbar-btn square this used to be
+   (amendment 1's now-superseded placement). order:2 — see index.html's own comment on this button. */
+.editor-container .editor-find-chip {
+    order: 2;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 5px 9px; border-radius: 999px; line-height: 1;
+    background: color-mix(in srgb, var(--panel, #161b22) 90%, transparent); color: var(--text-dim, #8b949e);
+    border: 1px solid var(--border, #30363d); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+    font-family: inherit;
+}
+.editor-container .editor-find-chip:hover { filter: brightness(1.15); color: var(--text, #e6edf3); }
+.editor-container .editor-find-chip.active { background: var(--accent, #2d7ff9); color: #fff; border-color: var(--accent, #2d7ff9); }
 /* t738 — the PREVIEW VISIBILITY modal rows: a visible toggle + label on the left, an opacity slider on the right. */
 .vis-modal-pop .vis-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 3px 0; }
 .vis-modal-pop .vis-tog { display: flex; align-items: center; gap: 7px; cursor: pointer; white-space: nowrap; color: var(--text, #e6edf3); }
@@ -1490,6 +1504,49 @@ html, body { overflow-x: clip; }
 .editor-statusbar .editor-status-text {
     flex: 1;
     white-space: pre-wrap;
+}
+
+/* t2383 — the editor find bar (ui/editorFind.js): a small floating strip anchored top-right of the code area,
+   matching the toolbar's own button chrome (.toolbar-btn) rather than inventing a new button style. */
+.editor-findbar {
+    position: absolute;
+    top: 6px; right: 6px;
+    z-index: 11;
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 6px;
+    background: var(--panel-bg, #1e1e1e);
+    border: 1px solid var(--btn-edge, rgba(255,255,255,.2));
+    border-radius: var(--btn-radius, 6px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.editor-findbar.hidden { display: none; }
+/* t2383 — scoped under `#editor-findbar` (ID + class specificity) rather than the bare `.editor-find-input`
+   class alone: the shared `input, select, textarea` rule (styles.css, t2085 P4e) sets `color`/`background`
+   from theme tokens that resolved to near-black-on-near-black here (live-caught via a screenshot — the typed
+   query was there but invisible) — this wins outright instead of guessing at which token was the real cause. */
+#editor-findbar .editor-find-input {
+    width: 140px;
+    font-size: 12px;
+    font-family: var(--font-code, monospace);
+    padding: 4px 6px;
+    background: #111;
+    color: #eee;
+    border: 1px solid var(--btn-edge, rgba(255,255,255,.2));
+    border-radius: 4px;
+}
+#editor-findbar .editor-find-input.no-match { border-color: #ef4444; }
+.editor-find-count {
+    font-size: 11px;
+    color: var(--text-dim, #999);
+    min-width: 42px;
+    text-align: center;
+    font-family: var(--font-code, monospace);
+}
+.editor-findbar .editor-find-nav,
+.editor-findbar .editor-find-close {
+    min-height: 22px;
+    padding: 4px 6px;
+    display: inline-flex; align-items: center; justify-content: center;
 }
 
 /* Bright green caret/selection for the editor as requested (plus fallbacks) */
