@@ -3510,7 +3510,10 @@ canvas and glows the block. Match against block label + field values (a param na
 
 ### 45. THE MILLING SNIPPETS HAND-ROLL WHAT THE ENGINE DECLARES — rebuild on real atoms, add surfacing
 
-*(owner-asked 2026-08-28: "does surfacing have a block snippet" — answer: NO, and the near-misses are fakes.)*
+*(owner-asked 2026-08-28: "does surfacing have a block snippet" — answer: NO, and the near-misses are fakes.
+⭐ Owner-approved the same day, with the principle in their own words: **"milling atom, needs to be true."**
+A snippet that imitates an operation with hand-listed moves is a lie a learner will trust — build on the real
+atom or not at all.)*
 
 `learnerLibrary.js`'s own discipline (its probe snippets: built from *the same atoms the wizards use, "so the
 later consolidation composes from it"*) is broken by its two milling snippets: `trace-square` and `face-pass`
