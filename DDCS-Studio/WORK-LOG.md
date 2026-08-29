@@ -62826,3 +62826,99 @@ removed after the JS-driven fix replaced it.
 BACKLOG #48 item 5 (the tail) not attempted — this turn's own investigation (the drill fallback shape, the
 SVG glow quirk) filled it.
 
+## t2399 — ARC: COMM, the LAST twin with a live shell — landed, deliberately UNHARMONIZED
+
+Closes the mill-family arc's shell-verified half. Read the shell (`index.html:1100-1213`), `commView.js`'s
+`getFieldVisibility`/per-arm show-hide, and the twin (`commData.js`) before writing anything.
+
+### The SECTION_THRESHOLD guess was wrong — live-checked, not assumed
+
+The dispatch expected comm to be compact enough that `formWidgets.js`'s `sectionize` gate (`rowCount >
+SECTION_THRESHOLD(8) && secList.length >= 2`) would never fire, calling for the WCS/ATC declaration-direct
+spec shape (no chrome to compare). Live probe (`page.evaluate` → `commDataDef()` → `formBindings`/
+`renderOpForm`) found the OPPOSITE: comm has 14 bindings across 2 named sections — `sectionize` IS true, real
+`.form-sec`/`.form-sec-title` chrome renders. So this spec compares REAL rendered chrome, not just the
+declaration.
+
+### A structural mismatch, live-confirmed, left AS-IS per the dispatch's own instruction
+
+The shell (`index.html`) declares THREE sections — FEATURE CONTEXT (type, mode) → GEOMETRY (val, cycle, msg)
+→ ADVANCED (id, dest, statusColor, statusDwell, slot1-4) — in that literal DOM order. The twin declares TWO —
+TYPE / GEOMETRY (its GEOMETRY absorbs the shell's own GEOMETRY *and* ADVANCED). Worse: `formWidgets.js`'s own
+`SECTION_RANK` (`['IDENTITY','GEOMETRY','TOOL & CUT']`) ranks GEOMETRY above the twin's unranked TYPE, so the
+RENDERED order puts msg/statusColor/statusDwell/id/dest/val/cycle/slot1-4 FIRST and type/popupMode/
+statusMode LAST — the fields that OPEN the shell's form render at the very bottom of the twin's. Screenshots
+make it obvious side-by-side (`t2399-shell-comm.png` vs `t2399-twin-comm.png`).
+
+Dispatched explicitly as "reproduce, do not harmonise, record inconsistencies" — a deliberate departure from
+t2381/t2383's own precedent (which DID resection WCS/ATC to match their shells). Not fixed this turn:
+`commData.js` untouched. `tests/comm-form-reproduction-2399.spec.js` pins the twin's CURRENT section map and
+field order as a regression guard (so a careless future edit still gets caught), pins the shell's own
+independently-hand-derived truth (from `.section-label` text + live DOM id order via `window.openWiz('comm')`)
+as a SEPARATE, always-true assertion, and asserts the two are NOT equal — a documented, intentional gap, not
+a silently-passing false match. A real fix belongs to a future turn, same shape as t2383's atc_change
+resection.
+
+### Panel wiring — confirmed untouched, the first-ever off-tree visual twin
+
+`userOpFromStack('comm_data', ..., 'commscreen', {}, ...)` stores `def.panel = 'commscreen'` as inert data;
+only `userOpView.js`'s own `render()` (`pt.mode === 'commscreen'`, ~line 832) reads it, calling
+`CommunicationWizard.generateScreenPreview()`. This spec's own def-loading path (`commDataDef()` →
+`formBindings`/`renderOpForm`) never reaches that code — confirmed with a dedicated test (creates the form
+into a detached host, counts `.comm-screen-host`/`#comm_screen_preview` elements before/after, asserts no
+change). commData.js's own `sim:{layout2d:false}` (line 89, a SEPARATE `uiChildren` 'sim' node, not
+`def.sim`) is untouched, reasoning left intact per the dispatch.
+
+### Non-vacuity proven by perturbation, three times
+
+Backed up `commData.js`/`index.html`, then: (1) renamed a twin binding's `section` — 2 tests failed
+correctly; (2) renamed a shell `.section-label` — the shell-mapping test failed correctly; (3) swapped two
+shell field ids' DOM order — the shell-order test failed correctly; (4) injected a stray `.comm-screen-host`
+into the perturbed-only test body — the panel-wiring test failed correctly. Every file restored from the
+backup and diffed clean (`git status --short` empty) before moving on.
+
+### Registry invariant updated (`tests/twin-section-invariant-2381.spec.js`)
+
+`user_comm_data`'s own `VOCABULARY_EXCEPTIONS` entry moved from `reason:'unverified'` to a NEW label,
+`reason:'shell-unharmonized'` — not `'shell'` (every other entry with that label MATCHES its shell; comm's
+own vocabulary now IS verified but does NOT match, a materially different claim) and not `'unverified'`
+either (it has, in fact, now been checked). The `reason` field is documentation only — nothing in the
+survey's own pass/fail logic reads it, so this is a safe, code-free relabel. Header comment updated with a
+`t2399` account alongside the existing `t2383` one.
+
+### Emit — untouched, confirmed still byte-identical
+
+`tests/comm-twin.spec.js` (unchanged) reruns green: 0 diffs across the type sweep × HMI + non-HMI posts. This
+turn added no new source-file edits to comm at all — spec files only.
+
+### The arc count
+
+32 registered twins total (confirmed live: `listUserOps().length`). With comm's own vocabulary now verified
+(landed, even though left unharmonized — it is a recorded, accounted-for gap, not an open unknown), the
+dispatch's own named stragglers are the ONLY twins still genuinely unresolved: **tap_data** (2/20 sectioned)
+and **bore_data** (25/37 sectioned) — no live shell, real internal completeness gaps; **pause_confirm**
+(0/1 sectioned, no live shell, likely moot since `sectionize` never fires under 2 sections); **io_step**,
+**lathe_faceprobe**, **lathe_odprobe** — non-canonical section vocabulary (`TYPE`/`PROBE`), no live shell to
+justify or refute it either way. That's **26 of 32** shell-verified-or-registry-complete by the dispatch's
+own count.
+
+Full honesty on a 7th, NOT in the dispatch's list but still open in the registry file today:
+**pocket_data** (t2381's own surprise finding — marked "ratcheted" at t2301 but that spec forces tree-mode
+rendering while `hasTreeLayout(pocketDataDef().template)` is actually false, so its REAL live render leaves
+`entryX`/`entryY`/`toolNum` unboxed) — flagged, not fixed, by t2381 and still true today; unchanged this
+turn. Counting it too: **25 of 32**.
+
+### Files changed
+
+`tests/comm-form-reproduction-2399.spec.js` (new) — 5 tests: shell section labels, shell live field order
+(independent), twin's pinned section map (+ asserted non-match vs the shell), twin's pinned rendered chrome
++ order (+ asserted non-match), panel-wiring-untouched.
+
+`tests/twin-section-invariant-2381.spec.js` — comm's own exception relabeled + header account added. Logic
+unchanged; survey still green.
+
+`DDCS-Studio/verification/t2399-{shell,twin}-comm.png` (new).
+
+No production source touched — Rule 1b doesn't strictly apply, but the dispatch's own "full suite at the
+end" does; run once, after the tail below, covering both.
+

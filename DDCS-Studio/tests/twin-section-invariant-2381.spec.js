@@ -75,6 +75,18 @@ import { test, expect } from '@playwright/test';
  * field-ORDER fix on atc_change, live-caught). atc_check_data gained a NEW vocabulary exception (`TOLERANCE`,
  * its one real shell field, corrected from the wrong `GEOMETRY`). atc_length_data stays CLEAN, untouched —
  * its shell has zero input fields for any of its bindings, so there was nothing to reproduce.
+ *
+ * ⭐ UPDATED t2399 (COMM — the LAST twin with a live shell) — comm_data's own vocabulary is now VERIFIED
+ * against its real shell (index.html:1100-1213; `comm-form-reproduction-2399.spec.js`), unlike every prior
+ * 'shell' entry above, this one does NOT match: the shell declares THREE sections (FEATURE CONTEXT / GEOMETRY
+ * / ADVANCED) and a field order the twin's own SECTION_RANK-driven render scrambles entirely (its GEOMETRY
+ * box — TYPE unranked, sorts after) — dispatched explicitly as "reproduce, do not harmonise, record
+ * inconsistencies," so the twin's `TYPE`/`GEOMETRY` split stays AS-IS, not resectioned to match. Reason
+ * relabeled 'shell-unharmonized' (a new, honest label — not 'shell', which every other entry uses to mean
+ * "verified AND matches"; not 'unverified' either, since it now genuinely has been checked). A real gap for a
+ * future turn, same shape as t2383's atc_change fix. comm_data was also the SURVEY's last has-a-shell-but-
+ * unratcheted entry — with it landed, only io_step/lathe_faceprobe/lathe_odprobe's own no-shell vocabulary
+ * gaps remain genuinely unresolved (see their own comments below, unchanged this turn).
  */
 
 const SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
@@ -137,7 +149,10 @@ const VOCABULARY_EXCEPTIONS = {
     // none of which are SECTION_RANK's own three — reproducing the shell means diverging from the canonical
     // vocabulary entirely here, verified byte-for-byte (wcs-form-reproduction-2381.spec.js).
     user_wcs_data: { reason: 'shell', sections: ['FEATURE CONTEXT', 'OPTIONS', 'WCS'] },
-    user_comm_data: { reason: 'unverified', sections: ['TYPE'] },   // GEOMETRY (its other section) is already canonical
+    // t2399 — VERIFIED against the real shell (comm-form-reproduction-2399.spec.js) and found NOT to match it
+    // (shell: FEATURE CONTEXT/GEOMETRY/ADVANCED; twin: TYPE/GEOMETRY, plus a scrambled field order) — dispatched
+    // "reproduce, do not harmonise, record inconsistencies," so left AS-IS. See this file's own t2399 update note.
+    user_comm_data: { reason: 'shell-unharmonized', sections: ['TYPE'] },   // GEOMETRY (its other section) is already canonical
     // NO live shell (advisor's own t2381 count), yet uses a non-canonical name — unlike comm's own `TYPE`
     // (which at least has a shell that MIGHT justify it), io_step has no shell to justify anything. Flagged,
     // not excused: this is exactly the "twin is wrong, not the vocabulary" question the dispatch named,
