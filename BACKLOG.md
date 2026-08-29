@@ -3399,7 +3399,7 @@ Open any wizard in Blocks, delete a `formfield` block, and look at the form. **R
 
 ---
 
-### 42. THE FORM-FIELD BLOCKS ARE A WALL OF BOXES — dynamic fields, human labels, an options editor, and on-block enablers
+### 42. [✅ SHIPPED t2385/t2387/t2389 — `5cee38d7`] THE FORM-FIELD BLOCKS ARE A WALL OF BOXES — dynamic fields, human labels, an options editor, and on-block enablers
 
 *(owner-requested 2026-08-28 from a screenshot of a twin's Parameter Group: "options just looks like coding,
 or cryptic, we should have a better gui." Design settled with the owner the same day; one ruling still open.)*
