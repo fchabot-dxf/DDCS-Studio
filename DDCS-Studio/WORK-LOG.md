@@ -61639,3 +61639,74 @@ rebaselines, updated to assert the NEW correct (shell-matching) section behavior
 No tail — the dispatch explicitly said not to bolt one on ("text alone may eat the turn" — it did not; both
 landed in one turn).
 
+## t2379 — THE PROBE BATCH: STOPPED at Corner, the gated pilot, per the dispatch's own explicit permission —
+## the mill-family bug class does not exist here; the premise the fix pattern rests on does not hold
+
+Dispatch: bring corner/edge/middle/alignment/rotary_center/rotary_clock's section metadata to match their
+shells, same shape as t2375/t2377's mill-family fix, starting with corner ("if CORNER surprises you, the
+other five are suspect and that is worth saying loudly before you touch them"). It surprised me. Reporting
+loudly, per the dispatch's own instruction, instead of forcing a fit. **No code changed this turn — this is
+a finding, not a build.**
+
+### THE FINDING
+
+**All six probe-batch wizards' static shells are RETIRED, not merely hidden.** Confirmed via git history for
+corner: `cbe08b03` — "④ RETIRE the built-in Corner wizard — replaced by the Corner (data) twin (full-remove)"
+— removed the `#wiz_corner` panel from index.html entirely, deleted `cornerView.js`, removed every opener
+(`window.openCornerWiz`, `WIZARD_VIEWS` entry, `WIZ_SPECIAL_OPENER` entry). `grep RETIRED index.html` confirms
+the same for all five others (middle t1730, rotary_center t1730, rotary_clock t1730, edge t1730, alignment
+t1730) — every one of this turn's six targets. **There is no live shell left to open via `window.openWiz(...)`
+and compare against** — the mill-family reproduction methodology (open the live legacy shell, diff its
+`.section-label`s against the twin's own render) is structurally inapplicable here, not merely inconvenient.
+
+**Recovered corner's shell markup from git archaeology** (`git show cbe08b03^:.../index.html`) to check what
+"reproducing the shell" would even mean if attempted anyway. The historical shell used **SIX** sections
+(FEATURE CONTEXT, WCS, GEOMETRY, FEED RATES, ADVANCED, OPTIONS) with entirely different field ids (`c_corner`,
+`c_probe_seq`, `c_probe_z_first`, `c_wcs`, `c_dist`, `c_retract`, `c_radius`, `c_safe_z`, `c_travel_dist`,
+`c_scan_depth`, `c_feed_fast`, `c_feed_slow`, `c_port`, `c_level`, `c_q`, `c_sync_a`, `c_slave`) — **NOT** the
+twin's current design at all.
+
+**The twin's current design is already complete, self-consistent, and a DELIBERATE simplification of that
+dead shell**, not an incomplete reproduction of it: `grep -c section: cornerData.js` → 23 declarations, exactly
+3 distinct names — `IDENTITY`, `GEOMETRY`, `TOOL & CUT` — the SAME three names `formWidgets.js`'s own
+`SECTION_RANK` whitelist declares (`t1239`, "op-defining-fields-at-top"). Live-rendered the twin
+(`renderOpForm` + `formBindings(cornerDataDef())`, no shell to open against): **23/23 bindings placed, exactly
+3 section boxes, zero orphans** — matching `blocksApp.js:788-794`'s own claim exactly ("Corner 23/23 fields (3
+named sections)... zero exceptions"). Surveyed the other five the same way (grep + a background Explore
+agent's own read of each file): **edge 9/9, middle 21/21, alignment 11/11, rotary_center 12/12, rotary_clock
+10/10 — every single binding in every one of the six already carries a non-empty `section:`, drawn ONLY from
+the same three canonical names.** Zero absences. Zero mismatches against that vocabulary.
+
+### WHY THIS IS A STOP, NOT A FORCED FIT
+
+`t2375`'s and `t2377`'s own governing rule — "THE SHELL IS AUTHORITATIVE... the declaration reproduces what
+the shell does EXACTLY; a difference is a bug in the DECLARATION" — presupposes a live shell the twin is
+SUPPOSED to still match. That premise does not hold for any of these six: the shell was deliberately RETIRED
+(a real, named, committed decision — `cbe08b03`, `t1730`), and the twin's own section design has since moved
+PAST it — three canonical, `SECTION_RANK`-aligned names replacing what used to be six ad-hoc ones, an
+intentional simplification, not an unfinished migration. **"Reproducing" the dead six-section shell would mean
+REVERTING corner's already-shipped, deliberate redesign back to a stale legacy layout nobody has opened in
+two months — an active regression of settled work, not a fix.** There is no mismatch to correct and no
+absence to fill: the mill-family bug class (a twin whose section metadata drifted from — or never matched — a
+STILL-LIVE shell it needs to keep reproducing) simply does not exist in this batch. It cannot, once the shell
+it would drift from no longer exists.
+
+### WHAT COULD BE BUILT INSTEAD — a methodology question for the advisor, not mine to decide unilaterally
+
+A genuinely useful ratchet spec for this batch would assert SELF-CONSISTENCY, not shell-reproduction: every
+binding carries a non-empty `section:` drawn only from `SECTION_RANK`'s own three names, the section-box count
+and field-per-section membership stay pinned, zero orphans. That is a REAL regression tripwire (a future edit
+that silently drops a `section:` or introduces a fourth ad-hoc name would still be caught) — but it is a
+DIFFERENT TEST SHAPE than `formReproduction.js`'s own engine, which is built entirely around comparing against
+a live external oracle (a shell it opens for real). Building that new shape, and deciding whether it belongs
+in the same file or a new one, is a design call with consequences for the rest of the stated arc (probes →
+ATC → lathe) — if ATC/lathe wizards are ALSO past-their-shell like this batch, the same question recurs there,
+and getting the answer right once beats guessing six times. Not invented here without sign-off, per the same
+discipline t2373's own stop was praised for.
+
+### Files changed
+
+None. Investigation only — `git status` confirms no code, test, or doc changes beyond this WORK-LOG entry
+itself (the corner survey used a scratch spec, deleted before this entry was written; the mill-family's own
+before/after-screenshot sibling-module technique was not needed since nothing was fixed).
+
