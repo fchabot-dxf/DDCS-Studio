@@ -59,10 +59,35 @@ twin takes its own flat path, and `formBindings()` + `renderOpForm()`'s section-
 different branch inside the same renderer, *not* a gap.
 
 ⇒ **The remaining distance is the PROOF, not the declaration.** The plan's done-condition (`:164-168`) is
-*"the arc is done when the gap list is empty"*, and that list is maintained by the reproduction specs — of
-which there are **two**. ⇒ **Next is extending the ratchet to the rest**: a verification exercise, far cheaper
-than the porting run this block used to describe. Flip a wizard to `split` only where a two-pane layout is
-actually wanted — a single-pane flip was never asked for (`drillData.js:197-201`).
+*"the arc is done when the gap list is empty"*, and that list is maintained by the reproduction specs.
+
+## ⭐⭐ THE ARC IS EIGHT WIZARDS FROM DONE — MEASURED 2026-08-28 (t2379/t2381)
+
+⚠ **This block has now been wrong twice, in the same direction both times** — first *"only 2 have a declared
+form, ~30 to port"*, then *"~26 to ratchet"*. **Both were taken from prose. The measurement is a grep.**
+
+```
+grep 'id="wiz_*"' index.html  →  FOURTEEN built-in shells still live
+                                  SIX already ratcheted (the mill family)
+                              ⇒  EIGHT remain: 6 ATC · comm · wcs
+```
+
+⭐⭐ **Everything else HAS NO LIVE SHELL** — all 6 probes (retired `cbe08b03` + t1730), all 7 lathe, plus
+homing, bore, tap, io_step, pause_confirm. ⇒ **The done-condition does not apply to them, and that is not a
+gap — it is completion.** The ratchet exists to prove a twin matches the incumbent shell *before* the twin
+replaces it. Where the shell is already retired, **the replacement has happened and the incumbent is gone.**
+Nothing is left to prove.
+
+⛔ **DO NOT "reproduce" a retired shell.** t2379 recovered corner's dead shell from `cbe08b03^` and checked:
+it used a 6-section design (FEATURE CONTEXT/WCS/GEOMETRY/FEED RATES/ADVANCED/OPTIONS) with entirely different
+field ids. The twin's current 3-section design is a **deliberate shipped simplification**. Reproducing the
+dead shell would REVERT it — an active regression dressed as arc work.
+
+⇒ **What replaces the ratchet for shell-less twins:** ONE registry-wide invariant over all 32 (every binding
+sectioned · only the canonical `SECTION_RANK` vocabulary · zero orphans), with a declared exception list
+asserting the known divergences **exactly** — e.g. text's unbound `rpm` frontier. Not 6 per-wizard specs: the
+property belongs to the registry, so one table-driven test covers the mill family too and catches every future
+twin with no new file.
 
 ⚠ **One consequence is already filed:** BACKLOG #39 — a *guarded* wizard forked from a **placed op** loses its
 guard arms and refuses (loudly, correctly). Blast radius today is small precisely because only two forms are
