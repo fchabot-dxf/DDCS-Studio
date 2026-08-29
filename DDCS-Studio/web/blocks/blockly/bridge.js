@@ -20,6 +20,9 @@ import { WCS_SELECTORS } from '../../wizards/ops/setworkoffset.js';   // the ONE
 import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
 import { installCoordListField } from './coordListField.js';
+import { installPickerField } from './pickerField.js';   // t2389 (BACKLOG #42 piece 6) — exact-name references (matchvar/atomType/whenparam)
+import { installOptionsEditorField } from './optionsEditorField.js';   // t2389 (BACKLOG #42 piece 2) — the options DSL's editor
+import { installComboField } from './comboField.js';   // t2389 (BACKLOG #42 piece 7) — section/units suggestion combo
 import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
 import { opLabelOf } from '../opBuilders.js';   // t1071 — the opunit chip's friendly per-instance label (opType → the twin's registered label)
 
@@ -211,6 +214,17 @@ export function fieldKind(def, field) {
     if (def.type === 'regionpick' && field === 'value') return 'regionpick';   // the region-pick control's value → inline picker
     if (def.type === 'coordlist' && field === 'pts') return 'coordlist';        // the coordinate-list → inline positions preview
     if (CORNER_COLOUR[field]) return 'cornergrid';   // PlaceOnStock attach / path-datum → inline 3×3 picker
+    // t2389 (BACKLOG #42 pieces 2/6/7) — SCOPED to param_field/formfield only (mirroring the def.type-scoped
+    // checks above): `options`/`matchvar`/`atomType`/`whenparam`/`section`/`units` are common field NAMES reused
+    // by dozens of unrelated blocks across the palette for unrelated purposes — a bare field-name match here
+    // (like `CORNER_COLOUR[field]` gets away with, because those two names are genuinely unique) would silently
+    // reclassify every one of them. `def.kind` is these two blocks' own routing key, already used the same way
+    // by jsonDef()'s `isParamGroup`/etc. checks just below.
+    if (def.kind === 'param_field' || def.kind === 'formfield') {
+        if (field === 'options') return 'optionseditor';
+        if (field === 'section' || field === 'units') return 'combo';
+    }
+    if (def.kind === 'formfield' && (field === 'matchvar' || field === 'atomType' || field === 'whenparam')) return 'picker';
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
     if (sock === 'region') return 'region';
@@ -283,6 +297,12 @@ function jsonDef(def) {
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
         else if (k === 'coordlist') args0.push({ type: 'field_coordlist', name: FN(f), value: String(def.defaults[f] ?? '{"points":[],"z":0}'), tooltip: desc });
+        // t2389 (BACKLOG #42 pieces 2/6/7) — `pickKind`/`comboKind` are the field's own NAME (matchvar/atomType/
+        // whenparam; section/units) — the field class reads live candidates from the workspace at popup-open
+        // time using that name to pick which enumeration to run (pickerField.js/comboField.js's own headers).
+        else if (k === 'optionseditor') args0.push({ type: 'field_optionseditor', name: FN(f), value: String(def.defaults[f] ?? ''), tooltip: desc });
+        else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
+        else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
         else if (k === 'checkbox') args0.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
         else if (k === 'text') args0.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
@@ -579,6 +599,9 @@ export function installBlockly(Blockly) {
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
     installRegionPickField(Blockly);   // register field_regionpick (the region-pick control's block adapter)
     installCoordListField(Blockly);    // register field_coordlist (the coordinate-list positions preview)
+    installPickerField(Blockly);       // t2389 — register field_picker (BACKLOG #42 piece 6)
+    installOptionsEditorField(Blockly);   // t2389 — register field_optionseditor (BACKLOG #42 piece 2)
+    installComboField(Blockly);        // t2389 — register field_combo (BACKLOG #42 piece 7)
     registerDynExtension(Blockly);
     registerSecColorExtension(Blockly);
     registerOpunitExtension(Blockly);   // t1071 — the opunit chip's friendly label + read-only routing key

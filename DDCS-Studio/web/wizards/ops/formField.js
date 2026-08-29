@@ -14,12 +14,19 @@
  * atom's own param directly (`atomType` + `key`) — the shape `deriveBindings.matches()` already supported with zero
  * engine changes (every shipped twin binding a real op atom uses exactly `match:{type:atomType},key:param`, e.g.
  * surfacingData.js's `w`/`h`/`toolDia` bind `match:{type:'surfaceraster'}`) but which the formfield authoring UI had
- * no way to reach — a form built over an op's own param (not a macro var) derived ZERO bindings. `atomType` is a
- * free-text field, matching `matchvar`'s existing precedent (neither is a live dropdown of the surrounding stack;
- * a typo in either is caught the same way — t1636's formfieldMatchReport, at save time, loudly, by name). No new
- * disambiguation mechanism for two atoms of the same type: `match:{type}` alone already requires EXACTLY one hit
- * (deriveBindings throws else), which is the correct authoring error today — rule-of-three says build an index/nth
- * picker if a THIRD real case ever needs two same-type atoms disambiguated, not speculatively here.
+ * no way to reach — a form built over an op's own param (not a macro var) derived ZERO bindings.
+ *
+ * ⭐ t2389 (BACKLOG #42 piece 6) — SUPERSEDED: `matchvar`/`atomType` were free text ("neither is a live dropdown of
+ * the surrounding stack"); the owner overruled that 2026-08-28 — "wherever we need an exact variable name don't
+ * allow typing" — both (plus `whenparam`) are now `field_picker` (blocks/blockly/pickerField.js): a searchable,
+ * MUST-MATCH picker whose candidates are read LIVE from this block's own workspace at popup-open time (assign
+ * vars actually declared, atom types actually present, this def's own sibling params). Typing FILTERS the list;
+ * it can never commit a value outside it. `formfieldMatchReport` (userOps.js, t1636) STAYS regardless — a picker
+ * prevents a TYPO, not a var/param picked correctly here and later DELETED elsewhere in the stack (dangling); that
+ * loud save-time check is still the only thing that catches that. No new disambiguation mechanism for two atoms of
+ * the same type: `match:{type}` alone already requires EXACTLY one hit (deriveBindings throws else), which is the
+ * correct authoring error today — rule-of-three says build an index/nth picker if a THIRD real case ever needs two
+ * same-type atoms disambiguated, not speculatively here.
  *
  * The fields ARE the deriveBindings spec vocabulary: param · widget · label · default (dflt; empty = socket-held, the
  * template's baked expression holds) · the bind mode + its socket link (assign: matchvar #N; opparam: atomType) + key ·

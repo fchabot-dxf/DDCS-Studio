@@ -62236,3 +62236,110 @@ told not to start them even if the turn felt light. It did not feel light — th
 dangling-caption bug (a second genuine defect, found the same way t2385's two were: reasoning from the API
 alone said it worked, only a real screenshot proved it didn't) took real time to isolate and fix correctly.
 
+## t2389 — BACKLOG #42 CLUSTER 2 (pieces 2, 6, 7): options editor, exact-name pickers, section/units combo —
+**THIS CLOSES #42**, all 7 pieces landed across t2385/t2387/t2389
+
+Three new custom Blockly fields, one live-caught bug in the process. `param_field.js`/`formField.js` needed NO
+edits (`options`/`matchvar`/`atomType`/`whenparam`/`section`/`units` are just field NAMES — `bridge.js`'s
+`fieldKind()`, scoped by `def.kind === 'param_field' || 'formfield'`, routes them to the new field classes).
+
+### Piece 2 — the options editor (`optionsEditorField.js`)
+
+Face shows a compact summary ("N choices: Label, Label, …"); click opens Label|Value rows with add/remove.
+⭐⭐ Storage stays the existing DSL string — the editor reads it with the SAME `parseParamOptions`
+(blocks/userOps.js) the register path already uses, and writes back through the same `Label=Value, …` shape;
+`parseParamOptions` itself is untouched. **A real bug, live-caught by a test, not assumed away**:
+`parseParamOptions(str, type)` defaults to NUMERIC parsing when `type` is omitted — the field's first
+`getText()` called it with no type argument, so a dropdown of STRING codes (`Front Left=nn`) parsed to ZERO
+rows and the face read "(no choices)" despite a real, correctly-stored value. Fixed by threading the sibling
+`TYPE` field's live value through every read (`_declType()`), the same resolution `showEditor_` already used —
+caught because the test read the face text BEFORE opening the editor and got a value inconsistent with what
+the editor itself showed moments later, not because of any static reasoning.
+
+### Piece 6 — exact-name pickers (`pickerField.js`)
+
+`matchvar`/`atomType`/`whenparam` (formfield only) are now `field_picker`: typing FILTERS a live-computed
+candidate list, never commits a value outside it. Candidates are read from `getSourceBlock().workspace.
+getAllBlocks(false)` at POPUP-OPEN time — never a cached list: `matchvar` = every `assign` block's `VAR` field;
+`atomType` = every OTHER block's own `.type`, excluding a small hardcoded meta/structural set (formfield,
+param_field, cam_field, section, param_group, panel, sim, simstart, user_root, assign, plus anything ending
+`_op` or starting `user_`) — a suggestion list, not a validation gate, so an imperfect exclude set is harmless;
+`whenparam` = sibling `formfield`/`param_field` blocks' own `PARAM` values, excluding the field's own block.
+⭐ SUPERSEDES t1636's free-text decision for `matchvar`/`atomType` — `formField.js`'s own header comment
+updated (deferred from t2385 for exactly this moment, per the dispatch). `formfieldMatchReport` STAYS
+unchanged — a picker prevents a typo, not a var/param picked correctly and later deleted elsewhere.
+
+### Piece 7 — section/units combo (`comboField.js`)
+
+A DIFFERENT shape than pieces 2/6 on purpose, not a shortcut: `section` (canonical IDENTITY/GEOMETRY/TOOL & CUT
++ this def's own already-used names) and `units` (the fixed mm/mm/min/in/deg/rpm/% set, the magic mm/mm-min
+pair among them, formWidgets.js:83-88) are SUGGESTIONS, never a gate ("typed free text stays first-class") —
+a native `<datalist>` already IS exactly that UX for free, so `FieldCombo extends Blockly.FieldTextInput`
+overriding `widgetCreate_`/`widgetDispose_` to attach/detach the datalist, rather than forcing pieces 2/6's
+custom-popup shape onto an interaction that doesn't need it. The t2381 registry invariant polices `section`'s
+actual NAMES; this widget never gates anything, so it never needs to agree with that invariant's exception list.
+
+### A mechanism-limit bug, live-caught before any field code was written: `Blockly.DropdownDiv`/`WidgetDiv` are
+NOT exposed on the vendored UMD namespace
+
+First design for the shared popup helper (`dropdownPopup.js`, pieces 2+6's common pattern) assumed
+`Blockly.DropdownDiv` — the SAME positioned-floating-div singleton `FieldDropdown`'s own native menu rides —
+would be reachable the way `Blockly.FieldDropdown`/`Blockly.utils.Size` etc. already are. Live-tested
+immediately (before building on top of it): `Object.keys(window.Blockly)` has NO `dropdown`/`widget` match at
+all — confirmed by a real `TypeError: Cannot read properties of undefined (reading 'clearContent')` the moment
+a field tried to open. `field.showEditor()` still privately manages a `.blocklyWidgetDiv` element internally
+(confirmed working at t2387 for auto-focus), but that machinery isn't exposed for OUR code to reuse. Rewrote
+`dropdownPopup.js` as a SELF-CONTAINED popup instead — the same shape as `ui/opContextMenu.js`'s own shared
+floating menu (one element, viewport-clamped via `Field.getSvgRoot().getBoundingClientRect()`, dismissed on an
+outside mousedown or Escape) — no dependency on internal Blockly machinery the vendored build doesn't expose.
+
+### VERIFIED live — every claim checked, not assumed
+
+Options editor: add/edit/remove rows, `Done` closes, and the FINAL value re-parses via the real
+`parseParamOptions` to the exact rows entered (not just "looks right" — the actual register-time parser ran
+against it). Picker: `matchvar` candidates correctly enumerate live `assign` vars, typing a non-matching query
+filters to zero, clicking a candidate commits + closes the popup; `atomType` candidates correctly include a
+real atom (`move`) and exclude every meta type present in the same stack (`assign`, `formfield`, `param_field`
+never appeared); `whenparam` candidates correctly list a SIBLING field's param name, never the field's own.
+Combo: typed free text (`CUSTOM SECTION`) is accepted and immediately appears as a live candidate for the
+OTHER field's own datalist (stack-derived, not stale). Paren-bearing option label (`Front (Left)=fl`) entered
+through the editor round-trips BYTE-IDENTICAL to the same string hand-typed directly on the field — confirmed
+via the real parser, not inspection. Register-time output: `paramFieldsFromStack` read all 28 rows of the real
+`user_surfacing_data` twin correctly through the new field classes (field VALUE reading — `getFieldValue` — is
+untouched by any of this turn's changes, only the RENDERING layer changed).
+
+Full suite: **2919 passed, 0 failed, 14 flaky (all recovered on retry), 26 skipped, 23.6m.** Named individually
+per Rule 1b: `formfield-loud-mismatch-1636.spec.js:57` was ALSO flaky in t2385's own full-suite run (same exact
+test, same exact assertion) — a pre-existing flake, not a t2389 regression. `gui-blocks-reauthor.spec.js:10`
+was newly flaky this run, but its failure (`TimeoutError: page.waitForFunction... window.ddcsStudio...`,
+5000ms) fired at PAGE BOOT, before any of this turn's field code runs at all — and the very next test in the
+same batch (`header-workspace-name-2147.spec.js`, wholly unrelated to formfield/param_field) hit the IDENTICAL
+boot-timeout pattern, pinning this to parallel-worker contention that turn, not a code regression. Every other
+flaky entry is a repeat of prior turns' own named environmental flakes (middle-superset's 14336-combo sweep
+timing, pane-sizer-mobile drag timing, etc.) — grepped: zero failures anywhere in the t2381 invariant or any
+form-reproduction ratchet spec.
+
+### Files changed
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — `fieldKind()`: 3 new kinds (`optionseditor`/`picker`/
+`combo`), scoped to `def.kind === 'param_field' || 'formfield'` (mirrors the existing `def.type`-scoped
+cornergrid/regionpick/coordlist checks — NOT a bare field-name match, which would silently reclassify every
+unrelated block sharing these common names); `jsonDef()`: the 3 new args0 cases; `installBlockly()`: the 3 new
+`installXField()` calls.
+
+`web/blocks/blockly/pickerField.js`, `optionsEditorField.js`, `comboField.js`, `dropdownPopup.js` (all new).
+
+`web/wizards/ops/formField.js` — header comment updated: matchvar/atomType's free-text decision (t1636)
+recorded as SUPERSEDED, per the dispatch's own explicit instruction (deferred from t2385).
+
+`DDCS-Studio/verification/t2389-1-options-editor.png`, `...-2-picker-filtering.png`, `...-3-combo-section.png`
+(new — the third shows the field's plain face, since a native `<datalist>`'s own suggestion popup is
+OS-rendered and doesn't appear in a page screenshot; wiring confirmed via DOM inspection instead, in the
+VERIFIED section above).
+
+### BACKLOG #42 — CLOSED, heading tagged per rule 8
+
+All 7 pieces shipped: piece 1 (t2385), pieces 3/4/5 (t2387), pieces 2/6/7 (t2389, this turn). The two
+DELIBERATELY-LEFT-ALONE items (gate/optionGate blobs, matchvar/atomType free text) — the second is now
+SUPERSEDED by the owner's own later ruling, recorded above and in formField.js's own header, not re-litigated.
+
