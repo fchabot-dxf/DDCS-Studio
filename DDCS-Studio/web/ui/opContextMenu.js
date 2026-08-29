@@ -119,6 +119,79 @@ export function openMenu(items, x, y) {
     return true;
 }
 
+/**
+ * t2411 (BACKLOG #52) — anchor the shared menu ADJACENT to a DOM rect (Explorer-style cascade), top-aligned,
+ * opening to the RIGHT of the rect by default and FLIPPING to its left when the right side would overflow the
+ * viewport — a real flip (the flyout's own right edge meets the anchor's left edge), not the point-based clamp
+ * `place()` already does for a cursor-positioned popup (that only shifts the menu to fit, which would leave it
+ * overlapping the row it hangs off rather than sitting cleanly beside it). Vertical placement reuses the same
+ * top/bottom viewport clamp `place()` already established.
+ */
+function placeAdjacent(m, anchorRect) {
+    m.hidden = false;
+    const r = m.getBoundingClientRect();
+    const gap = 2;   // a hair of separation so the flyout doesn't visually fuse with the row it hangs off
+    const fitsRight = anchorRect.right + gap + r.width <= window.innerWidth - 6;
+    const left = fitsRight ? (anchorRect.right + gap) : (anchorRect.left - gap - r.width);
+    m.style.left = Math.round(Math.max(6, Math.min(left, window.innerWidth - r.width - 6))) + 'px';
+    m.style.top = Math.round(Math.max(6, Math.min(anchorRect.top, window.innerHeight - r.height - 6))) + 'px';
+}
+
+/** t2411 — same shape as `openMenu`, positioned adjacent to a rect instead of at a point. */
+export function openFlyoutAdjacent(items, anchorRect) {
+    const m = ensure();
+    m.innerHTML = '';
+    for (const it of (items || [])) if (it) item(m, it.label, it.fn, it.disabled, it.title);
+    if (!m.children.length) return false;
+    placeAdjacent(m, anchorRect);
+    return true;
+}
+
+// t2411 — HOVER_MS small (the cascade should feel responsive to a deliberate hover); CLOSE_MS generous (survives
+// the diagonal mouse path from the row into the flyout — the classic cascade tolerance, done here as a plain
+// close-delay rather than true geometric triangle-tracking, which is the standard, simpler implementation of the
+// same tolerance and matches what most real cascading menus actually ship).
+const FLYOUT_OPEN_MS = 150;
+const FLYOUT_CLOSE_MS = 450;
+
+/**
+ * t2411 (BACKLOG #52) — wire an Explorer-style CASCADE trigger onto an existing DOM row that some OTHER owner
+ * (Blockly's own native context menu, here) already rendered and already wired its own click handling on:
+ * hover-open (small delay), a generous close-delay with re-entry cancellation (moving from the row into the
+ * flyout keeps it open), a click that does NOT reach the row's own native handler (captured + stopped, so
+ * whatever menu the row lives in stays open beside the flyout instead of closing itself the way a normal
+ * click-to-activate item would), and touch tap-to-toggle (captured + `preventDefault`, so the browser's own
+ * synthetic post-touch mouse-event cascade — mouseenter/click ~300ms later — can't double-trigger it).
+ * `getItems()` is called FRESH at every open (a hover-delay firing, a click, or a tap), never cached at wiring
+ * time, so the flyout always reflects the row's CURRENT state (e.g. which enablers are still pending).
+ */
+export function wireFlyoutTrigger(rowEl, getItems) {
+    if (!rowEl || rowEl.dataset.flyoutWired === '1') return;
+    rowEl.dataset.flyoutWired = '1';
+    let openTimer = null, closeTimer = null, openFor = null;   // openFor: which row's flyout is currently up, so an unrelated row's leave can't close ours
+
+    const clearTimers = () => { if (openTimer) clearTimeout(openTimer); if (closeTimer) clearTimeout(closeTimer); openTimer = closeTimer = null; };
+    const scheduleClose = () => { clearTimers(); closeTimer = setTimeout(() => { hideOpMenu(); openFor = null; }, FLYOUT_CLOSE_MS); };
+    const doOpen = () => {
+        clearTimers();
+        if (!rowEl.isConnected) return;   // Blockly's own menu closed (Escape / outside click) before our delay fired
+        const items = getItems();
+        if (!items || !items.length || !openFlyoutAdjacent(items, rowEl.getBoundingClientRect())) return;
+        openFor = rowEl;
+        const m = ensure();
+        m.onmouseenter = () => clearTimers();
+        m.onmouseleave = scheduleClose;
+    };
+
+    rowEl.addEventListener('mouseenter', () => { clearTimers(); openTimer = setTimeout(doOpen, FLYOUT_OPEN_MS); });
+    rowEl.addEventListener('mouseleave', () => { if (openTimer) { clearTimeout(openTimer); openTimer = null; } if (openFor === rowEl) scheduleClose(); });
+    rowEl.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); doOpen(); }, { capture: true });
+    rowEl.addEventListener('touchend', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        if (openFor === rowEl && menu && !menu.hidden) { hideOpMenu(); openFor = null; } else { doOpen(); }
+    }, { capture: true });
+}
+
 /** Show the op menu for `op` ({ id, opType, label }) at viewport (x, y). */
 export function showOpMenu(op, x, y) {
     if (!op || !op.id) return;

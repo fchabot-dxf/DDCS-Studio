@@ -1305,6 +1305,34 @@ html, body { overflow-x: clip; }
 .op-ctx-item:hover:not(:disabled) { background: var(--accent, #0ea5e9); color: #fff; }
 .op-ctx-item:disabled { color: var(--text-dim, #8b949e); cursor: default; }
 
+/* t2411 (BACKLOG #52, theme rider) — Blockly's OWN native context menu (Duplicate / Add Comment / Collapse /
+   Disable / Delete / our "Block options…" row) ships no theme hook at all: it is styled entirely by vendored
+   CSS injected at runtime (`.blocklyMenu { background:#fff }`, `.blocklyMenuItem { color:#000 }`, …), so it read
+   as a plain white/black menu regardless of the app's active theme or skin. Grepped first, not assumed: no rule
+   anywhere in this file touched `.blocklyMenu`/`.blocklyMenuItem`/`.blocklyWidgetDiv` before this. `!important`
+   is deliberate and scoped to exactly these selectors — Blockly's own stylesheet is injected AFTER this file
+   loads, so at equal specificity its later rule would win without it; this is the standard, accepted use of
+   `!important` for overriding a vendored library's own runtime styles. Same token family as `.op-ctx-menu`
+   above, so the flyout and the native menu it hangs off read as one family. */
+.blocklyWidgetDiv .blocklyMenu {
+    background: var(--panel, #1d2530) !important;
+    border: 1px solid var(--border, rgba(255,255,255,.18)) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 28px rgba(0,0,0,.5) !important;
+}
+.blocklyMenuItem {
+    color: var(--text-main, #e6edf3) !important;
+    border-radius: 5px !important;
+    margin: 0 2px !important;
+}
+.blocklyMenuItemContent { color: inherit !important; }
+.blocklyMenuItemHighlight:not(.blocklyMenuItemDisabled) {
+    background-color: var(--accent, #0ea5e9) !important;
+    color: #fff !important;
+}
+.blocklyMenuItemDisabled { color: var(--text-dim, #8b949e) !important; }
+.blocklyMenuSeparator { border-color: var(--border, rgba(255,255,255,.18)) !important; }
+
 /* Capability gating: grey (not hide) a field the active post can't use — layout stays put; tooltip explains. */
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }

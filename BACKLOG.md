@@ -3916,7 +3916,7 @@ engine really does.
 
 ---
 
-### 51. TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+### 51. [⚠ INVESTIGATED t2411 — could not reproduce; the described symptom does not hold against the current code, live-tested. See findings below. Becomes an owner re-check, per the dispatch's own fallback] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
 
 *(owner, 2026-08-29, while testing the t2371 pinch-zoom: "2finger pinch should act as pan.")*
 
@@ -3932,9 +3932,46 @@ anchor feels broken; the combined transform is the standard fix.
 **VERIFY:** on a real touch device (the owner can), zoom in then move around with two fingers; one-finger
 handle drags unaffected; desktop wheel/drag behaviour unchanged.
 
+> ⭐⭐ **t2411 — ESTABLISHED how the anchor works, per the dispatch's own instruction, before writing anything:**
+> `_pinchMove()` (`web/viz/featureCanvas.js`) solves `t.cxw`/`t.cyw` on EVERY move so that `w0` — the world
+> point captured under the midpoint ONCE, at `_pinchStart()` — stays under the CURRENT (possibly drifted)
+> midpoint, at a scale derived from the current/initial distance ratio. That formula does not describe
+> "zoom only" — it describes a COMBINED anchor: when the midpoint moves at a roughly constant distance (a
+> pure two-finger pan), the content is re-solved to keep following the SAME world point under the moving
+> midpoint, which IS panning. Traced the actual `_W()` transform (`t.cxw + (sx-t.cx)/t.scale`, the same
+> screen→world formula the wheel-zoom handler already uses) to confirm the algebra, not just read the
+> comment.
+>
+> **Live-verified, not just derived**: dispatched synthetic two-pointer `PointerEvent`s (`pointerType:'touch'`,
+> two distinct `pointerId`s) directly at the SVG — the exact event shape any touch device produces, and the
+> exact listener this file registers — moving both points by the SAME 150px delta at a CONSTANT distance (a
+> pure pan, no zoom). A handle's own `getBoundingClientRect()` moved by exactly 150,0px, matching the fingers
+> 1:1. **The combined pan+zoom gesture the ticket asks for already exists in the code and already works when
+> driven by the exact events a touch device sends.**
+>
+> ⚠ Given that, I did NOT modify `_pinchStart`/`_pinchMove` — rewriting already-correct, subtle anchor math on
+> a guess would risk breaking it for a benefit I can't confirm. Checked the one other plausible explanation
+> that fits "works when I drive it directly, owner says it doesn't work on their phone": `web/index.html`'s
+> viewport meta has no `user-scalable=no`/`maximum-scale=1`, which COULD let the OS/browser's own native
+> page-pinch-zoom compete with the canvas's `touch-action:none` on some mobile browsers — but this SVG
+> already sets `touch-action:none` directly on itself (the same per-element pattern this codebase already
+> uses for every other drag surface — splitters, resize handles — none of which get a page-level
+> `user-scalable=no` either), and per the CSS Touch Action spec a child's more-restrictive value should win
+> regardless of ancestors. Did not change this either — it's a real candidate but unconfirmed, and changing
+> the page's own zoom behavior site-wide is a bigger blast radius than this ticket's own scope for an
+> unconfirmed cause.
+>
+> ⛔ **Per the dispatch's own fallback ("if you cannot drive it convincingly, say so plainly, and it becomes
+> an owner check rather than a claimed pass"): this is that.** Not claiming fixed, not claiming closed —
+> the mechanism is confirmed correct by direct trace + live event simulation, so the next useful data point
+> is the owner re-testing on the CURRENT deployed build (this exact code has been live since t2371, unchanged
+> by this turn) and reporting exactly what they see: does it pan at all, does it only zoom, does it jitter?
+> If it still fails on-device, the viewport-meta/native-gesture-interception candidate above is where to look
+> next, with real hardware in hand rather than a synthetic repro.
+
 ---
 
-### 52. "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+### 52. [✅ SHIPPED t2411 — hover/click/touch cascade, edge-flip, theme tokens on both the flyout and Blockly's own native menu, verified live incl. screenshots] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
 
 *(owner, 2026-08-29, with a Windows Explorer screenshot: "right click submenu should be like this." Refines
 #42 piece 4's shipped fallback — the vendored Blockly has no native submenus (established t2389), so t2387
@@ -3970,6 +4007,77 @@ The reference behaviour, from the screenshot:
 
 **VERIFY:** screenshots desktop hover + touch tap; near-right-edge flip shown; the existing entries all
 still fire.
+
+> ⭐⭐ **t2411 — SHIPPED.** First dumped Blockly's own rendered context-menu DOM live (not guessed): a fresh
+> `.blocklyContextMenu` under a fresh `.blocklyWidgetDiv` is painted from SCRATCH on every open (never patched
+> in place), each row a plain `.blocklyMenuItem` with NO submenu chrome of its own — confirming t2389's own
+> "no native submenu support" finding and, more usefully, that "Block options…" is indistinguishable in the
+> DOM from Duplicate/Delete/etc. — there's nothing to hook UNTIL Blockly paints it.
+>
+> **THE MECHANISM** (both new, in `ui/opContextMenu.js`, alongside the existing `openMenu`/`place`):
+> - `openFlyoutAdjacent(items, anchorRect)` — the SAME shared `.op-ctx-menu` element `openMenu` already uses,
+>   positioned adjacent to a DOM rect instead of a cursor point: opens to the right, top-aligned; flips to the
+>   LEFT when the right side would overflow the viewport (a real flip — the flyout's own right edge meets the
+>   anchor's left edge — not `place()`'s existing edge-CLAMP, which only shifts a cursor-popup to fit and would
+>   leave a row-anchored one overlapping the row).
+> - `wireFlyoutTrigger(rowEl, getItems)` — hover-open (150ms), a 450ms close-delay that survives moving from
+>   the row into the flyout (cancelled on re-entry to either), and a CAPTURE-phase click/touchend interceptor
+>   that `stopPropagation()`s + `preventDefault()`s so the row's own native handler (Blockly's "activate and
+>   close the menu") never fires — the parent menu stays up because it was never told anything happened.
+>   `getItems()` is called fresh at every open, never cached, so the flyout always reflects the block's CURRENT
+>   pending-enabler state.
+>
+> **`blocksApp.js`'s `registerBlockOptionsMenu()`**: kept the existing `CMR.registry.register(...)` (so
+> Blockly still shows the row at all, same precondition) but its `callback` is now the FALLBACK ONLY —
+> reached by keyboard activation (arrow keys + Enter), which never hovers or clicks the row, so it keeps the
+> old cursor-popup-that-closes-the-parent behaviour unchanged for that one path. The PRIMARY path is a
+> `MutationObserver` on `document.body` (wired ONCE, module-scope-guarded on `window` since the IIFE re-runs
+> per Blockly workspace init but the observer only needs to exist once, ever) that catches every fresh
+> `.blocklyContextMenu` paint, finds the row whose text is exactly "Block options…", and wires it with
+> `wireFlyoutTrigger`. Which block owns the open menu is resolved via `B.getSelected()` (an existing,
+> already-used API in this file) at OPEN time, not paint time — confirmed live that right-click selects the
+> block first and Blockly does not change selection while its own menu is open.
+>
+> **THEME TOKENS** (the owner's own rider): grepped first — no rule anywhere in `styles.css` touched
+> `.blocklyMenu`/`.blocklyMenuItem`/`.blocklyWidgetDiv` before this turn, confirmed by checking Blockly's own
+> vendored CSS (`.blocklyMenu{background:#fff}`, `.blocklyMenuItem{color:#000}`, injected at runtime, AFTER
+> this file loads) — the native menu was plain white/black regardless of the app's active theme or skin, full
+> stop. Added token-driven overrides (`var(--panel)`/`var(--border)`/`var(--text-main)`/`var(--accent)`/
+> `var(--text-dim)`, the SAME family `.op-ctx-menu` already uses) with `!important` — deliberate and scoped to
+> exactly these selectors, the standard/accepted way to override a vendored library's own runtime-injected
+> styles, verified necessary (Blockly's later-injected same-specificity rule would otherwise win). `.op-ctx-menu`
+> itself was ALREADY correctly tokenized (checked, not assumed) — the theme gap was Blockly's own chrome only.
+>
+> **VERIFIED, every claim live, nothing assumed:**
+> - `openFlyoutAdjacent`'s own edge-flip math, in isolation: an anchor with room to its right opens right; an
+>   anchor near the viewport edge flips left, staying top-aligned in both cases.
+> - `wireFlyoutTrigger`'s full timing contract on a synthetic row: not open at 50ms, open by 300ms (past the
+>   open-delay); still open at 200ms after leaving (survives the tolerance window), closed by 600ms with no
+>   re-entry; entering the flyout itself before the close-delay fires keeps it open indefinitely; a click on
+>   the row never reaches a stand-in "native" handler and opens the flyout instead; a touch tap opens it, a
+>   second tap closes it.
+> - END TO END on a REAL Blockly-rendered row: a fresh `formfield` block (every enabler still pending) →
+>   right-click → hover "Block options…" → Blockly's own native menu STAYS visible AND the flyout opens
+>   beside it with the correct 4 items (`+ help text`, `+ limits (min/max/step)`, `+ units`,
+>   `+ show-when condition`) → clicking a flyout item closes BOTH menus together, matching the Explorer
+>   reference exactly (turns out Blockly's own outside-click dismiss already treats a click inside our
+>   flyout as "outside its own menu" and closes itself — no extra code needed for that half).
+> - Screenshots: `verification/t2411-cascade-dark.png` (default/dark skin — the parent menu open, "Block
+>   options…" highlighted in the skin's own accent colour, the flyout cascading beside it with matching
+>   panel/border colours), `verification/t2411-cascade-light.png` (the "normal" light skin — white panel,
+>   same layout, confirming the tokens actually SWITCH, not just resolve once), `verification/t2411-cascade-
+>   edge-flip.png` (a row placed near the viewport's right edge — the flyout opens leftward, no clipping).
+> - REGRESSION: `Duplicate` (an ordinary, un-wired row) still duplicates the block on click — proven both
+>   ways: passes on the new code, and — checked, not assumed — ALSO passes when the t2411 changes are
+>   reverted, confirming it was never at risk (the other 4 new tests correctly FAIL when reverted, proving
+>   they test the real mechanism and aren't vacuous). The shell's regression surface wasn't separately
+>   re-checked here (this ticket never touches `pocket-canvas.spec.js`'s own code path); the modal-door
+>   check from t2409 stands untouched by this turn's files.
+> - Committed as a permanent spec, `tests/blocks-context-flyout-2411.spec.js` (5 tests) — a shared-file
+>   feature (`blocksApp.js`, `opContextMenu.js`, `styles.css`) earns a pinning test.
+>
+> Not covered: TOUCH tap-to-toggle on a REAL touch device (only synthetic `TouchEvent`s, matching #51's own
+> same honest limit — no physical hardware available this session).
 
 ---
 

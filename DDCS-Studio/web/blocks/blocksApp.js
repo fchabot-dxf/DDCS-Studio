@@ -27,7 +27,7 @@ import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
-import { openMenu, attachLongPress } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation; t2397 — attachLongPress: "long-press IS right-click, declared once" (BACKLOG #43's own form-row reveal gesture)
+import { openMenu, attachLongPress, wireFlyoutTrigger } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation; t2397 — attachLongPress: "long-press IS right-click, declared once" (BACKLOG #43's own form-row reveal gesture); t2411 (BACKLOG #52) — wireFlyoutTrigger: the Explorer-style cascade trigger for the SAME popup, anchored to the row instead of opened at the cursor
 import { toast } from '../ui/gateway/util.js';   // t2397 (BACKLOG #43) — the app's existing global toast; a param with no single declared source says so through it, never a dead gesture
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
@@ -1137,18 +1137,52 @@ async function buildWorkspace() {
       row.classList.add('ddcs-reveal-glow');
       row.addEventListener('animationend', () => row.classList.remove('ddcs-reveal-glow'), { once: true });
     };
+    const BLOCK_OPTIONS_LABEL = 'Block options…';
+    const itemsFor = (blk) => {
+      const items = pendingEnablers(blk).map((en) => ({ label: `+ ${en.label}`, fn: () => reveal(blk, en) }));
+      if (formRowFor(blk)) items.push({ label: 'Show in form', fn: () => showInForm(blk) });
+      return items;
+    };
     try { CMR.registry.unregister('ddcsBlockOptions'); } catch (_) { /* first run */ }
     CMR.registry.register({
       id: 'ddcsBlockOptions', weight: 200, scopeType: CMR.ScopeType.BLOCK,
       preconditionFn: (scope) => (pendingEnablers(scope.block).length || formRowFor(scope.block) ? 'enabled' : 'hidden'),
-      displayText: () => 'Block options…',
-      callback: (scope, menuOpenEvent, menuSelectEvent, location) => {
-        const blk = scope.block;
-        const items = pendingEnablers(blk).map((en) => ({ label: `+ ${en.label}`, fn: () => reveal(blk, en) }));
-        if (formRowFor(blk)) items.push({ label: 'Show in form', fn: () => showInForm(blk) });
-        openMenu(items, location.x, location.y);
-      },
+      displayText: () => BLOCK_OPTIONS_LABEL,
+      // t2411 (BACKLOG #52) — the FALLBACK: reached only when the row's own cascade trigger (below) never fired
+      // — a keyboard activation (arrow keys + Enter), which never hovers or clicks the row at all. Unchanged from
+      // before: a cursor-positioned popup, Blockly's own menu closes (its normal activate-an-item behavior). The
+      // primary, mouse/touch interaction never reaches here — see the MutationObserver below.
+      callback: (scope, menuOpenEvent, menuSelectEvent, location) => { openMenu(itemsFor(scope.block), location.x, location.y); },
     });
+
+    // t2411 (BACKLOG #52) — THE CASCADE: Blockly repaints its ENTIRE context-menu DOM fresh on every open (a new
+    // `.blocklyContextMenu` under a new `.blocklyWidgetDiv`, confirmed live — never patched in place), so the
+    // "Block options…" ROW doesn't exist to wire until Blockly has just painted it. A MutationObserver on body
+    // catches that paint regardless of what triggered it (right-click, or a synthesized long-press contextmenu —
+    // attachLongPress's own doctrine, "long-press IS right-click," applies here for free: this observer doesn't
+    // care which). Wired ONCE at module scope (guarded on `window`, not on this IIFE re-running, which it does —
+    // Blockly workspace re-init unregisters+re-registers the menu ITEM above every time, but the observer itself
+    // only needs to exist once, ever, for the page's whole lifetime) — every future paint re-finds and re-wires a
+    // BRAND NEW row, so there is nothing stale to clean up between opens.
+    if (typeof MutationObserver !== 'undefined' && !window.__ddcsBlockOptionsFlyoutWired) {
+      window.__ddcsBlockOptionsFlyoutWired = true;
+      const mo = new MutationObserver((muts) => {
+        for (const mut of muts) {
+          for (const node of mut.addedNodes) {
+            if (!(node instanceof HTMLElement)) continue;
+            const menuEl = node.classList.contains('blocklyContextMenu') ? node : (node.querySelector && node.querySelector('.blocklyContextMenu'));
+            if (!menuEl) continue;
+            const row = Array.from(menuEl.querySelectorAll('.blocklyMenuItem')).find((r) => r.textContent.trim() === BLOCK_OPTIONS_LABEL);
+            if (!row) continue;
+            // t2411 — right-click SELECTS the block first (confirmed live, B.getSelected() reads it back), and
+            // Blockly does not change the selection while its own context menu is open — so resolving it fresh
+            // at OPEN time (not paint time) is safe and gives the row's own current pending-enabler state.
+            wireFlyoutTrigger(row, () => { const blk = B.getSelected ? B.getSelected() : null; return blk ? itemsFor(blk) : []; });
+          }
+        }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
   })();
 
   // DECLARE the edit, don't infer it: when a REAL user change fires (not a UI event, not our own muted model→workspace

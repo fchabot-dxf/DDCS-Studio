@@ -63695,3 +63695,98 @@ failure happened too fast to produce a meaningful progress file — the 0-tests 
 0s` immediately, which if anything was itself a useful signal that something was structurally wrong rather
 than a slow failure).
 
+## t2411 — BACKLOG #51 (investigated, not reproduced) + #52 (SHIPPED): the owner's touch/menu riders
+
+Two items born from the owner's own on-device testing of prior turns' work.
+
+### #51 — two-finger pan: traced the anchor math, live-simulated the exact gesture, could not reproduce
+
+The dispatch's own "ESTABLISH with the t2371 code in hand how the pinch anchor works today" instruction was
+followed literally before writing anything. Read `_pinchStart`/`_pinchMove` in `web/viz/featureCanvas.js`
+(t2371, BACKLOG #32) closely: `_pinchMove` re-solves `t.cxw`/`t.cyw` on every move so that `w0` — the world
+point captured once, under the midpoint, at gesture start — stays under the CURRENT midpoint at a scale
+derived from the current/initial pointer-distance ratio. Worked the algebra against `_W()` (the same
+screen→world transform the wheel-zoom handler already uses) rather than trusting the comment: this formula
+does not describe zoom-only behavior. When the midpoint drifts at a roughly constant distance (a pure
+two-finger pan, no pinch), the anchor re-solve keeps the SAME world point under the moving midpoint — which
+is, by definition, panning.
+
+Rather than trust the derivation alone, live-tested it the way #46 taught this session to test canvas
+gestures: dispatched synthetic two-pointer `PointerEvent`s (`pointerType:'touch'`, two distinct `pointerId`s)
+directly at a real pocket op's `svg.feature-canvas`, moving both points by an identical 150px delta at a
+CONSTANT distance (isolating pure pan, no zoom). A handle's `getBoundingClientRect()` moved by exactly
+150,0px — 1:1 with the fingers. **The combined pan+zoom gesture BACKLOG #51 asks for already exists in the
+code and already works, driven by the exact event shape any touch device produces.**
+
+Given that, did NOT touch `_pinchStart`/`_pinchMove` — rewriting subtle, already-correct anchor math on a
+guess risks breaking it for an unconfirmed benefit, which is exactly the "Think Before Coding" trap: a
+simpler read exists (nothing to fix) and it's worth saying so rather than shipping a speculative change.
+Checked the one other plausible explanation for "works in my simulation, owner says it doesn't on their
+phone": `web/index.html`'s viewport meta has no `user-scalable=no`, which COULD let the OS/browser's own
+native pinch-zoom compete with the canvas's `touch-action:none`. Did not change this either — it's real but
+unconfirmed, and a site-wide zoom-behavior change is a bigger blast radius than this ticket's scope for a
+guess. Per the dispatch's own explicit fallback ("if you cannot drive it convincingly, say so plainly, and
+it becomes an owner check"), logged the full trace + live-simulation evidence in BACKLOG #51 and left it as
+an owner re-check rather than a claimed fix or a speculative patch. No code changed for this half.
+
+### #52 — the Explorer-style cascade flyout: SHIPPED
+
+**Investigation first.** Dumped Blockly's own rendered context-menu DOM live (a fresh `.blocklyContextMenu`
+under a fresh `.blocklyWidgetDiv`, repainted from scratch on every open, `.blocklyMenuItem` rows with zero
+submenu chrome) — confirmed t2389's "no native submenu support" finding and, more usefully, that "Block
+options…" is indistinguishable in the DOM from Duplicate/Delete until Blockly paints it — there is nothing
+to hook until then.
+
+**The mechanism**, added to `ui/opContextMenu.js` (the app's ONE floating menu, per its own charter — this
+stays true to that, not a second implementation):
+- `openFlyoutAdjacent(items, anchorRect)` — the same shared `.op-ctx-menu` element, positioned adjacent to a
+  DOM rect (right by default, flipping LEFT when it would overflow the viewport — a real flip, not `place()`'s
+  existing edge-clamp, which only shifts a cursor-popup to fit and would leave a row-anchored flyout
+  overlapping the row it hangs off).
+- `wireFlyoutTrigger(rowEl, getItems)` — hover-open (150ms), a 450ms close-delay that survives moving from
+  the row toward the flyout (cancelled on re-entry to either — the standard, accepted simplification of
+  "diagonal tolerance" as a timer rather than true geometric triangle-tracking), and a CAPTURE-phase
+  click/touchend interceptor (`stopPropagation`+`preventDefault`) so the row's own native "activate and close"
+  handler never fires — the parent menu stays open because Blockly is never told anything happened to it.
+
+`blocksApp.js`'s `registerBlockOptionsMenu()` keeps its existing `CMR.registry.register(...)` (Blockly still
+needs to render the row) but the `callback` is now a FALLBACK for keyboard activation only (arrow+Enter never
+hovers/clicks). The PRIMARY path is a `MutationObserver` on `document.body`, wired once at module scope
+(guarded on `window`, since the containing IIFE re-runs per Blockly workspace init but the observer itself
+only needs to exist once) — it catches every fresh context-menu paint, finds the "Block options…" row by
+text, and wires it. Which block owns the currently-open menu is read via `B.getSelected()` (an existing API
+already used elsewhere in this file) at OPEN time — confirmed live that right-click selects the block first
+and Blockly doesn't change selection while its own menu is up.
+
+**Theme tokens** (the owner's own rider, same session as #52's own request): grepped `styles.css` first — no
+rule touched `.blocklyMenu`/`.blocklyMenuItem`/`.blocklyWidgetDiv` before this turn. Checked Blockly's own
+vendored CSS directly (`node_modules/blockly/blockly_compressed.js`) rather than guessing class names or
+specificity: `.blocklyMenu{background:#fff}`/`.blocklyMenuItem{color:#000}` etc., injected at runtime AFTER
+this app's own stylesheet loads — meaning an equal-specificity override would lose without `!important`,
+confirmed by checking, not assumed. `.op-ctx-menu` itself was ALREADY correctly tokenized (checked before
+touching anything) — the real gap was Blockly's own chrome exclusively. Added `!important`-scoped overrides
+using the same token family (`--panel`/`--border`/`--text-main`/`--accent`/`--text-dim`).
+
+**Verification, every claim live:** the edge-flip math in isolation (both directions, top-alignment held);
+the full hover/close-delay/re-entry/click-intercept/touch-toggle timing contract on a synthetic row; a
+genuine end-to-end pass (fresh `formfield` block → right-click → hover → parent stays open, flyout shows the
+correct 4 pending-enabler items → clicking a flyout item closes both menus together, which turned out to
+need no extra code — Blockly's own outside-click dismiss already treats a click inside the flyout as
+"outside its own menu"); three screenshots (dark skin, light skin — confirming tokens actually switch, not
+just resolve once — and the edge-flip); a Duplicate regression check proven BOTH ways (passes on the new
+code, and — reverted via `git stash` and re-run — the other 4 new tests correctly FAIL on the pre-change
+code, proving they test the real mechanism rather than passing vacuously). Committed as a permanent spec,
+`tests/blocks-context-flyout-2411.spec.js`.
+
+One real test-authoring mistake worth naming: the FIRST version of the consolidated permanent spec dropped
+`z-index` on its synthetic test rows (present in the throwaway diagnostic version, lost when merging into one
+file) — the row was silently covered by the app's own header chrome at the same screen coordinates, so
+`mouseenter` never reached it and two tests failed with a confusing "menu never opens" symptom that looked
+like a real bug in the mechanism. Debugged by adding an `enterCount` probe rather than guessing, found the
+row simply wasn't receiving the hover at all, and traced it to the missing stacking context — not a
+mechanism bug, a test fixture bug.
+
+Not covered: touch tap-to-toggle on real hardware (only synthetic `TouchEvent`s — no physical touch device
+available this session, same honest limit as #51). Rule 1b: `blocksApp.js`/`opContextMenu.js`/`styles.css`
+are all shared — full suite below.
+
