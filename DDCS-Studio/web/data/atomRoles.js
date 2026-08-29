@@ -173,7 +173,7 @@ export const ATOM_ROLES = {
     pathmode: { mode: 'other', tol: 'geometry' },
     drillcycle: { cycle: 'other', x: 'geometry', y: 'geometry', z: 'geometry', r: 'geometry', q: 'geometry', dwell: 'geometry', feed: 'geometry' },
     outpin: { pin: 'geometry', state: 'other', sync: 'other' },
-    waitinput: { pin: 'geometry', mode: 'other', timeout: 'geometry', var: 'other' },   // `var` (#5399) declared but never read in emit → metadata
+    waitinput: { pin: 'geometry', mode: 'other', timeout: 'geometry' },   // t2393 — `var` DROPPED from the block entirely (BACKLOG #48 item 4): was declared, rendered, and read by nothing
 
     // — macro.js: raw / machine-move ride a #var through by string interpolation (NOT val, but still passthrough) → value —
     machinemove: { to: 'value', var: 'value', axis: 'other' },

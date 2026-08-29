@@ -98,7 +98,11 @@ export const safeRetractBlock = {
 // CALLER's (corner probeWallR / middle safeTraverseStack), so this block emits ONLY the lift.
 export const clearLiftBlock = {
     type: 'clearlift', label: 'Clearance Lift', kind: 'leaf', category: 'Move', hidden: true,
-    defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
+    // t2393 (BACKLOG #48 item 4) — `planeFellBack` was declared in `fields` with NO default, rendering as an
+    // unguarded free-text field though `emit()` (below) reads it as a plain boolean (`p.planeFellBack ? […] : []`)
+    // — a hand-typed string `"false"` is JS-truthy, so it would have fired the fallback comment it's supposed to
+    // gate. Defaulting it `false` classifies it as a real checkbox (`fieldKind()`: `typeof d === 'boolean'`).
+    defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92, planeFellBack: false },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
     fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel', 'planeFellBack'],
     scratch: [[17, 17], [95, 95]],   // t1085 — it resolves to the retract (#17) or the hop (#95) depending on clearMode, so it owns both
     // t931/t1381 — labels per the clearMode: max → 1 (the #520 unset-guard, same as a saferetract), hop → 2 (guard +
@@ -119,7 +123,13 @@ export const clearLiftBlock = {
         // t961 — the plane-guarantee backstop: when Plane was requested but not guaranteed (WCS!=Active or no Z-datum-first), the
         // caller folded it to Hop and set planeFellBack → emit an honest comment (defense-in-depth; the same param on both the
         // form path (clearLiftNode) and the twin path (postInstantiate) → byte-identical).
-        const lead = p.planeFellBack ? ['( Clearance plane needs the Active WCS + a Z datum - using Hop )'] : [];
+        // t2393 — the SAME defensive form radiuscomp.js's own `enable` boolean already uses: `workspaceToStack`
+        // normalizes a checkbox to a real boolean, but a hand-authored params object (a caller building this
+        // block's params directly in JS, or a hand-edited .ddcs file) is not guaranteed to — and a bare truthy
+        // check would treat the STRING "false" as true, exactly the bug this default fixes for the canvas but
+        // not for every other entry path.
+        const fellBack = p.planeFellBack === true || p.planeFellBack === 'TRUE';
+        const lead = fellBack ? ['( Clearance plane needs the Active WCS + a Z datum - using Hop )'] : [];
         if (mode === 'hop') return [...lead, ...safeHopBlock.emit({ hopDist: p.hopDist, saveVar: p.saveVar, margin: p.margin, guardLabel: p.guardLabel, capLabel: p.capLabel, restore: p.restore }, dx, dy, dialect)];
         if (mode === 'plane') return [...distModeBlock.emit({ dist: 'abs' }), ...moveBlock.emit({ mode: 'rapid', z: String(r3(num(p.planeZ, 10))) }, dx, dy, dialect), ...distModeBlock.emit({ dist: 'inc' })];
         // 'max' — delegate to the safe-Z retract (byte-identical to a direct safeRetractNode; the guardLabel is the #520 unset-guard label)

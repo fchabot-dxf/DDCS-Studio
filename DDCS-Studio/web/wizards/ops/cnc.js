@@ -95,7 +95,12 @@ export const outPinBlock = {
 
 export const waitInputBlock = {
     type: 'waitinput', label: 'Wait Input', kind: 'leaf', category: 'Signals',
-    defaults: { pin: 0, mode: 'rise', timeout: 0, var: '#5399' }, fields: ['pin', 'mode', 'timeout', 'var'],
+    // t2393 (BACKLOG #48 item 4) — `var` DROPPED: declared, rendered, and read by nothing (the M66 poll result
+    // always lands in the CONTROLLER's own fixed #5399, per the comment just below — never a redirectable
+    // target); confirmed dead via `atomRoles.js`'s own prior note on this exact field and the reverse .nc→blocks
+    // parser (`gcodeToStack.js`), which never reconstructs it either. Established WITH the file in hand, per the
+    // dispatch's own instruction, rather than defaulting a field with nothing to default it FOR.
+    defaults: { pin: 0, mode: 'rise', timeout: 0 }, fields: ['pin', 'mode', 'timeout'],
     gate: (d) => (isOword(d) || (isDDCS(d) && d.caps && d.caps.inputRead)) ? null : 'wait-on-input: M66 (RS274) or DDCS Expert only — V4.1/DM500 use a sensor M-Code',
     // RS274/grblHAL wait-on-input: M66 P<n> L<mode> Q<timeout> → result in #5399 (L: 0 immediate, 1 rise, 2 fall,
     // 3 high, 4 low). DDCS EXPERT (caps.inputRead) → generic live-input poll WHILE [#[1520+N]!=L] (slib O10300);

@@ -62557,3 +62557,52 @@ fallback (fixes the array regression + makes holecycle/param's new gating actual
 Items 3-5 of BACKLOG #48 (magic scope names, undefaulted fields, the remaining mode-gated families) not yet
 attempted — continuing if the turn has room.
 
+## t2393 ITEM 4 (own commit) — BACKLOG #48 item 4: two declared-but-undefaulted fields, one genuinely dead one
+
+`radiuscomp.rawAxis` — declared in `fields` with NO default, rendering as an unguarded free-text field though
+`emit()` only ever compares it against a 3-letter axis vocabulary (`dialect.probeTrigVar(p.rawAxis)`, X/Y/Z).
+Added `rawAxis: ''` to `defaults` (empty = the documented opt-out, "UNSET rawAxis → the literal `raw` exactly
+as before") and a proper dropdown (`[['(unset — use raw literal)', ''], 'X', 'Y', 'Z']`).
+
+`clearlift.planeFellBack` — same gap, but a BOOLEAN: `emit()` reads it as `p.planeFellBack ? […] : []`, and a
+hand-typed string `"false"` is JS-truthy — the exact bug BACKLOG named. Added `planeFellBack: false` to
+`defaults` (classifies it as a real checkbox, `fieldKind()`'s `typeof d === 'boolean'` test) AND hardened the
+read itself (`p.planeFellBack === true || p.planeFellBack === 'TRUE'`) — checked live first: Blockly's own
+`field_checkbox.getFieldValue()` returns the STRING `"TRUE"`/`"FALSE"`, and while `workspaceToStack` already
+normalizes that to a real boolean before `emit()` ever sees it, a hand-authored params object (a caller
+building this block's params directly, or a hand-edited `.ddcs` file) has no such guarantee — the bare
+truthy check was unsafe on BOTH the canvas path (now fixed by the default) and this second path (now fixed by
+the read itself). Confirmed BYTE-IDENTICAL for every real caller: grepped every `planeFellBack` site
+(`safeZframe.js`, `cornerWizard.js`, `middleWizard.js`) — the only two states any of them ever produce are the
+real boolean `true` or the key being absent entirely, both handled identically by the old and new checks.
+
+`waitinput.var` — DROPPED entirely, not defaulted: declared, rendered, and read by NOTHING. `cnc.js`'s own
+`emit()` only ever reads `p.pin`/`p.mode`/`p.timeout`; the RS274 M66 poll's result always lands in the
+CONTROLLER's own fixed `#5399` (per the file's existing comment), never a redirectable target. Corroborated,
+not just asserted: `atomRoles.js` already carried a `// var (#5399) declared but never read in emit → metadata`
+note on this exact field (someone had already found this), and the reverse `.nc`→blocks parser
+(`gcodeToStack.js`) never reconstructs it on round-trip either — three independent signals agreeing it's dead.
+Removed from `defaults`/`fields`; `atomRoles.js`'s stale role entry updated to match.
+
+### VERIFIED
+
+Isolated field checks: `radiuscomp`'s `RAWAXIS` field is a real dropdown with exactly `['', 'X', 'Y', 'Z']`;
+`clearlift`'s `PLANEFELLBACK` field classifies as a checkbox (not text); `waitinput` has no `VAR` field at
+all, face reads `"Wait Input pin ? mode imm timeout ?"` — clean, no dangling reference.
+
+Full suite (Rule 1b — the dispatch's own explicit "bridge.js + the emitters are shared"): **2928 passed, 0
+failed, 10 flaky (all recovered on retry), 26 skipped, 23.7m.**
+
+### Files changed (this commit only)
+
+`web/wizards/ops/radiuscomp.js` — `rawAxis` default + dropdown.
+
+`web/wizards/ops/saferetract.js` — `planeFellBack` default (checkbox) + the hardened read.
+
+`web/wizards/ops/cnc.js` — `var` dropped from `waitinput`.
+
+`web/data/atomRoles.js` — the stale `waitinput.var` role entry removed to match.
+
+Item 3 (the magic `z`/`by` scope names, 8 files) is next if the turn has room; item 5 (remaining mode-gated
+families) after that, partial credit explicitly sanctioned by the dispatch.
+

@@ -14,10 +14,14 @@
  */
 export const radiuscompBlock = {
     type: 'radiuscomp', label: 'Radius comp', kind: 'leaf', category: 'Probing',
-    defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '' },
+    defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '', rawAxis: '' },
     // t1520 — `dir` here is the COMPENSATION SIGN, not a spindle direction: declare the vocabulary so the canvas can hold
     // a '-' (it used to coerce it to the shared cw/ccw list's first option, flipping the surface by 2× the stylus radius).
-    selects: { dir: ['+', '-'] },
+    // t2393 (BACKLOG #48 item 4) — `rawAxis` was declared in `fields` with NO default, rendering as an unguarded
+    // free-text field (any string, not just X/Y/Z) despite `emit()` (below) only ever comparing it against a
+    // 3-letter axis vocabulary via `dialect.probeTrigVar(p.rawAxis)`. Empty stays the documented opt-out
+    // ("UNSET rawAxis (every existing caller) → the literal `raw` exactly as before").
+    selects: { dir: ['+', '-'], rawAxis: [['(unset — use raw literal)', ''], 'X', 'Y', 'Z'] },
     scratch: [[6, 6], [50, 50]],   // t1085 — WRITES the comped result (#50) and READS the tool-radius var (#6); #1925 is a firmware probe-trigger reg
     fields: ['raw', 'rawAxis', 'result', 'radius', 'dir', 'enable', 'note'],
     emit: (p, dx, dy, dialect) => {
