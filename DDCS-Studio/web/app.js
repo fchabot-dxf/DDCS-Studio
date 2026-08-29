@@ -355,6 +355,12 @@ class DDCSStudio {
 // owner's direction; lives OUTSIDE paneAccordion.js so it observes any fix rather than depending on one.
 if (/[?&]debug=drag/.test(location.search)) import('./debug/dragProbe.js').catch(() => {});
 
+// t2405 (BACKLOG #46, the reopened probe turn) — the EXTERNAL feature-canvas drag probe (?debug=feat): same
+// zero-weight-unless-flagged, read-only, fix-independent shape as dragProbe.js above. Measures the feature
+// handle's own getBoundingClientRect() (the number nobody has measured) alongside pointer position, so a real
+// human drag on the owner's own device can be checked against reality instead of a synthetic repro.
+if (/[?&]debug=feat/.test(location.search)) import('./debug/featProbe.js').catch(() => {});
+
 // Initialize application when DOM is ready
 const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();

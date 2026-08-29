@@ -63355,3 +63355,116 @@ turn's own scope) while this turn was in progress, in the SAME shared working di
 up this turn's own still-uncommitted BACKLOG.md edit (noted above). No conflicts, nothing lost; flagged
 plainly as an observation, not something this turn needed to act on.
 
+## t2405 — THE #46 PROBE TURN: investigation + a deliverable, no fix (root not observed)
+
+### Re-examined t2391's own method, stated plainly per the dispatch's own instruction
+
+t2391 measured two things: whether `FeatureCanvas.render()` FIRED on each `pointermove`, and whether a
+handle's `cx`/`cy` SVG ATTRIBUTE advanced. Both are "did a change happen" signals — neither measures where
+the handle is actually PAINTED on screen ([[assert-the-value-not-the-change]]). Confirmed by reading
+featureCanvas.js's own drag path: on `pointermove` while dragging a normal (non-`noSnap`) handle, the canvas
+does NOT redraw itself synchronously — it calls `spec.onDrag(...)` and relies on an EXTERNAL round trip
+(write the field → dispatch `'input'` → `wizardManager.update()` → the op rebuilds its spec → `render()`
+runs again, per the file's own header comment) to eventually repaint. A slow/paced synthetic drag would never
+notice a hiccup in that round trip; the gap in t2391's own coverage is real.
+
+### The deliverable — `?debug=feat`, dragProbe.js's own pattern verbatim
+
+`web/debug/featProbe.js` (wired in `app.js` behind the flag, matching `?debug=drag`'s own zero-weight
+shape): passive, capture-phase `pointerdown`/`pointermove`/`pointerup` listeners on `.fc-handle` elements,
+re-querying the ACTIVE handle by its own stable `data-hid` (featureCanvas.js's own t122 identity attribute)
+every animation frame rather than caching a node reference — `render()` REBUILDS the whole handle layer with
+fresh elements on every call, so a cached reference goes stale the instant a redraw happens. Measures, per
+frame, change-only: pointer position, the handle's own `getBoundingClientRect()` (the number nobody had
+measured), `viewBox`, a `writes` counter (`input`/`change` events observed anywhere — the writeback chain's
+own dispatch, per dragProbe.js's own header), and a `redraws` counter (a `MutationObserver` on the SVG,
+counting batches — `render()` rebuilding the DOM is itself the passive signal, no hook into featureCanvas.js
+needed). On-screen overlay + a Copy-rows button, same shape as dragProbe.js. NO hooks inside featureCanvas.js/
+devMode.js/userOpView.js — fix-independent by construction.
+
+Live-verified: `featProbe.js` never loads without `?debug=feat` (checked via
+`performance.getEntriesByType('resource')` — genuinely zero weight, not just visually hidden); with the flag,
+a scripted drag on surfacing's `sf_pos` handle produced a full, legible row set (screenshot: `verification/
+t2405-featprobe-armed.png`). One cosmetic bug caught and fixed before shipping: SVG elements' own `.className`
+is an `SVGAnimatedString`, not a plain string — the header row printed `[object SVGAnimatedString]` until
+switched to `getAttribute('class')`.
+
+### Reproduced myself, twice, probe on — root NOT observed
+
+Ran the same scripted drag two ways, both against localhost: Playwright's own bundled Chromium (a paced,
+even-timed drag — the harness's own default) AND a SEPARATELY-LAUNCHED real, headed Google Chrome
+(`chromium.launch({channel:'chrome', headless:false})`, an irregular, faster-and-varying-step drag — a
+one-off Node script, not a persisted test, since this needed a REAL installed browser bypassing
+`playwright.config.js`'s own `headless:true`). **Neither shows a hard freeze.** Both show the exact same
+measurable pattern instead: the handle's rendered position consistently lags the pointer by roughly one
+animation frame, then catches up — every step, the whole drag (`ptr:696,563 handle:691,559` one frame,
+converged the next). A real, small, round-trip latency, not the reported freeze.
+
+Attempted the DEPLOYED-site comparison too — the probe correctly did NOT appear there (this branch, including
+`?debug=feat`'s own wiring, was still uncommitted at the time; production serves whatever last merged to
+`main`). Confirmed this is expected, not a bug, by screenshotting the deployed app and observing a normal,
+probe-free page. A real deployed-vs-localhost comparison needs a future turn, after this ships and merges.
+
+### Where this leaves it — no fix attempted, by the dispatch's own rule
+
+I could not reproduce the reported freeze even in a real, non-harness Chrome. The dispatch's own explicit
+rule: fix ONLY if the root is OBSERVED and the fix is a plain broken-redraw repair — a one-frame lag pattern,
+present identically in every environment I tested, is not the reported symptom and does not meet that bar.
+No code touched in featureCanvas.js/devMode.js/userOpView.js/blocksApp.js. BACKLOG #46 updated with this
+turn's own account (own `⭐` block, dated, matching the entry's existing append-only pattern) — NOT tagged
+closed (rule 8 is for closures; this is still an open investigation) — naming the owner's own probe capture
+as the necessary next evidence, per the dispatch's own fallback clause.
+
+### Files changed
+
+`web/debug/featProbe.js` (new) — the probe.
+
+`web/app.js` — `?debug=feat` wiring, mirroring `?debug=drag`.
+
+`DDCS-Studio/verification/t2405-featprobe-armed.png` (new).
+
+`BACKLOG.md` — #46's own body gained this turn's dated findings block (append-only, matching its existing
+shape — not a heading retag, since nothing closed).
+
+## t2405 TAIL (own commit) — BACKLOG #53: the dangling-caption fix's missing path, closed
+
+### Established which path leaked, with the file in hand — the widget path, confirmed
+
+t2387's own fix (`bridge.js`'s `jsonDef()`) gave a NAMED, independently-hideable `_LBL` caption ONLY to
+fields listed in a block's own `def.enablers` — every field gated ONLY by `dynamic`+`fieldsFor` (the WIDGET-
+driven hide path: holecycle's pattern-specific fields, param.js's `options`, progend's `retractZ`/`parkX`/
+`parkY`, drillcycle's `q`/`dwell`, slot/surfaceraster/pocketfill/surfaceFill's `rampAngle`/`helixDia`/
+`helixPitch`, pocketfill/pocketwall/region's shape-gated fields — EVERY dynamic-gating fix this whole arc
+shipped, t2393 through t2403) kept baking its caption as a bare string literal in `message0`, becoming an
+UNNAMED implicit label `setVisible()` could never reach. Exactly the class t2387 already named and fixed —
+just never widened past `enablers`.
+
+### The fix — widen jsonDef()'s own condition, once
+
+`bridge.js`: `dynamicGated = !!(def.dynamic && def.fieldsFor)` — any field on such a block now gets the SAME
+named `_LBL` caption `enablers` fields already got, regardless of enabler membership. `apply()`'s own
+value-visibility loop (`all.forEach`, already toggling each field's box/socket) now ALSO toggles its `_LBL`
+in the same pass; the pre-existing `enablerFields`-only loop stays untouched (a def with ONLY `enablers`, no
+`dynamic`, has an empty `all` — that loop is still the only thing reaching its labels).
+
+### Verified live — the new coverage AND the pre-existing coverage, both confirmed correct
+
+13 scenarios via `Blockly.serialization.blocks.append` + a forced `_ddcsApplyDyn()` recompute: holecycle's
+`cols` (grid-only) now hides its own caption alongside its box under `pattern:'single'`, shows both under
+`pattern:'grid'`; slot's `rampAngle`/`helixDia` the same, gated on `entry`. The dispatch's own explicit "check
+across" list — `formfield`'s `nmin`/`nmax`/`nstep`/`units` (widget-gated AND enabler-gated, both at once) and
+`whenparam`/`whenis` — confirmed ALREADY correct (all five were already in `formfield`'s own `enablers` list,
+covered since t2387), not assumed from reading the code. Non-vacuity proven: reverted the widened condition,
+confirmed the exact `NO_LBL_FIELD` gap reproduces on holecycle's own previously-broken case, restored.
+Screenshot: `verification/t2405-caption-fix.png` (holecycle/slot/progend, no dangling text on any hidden
+field).
+
+### Files changed
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — `jsonDef()`'s NAMED-caption condition widened;
+`apply()`'s value-visibility loop also toggles `_LBL`.
+
+`DDCS-Studio/verification/t2405-caption-fix.png` (new).
+
+`BACKLOG.md` — #53's heading tagged `[✅ SHIPPED t2405]` per rule 8, body gained the closing account.
+

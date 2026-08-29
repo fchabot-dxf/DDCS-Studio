@@ -3672,6 +3672,31 @@ checks stay (dangling still needs catching).
 > on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
 > writes) still sequences BEFORE the commit-on-release fix, per its own entry.
 
+> ⭐ **t2405 (THE PROBE TURN, no fix attempted) — t2391's own method, stated plainly:** it measured whether
+> `FeatureCanvas.render()` FIRED and whether a handle's `cx`/`cy` ATTRIBUTE advanced — both "did a change
+> happen" signals, not "where is the handle actually painted" ([[assert-the-value-not-the-change]]). Shipped
+> the deliverable: `?debug=feat` (`web/debug/featProbe.js`, `dragProbe.js`'s own pattern verbatim — passive,
+> capture-phase, zero weight unless flagged, a Copy-rows button) measures the handle's own
+> `getBoundingClientRect()` every frame beside pointer position, writes observed, redraws observed, and the
+> SVG's own `viewBox` — the one number nobody had measured. Live-verified: zero weight without the flag
+> (`featProbe.js` never even loads), and a real drag correctly captured, screenshot in `verification/`.
+>
+> **Reproduced myself, twice, WITH the probe on** — Playwright's own Chromium (a paced synthetic drag) AND a
+> separately-launched, REAL headed Google Chrome (`channel:'chrome'`, an irregular faster drag), both against
+> localhost. **NEITHER shows a hard freeze.** Both show the SAME measurable pattern instead: the handle's
+> rendered position consistently lags the pointer by roughly one animation frame, then catches up, every
+> step, for the whole drag — a real, small round-trip latency (`onDrag`→write→dispatch→`update()`→
+> `render()`), not the reported freeze. ⚠ The DEPLOYED site could not be compared this turn — `?debug=feat`
+> isn't live there yet (this branch, unshipped at investigation time); a same-build deployed-vs-localhost
+> check is a future turn's job once this merges.
+>
+> ⇒ **I could not reproduce the reported freeze even in a real, non-harness Chrome.** Per the dispatch's own
+> fallback: the owner's own ten-second probe capture on their real device (desktop mouse, the surfacing pos/
+> W×H handles, per their own screenshot) is now the necessary next evidence — screenshot the overlay (or copy
+> its rows) and reopen with that attached. ⛔ NO FIX ATTEMPTED — the root was not observed (the dispatch's own
+> rule: fix only if the root is OBSERVED and the fix is a plain redraw repair; a one-frame lag pattern,
+> present in every environment I could test, does not meet that bar and is not the reported symptom).
+
 > **t2391 (no code changed):** extensive live drag testing (surfacing + corner, both routes, paced + rapid)
 > could NOT reproduce the dead-GUI symptom — the canvas followed. The worker tried the ruled fix anyway, saw
 > it possibly break canvas live-redraw in one run, and REVERTED rather than ship unverified. ⚠ **Not-reproduced
@@ -3843,7 +3868,7 @@ still fire.
 
 ---
 
-### 53. THE DANGLING-CAPTION FIX MISSED A PATH — "options" renders as a bare word on number rows
+### 53. [✅ SHIPPED t2405] THE DANGLING-CAPTION FIX MISSED A PATH — "options" renders as a bare word on number rows
 
 *(owner screenshot, 2026-08-29, during the on-device #42 check — which otherwise PASSED: long-press opens
 the popup, an enabler reveals `help` with the cursor in it. But every `param_field` row in the shot trails
@@ -3858,3 +3883,14 @@ across the other captioned fields (nmin/nmax/nstep/units, whenparam/whenis) so t
 
 **STILL REAL IF:** open any twin's Parameter Group, look at a number-widget row — a trailing bare `options`
 word means still real.
+
+✅ **SHIPPED t2405** — confirmed: the WIDGET path (`fieldsFor` gating — `dynamic`+`fieldsFor`, the mechanism
+this whole arc's holecycle/param/progend/drillcycle/slot/pocketfill/surfaceFill/region fixes all use) was the
+leak, exactly as suspected — it had NO named-caption treatment at all (t2387's own fix scoped it to `enablers`
+fields only). Widened `jsonDef()`'s own condition (`bridge.js`): any field on a block declaring BOTH `dynamic`
+and `fieldsFor` now gets the same independently-hideable `_LBL` caption every `enablers` field already had;
+`apply()`'s own value-visibility loop toggles it in the same pass. `nmin`/`nmax`/`nstep`/`units`/`whenparam`/
+`whenis` were ALREADY correct (all five are `formfield`'s own declared `enablers`, covered since t2387) —
+checked live, confirmed unregressed, not just assumed. Non-vacuity proven by perturbation (reverting the
+widened condition reproduces the exact `NO_LBL_FIELD` gap on a previously-broken case). Screenshot:
+`verification/t2405-caption-fix.png`.
