@@ -307,6 +307,15 @@ function jsonDef(def) {
     // majority — nothing declares `enablers` except param_field/formfield) keeps the byte-identical literal-text
     // path; this only changes shape for the handful of fields that opted into hide-when-empty.
     const enablerFieldSet = new Set((def.enablers || []).flatMap((en) => en.fields));
+    // t2405 (BACKLOG #53) — t2387's own fix scoped the NAMED-caption treatment to `enablers` fields only ("shown
+    // = non-empty"); it never reached the WIDGET-driven hide path (`dynamic`+`fieldsFor` — holecycle/param/
+    // progend/drillcycle/slot/pocketfill/region and every other consumer this arc built), so those blocks kept
+    // baking every caption as a bare string literal — the exact same dangling-word bug, just via the OTHER hide
+    // mechanism (owner screenshot: un-revealed NUMBER rows trailing a bare "options"). A def with `dynamic`+
+    // `fieldsFor` can hide/show ANY of its own fields depending on state, so EVERY one of them needs an
+    // independently-hideable caption too, not just the enabler subset — `apply()` (registerDynExtension, below)
+    // toggles it in the SAME loop that already toggles the value field/socket.
+    const dynamicGated = !!(def.dynamic && def.fieldsFor);
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
         // t2385 (BACKLOG #42 piece 1) — a def MAY declare its own `labels: {field: 'friendly text'}` map so
@@ -323,7 +332,7 @@ function jsonDef(def) {
         // field names across the whole registry — grepped, no other def declares either.
         const sentenceLabel = f === 'whenparam' ? 'show when' : f === 'whenis' ? 'is' : null;
         const faceLabel = sentenceLabel || (def.labels && def.labels[f]) || f;
-        if (enablerFieldSet.has(f) && !(isSection || isStructctl || isOpunit || isParamGroup)) {
+        if ((enablerFieldSet.has(f) || dynamicGated) && !(isSection || isStructctl || isOpunit || isParamGroup)) {
             args0.push({ type: 'field_label', name: FN(f) + '_LBL', text: faceLabel });   // t2387 — a NAMED, independently hideable caption (see the header note above)
             message0 += ` %${++n} %${++n}`;
         } else {
@@ -560,10 +569,21 @@ function registerDynExtension(Blockly) {
                     // own `setVisible`, the ORIGINAL pre-t2385 mechanism) — checking BOTH per field, in the order
                     // most fields actually are (inline fields outnumber sockets registry-wide), covers both
                     // shapes with the one shared loop instead of two mechanisms that each covered half.
-                    all.forEach((f) => { const target = this.getField(FN(f)) || this.getInput(FN(f)); if (target) target.setVisible(show.has(FN(f))); });
+                    // t2405 (BACKLOG #53) — every field in `all` now ALSO gets its own NAMED caption toggled in
+                    // lockstep (jsonDef()'s own widened `dynamicGated` condition, see its header note) — the
+                    // WIDGET-driven hide path was leaking a dangling caption exactly like the enabler path did
+                    // before t2387, just never covered. One loop, both the value field/socket AND its label.
+                    all.forEach((f) => {
+                        const target = this.getField(FN(f)) || this.getInput(FN(f));
+                        if (target) target.setVisible(show.has(FN(f)));
+                        const lbl = this.getField(FN(f) + '_LBL');
+                        if (lbl) lbl.setVisible(show.has(FN(f)));
+                    });
                     // t2387 — the enabler fields' own NAMED caption (jsonDef()'s `_LBL` twin, see its own header
                     // note) toggles in LOCKSTEP with the value field it labels — a dangling "help" with no box
-                    // next to it is exactly the bug this second line exists to prevent.
+                    // next to it is exactly the bug this second line exists to prevent. Kept separate from the
+                    // `all`-based loop above: a def with ONLY `enablers` (no `dynamic`/`fieldsFor`) has an empty
+                    // `all`, so this is the only thing that reaches its own labels.
                     for (const f of enablerFields) { const lbl = this.getField(FN(f) + '_LBL'); if (lbl) lbl.setVisible(show.has(FN(f))); }
                     if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
                 } catch (e) { /* degrade to all-fields-visible */ }
