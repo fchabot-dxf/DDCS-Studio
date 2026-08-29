@@ -3657,12 +3657,17 @@ checks stay (dangling still needs catching).
 > workspace's stock/feature/machine values reaching both devices was the standing suspect — ⭐ **ELIMINATED
 > 2026-08-29: "incognito doesn't work either."** Fresh state, fresh storage, owner's browser: STILL fails.
 > ⇒ State, data, device and input kind are ALL eliminated. What remains, in order of suspicion:
-> (1) ⭐⭐ **THE REFERENT** ([[confirm-the-referent-before-dropping]]): the owner may be dragging a DIFFERENT
-> SURFACE than the harness tested — "wiz preview" could be the WIZARD TAB's own 2D feature canvas, not the
-> Blocks tab's Wizard View pane the t2391 tests drove; or a different HANDLE kind. Screenshot requested.
-> (2) **real browser vs harness Chromium** — the known Playwright browser-version gotcha
-> ([[ddcs-studio-playwright-verify]]); (3) deployed-site build vs the harness's localhost:3211.
-> ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
+> (1) **THE REFERENT — ELIMINATED by owner screenshot 2026-08-29**: it IS the Blocks tab's Wizard View pane,
+> the SURFACING twin, its 2D canvas — specifically the **`pos` square and the W×H corner handle** (both
+> circled). The exact surface and twin t2391 reports driving. ⇒ Every axis is now eliminated EXCEPT:
+> (2) ⭐⭐ **what t2391's "the canvas follows" actually ASSERTED** — re-examine the method: a redraw-counter
+> or value assertion would pass while the HANDLE'S RENDERED POSITION stays frozen; the probe must measure the
+> handle's on-screen position, not whether a redraw ran ([[assert-the-value-not-the-change]]);
+> (3) **real browser vs harness Chromium** ([[ddcs-studio-playwright-verify]]'s own gotcha) and the deployed
+> build vs localhost:3211. ⇒ The probe turn ships an owner-runnable overlay (`?debug=feat`, the dragProbe
+> pattern: passive listeners, on-screen rows — pointerdown/move coords · writeback calls · redraw calls · the
+> handle's getBoundingClientRect per frame) so the owner's ten-second drag on the DEPLOYED site produces the
+> numbers no harness can. ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
 > feature canvas (the `?debug=drag` dragProbe pattern that cracked the splitter saga — passive listeners,
 > on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
 > writes) still sequences BEFORE the commit-on-release fix, per its own entry.
