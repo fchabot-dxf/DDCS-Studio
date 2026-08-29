@@ -84,63 +84,79 @@ export const SLOT_DEFAULTS = {
 // class as pocket's literal arm — NOT surfaceraster.js's val()/liveWord() pass-through, even on the re-pointed arm,
 // since the atom's OWN slot-side params are entirely postInstantiate-derived from slotRasterParams, never a live
 // bound socket read directly).
+// t2375 — SECTION ABSENCE, fixed: only 2 of ~30 specs carried `section:` at all before this turn (both the
+// stale 'GEOMETRY' name, never a real shell section here). Same mechanism as contourData.js's own t2375 fix
+// (see that file's header comment above CONTOUR_EXEC_BINDINGS for the full account of WHY array order, not
+// just the `section:` string, drives formWidgets.js's own rendered grouping) — reordered into four
+// contiguous groups matching the shell (index.html:642-716) exactly: ENDPOINTS (ax/ay/bx/by/originX/
+// originY/offZ/[hidden stock fields]) -> TOOL (toolNum/rpm) -> TOOL & WIDTH (width/toolDia/stepoverPct) ->
+// DEPTH & FEED (depth/stepdown/clearance/wcs/feed/plunge). entryX/entryY and the entry/rampAngle/helixDia/
+// helixPitch cluster have no shell field at all (grepped index.html's own wiz_slot block, zero hits) —
+// twin-only, the same orphan class drill/pocket/contour already have; entryX/entryY placed in ENDPOINTS
+// (the closest conceptual fit — they're point coordinates), the entry cluster in DEPTH & FEED (grouped with
+// the other depth-descent fields, same placement contour gave its own entry/rampAngle).
 const SLOT_BINDING_SPECS = [
-    {
-        param: 'wcs', tokenEligible: true, type: 'enum', key: 'wcs', match: { type: 'wcs' }, default: SLOT_DEFAULTS.wcs,
-        widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS },
-    },
+    // ENDPOINTS
+    { param: 'ax', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'x0', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.ax, section: 'ENDPOINTS' },
+    { param: 'ay', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'y0', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.ay, section: 'ENDPOINTS' },
+    { param: 'bx', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'x1', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.bx, section: 'ENDPOINTS' },
+    { param: 'by', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'y1', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.by, section: 'ENDPOINTS' },
     // placement scalars (the arm's ONE placeonstock) — opt-in: originX/originY are the raw offset; stock-attach uses the live extent
-    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offX', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.originX },
-    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offY', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.originY },
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offX', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.originX, section: 'ENDPOINTS' },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offY', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.originY, section: 'ENDPOINTS' },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offZ', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.offZ, section: 'ENDPOINTS' },
     {
         param: 'stockAttach', tokenEligible: true, type: 'enum', key: 'stockAttach', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockAttach,
-        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
+        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'ENDPOINTS',
     },
     {
         param: 'pathDatum', tokenEligible: true, type: 'enum', key: 'pathDatum', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.pathDatum,
-        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
+        widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'ENDPOINTS',
     },
     {
         param: 'stockDatum', tokenEligible: true, formHidden: true, type: 'enum', key: 'stockDatum', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockDatum,
-        widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS },
+        widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, section: 'ENDPOINTS',
     },
-    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockW', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockW },
-    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockH', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockH },
-    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockZ', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockZ },
-    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'offZ', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.offZ },
-    // geometry + cut (the LITERAL arm's slot leaf). Wizard names ax/ay/bx/by/toolDia → leaf keys x0/y0/x1/y1/tool —
-    // the SAME map `slotLeafParams` declares, which is why the form's labels and the builder's sockets cannot drift.
-    // ax/ay/bx/by/width/toolDia: feed the arm-selection gate (slotStackArmGap: zero-length AND width-vs-tool both
-    // pick a different program shape) AND slotPath's own too-small refusal / offset-pass-count loop — categorical.
-    { param: 'ax', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'x0', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.ax },
-    { param: 'ay', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'y0', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.ay },
-    { param: 'bx', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'x1', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.bx },
-    { param: 'by', tokenRefusal: 'The endpoint decides whether the slot has any length at all (a zero-length slot refuses everywhere) and picks the arm the program is built on — not a value inside one.', type: 'number', key: 'y1', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.by },
-    { param: 'width', tokenRefusal: 'Decides whether the slot can be cut at all (too small refuses everywhere) and how many offset passes the program contains — not a value inside one.', help: "Finished slot width (≥ tool Ø). Equal to the tool = a single pass.", type: 'number', key: 'width', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.width },
-    { param: 'toolDia', tokenRefusal: 'Decides whether the slot can be cut at all (too small refuses everywhere) and how many offset passes the program contains — not a value inside one.', type: 'number', key: 'tool', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.toolDia },
-    { param: 'stepoverPct', tokenRefusal: 'Directly sets how many offset passes the program contains — a loop-count decision, not a value inside one.', type: 'number', key: 'stepoverPct', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.stepoverPct },
-    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', key: 'depth', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.depth },
-    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', key: 'stepdown', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.stepdown },
-    // t842 — DEPTH ENTRY cluster: ramp runs along the slot length; a helix needs the slot to be wider than the tool (else degrades).
-    // entry: also checked directly in the arm gate (entry:'helix' routes to the literal arm outright) — categorical.
-    { param: 'entry', tokenRefusal: 'Picks a genuinely different descent shape (plunge / ramp / helix) and, for helix, also routes the whole op onto the literal arm — not a value inside one.', type: 'enum', key: 'entry', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle, ALONG the slot length (degrades to plunge on a slot shorter than the ramp needs). Helix = a descending helix (needs a slot wider than the tool; else degrades).' },
-    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move, and whether it degrades to a plunge) before the program is built.', tokenDeferrable: true, type: 'number', key: 'rampAngle', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal).' },
-    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, type: 'number', key: 'helixDia', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped to the slot width; a tool-width slot degrades to plunge.' },
-    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', type: 'number', key: 'helixPitch', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev).' },
-    { param: 'feed', tokenRefusal: 'This value is re-resolved by the slot atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'feed', match: { type: 'slot' }, optional: true, units: 'mm/min', default: SLOT_DEFAULTS.feed },
-    { param: 'plunge', tokenRefusal: 'This value is re-resolved by the slot atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'plunge', match: { type: 'slot' }, optional: true, units: 'mm/min', default: SLOT_DEFAULTS.plunge },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockW', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockW, section: 'ENDPOINTS' },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockH', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockH, section: 'ENDPOINTS' },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, type: 'number', key: 'stockZ', match: { type: 'placeonstock' }, default: SLOT_DEFAULTS.stockZ, section: 'ENDPOINTS' },
+    // t726 P2b entry — IN the specs (not entryBindingsFor) so it re-derives over the PRUNED stack each
+    // instantiate; the marker sits after a body whose block count now changes with the arm. Locally declared
+    // (not the shared entryBindingsFor helper), so its section is a plain local value, no Rule-1b override needed.
+    { param: 'entryX', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'ENDPOINTS', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+    { param: 'entryY', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'ENDPOINTS', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+    // TOOL — t768 P1a tool: SHARED-deriver-sourced (deriveBindings.js's own TOOL_BINDING_SPECS) carries NO
+    // section at all there; overridden LOCALLY via .map() here (Rule-1b: never edit deriveBindings.js itself)
+    // rather than left to fall wherever array position happened to put it.
+    ...TOOL_BINDING_SPECS.map((s) => ({ ...s, section: 'TOOL' })),
+    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library.", section: 'TOOL' },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
+    // TOOL & WIDTH — geometry + cut (the LITERAL arm's slot leaf). Wizard names ax/ay/bx/by/toolDia → leaf
+    // keys x0/y0/x1/y1/tool — the SAME map `slotLeafParams` declares, which is why the form's labels and the
+    // builder's sockets cannot drift. width/toolDia: feed the arm-selection gate (slotStackArmGap: zero-length
+    // AND width-vs-tool both pick a different program shape) AND slotPath's own too-small refusal / offset-
+    // pass-count loop — categorical.
+    { param: 'width', tokenRefusal: 'Decides whether the slot can be cut at all (too small refuses everywhere) and how many offset passes the program contains — not a value inside one.', help: "Finished slot width (≥ tool Ø). Equal to the tool = a single pass.", type: 'number', key: 'width', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.width, section: 'TOOL & WIDTH' },
+    { param: 'toolDia', tokenRefusal: 'Decides whether the slot can be cut at all (too small refuses everywhere) and how many offset passes the program contains — not a value inside one.', type: 'number', key: 'tool', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.toolDia, section: 'TOOL & WIDTH' },
+    { param: 'stepoverPct', tokenRefusal: 'Directly sets how many offset passes the program contains — a loop-count decision, not a value inside one.', type: 'number', key: 'stepoverPct', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.stepoverPct, section: 'TOOL & WIDTH' },
+    // DEPTH & FEED
+    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', key: 'depth', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.depth, section: 'DEPTH & FEED' },
+    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', key: 'stepdown', match: { type: 'slot' }, optional: true, units: 'mm', default: SLOT_DEFAULTS.stepdown, section: 'DEPTH & FEED' },
     // t1500 — CLEARANCE, the frontier identity specs close: it drives the framing progstart AND the literal leaf. The
     // progstart row carries the form's words (it is the one present in EVERY state); the leaf row is optional.
-    { param: 'clearance', tokenRefusal: 'This value is re-resolved by the framing/slot atoms themselves before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'clearance', match: { type: 'progstart' }, units: 'mm', default: SLOT_DEFAULTS.clearance, label: 'Clearance' },
+    { param: 'clearance', tokenRefusal: 'This value is re-resolved by the framing/slot atoms themselves before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'clearance', match: { type: 'progstart' }, units: 'mm', default: SLOT_DEFAULTS.clearance, label: 'Clearance', section: 'DEPTH & FEED' },
     { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'slot' }, optional: true },
-    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
-    // t726 P2b entry / t768 P1a tool — IN the specs (not the *BindingsFor helpers) so they re-derive over the PRUNED
-    // stack each instantiate; the markers sit after a body whose block count now changes with the arm.
-    // entryX/entryY: matches the SHARED entryBindingsFor verdict (deriveBindings.js) — decides whether an extra
-    // lead-in rapid gets inserted, not a magnitude re-resolved downstream.
-    { param: 'entryX', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
-    { param: 'entryY', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
-    ...TOOL_BINDING_SPECS,
+    {
+        param: 'wcs', tokenEligible: true, type: 'enum', key: 'wcs', match: { type: 'wcs' }, default: SLOT_DEFAULTS.wcs,
+        widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'DEPTH & FEED',
+    },
+    { param: 'feed', tokenRefusal: 'This value is re-resolved by the slot atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'feed', match: { type: 'slot' }, optional: true, units: 'mm/min', default: SLOT_DEFAULTS.feed, section: 'DEPTH & FEED' },
+    { param: 'plunge', tokenRefusal: 'This value is re-resolved by the slot atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', key: 'plunge', match: { type: 'slot' }, optional: true, units: 'mm/min', default: SLOT_DEFAULTS.plunge, section: 'DEPTH & FEED' },
+    // t842 — DEPTH ENTRY cluster: ramp runs along the slot length; a helix needs the slot to be wider than the tool (else degrades).
+    // entry: also checked directly in the arm gate (entry:'helix' routes to the literal arm outright) — categorical.
+    { param: 'entry', tokenRefusal: 'Picks a genuinely different descent shape (plunge / ramp / helix) and, for helix, also routes the whole op onto the literal arm — not a value inside one.', type: 'enum', key: 'entry', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', section: 'DEPTH & FEED', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle, ALONG the slot length (degrades to plunge on a slot shorter than the ramp needs). Helix = a descending helix (needs a slot wider than the tool; else degrades).' },
+    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move, and whether it degrades to a plunge) before the program is built.', tokenDeferrable: true, type: 'number', key: 'rampAngle', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'DEPTH & FEED', help: 'Max descent angle of the ramp (degrees from horizontal).' },
+    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, type: 'number', key: 'helixDia', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, section: 'DEPTH & FEED', help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped to the slot width; a tool-width slot degrades to plunge.' },
+    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', type: 'number', key: 'helixPitch', match: { type: 'slot' }, optional: true, default: SLOT_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, section: 'DEPTH & FEED', help: 'How far the helix descends per full revolution (mm/rev).' },
 ];
 
 export const SLOT_DATA_OPTYPE = 'user_slot_data';
@@ -216,31 +232,16 @@ const CANONICAL_BIND = { ...SLOT_DEFAULTS, _para: false };
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(slotDataStack(SLOT_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 const SLOT_DERIVED = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), SLOT_BINDING_SPECS));
 
-/**
- * ⚠ t1500 — THE TOOL PICKER SITS BESIDE THE FIELD IT FILLS, spliced deliberately (the shape pocket uses for its
- * `strategy` and `material` rows).
- *
- * `toolNum` used to reach the form through `toolBindingsFor` PREPENDED to the bindings array, which rendered it third
- * — before the WCS row. Moving it into the specs (where it belongs, so it re-derives over the pruned stack) put it
- * DEAD LAST, after the entry-point markers and the spindle RPM. Both positions are accidents of array order rather
- * than decisions, and the last one is the worse accident: the picker's whole job is to FILL `toolDia`, and it ended
- * up several fields away from it with `rpm` and two entry markers in between.
- *
- * So it is placed rather than left where the plumbing dropped it — immediately before `toolDia`, which is the
- * project's declared row order (identity → geometry → tool/cut) and keeps the control next to its effect.
- *
- * This ALSO restores the property `tool-picker-1b-768` depends on. That spec finds "the wizard ⚙" by text, and the
- * slot form has TWO legitimate gears — the tool library's, and the WCS deep-link every twin inherits from
- * `FIELD_LINKS`. Its locator is ambiguous either way and is restated in the same act; this is not a fix BY ordering.
- */
-const TOOL_ANCHOR = 'toolDia';
-export const SLOT_BINDINGS = (() => {
-    const tool = SLOT_DERIVED.find((b) => b.param === 'toolNum');
-    const rest = SLOT_DERIVED.filter((b) => b.param !== 'toolNum');
-    if (!tool) return rest;                                   // no marker in this state → nothing to place
-    const at = rest.findIndex((b) => b.param === TOOL_ANCHOR);
-    return at < 0 ? [...rest, tool] : [...rest.slice(0, at), tool, ...rest.slice(at)];
-})();
+// t2375 — the t1500 TOOL_ANCHOR splice (below, now removed) used to relocate toolNum to sit immediately
+// before toolDia — a fix for the UNSECTIONED flat render, where array position was the only ordering signal
+// and the picker's job (filling toolDia) argued for adjacency. Now that SLOT_BINDING_SPECS itself declares
+// section metadata (this turn's own fix, see the header comment above SLOT_BINDING_SPECS), toolNum's real
+// home is the TOOL section beside rpm — matching drill's and pocket's own established TOOL-section convention
+// — and SLOT_BINDING_SPECS already places it there directly, so no post-derivation splice is needed anymore.
+// Splicing toolNum next to toolDia now would be actively wrong: it would plant a 'TOOL'-section field in the
+// middle of the 'TOOL & WIDTH' array region, and formWidgets.js's own first-seen-wins box order would render
+// a 'TOOL' box AFTER 'TOOL & WIDTH' instead of before it.
+export const SLOT_BINDINGS = SLOT_DERIVED;
 
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {

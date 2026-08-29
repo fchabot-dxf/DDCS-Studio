@@ -61361,3 +61361,156 @@ perturbation of each).
 No production code changed this turn — the mill-family blast radius (contour/slot/surfacing/text) was
 established as OUT OF THIS TURN's REACH (see PART 2 above), not touched.
 
+## t2375 — UNBLOCK THE MILL FAMILY: contour's section MISMATCH + slot's section ABSENCE fixed, one of each
+## shape, proving the pattern both ways
+
+t2373 found PART 2 of the mill family (contour/slot/surfacing/text) blocked because their own bindings carry
+almost no `section:` metadata matching their shells' own section design — contour's own metadata EXISTS but
+is WRONG (declares `GEOMETRY`/`TOOL & CUT`, a hardcoded whitelist name-collision with `formWidgets.js`'s own
+`SECTION_RANK`, but names the WRONG bucket relative to the shell's own SHAPE/SIDE & TOOL/DEPTH & FEED), slot's
+metadata is nearly ABSENT (2 of ~30 bindings carried `section:` at all, both the stale `GEOMETRY` name). This
+turn's dispatch: fix one of each shape (contour = mismatch, slot = absence) so the pattern is proven both
+ways before the remaining two (surfacing/text, deferred). TAIL: explicitly none.
+
+### THE CENTRAL MECHANISM, read before touching anything
+
+`formWidgets.js`'s own `renderOpForm` buckets by a **hardcoded, shared, global whitelist** —
+`SECTION_RANK = ['IDENTITY','GEOMETRY','TOOL & CUT']`. A section name OUTSIDE that list (which is every real
+shell section name: SHAPE, SIDE & TOOL, DEPTH & FEED, ENDPOINTS, TOOL, TOOL & WIDTH…) gets the SAME "unranked"
+rank, so `units.sort()`'s STABLE sort leaves those items in their raw ARRAY ORDER relative to each other. The
+section BOX order is "whichever section name is first-seen walking the (rank-sorted) array"; the field order
+WITHIN a box is likewise raw array order. **This means a naive fix — renaming `section:` strings without
+reordering the declaring array — produces the WRONG box order and WRONG within-box field order.** Caught this
+by reading the mechanism carefully BEFORE writing any code (not by a failed test), consistent with this
+project's own verify-live discipline. So both fixes below are a REORDER + rename, not a rename alone.
+
+### CONTOUR — the mismatch, fixed
+
+`contourData.js`'s `CONTOUR_EXEC_BINDINGS` (25 bindings) reordered into three contiguous groups matching the
+shell's own field sequence exactly: **SHAPE** (shape, originX, originY, offZ, stockAttach, pathDatum,
+[stockDatum/stockW/stockH/stockZ formHidden], wcs, w, h, dia, sides) → **SIDE & TOOL** (side, toolDia, rpm) →
+**DEPTH & FEED** (depth, stepdown, [confirmEvery/entry/rampAngle — no shell field, twin-only], feed, plunge).
+Every OTHER property (blockIndex/key/type/default/widget/widgetConfig/when/label/help/units) is byte-for-byte
+unchanged — only array position and `section:` moved. `toolNum` (from the SHARED `toolBindingsFor`,
+`deriveBindings.js`) carries no `section:` at the source, and `entryX`/`entryY` (from the SHARED
+`entryBindingsFor`) carry the stale `'GEOMETRY'` name — neither shared file was touched (Rule 1b): both are
+overridden LOCALLY via `.map()` inside `contourDataDef()`'s own assembly, then spliced into the position their
+target section needs (`shapeFields, entryXY, sideToolCore, toolNum, rpmField, depthFeedFields` — toolNum lands
+immediately before rpm, matching drill's/pocket's own established toolNum-before-rpm TOOL-section convention,
+not a new one invented here). Array position doesn't move `blockIndex` — proven byte-identical emit by
+`contour-data-emit.spec.js` (unchanged, still green) after each edit.
+
+### SLOT — the absence, fixed
+
+`slotData.js`'s `SLOT_BINDING_SPECS` (~30 specs) reordered + given real `section:` values for the first time:
+**ENDPOINTS** (ax, ay, bx, by, originX, originY, offZ, [hidden stock fields], [entryX/entryY — no shell field,
+twin-only]) → **TOOL** (toolNum, rpm) → **TOOL & WIDTH** (width, toolDia, stepoverPct) → **DEPTH & FEED**
+(depth, stepdown, clearance, wcs, feed, plunge, [entry/rampAngle/helixDia/helixPitch — no shell field]). The
+shell's own `REPEAT (array)` section renders NOTHING in the twin — `pattern` is a pre-existing declared
+FRONTIER (this def is the single-slot template; slot's own file header), so no bound field ever carries that
+section — a legitimate declared gap, not a miss. `toolNum` (SHARED `TOOL_BINDING_SPECS`, spread directly into
+the specs array, no section at the source) overridden LOCALLY via `.map()` at the spread site (Rule 1b) —
+`...TOOL_BINDING_SPECS.map((s) => ({ ...s, section: 'TOOL' }))`.
+
+**Retired the t1500 `TOOL_ANCHOR` splice** (the old post-derivation mechanism that relocated `toolNum` to sit
+immediately before `toolDia`, written BEFORE sections existed, when array-adjacency to the field it fills was
+the only ordering signal available). With real sections now in play, that splice would have been actively
+WRONG — it would plant a `'TOOL'`-section field in the middle of the `'TOOL & WIDTH'` array region, and the
+first-seen-wins box order would then render a `'TOOL'` box AFTER `'TOOL & WIDTH'` instead of before it.
+`toolNum`'s real home (the TOOL section, beside rpm) is now reached by `SLOT_BINDING_SPECS`' own declared
+position directly — `export const SLOT_BINDINGS = SLOT_DERIVED;`, no post-hoc splice. Checked for any other
+consumer of the retired ordering guarantee (`TOOL_ANCHOR`, a "tool-picker-1b-768" spec the old comment named)
+— neither exists elsewhere in the repo; safe to retire outright, not a silent behavior change anyone depended on.
+
+Proven byte-identical across BOTH arms and every gate: `slot-as-data.spec.js` + `slot-twin-repoint-1500.spec.js`
+— all 15 tests green, unchanged.
+
+### LIVE VERIFICATION — driven the real app, not read from the array
+
+Opened both twins for real (`wizardManager.open('user_contour_data')` / `open('user_slot_data')`) and compared
+rendered `.form-sec-title` lists + `[data-param]` field order against each shell's own `window.openWiz(...)`
+render:
+
+```
+contour  twin sections: SHAPE, SIDE & TOOL, DEPTH & FEED     shell: SHAPE, SIDE & TOOL, DEPTH & FEED   — MATCH
+slot     twin sections: ENDPOINTS, TOOL, TOOL & WIDTH,       shell: ENDPOINTS, REPEAT (array), TOOL,
+                         DEPTH & FEED                                TOOL & WIDTH, DEPTH & FEED
+                                                              — MATCH minus the declared REPEAT frontier
+```
+
+Field order (ignoring twin-only orphan fields and shell-hidden/unbound rows) matches the shell's own sequence
+exactly for both wizards — confirmed field-by-field, not just section-by-section.
+
+### BEFORE/AFTER SCREENSHOTS — the regrouping made visible
+
+Per the dispatch's own explicit requirement. Rendered each twin's OLD (pre-turn, `git show HEAD:...`) binding
+declarations from a same-directory sibling module (so their own relative imports resolved unchanged) — NOT by
+overwriting the real files in place, which would have exposed a broken-mid-edit window to the other seat
+sharing this repo. Saved to `DDCS-Studio/verification/t2375-{contour,slot}-{before,after}.png`, deleted the
+sibling modules immediately after. Contour BEFORE: one `GEOMETRY` box wrongly containing Shape/Side/Width/
+Height/Diameter/Sides alongside Origin/WCS, one `TOOL & CUT` box containing Depth/Feed correctly but under
+the wrong label. Contour AFTER: three correctly-named, correctly-populated boxes. Slot BEFORE: NO section
+chrome at all (< 2 sections named → `sectionize` never triggers), raw array-order rows with un-labelled
+param-name fallbacks (`ax`, `ay`, `wcs`, `depth`…). Slot AFTER: four correctly-named, correctly-populated
+boxes with real labels. Confirmed each AFTER screenshot reads as its own shell does, side by side.
+
+### THE TWO RATCHET SPECS — `formReproduction.js` genuinely extended with `mode:'flat'`
+
+t2373 deliberately did NOT half-build a flat-mode branch (nothing would have exercised it that turn). This
+turn genuinely needs one — contour/slot are flat-rendered (no `split_*` uiChildren node), so `hasTreeLayout()`
+routes their live `render()` through `renderOpForm` directly, not `renderUiTree`. Added `mode: 'tree' | 'flat'`
+to `registerFormReproductionSuite`'s own config (default `'tree'`, unchanged behavior — proven by re-running
+drill's/pocket's own existing specs unmodified, still green, still asserting exactly what they asserted
+before this turn). `mode:'flat'`:
+- **Structure test**: renders via `renderOpForm(host, binds)` directly (no `renderUiTree` layer — that IS the
+  real render for these wizards); no orphan concept (every bound field renders somewhere), so
+  `expectedOrphans` is always `[]` and the full field list is the "explicit" list.
+- **Wording test**: compares `.form-sec-title` against the live shell's own `.section-label` list, filtered by
+  a new `expectedFrontierSections` config (slot's own declared `REPEAT (array)` gap) so a REAL future
+  regression — a bound field silently losing its section — still fails loudly. `.wiz-usage`/code-preview-tag
+  text is NOT asserted for flat mode: both come from a `usage_text`/`preview_code` uiChildren node that
+  `renderUiTree` handles and contour/slot never declare (a SEPARATE, pre-existing frontier — usage-text
+  parity — out of this turn's own section-metadata scope, not expanded into).
+- **Edit-reaches-emit test**: reads/writes through `renderOpForm`'s own readers directly (no `tempHost`/
+  `byParam` detour needed — flat mode has no tree to feed values back into).
+
+`tests/contour-form-reproduction-2375.spec.js` + `tests/slot-form-reproduction-2375.spec.js` — `EXPECTED_ORDER`
+hand-derived from each shell's own markup (index.html:564-613 contour, 642-716 slot), not from the twin's own
+binding array (would compare the declaration to itself). **Non-vacuity proven by perturbation** — swapped two
+adjacent EXPECTED_ORDER entries for each wizard (contour: shape/originX; slot: ax/ay) and confirmed the
+structure test goes red (1 failed / 2 passed each time), then restored; separately swapped slot's own
+`expectedFrontierSections` to `[]` and confirmed the section-title assertion alone goes red, then restored.
+
+### FULL SUITE — run twice (direct Playwright, then `npm test` which also re-runs it)
+
+Direct `npx playwright test`: **2888 passed / 0 failed / 16 flaky / 26 skipped (25.0m)**. `npm test` (test:node
++ test:e2e): **2893 passed / 0 failed / 11 flaky / 26 skipped (23.8m)**, `test:node exit 0, test:e2e exit 0`.
+Both runs: **0 failed** (FAILED COUNT attributable to this turn: 0). The t1766 reproject-echo race
+(`wizard-face-1599.spec.js`) — flagged by t2373 as a HARD FAIL that turn, with an explicit "say so plainly if
+it happens again, it may be degrading" watch item — was FLAKY (recovered on retry) in the direct run and did
+not appear in the flaky list AT ALL in the `npm test` run. **Reporting plainly per the watch item: this run it
+behaved as its own documented "rarely, only under sustained load" stable-flaky race, not a hard fail — no
+sign of degrading.** None of the flaky names in either run touch contour/slot/formReproduction.js or either
+new spec file — all are repeat names from earlier turns' own full-suite runs (middle-superset, pane-visual-
+host-programmatic-1762, probe-port-gate-1880, pull-v41-wcs, viz3d-handle-theme-2155, wizard-face-1599 among
+them) or new names on files this turn never touched.
+
+### Files changed
+
+`web/blocks/dataOps/contourData.js` — `CONTOUR_EXEC_BINDINGS` reordered + corrected `section:` values;
+`contourDataDef()`'s own assembly reworked to interleave the shared-deriver-sourced `toolNum`/`entryX`/
+`entryY` into the right section groups via local `.map()` overrides.
+
+`web/blocks/dataOps/slotData.js` — `SLOT_BINDING_SPECS` reordered + given real `section:` values; the t1500
+`TOOL_ANCHOR` splice retired (superseded by the new section-driven placement).
+
+`tests/support/formReproduction.js` — extended with `mode:'flat'` + `expectedFrontierSections`; `mode:'tree'`
+(drill/pocket) byte-identical to before.
+
+`tests/contour-form-reproduction-2375.spec.js`, `tests/slot-form-reproduction-2375.spec.js` (new) — the two
+ratchet specs, proven non-vacuous.
+
+`DDCS-Studio/verification/t2375-{contour,slot}-{before,after}.png` (new) — the before/after screenshots.
+
+No tail — the dispatch explicitly said not to bolt one on.
+
