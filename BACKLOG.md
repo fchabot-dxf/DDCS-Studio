@@ -3894,3 +3894,52 @@ and `fieldsFor` now gets the same independently-hideable `_LBL` caption every `e
 checked live, confirmed unregressed, not just assumed. Non-vacuity proven by perturbation (reverting the
 widened condition reproduces the exact `NO_LBL_FIELD` gap on a previously-broken case). Screenshot:
 `verification/t2405-caption-fix.png`.
+
+---
+
+### 54. THE FULL SUITE HAS NO PROGRESS SURFACE — and its current reporter burns the worker's context
+
+*(owner-asked 2026-08-29: "is there a way to indicate progress on full suite… like a progress bar", then
+ruled the surface after two rounds — ⛔ NOT the terminal, ⛔ NOT the chat (a sent message cannot redraw), and
+⛔ not anything needing a server, because their Live Preview is occupied by the app itself.)*
+
+**Two problems, one fix.** A full suite is 25-50 minutes with no sense of how far along it is — AND
+`playwright.config.js:19` uses the `list` reporter off-CI, which prints **one line per test, ~2900 lines
+every run**, straight into the worker's context. At ~25-30k characters that likely exceeds the tool's own
+truncation, so most of it is paid for and then discarded. The useful part — failures and final counts — is
+at the end regardless.
+
+### THE SHAPE
+
+```
+reporter writes   test-results/progress.md    (+ .html, + .json)   — files, ZERO stdout cost
+worker's stdout   failures + final summary only                    — far cheaper than today
+owner watches     progress.md in VS CODE'S OWN MARKDOWN PREVIEW    — no server, no browser,
+                  (re-renders on disk change, docks beside code)      does not touch Live Preview
+phone / browser   progress.html — numbers BAKED IN + a 2s meta-refresh, opened as a plain
+                  file:// — no server, no fetch, no CORS
+advisor           reads progress.json to answer "how far?" on demand
+```
+
+Content: a block-character bar, percent, N/M, elapsed, ETA, pass/fail/flaky counts, the currently-running
+spec, and ⭐ a **heartbeat timestamp** so a stalled or dead run reads as "stalled 6m ago" instead of
+confidently sitting at 47% forever.
+
+### ⚠ ESTABLISH, don't guess
+
+- Whether to keep a compact stdout fallback (`dot` — one char per test, what CI already uses) or go fully
+  silent-except-failures. Fully silent is cheapest, but a 40-minute command with no output can look hung —
+  a heartbeat line every few minutes may be worth its tiny cost. Decide and say which.
+- That `test-all.cjs`'s `stdio: 'inherit'` still surfaces failures unchanged — ⛔ the failure output is the
+  part that matters and must not get quieter.
+- Playwright custom reporters are a supported API; this needs no new dependency.
+- ⭐ **AUTOMATIC BY CONSTRUCTION**: declared in `playwright.config.js`, so `npm test` (via `test-all.cjs` →
+  `test:e2e`) and `test:changed` pick it up with no flag and nothing to remember. ⚠ TWO GAPS to decide:
+  `test:smoke` uses its OWN config (`playwright.smoke.config.js`) so it needs the same reporter line added
+  there, and the NODE tier (`test:node`) is not Playwright at all — either leave it uncovered (it is fast,
+  progress is moot) or have `test-all.cjs` write the two tiers' phase into the same file. Say which.
+- ⭐ Follow the JSON reporter's own precedent (`playwright.config.js:16`, "runs UNCONDITIONALLY, local + CI
+  alike") — the progress reporter should too, rather than branching on `process.env.CI`.
+
+**VERIFY:** run a real suite, watch `progress.md` update in the markdown preview, confirm the worker's own
+captured stdout shrank dramatically, and confirm a killed run leaves a stale-marked file rather than a lie.
