@@ -62972,3 +62972,16 @@ counted plainly in the item's own bracket note.
 No test spec persisted (matching t2393's own precedent for this exact mechanism — verified live during the
 turn, not ratcheted as a permanent spec).
 
+### Full suite (both commits, run once at the end)
+
+**2933 passed, 0 failed, 15 flaky (all recovered on retry), 26 skipped, 23.7m.** None of this turn's own
+specs (comm-form-reproduction-2399, twin-section-invariant-2381, comm-twin) appear in the flaky list — all
+6 clean on first try. 14 of the 15 flakes have deep prior-turn history in this file (2-70 mentions each —
+blocks-rotary-rig, fork-to-custom-2365, form-section-collapse-820, formfield-authoring-1610, formfield-loud-
+mismatch-1636, gateway-mismatch-gate-1229, group-gesture, middle-superset, pane-visual-host-programmatic-
+1762, passes-field-1613, probe-port-gate-1880, wizard-manager-1617, workspace-roundtrip, federated-registry)
+— the established parallel-contention pattern. The one new name, `compose-settings.spec.js`, failed with
+`window.showApp is not a function` — a page-load timing race (evaluate ran before the app script finished
+initializing), recovered on the immediate retry; unrelated to anything this turn touched (comm/progend/
+drillcycle). No regressions.
+
