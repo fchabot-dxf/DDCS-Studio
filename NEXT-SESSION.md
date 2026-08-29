@@ -24,9 +24,41 @@ completed plans are not kept — *"we can always plan again."*
 
 ---
 
+## ⭐⭐ THE RUNNING ORDER — set with the owner, evening 2026-08-28
+
+**Two tracks.** Track A finishes the wizards-as-data arc. Track B is the AUTHORING-UX overhaul born from the
+owner's screenshots today (#41-#49) — sequenced by which turn BUILDS a mechanism the later ones REUSE.
+
+```
+IN FLIGHT  t2385   #42 blocks GUI — builds THE MECHANISMS everything below reuses:
+                   the searchable picker field · inline-field hiding · the label map
+                   · the options popup editor · the Block ▸ submenu
+
+THEN, in order, each its own turn unless sized otherwise:
+  1  #46  the wizard-view drag — complete the loop, commit on release   (owner bug, ruled)
+  2  #48  the block face lies — ⛔ its DATA-LOSS item FIRST (layout/panel dropdowns
+          eating values on round-trip), then holecycle's dead dynamic (reuses t2385's
+          hiding mechanism), the 'z'/'by' magic-name hazard, undefaulted fields
+  3  #47  tier 1 — goto-target picker + var picker on assign
+          (declare/reference/traffic-light ladder; reuses t2385's picker field)
+  4  #47  tier 2 — tool/pin/setup pickers (reuses tier 1's field verbatim)
+  5  #43  form ↔ block reveal (uses #42's Block ▸ submenu for the reverse direction)
+  6  comm — the LAST live-shell twin (closes Track A's shell-verified half)
+TAILS (small, ride along, own commits): #49 help+labels pass · #44 canvas find · #45 true snippets
+BLOCKED    #41 freeze/remove-from-form — ⛔ needs #23 (persisted disable, ruled 08-26,
+           never built) FIRST or together, else frozen inherits the comes-back-on-reload bug
+PARKED     #40 sim reads the output table (stage 3) · #28 T.nc (OWNER ruling) ·
+           #30 V4.1 equivalence (bench) · #31 pipe test (bench) · arc's LOCKED→ONLY
+           deletion pass (unscoped) · tap/bore/pause_confirm registry completeness
+```
+
+⚠ **The dependency rule that set this order:** t2385 builds five reusable mechanisms; everything that would
+otherwise hand-roll one waits for it. #48's data-loss item outranks its siblings because it silently DESTROYS
+saved values today. #46 jumped the queue as an owner-reported live bug.
+
 ## WHERE THINGS STAND — 2026-08-28
 
-**Branch `wizards-as-data-blocks`. Released V2026.08.28.4.**
+**Branch `wizards-as-data-blocks`. Released V2026.08.28.10.**
 
 The live arc is **wizards-as-data**: every built-in becomes a `{template, bindings}` definition, so a wizard
 can be reproduced from declared data alone. `drill` is the pilot.
