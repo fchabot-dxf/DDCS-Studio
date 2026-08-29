@@ -63330,3 +63330,28 @@ gating added.
 
 `BACKLOG.md` — already committed via the advisor's own `333b7404`, per the note above.
 
+### Full suite (both commits, run once at the end)
+
+**2931 passed, 3 failed (even after retries), 14 flaky (recovered on retry), 26 skipped, 27.0m.** Neither of
+this turn's own touched-test-file specs (`pocket-form-reproduction-2301`, `twin-section-invariant-2381`)
+appear anywhere in the reds — all clean on first try.
+
+The 3 that stayed red through the full run's own retries — `collapsible-panes-752.spec.js` (pane collapse/
+reflow), `open-as-modal-1625.spec.js` (preview→real-open chrome), `fork-to-custom-2365.spec.js` (Pocket
+CUSTOMIZE fork) — each RE-RUN in isolation (14 tests, 3 files, outside full-suite contention): 13/14 passed
+outright, the 14th (`fork-to-custom-2365`'s own Pocket-CUSTOMIZE test) flaked once more on its own FIRST try
+(a bare page-BOOT timeout — `window.ddcsStudio && window.ddcsGetBlockProgram` not ready in 5s, failing BEFORE
+any pocket-specific code runs at all) then passed clean on retry #1. None of the 3 test areas (pane layout,
+modal-preview chrome, wizard-fork dialog timing) overlap this turn's own touched files (slot/surfaceraster/
+pocketfill/surfaceFill/region.js, pocketData.js, formReproduction.js) — every failure is a raw TIMEOUT
+(element/page never appeared in time), not an assertion mismatch, the resource-contention signature this
+session has repeatedly confirmed elsewhere. All 3 have deep prior-turn history too (8-45 mentions each). The
+14 flaky-and-recovered also all have prior history (2-72 mentions, none new). No regressions from either
+commit this turn.
+
+Genuine live concurrent activity confirmed mid-turn: the advisor pushed 4 more commits (backlog(51,52),
+backlog(53), backlog(46) reopened+narrowed — owner-confirmed on-device drag feedback, unrelated to this
+turn's own scope) while this turn was in progress, in the SAME shared working directory — one of them swept
+up this turn's own still-uncommitted BACKLOG.md edit (noted above). No conflicts, nothing lost; flagged
+plainly as an observation, not something this turn needed to act on.
+
