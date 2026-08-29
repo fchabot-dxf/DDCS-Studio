@@ -63479,3 +63479,91 @@ blocks/blockly/bridge.js`) — the two tests that DO directly exercise the `ddcs
 (`blocks-edit-lag-788.spec.js`, `sim-socket-hide-820.spec.js`) both passed cleanly on their own, both before
 and within the full run. No regressions from either commit.
 
+## t2407 — BACKLOG #54: a full-suite progress surface, and a quiet stdout
+
+### The two problems, confirmed with real numbers before touching anything
+
+A full suite is 25-50 minutes with no progress signal, AND the local `list` reporter's own captured output
+across the last two turns' full runs measured **525,566 and 541,230 bytes** (`/tmp/t2405-full-suite.log`,
+`/tmp/t2403-full-suite.log`) — far larger than a bare "one line per test" estimate, since `list` also prints
+full error-context blocks for every flaky/failed test's own retries. The useful part (failures + the final
+tally) sits at the end regardless of the ~2900 lines before it.
+
+### The build — `tests/support/progressReporter.mjs`, a Playwright custom reporter, no new dependency
+
+Writes three files every `onTestEnd` (change is cheap; VS Code's own Markdown Preview needs the repeated
+overwrite to BE the live-update mechanism, no server involved):
+- `test-results/progress.md` — a block-character bar, percent, N/M, pass/fail/flaky/skipped, elapsed, ETA,
+  the currently-running spec, status, and a heartbeat timestamp — read in VS Code's own Markdown Preview
+  (owner-ruled surface #1).
+- `test-results/progress.html` — the SAME numbers baked in as plain text (never fetched/computed client-
+  side) with a 2-second `<meta http-equiv="refresh">` — opens as a bare `file://` with zero server, zero
+  fetch, zero CORS (owner-ruled surface #2, for a phone).
+- `test-results/progress.json` — machine-readable, for the advisor to answer "how far along?" on demand
+  (owner-ruled surface #3).
+
+### The decisions the dispatch asked me to establish, and why
+
+**Stdout: fully silent-except-failures, plus a 2-minute heartbeat line — not `dot`, not pure silence.** Pure
+silence is cheapest but a 25-50 minute command printing nothing is indistinguishable from a hang to whoever
+is watching the tool call; a heartbeat costs a few lines against the ~525KB this replaces and answers "still
+alive?" without reaching for the files. Failures print IMMEDIATELY (not batched) — the one thing that must
+never get quieter than `list` already made it.
+
+**CI's own console stays untouched, but the file writes are unconditional.** CI already runs `dot`+`html` —
+doubling that with this reporter's own console noise would be pure addition, not a fix, since CI log volume
+was never this entry's complaint (only the WORKER's own captured stdout was). So `progressReporter`'s
+`console.log` calls are suppressed under `process.env.CI`, while the file writes (its own core, defining
+behavior) stay unconditional — following the JSON reporter's own established "runs unconditionally, local +
+CI alike" precedent for the part of the mechanism that precedent actually applies to.
+
+**`test:smoke` needed NO separate wiring** — `playwright.smoke.config.js` already does `{...base, testMatch:
+...}`, so it inherits `playwright.config.js`'s own `reporter` array automatically; adding the line there too
+would have been a duplicate, not a fix for a real gap. Confirmed by reading the file, not assumed.
+
+**The NODE tier gets a minimal, independent phase marker** in `scripts/test-all.cjs` (`writePhaseMarker`) —
+not the full bar/ETA machinery (that class only exists inside the Playwright process; `test:e2e`'s own
+`onBegin` overwrites it the instant it starts). The node tier is seconds long, so a viewer glancing at
+`progress.md` during those seconds would otherwise see either a missing file or a STALE 100% from a PRIOR
+run (misreadable as a hung run at the wrong percentage) — a one-line "node tier running…" / "node ✓ · e2e
+starting…" write before/after `test:node` closes that gap cheaply.
+
+### Two real bugs caught live before shipping
+
+1. **`completed` could exceed `total`** — measured live: a run with one retrying test showed `10/8 = 125%`.
+   Playwright calls `onTestEnd` once per ATTEMPT, not once per logical test — a flaky test that fails then
+   passes on retry fires it twice; a deterministic failure fires it `1+retries` times. Fixed: only the FINAL
+   attempt (a pass, a skip, or the last allowed retry) counts as a completion; an earlier failing attempt
+   that will still retry is not counted at all. Re-verified: a flaky repro (fails attempt 1, passes attempt
+   2) now correctly counts as 1 flaky, 0 failed, 0 passed — matching the JSON reporter's own established
+   flaky/passed/failed distinction, not double-counted either way.
+2. **`test.titlePath()`-based spec naming printed a stray leading `" › "`** — the project-name slice didn't
+   land where expected. Switched to `path.basename(test.location.file)` + `test.title` directly — simpler,
+   correct, and reads better in the rendered surfaces besides.
+
+### Verified live
+
+A killed run leaves an honest stale marker, not a lie: started a run, `kill -9`'d it mid-flight, read
+`progress.json` back — `status:"running"`, frozen at `1/73` with a frozen `heartbeatAt` that will never
+update again. The file's own documented `staleAfterSec` (120s) lets a reader correctly conclude "this run
+died" rather than trusting a number that stopped moving, exactly the dispatch's own "stale-marked, not a
+confident lie" requirement.
+
+`progress.html` confirmed rendering correctly as a genuine bare `file://` (Playwright navigated straight to
+the file on disk, no server) — screenshot: `verification/t2407-progress-html.png`. `progress.md`'s own
+content read back correctly formed GitHub-flavored markdown (table + fenced bar), the shape VS Code's
+Markdown Preview renders.
+
+### Files changed
+
+`tests/support/progressReporter.mjs` (new) — the reporter.
+
+`playwright.config.js` — `list` removed off-CI, `progressReporter.mjs` added unconditionally alongside the
+JSON reporter; CI's own `dot`+`html` untouched.
+
+`scripts/test-all.cjs` — `writePhaseMarker()` for the node tier's own brief window.
+
+`DDCS-Studio/verification/t2407-progress-html.png` (new).
+
+Full suite (this turn's own closing gate) reported separately below — it also dogfoods this very change.
+

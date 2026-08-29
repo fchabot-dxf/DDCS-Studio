@@ -13,7 +13,23 @@ function run(label, script) {
     return r.status == null ? 1 : r.status;
 }
 
+// t2407 (BACKLOG #54) — a MINIMAL phase marker for the node tier, written independently of progressReporter.mjs
+// (that class only exists inside the Playwright process — test:e2e's own onBegin overwrites this the instant it
+// starts). The node tier is seconds long, so it does not need the full bar/ETA machinery, only enough that a
+// viewer watching progress.md during those seconds sees "node tier running" instead of a stale file from a
+// PRIOR run's 100% (which would misread as a hung run at the wrong percentage) or a missing file.
+function writePhaseMarker(text) {
+    const outDir = path.join(__dirname, '..', 'test-results');
+    try { fs.mkdirSync(outDir, { recursive: true }); } catch (_) { /* already exists */ }
+    const now = new Date().toISOString();
+    try { fs.writeFileSync(path.join(outDir, 'progress.json'), JSON.stringify({ phase: 'node', status: 'running', note: text, heartbeatAt: now }, null, 2)); } catch (_) {}
+    try { fs.writeFileSync(path.join(outDir, 'progress.md'), `# Suite progress\n\n**${text}**\n\nHeartbeat: ${now}\n`); } catch (_) {}
+    try { fs.writeFileSync(path.join(outDir, 'progress.html'), `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="2"><title>Suite progress</title><style>body{font:16px monospace;background:#0b0f14;color:#e6edf3;padding:16px;}</style></head><body><h2>${text}</h2><p>Heartbeat: ${now}</p></body></html>`); } catch (_) {}
+}
+
+writePhaseMarker('node tier running…');
 const nodeCode = run('test:node', 'test:node');
+writePhaseMarker(`node ✓ (exit ${nodeCode}) · e2e tier starting…`);
 const e2eCode = run('test:e2e', 'test:e2e');
 
 // t1724 — THE FLAKY COUNT IS THE HEALTH METRIC, read here rather than left in scrollback. A per-spec retries

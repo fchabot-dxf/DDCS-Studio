@@ -11,12 +11,17 @@ export default defineConfig({
   // t1587 — this exclusion means `npx playwright test` / `npm run test:e2e` alone SKIPS these tests silently; the
   // merge gate must run `npm test` (both tiers, fails if either does), never `test:e2e` on its own.
   testIgnore: ['node/**'],
-  // t1607 — CI needs an HTML report to upload as a diagnosable artifact on a red run; local runs keep the
-  // terse 'list' output unchanged (this only takes effect under GitHub Actions' own CI=true).
+  // t1607 — CI needs an HTML report to upload as a diagnosable artifact on a red run; kept exactly as before.
   // t1724 — the JSON reporter runs UNCONDITIONALLY (local + CI alike): scripts/test-all.cjs reads its
   // `stats.flaky`/`stats.unexpected` back out and prints them as the gate's own named health metric, so
   // "how many flaked this run" is a number the gate states, not text a human has to notice in scrollback.
-  reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : [['list']]), ['json', { outputFile: 'test-results/summary.json' }]],
+  // t2407 (BACKLOG #54) — `list` REMOVED off-CI: it printed one line per test (~2900 lines, ~25-30k chars)
+  // straight into the caller's own captured output, discarded once the run ends. Replaced with
+  // progressReporter.mjs, which follows the JSON reporter's own "unconditional" precedent (its FILE writes —
+  // test-results/progress.{md,html,json} — run local+CI alike) but keeps its own console output CI-silent
+  // (CI already has `dot`+`html`; doubling that up was never this entry's complaint). See the reporter's own
+  // header for the full surface/stdout-shape reasoning.
+  reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : []), ['./tests/support/progressReporter.mjs'], ['json', { outputFile: 'test-results/summary.json' }]],
   workers: 6,  // t1593 (2026-08-06) — re-measured on the i7-13700F (16c/24t/32GB): w4=1158s/73fail, w6=975s/73fail (same set, ±2 within
                // the existing flake class), w8=897s/82fail (+10 NEW beyond baseline, only 1 healed — a real contention ceiling; backed
                // off per the "new failures → back off one step" rule, so w12 was not run). The t836 baseline this replaces was itself
