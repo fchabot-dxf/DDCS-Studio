@@ -3462,12 +3462,14 @@ impossible to fill meaningfully for that row's widget.** Its sibling `formfield`
 - `matchvar` / `atomType` free text — a RECORDED decision (formField.js header: typos are caught loudly at
   save by t1636's `formfieldMatchReport`). Do not re-litigate.
 
-### ⏳ THE ONE OPEN RULING
+### ✅ RULED — owner, 2026-08-28: "A"
 
-`section` and `units`: **combo dropdown-with-custom-entry** (advisor lean — section offers the canonical
-IDENTITY/GEOMETRY/TOOL & CUT + the def's own names; units offers mm/in/°/rpm/%; both accept anything typed)
-vs **free text as today**. Pure dropdown is wrong (12 known legitimate shell-dictated section names — the
-t2381 invariant's own exception list); free text is where the typos come from. Owner rules at dispatch.
+`section` and `units` become **combo dropdown-with-custom-entry**: section offers the canonical
+IDENTITY/GEOMETRY/TOOL & CUT plus the def's own existing names; units offers mm/in/°/rpm/%; **both still
+accept anything typed**. ⛔ Never a closed dropdown — 12 shells legitimately dictate their own section names
+(the t2381 invariant's own exception list), and a new unit must never need a code change. The dropdown is a
+spelling aid, not a gate: typed free text remains first-class, and the t2381 invariant stays the thing that
+catches a wrong section name — not this widget.
 
 ### VERIFY
 
