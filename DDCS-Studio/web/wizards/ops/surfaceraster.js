@@ -2025,6 +2025,18 @@ export const surfaceRasterBlock = {
      */
     defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', rowAxis: 'x', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
     fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'rowAxis', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
+    allFields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'rowAxis', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
+    // t2403 (BACKLOG #48 item 5) — `rampAngle` only for `entry:'ramp'`, `helixDia`/`helixPitch` only for
+    // `entry:'helix'` (both read by `lines()`'s own entry handling below) — same dead-field shape as slot.js.
+    dynamic: 'entry',
+    fieldsFor(p) {
+        const entry = (p && p.entry) || 'plunge';
+        const f = ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'rowAxis', 'entry'];
+        if (entry === 'ramp') f.push('rampAngle');
+        else if (entry === 'helix') f.push('helixDia', 'helixPitch');
+        f.push('confirmEvery');
+        return f;
+    },
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
     /**
      * ── t1408 — THE DECLARED FLOW LABELS. See LABEL_DEFAULTS for the defect this closes ──────────────────────────

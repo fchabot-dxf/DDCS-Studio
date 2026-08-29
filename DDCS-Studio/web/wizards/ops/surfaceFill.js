@@ -10,6 +10,19 @@ export const surfaceFillBlock = {
     type: 'surfacefill', label: 'Surface Fill', kind: 'fill', mouth: 'DO', category: 'Transforms',
     defaults: { shape: 'rect', x: 0, y: 0, w: 100, h: 80, stepover: 7.2, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, by: 'by', toolDia: 6, z: 'z', feed: 2000, plunge: 200, clearance: 5 },
     fields: ['shape', 'x', 'y', 'w', 'h', 'stepover', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'toolDia', 'z', 'feed', 'plunge', 'clearance'],
+    allFields: ['shape', 'x', 'y', 'w', 'h', 'stepover', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'toolDia', 'z', 'feed', 'plunge', 'clearance'],
+    // t2403 (BACKLOG #48 item 5) — `rampAngle` only for `entry:'ramp'`, `helixDia`/`helixPitch` only for
+    // `entry:'helix'` (fillStrategy's own entry handling, mirroring pocketfill/slot). No shape gate needed —
+    // this atom has no dia/sides fields at all (shape is always 'rect', w/h only).
+    dynamic: 'entry',
+    fieldsFor(p) {
+        const entry = (p && p.entry) || 'plunge';
+        const f = ['shape', 'x', 'y', 'w', 'h', 'stepover', 'strategy', 'direction', 'entry'];
+        if (entry === 'ramp') f.push('rampAngle');
+        else if (entry === 'helix') f.push('helixDia', 'helixPitch');
+        f.push('by', 'toolDia', 'z', 'feed', 'plunge', 'clearance');
+        return f;
+    },
     lines: (p, z) => fillStrategy(p, z),
     segments: (p) => fillSegments(p),
     extent: (p) => { const c = fillRegion(p).contour; const pts = (c || []).flat(); return pts.length ? pointsBBox(pts) : null; },

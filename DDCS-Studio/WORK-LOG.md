@@ -63265,3 +63265,68 @@ the reached 32/32 goal state.
 
 `DDCS-Studio/verification/t2403-pocket-sectioned.png` (new).
 
+## t2403 piece 2 (own commit) — BACKLOG #48 item 5 CLOSED: the last four dynamic-gating families
+
+### Entry-field gating (rampAngle/helixDia/helixPitch) — 4 blocks
+
+`slotBlock` (slot.js), `surfaceRasterBlock` (surfaceraster.js), `pocketFillBlock` (pocketfill.js),
+`surfaceFillBlock` (surfaceFill.js) each gained `dynamic`/`fieldsFor`/`allFields`: `rampAngle` only for
+`entry:'ramp'`, `helixDia`/`helixPitch` only for `entry:'helix'` — the exact shape t2393/t2399 already
+established for holecycle/progend/drillcycle. `slot.js`'s own comment at its `entry`/`rampAngle`/`helixDia`
+read site (the dispatch's own cited reference) confirmed the semantics before writing anything.
+
+### Shape-field gating (dia+sides vs w+h) — 3 blocks
+
+`pocketFillBlock`/`pocketWallBlock` (pocketfill.js) and `regionBlock` (region.js) gained the shape gate:
+`dia`+`sides` only for circle/polygon, `w`+`h` only for rect/ellipse — mirroring each block's own real read
+site (`trueRegionFromFlat` in pocketfill.js, `regionDesc` in region.js — the dispatch's own cited references).
+A shared `POCKET_SHAPE_DIMS(shape)` helper covers both pocketfill blocks (they read the identical shape
+mapping); regionBlock's own gate is separate (its field names differ: `sides` gates on polygon alone, `h`
+gates on rect/ellipse, no `dia` field — a genuinely different field set from pocketfill's flat version, not
+an oversight).
+
+`regionBlock`'s own `w` field is a real semantic overload the dispatch flagged: DIAMETER for circle/polygon,
+WIDTH for rect/ellipse (`regionDesc`'s own comment already said so). Checked whether a per-shape-reactive
+LABEL was cheap before deciding: `jsonDef()`'s own `labels` map (bridge.js) is a STATIC, build-time string —
+not reactive to the live `shape` field's current value — so making the label itself change with the shape
+would need genuinely new machinery (a label re-render hook keyed to a dynamic field's change, which nothing
+in this codebase currently does). Per the dispatch's own explicit instruction ("if not, note it, do not build
+machinery"), left the label as-is and documented the overload in a comment instead.
+
+### Verified live, comprehensively
+
+Wrote a single probe covering all 13 scenarios across all 5 touched blocks (slot × 3 entry states, pocketfill
+× shape+entry combinations, pocketwall × shape, surfacefill × entry, surfaceraster × entry, region × all 4
+shapes) via `Blockly.serialization.blocks.append` + a forced `_ddcsApplyDyn()` recompute (the same technique
+t2399 established) — every assertion passed on the first try, matching the hand-derived expected visibility
+for each case exactly.
+
+295 existing tests across every touched file's own test suites rerun green (94 slot-family, 142 surfaceraster/
+pocketfill/holecycle-family, 59 pocketfill/region/shape-types-family) — zero regressions. Screenshot:
+`verification/t2403-item5-dynamic-gating.png`.
+
+### BACKLOG #48 closed outright (rule 8)
+
+Per rule 8 (AGENTS.md — "closing a backlog item means editing its HEADING, not appending to its body"),
+item #48's own heading retagged `[✅ SHIPPED — items 1-4 t2393; item 5 t2399+t2401+t2403]`, quoting every
+turn that shipped a piece, and item 5's own numbered-list entry marked `✅ CLOSED` with the t2403 account
+appended. **NOTE, not an error**: this BACKLOG.md edit landed inside the advisor's own concurrent commit
+(`333b7404`) rather than a commit of mine — the advisor is working the SAME shared working directory in
+real time (confirmed live: 3 more advisor commits landed between my own t2403 commits, the newest reopening
+BACKLOG #46 on owner-confirmed on-device feedback, unrelated to this turn's own scope) and its own commit
+process swept up my still-uncommitted edit alongside its own. Content is correct and already pushed — no
+data lost, just worth naming plainly rather than silently re-committing over it.
+
+### Files changed (this piece)
+
+`web/wizards/ops/slot.js`, `web/wizards/ops/surfaceraster.js`, `web/wizards/ops/surfaceFill.js` — entry-field
+gating added.
+
+`web/wizards/ops/pocketfill.js` — entry-field gating (pocketFillBlock) + shape gating (both blocks).
+
+`web/wizards/ops/region.js` — shape gating + the label-overload note.
+
+`DDCS-Studio/verification/t2403-item5-dynamic-gating.png` (new).
+
+`BACKLOG.md` — already committed via the advisor's own `333b7404`, per the note above.
+

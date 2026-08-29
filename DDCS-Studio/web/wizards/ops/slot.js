@@ -478,6 +478,19 @@ export const slotBlock = {
     type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',
     defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, feed: 2000, plunge: 150, clearance: 5 },
     fields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'feed', 'plunge', 'clearance'],
+    allFields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'feed', 'plunge', 'clearance'],
+    // t2403 (BACKLOG #48 item 5) — `rampAngle` only means anything for `entry:'ramp'` (read at line ~74's own
+    // `entryOrPlunge` call), `helixDia`/`helixPitch` only for `entry:'helix'` — every other entry showed all 3
+    // regardless, the same dead-field shape t2393/t2399 already fixed elsewhere on this family.
+    dynamic: 'entry',
+    fieldsFor(p) {
+        const entry = (p && p.entry) || 'plunge';
+        const f = ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'entry'];
+        if (entry === 'ramp') f.push('rampAngle');
+        else if (entry === 'helix') f.push('helixDia', 'helixPitch');
+        f.push('feed', 'plunge', 'clearance');
+        return f;
+    },
     emit: (p, dx = 0, dy = 0) => slotPath({
         ...p,
         x0: num(p.x0, 0) + dx, y0: num(p.y0, 0) + dy,

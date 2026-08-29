@@ -112,6 +112,11 @@ export const POCKET_SHAPE_GAP = 'a circle / polygon / ellipse pocket is cleared 
 /** Why THIS pocket's shape cannot be a runtime macro loop — or '' for the RECT, which converted at t1406. */
 export function pocketShapeGap(p = {}) { return (p && (p.shape || 'rect') === 'rect') ? '' : POCKET_SHAPE_GAP; }
 
+// t2403 (BACKLOG #48 item 5) — the shape gate SHARED by pocketFillBlock/pocketWallBlock: `dia`+`sides` only
+// mean anything for circle/polygon, `w`+`h` only for rect/ellipse (`trueRegionFromFlat`, above, is the exact
+// per-shape read this mirrors) — every OTHER shape showed all 4 regardless.
+const POCKET_SHAPE_DIMS = (shape) => (shape === 'circle' || shape === 'polygon') ? ['dia', 'sides'] : ['w', 'h'];
+
 export const pocketFillBlock = {
     type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', mouth: 'DO', category: 'Toolpaths',
     // t804 — DEPTH ENTRY: `entry` (plunge|ramp|helix) is the per-level descent to the cut Z. plunge = straight (default,
@@ -119,6 +124,18 @@ export const pocketFillBlock = {
     // `by` reads the enclosing StepDown's step (exposed in scope) so the entry descends exactly one level.
     defaults: { shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, dia: 50, sides: 6, wallOffset: 0, toolDia: 6, stepoverPct: 40, strategy: 'concentric', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, by: 'by', z: 'z', feed: 2000, plunge: 150, clearance: 5 },
     fields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'z', 'feed', 'plunge', 'clearance'],
+    allFields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'z', 'feed', 'plunge', 'clearance'],
+    // t2403 — BOTH gates on this block: shape (dia+sides vs w+h) and entry (rampAngle vs helixDia/helixPitch).
+    dynamic: ['shape', 'entry'],
+    fieldsFor(p) {
+        const shape = (p && p.shape) || 'rect';
+        const entry = (p && p.entry) || 'plunge';
+        const f = ['shape', 'originX', 'originY', ...POCKET_SHAPE_DIMS(shape), 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'entry'];
+        if (entry === 'ramp') f.push('rampAngle');
+        else if (entry === 'helix') f.push('helixDia', 'helixPitch');
+        f.push('by', 'z', 'feed', 'plunge', 'clearance');
+        return f;
+    },
     // the enclosing StepDown fills scope `z`; fillStrategy reads the inset region + the flat cut params → the stepover passes.
     lines: (p, z) => fillStrategy({ ...p, region: pocketInsetRegion(p), stepover: stepoverMm(p) }, z),
     segments: (p) => fillSegments({ ...p, region: pocketInsetRegion(p), stepover: stepoverMm(p) }),
@@ -128,6 +145,12 @@ export const pocketWallBlock = {
     type: 'pocketwall', label: 'Pocket Wall', kind: 'leaf', category: 'Toolpaths',
     defaults: { shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, dia: 50, sides: 6, wallOffset: 0, toolDia: 6, z: 'z', feed: 600, plunge: 150, clearance: 5 },
     fields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'z', 'feed', 'plunge', 'clearance'],
+    allFields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'z', 'feed', 'plunge', 'clearance'],
+    dynamic: 'shape',
+    fieldsFor(p) {
+        const shape = (p && p.shape) || 'rect';
+        return ['shape', 'originX', 'originY', ...POCKET_SHAPE_DIMS(shape), 'wallOffset', 'toolDia', 'z', 'feed', 'plunge', 'clearance'];
+    },
     // the raster wall finish = Contour(on) on the inset region: trace it at the scope Z (circle → true G3 arc).
     emit: (p) => {
         const rg = pocketInsetRegion(p);

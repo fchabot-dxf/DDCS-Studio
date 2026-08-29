@@ -28,5 +28,20 @@ export const regionBlock = {
     type: 'region', label: 'Region', kind: 'reporter', returns: 'region', category: 'Shapes',
     defaults: { shape: 'rect', x: 0, y: 0, w: 50, h: 30, sides: 6 },
     fields: ['shape', 'x', 'y', 'w', 'h', 'sides'],   // shape: rect/circle/polygon/ellipse; w=diameter (circle/polygon), w×h=ellipse; sides=polygon
+    allFields: ['shape', 'x', 'y', 'w', 'h', 'sides'],
+    // t2403 (BACKLOG #48 item 5) — `h` only means anything for rect/ellipse (`regionDesc`, above: circle/
+    // polygon use `w` alone as a diameter), `sides` only for polygon. Every other shape showed both regardless.
+    // ⚠ THE LABEL ITSELF STAYS UNCHANGED, DELIBERATELY: `w` reads "Width" for rect/ellipse but is really a
+    // DIAMETER for circle/polygon (see the field comment above) — a per-shape-reactive label would need NEW
+    // machinery (jsonDef()'s own `labels` map is a static, build-time string, not reactive to the live `shape`
+    // field), which the dispatch's own instruction was explicit not to build for this. Noted here instead.
+    dynamic: 'shape',
+    fieldsFor(p) {
+        const shape = (p && p.shape) || 'rect';
+        const f = ['shape', 'x', 'y', 'w'];
+        if (shape === 'rect' || shape === 'ellipse') f.push('h');
+        if (shape === 'polygon') f.push('sides');
+        return f;
+    },
     reduce: (p) => regionDesc(p),
 };
