@@ -3538,9 +3538,26 @@ fields get the searchable match-result picker — `assign` is the pilot (the #1 
 var fields take the SAME field type only where it drops in trivially. ⛔ Items 3 and 4 (tool/pin numbers,
 `flip.setup`) are OUT of scope for now — recorded here, not licensed. No sweeping verification layer.
 
-⛔ Typing FILTERS candidates, never commits a free value (#42's ruled control shape). ⚠ Depends on t2385's
-searchable-picker mechanism — sequence AFTER it and REUSE what it built. Save-time loud checks stay (dangling
-still needs catching).
+### ⭐⭐ DECLARE vs REFERENCE — owner-surfaced 2026-08-28 ("wouldn't verifying forbid users from making new
+content") and it reshapes the build. Three field kinds, three behaviours:
+
+```
+DECLARES   assign.var, label.n        typing stays FULLY OPEN — this field is where the
+                                      thing is BORN. Picker = suggestions only (known
+                                      ranges, scratch bands) + ⭐ one real warning:
+                                      "this squats a reserved/persistent register"
+REFERENCES goto targets               picker of what exists + typed NEW numbers allowed
+(forward-authorable)                  (people place the jump before the label) — the
+                                      save-time check nets the ones never made
+REFERENCES formfield.matchvar etc.    closed picker (a reference to a thing that does
+(must exist now)                      not exist is ALWAYS a mistake) — #42 unchanged
+```
+
+⛔ A closed picker on a DECLARATION site forbids new content — never do it. The gate lives only where
+"doesn't exist" is proof of error.
+
+⚠ Depends on t2385's searchable-picker mechanism — sequence AFTER it and REUSE what it built. Save-time loud
+checks stay (dangling still needs catching).
 
 ---
 
