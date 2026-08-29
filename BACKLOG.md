@@ -3654,11 +3654,15 @@ checks stay (dangling still needs catching).
 > devices fail while the harness passes. The common factor is therefore not the device or the input kind but
 > **what both devices share and the harness lacks: the owner's own WORKSPACE DATA and returning-user state.**
 > The harness boots a DEFAULT machine config ([[agent-tests-use-default-config-not-users]]) — a real
-> workspace's stock/feature/machine values reaching both devices is the standing suspect (e.g. a value that
-> makes the canvas redraw silently fail while the writeback half still lands). Two owner discriminators, ten
-> seconds each: (1) the drag in an INCOGNITO window — follows there = data/state confirmed; (2) if confirmed,
-> EXPORT the workspace (.ddcs) so the probe turn reproduces with the owner's real data instead of the
-> default. ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
+> workspace's stock/feature/machine values reaching both devices was the standing suspect — ⭐ **ELIMINATED
+> 2026-08-29: "incognito doesn't work either."** Fresh state, fresh storage, owner's browser: STILL fails.
+> ⇒ State, data, device and input kind are ALL eliminated. What remains, in order of suspicion:
+> (1) ⭐⭐ **THE REFERENT** ([[confirm-the-referent-before-dropping]]): the owner may be dragging a DIFFERENT
+> SURFACE than the harness tested — "wiz preview" could be the WIZARD TAB's own 2D feature canvas, not the
+> Blocks tab's Wizard View pane the t2391 tests drove; or a different HANDLE kind. Screenshot requested.
+> (2) **real browser vs harness Chromium** — the known Playwright browser-version gotcha
+> ([[ddcs-studio-playwright-verify]]); (3) deployed-site build vs the harness's localhost:3211.
+> ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
 > feature canvas (the `?debug=drag` dragProbe pattern that cracked the splitter saga — passive listeners,
 > on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
 > writes) still sequences BEFORE the commit-on-release fix, per its own entry.
