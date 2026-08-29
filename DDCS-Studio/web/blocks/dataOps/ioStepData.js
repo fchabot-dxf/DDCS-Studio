@@ -77,7 +77,12 @@ export function ioStepDataDef() {
 // ── FORM bindings (the WORK-LOG mockup) — mode picker + per-mode fields (when-gated). The declared-I/O pickers use the
 //    `declared-io` widget (lists settings.outputs/inputs BY NAME + a raw-pin fallback). ──
 export const IO_STEP_BINDINGS = [
-    { param: 'mode', type: 'enum', default: 'output', label: 'Mode', help: 'Set an output / wait on an input / dwell.', section: 'TYPE', widget: 'segmented', widgetConfig: { options: [['Output', 'output'], ['Input', 'input'], ['Dwell', 'dwell']], gateSeg: { value: 'input', pred: 'ioInput', fallback: 'output', tip: 'Wait-Input needs a DDCS Expert (or RS274/grblHAL) post' } } },
+    // t2401 (CLOSE THE REGISTRY) — was 'TYPE' (an invented name, no live shell to justify it — io_step is
+    // opened in-place from a built-in setup entry, never a standalone panel). `mode` is exactly SECTION_RANK's
+    // own 'IDENTITY' role ("what it is": output/input/dwell) — mapped to the canonical name rather than kept
+    // as a one-off word. Confirmed no order regression: IDENTITY (rank 0) still sorts before GEOMETRY (rank 2),
+    // matching this array's own existing declaration order.
+    { param: 'mode', type: 'enum', default: 'output', label: 'Mode', help: 'Set an output / wait on an input / dwell.', section: 'IDENTITY', widget: 'segmented', widgetConfig: { options: [['Output', 'output'], ['Input', 'input'], ['Dwell', 'dwell']], gateSeg: { value: 'input', pred: 'ioInput', fallback: 'output', tip: 'Wait-Input needs a DDCS Expert (or RS274/grblHAL) post' } } },
     // OUTPUT
     { param: 'outputRef', type: 'string', default: 'raw', label: 'Output', help: 'Pick a declared output (emits its on/off M-code) or a raw pin.', section: 'GEOMETRY', when: { param: 'mode', is: 'output' }, widget: 'declared-io', widgetConfig: { kind: 'output' } },
     { param: 'state', type: 'enum', default: 'on', label: 'State', help: 'Turn the output on or off.', section: 'GEOMETRY', when: { param: 'mode', is: 'output' }, widget: 'segmented', widgetConfig: { options: [['On', 'on'], ['Off', 'off']] } },

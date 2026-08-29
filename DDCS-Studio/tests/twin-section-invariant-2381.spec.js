@@ -95,6 +95,21 @@ import { test, expect } from '@playwright/test';
  * section otherwise sorts ahead of any unranked name regardless of array order, which would have silently
  * defeated a same-name resection. `user_wcs_data`'s own exception NARROWED as a result (FEATURE CONTEXT is
  * now canonical, so only OPTIONS/WCS remain outside it — no behavior change for WCS itself, confirmed).
+ *
+ * Also this turn: `user_pause_confirm` moved from a COMPLETENESS exception to a new `MOOT_TWINS` exemption —
+ * its own single binding makes `sectionize`'s own `>= 2 sections` gate structurally unreachable, so an
+ * unsectioned field there was never a live gap; exempted with that stated reason instead of "decorating" it
+ * with a section value nothing would ever render. `user_io_step`/`user_lathe_faceprobe`/`user_lathe_odprobe`
+ * CLOSED — each mapped to a canonical `SECTION_RANK` name (see their own comments below) rather than left
+ * flagged; no VOCABULARY_EXCEPTIONS entries remain for any of them. `user_tap_data`/`user_bore_data` CLOSED
+ * too — both fully sectioned by their own structure (GEOMETRY/TOOL & CUT), no COMPLETENESS_EXCEPTIONS entry
+ * remains for either.
+ *
+ * ⭐ GOAL STATE, now reached: every remaining `VOCABULARY_EXCEPTIONS` entry is a live-shell `reason:'shell'`
+ * case (the shell decides, every time — never harmonised away). `COMPLETENESS_EXCEPTIONS` carries exactly
+ * ONE remaining entry, `pocket_data` — a real, no-live-shell gap, but a separate turn's own bug (a stale
+ * ratchet testing the wrong render mode, per its own note above), not this survey's to fix. `TREE_MODE_TWINS`/
+ * `MOOT_TWINS` are the 2 structurally-exempt classes, each with a stated mechanism, not a silent escape hatch.
  */
 
 // t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not
@@ -108,17 +123,27 @@ const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
 // today only drill's own uiChildren declares a real split_horizontal/split_vertical switch.
 const TREE_MODE_TWINS = ['user_drill_data'];
 
+// t2401 — MOOT twins: `sectionize` (formWidgets.js) requires rowCount > SECTION_THRESHOLD(8) AND >= 2 DISTINCT
+// section names — a twin with exactly ONE binding can never satisfy the second condition no matter what (or
+// whether) that one binding's `section:` says, so an "unsectioned" binding here is genuinely inert, not a
+// live gap masquerading as one. Established, not assumed: `pause_confirm` (PAUSE_CONFIRM_BINDINGS.length===1,
+// confirmed by reading pauseConfirmData.js). Exempt from the COMPLETENESS check with this stated reason,
+// rather than "decorating" it with a section value that would never be load-bearing (the dispatch's own
+// instruction) — a fabricated section is worse than an honest exemption, since it reads as verified when it
+// was never actually exercised by anything.
+const MOOT_TWINS = ['user_pause_confirm'];
+
 // COMPLETENESS exceptions — a REAL, already-confirmed gap (a binding with no `section:` at all), out of
 // THIS turn's own dispatched scope. Each carries the exact missing-param set as of t2381's own measurement —
 // closing the gap (adding sections) must ALSO remove the entry here, or the exact-match assertion below
 // catches the drift either way (a shrunk gap not reflected here, or a widened one).
 const COMPLETENESS_EXCEPTIONS = {
-    // no live shell (advisor's own t2381 count) — a real internal gap, not a shell-reproduction bug.
-    user_tap_data: ['toolNum', 'wcs', 'stockAttach', 'pathDatum', 'stockDatum', 'stockW', 'stockH', 'stockZ', 'originX', 'originY', 'offZ', 'x', 'y', 'pitch', 'depth', 'rpm', 'dwell', 'rigid'],
-    user_bore_data: ['toolNum', 'wcs', 'stockAttach', 'pathDatum', 'stockDatum', 'stockW', 'stockH', 'stockZ', 'originX', 'originY', 'pattern', 'skip'],
-    // no live shell — a single field; `sectionize` never triggers under 2 named sections regardless, so this
-    // is likely moot rather than urgent.
-    user_pause_confirm: ['msg'],
+    // tap_data/bore_data CLOSED at t2401 — sectioned by own structure (no live shell): placement/position
+    // fields → GEOMETRY, cutting mechanics + tool → TOOL & CUT (tapData.js's own comment gives the full
+    // identity/geometry/tool-cut reasoning; boreData.js matches the convention its own surrounding array
+    // fields already used). toolNum (the shared, deliberately-unsectioned TOOL_BINDING_SPECS) sectioned
+    // locally at each def-builder's own call site, same as contourData.js's own precedent.
+    //
     // t2381's OWN surprise finding: pocket was marked "ratcheted" at t2301, but that spec forces `renderUiTree`
     // regardless of `hasTreeLayout()` — and pocket's REAL live render is FLAT (hasTreeLayout() is false for
     // it), where these three (SHARED-deriver-sourced: toolNum from toolBindingsFor, entryX/entryY from
@@ -168,16 +193,14 @@ const VOCABULARY_EXCEPTIONS = {
     // reason relabeled from 'shell-unharmonized' back to 'shell' (t2399's own reading of "do not harmonise"
     // was corrected: that instruction guards the shell, not the twin).
     user_comm_data: { reason: 'shell', sections: ['ADVANCED'] },
-    // NO live shell (advisor's own t2381 count), yet uses a non-canonical name — unlike comm's own `TYPE`
-    // (which at least has a shell that MIGHT justify it), io_step has no shell to justify anything. Flagged,
-    // not excused: this is exactly the "twin is wrong, not the vocabulary" question the dispatch named,
-    // genuinely unresolved by this survey turn.
-    user_io_step: { reason: 'unverified', sections: ['TYPE'] },   // GEOMETRY (its other section) is already canonical
-    // NO live shell — a 4th section name (`PROBE`) neither an existing shell nor SECTION_RANK explains.
-    // Plausibly a deliberate, reasonable addition (lathe's own probe ops are a distinct function from its
-    // cutting ops) — NOT verified as such this turn; flagged for a future lathe-probe-owning turn to decide.
-    user_lathe_faceprobe: { reason: 'unverified', sections: ['PROBE'] },   // IDENTITY (its other section) is already canonical
-    user_lathe_odprobe: { reason: 'unverified', sections: ['PROBE'] },   // IDENTITY (its other section) is already canonical
+    // io_step/lathe_faceprobe/lathe_odprobe CLOSED at t2401 — resolved with each file in hand (per the
+    // dispatch's own instruction), not left flagged. io_step's own 'TYPE' (no live shell) renamed to
+    // 'IDENTITY' — `mode` (output/input/dwell) is exactly SECTION_RANK's own "what it is" role, no reason to
+    // keep a one-off word for it. lathe_faceprobe/lathe_odprobe's own 'PROBE' (no live shell) renamed to
+    // 'TOOL & CUT' — the SAME 6-field group (stylus radius/max seek/retract/fast+slow feed/port) already
+    // lives under 'TOOL & CUT' on corner/edge/middle (cornerData.js); a lathe-specific 'PROBE' family would
+    // have fragmented the registry's vocabulary rather than reflected a real difference in kind. All 3 now
+    // canonical — no exception entries remain for them.
 };
 
 function hasTreeLayout(template) {
@@ -226,8 +249,13 @@ test('SURVEY: section-metadata completeness + vocabulary across every registered
     for (const r of rows) {
         if (r.error) { completenessFailures.push(`${r.opType}: ${r.error}`); continue; }
 
-        // COMPLETENESS — skip TREE-mode twins entirely (section: isn't their mechanism).
-        if (!TREE_MODE_TWINS.includes(r.opType)) {
+        // COMPLETENESS — skip TREE-mode twins (section: isn't their mechanism) and MOOT twins (sectionize can
+        // never fire for them, so an unsectioned binding is inert, not a live gap).
+        if (TREE_MODE_TWINS.includes(r.opType)) {
+            if (r.tree === false) staleExceptions.push(`${r.opType}: listed as TREE_MODE_TWINS but hasTreeLayout() now returns false — remove from the tree exemption, its completeness now counts for real`);
+        } else if (MOOT_TWINS.includes(r.opType)) {
+            if (r.total >= 2) staleExceptions.push(`${r.opType}: listed as MOOT_TWINS (sectionize needs >=2 sections, impossible with 1 binding) but now has ${r.total} bindings — sectionize may be reachable now, its completeness should count for real`);
+        } else {
             const known = COMPLETENESS_EXCEPTIONS[r.opType];
             if (known) {
                 const knownSorted = [...known].sort();
@@ -237,8 +265,6 @@ test('SURVEY: section-metadata completeness + vocabulary across every registered
             } else if (r.missing.length) {
                 completenessFailures.push(`${r.opType}: ${r.missing.length} unsectioned binding(s) — [${r.missing.join(', ')}] — not a declared exception`);
             }
-        } else if (r.tree === false) {
-            staleExceptions.push(`${r.opType}: listed as TREE_MODE_TWINS but hasTreeLayout() now returns false — remove from the tree exemption, its completeness now counts for real`);
         }
 
         // VOCABULARY — every section name must be in SECTION_RANK, unless declared.

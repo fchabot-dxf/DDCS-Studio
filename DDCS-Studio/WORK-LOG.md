@@ -63044,3 +63044,92 @@ ADVANCED in both, same order, same names.
 
 `DDCS-Studio/verification/t2401-{shell,twin}-comm.png` (new).
 
+## t2401 — CLOSE THE REGISTRY, piece 2: the shell-less stragglers, all 6 closed
+
+### pause_confirm — established moot, exempted rather than decorated
+
+`pauseConfirmData.js` has exactly ONE binding (`msg`). `formWidgets.js`'s `sectionize` needs `rowCount > 8 AND
+>= 2 distinct sections` — with 1 binding, the second condition is structurally unreachable no matter what (or
+whether) that binding's `section:` says. Confirmed by reading the file, not assumed from the invariant's own
+old comment ("likely moot"). Added a new `MOOT_TWINS` exemption (mirrors `TREE_MODE_TWINS`'s own shape) rather
+than slapping an inert section value on it — the dispatch's own "not decorating" instruction: a fabricated
+section reads as verified when nothing would ever exercise it. Non-vacuity proven: emptied `MOOT_TWINS`,
+confirmed the survey then reports the exact gap correctly, restored.
+
+### io_step / lathe_faceprobe / lathe_odprobe — decided with each file in hand, mapped to canonical
+
+All 3 had NO live shell (nothing to reproduce) and used one-off section names. Read each file before deciding
+— no shell means the vocabulary question is genuinely open, not a foregone "must map."
+
+`io_step`'s own `'TYPE'` → `'IDENTITY'`: `mode` (output/input/dwell) is exactly the "what it is" role
+`SECTION_RANK`'s own `IDENTITY` already names elsewhere — no reason to keep a synonym. No order regression
+(IDENTITY still ranks before GEOMETRY, matching the array's own existing declaration order).
+
+`lathe_faceprobe`/`lathe_odprobe`'s own `'PROBE'` → `'TOOL & CUT'`: checked the alternative (ruling `'PROBE'`
+a deliberate lathe-family vocabulary addition to `SECTION_RANK`, which the dispatch explicitly allowed) against
+the evidence first — corner/edge/middle (cornerData.js) already section the IDENTICAL conceptual field group
+(stylus radius/max seek/retract/fast+slow feed/port) as `'TOOL & CUT'`, mill-side. A lathe-specific `'PROBE'`
+family would fragment the registry's vocabulary rather than reflect a real difference in kind, so mapped to
+canonical instead of declared legitimate. No live-render impact either way (both twins sit at 8 bindings — AT,
+not over, `SECTION_THRESHOLD` — chrome never renders regardless of the section name).
+
+All 3 twins' own existing test suites (`io-step-*.spec.js` ×5, `lathe-probe-1299.spec.js`, `lathe-honest-3d-
+1301.spec.js`, `probe-family-token-policy-1756.spec.js` — 34 tests total) rerun green.
+
+### tap_data / bore_data — real completeness gaps, sectioned by their own structure
+
+No live shell for either (the advisor's own t2381 count). Sectioned every previously-bare binding using
+`SECTION_RANK`'s own identity/geometry/tool-cut reading: placement/position fields (wcs, stock attach/datum,
+stock size, origin offsets, x/y, pattern, skip) → `GEOMETRY` ("where it cuts"); cutting mechanics + the tool
+itself (pitch/depth/rpm/dwell/rigid/ramp/feed/holeDia/toolDia, toolNum) → `TOOL & CUT` ("how it cuts"). Neither
+twin has an `IDENTITY`-role field — no "which variant" selector the way corner's `corner`/`probeSeq` are — so
+neither section is used, which is correct, not a gap.
+
+`toolNum` (via `toolBindingsFor`) carries no `section:` at all in its own SHARED spec (`TOOL_BINDING_SPECS`,
+deriveBindings.js) — deliberately unsectioned there since every consumer needs a different placement.
+Sectioned locally at each def-builder's own call site instead (`toolBindingsFor(stack).map((b) => ({...b,
+section:'TOOL & CUT'}))`), the exact precedent `contourData.js` already set (confirmed by reading it) rather
+than touching the shared registry-wide spec.
+
+tap_data: 20/20 sectioned (was 2/20) — live-confirmed via `formBindings`/`renderOpForm`: chrome renders
+(20 rows > 8, 2 sections), GEOMETRY box then TOOL & CUT box, zero unsectioned fields. bore_data: 37/37 (was
+25/37). Both twins' own existing suites rerun green (49 tests: bore-as-data, bore-in-place, drill-bindings-
+identity-1385, mill-family-token-policy-1758, tool-select-768, tap-twin-778, clearing-cluster-800, layout-
+partzero-shift-1672, poschip-fit-779, spindle-head-inherit-945, stock-spill-792, tooltable-gate-1890).
+Screenshot: `verification/t2401-tap-sectioned.png`.
+
+### The registry invariant — goal state reached
+
+`COMPLETENESS_EXCEPTIONS` now carries exactly ONE entry (`pocket_data` — a separate turn's own bug, a stale
+ratchet exercising the wrong render mode, not this survey's to fix). Every remaining `VOCABULARY_EXCEPTIONS`
+entry is now a live-shell `reason:'shell'` case — no `'unverified'` entries remain anywhere in the file.
+
+### THE FINAL REGISTRY COUNT
+
+**32 twins total** (confirmed live: `listUserOps().length`). **31 of 32** match their shell exactly OR are
+deliberately-ruled — either CLEAN (canonical + complete, no exception needed: 19 twins with zero entries in
+any list), structurally exempt with a stated mechanism (`drill` — tree-mode; `pause_confirm` — sectionize
+unreachable), or a verified `reason:'shell'` vocabulary case (10 twins: atc_warmup/contour/slot/surfacing/
+text/atc_test/atc_change/atc_table/atc_check/wcs/comm — comm counted once, its own entry). **The 1 remaining
+gap: `pocket_data`** (3 unsectioned fields — entryX/entryY/toolNum — a real bug from a stale t2301 ratchet
+testing tree-mode rendering when pocket's actual live render is flat; flagged by t2381, confirmed still true,
+out of this survey's own scope).
+
+### Files changed
+
+`web/blocks/dataOps/pauseConfirmData.js` — read only, no change (established moot via its own structure).
+
+`web/blocks/dataOps/ioStepData.js` — `mode`'s section `'TYPE'` → `'IDENTITY'`.
+
+`web/blocks/dataOps/faceProbeData.js`, `web/blocks/dataOps/odProbeData.js` — `'PROBE'` → `'TOOL & CUT'` (6
+fields each).
+
+`web/blocks/dataOps/tapData.js` — all 17 exec bindings + `toolNum` sectioned (GEOMETRY/TOOL & CUT).
+
+`web/blocks/dataOps/boreData.js` — 11 previously-bare bindings + `toolNum` sectioned (GEOMETRY/TOOL & CUT).
+
+`tests/twin-section-invariant-2381.spec.js` — `MOOT_TWINS` added; io_step/lathe_faceprobe/lathe_odprobe/
+tap_data/bore_data exception entries removed (closed); header comment updated with the goal-state account.
+
+`DDCS-Studio/verification/t2401-tap-sectioned.png` (new).
+

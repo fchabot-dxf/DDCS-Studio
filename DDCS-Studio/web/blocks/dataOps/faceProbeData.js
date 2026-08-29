@@ -31,27 +31,34 @@ const WCS_OPTIONS = [['Active WCS', 'active'], ['G54', 'G54'], ['G55', 'G55'], [
 // into a probe atom's socket or a controller-side expression, e.g. `ahead` → `[surface-ahead]` computed AT the
 // controller, never branched on in JS) — the corner `hopDist`/`planeZ` shape, so all 7 are DEFERRABLE-CANDIDATES.
 const REBUILD_REFUSAL = 'This value is re-resolved by the operation\'s own rebuild before the program is built — it can\'t carry a live value yet.';
+// t2401 (CLOSE THE REGISTRY) — the 6 probe-mechanic fields below were sectioned 'PROBE', a one-off name no
+// live shell dictates (lathe_faceprobe has none). Mapped to the canonical 'TOOL & CUT' instead of kept as a
+// lathe-specific word: corner/edge/middle's own OWN stylus-radius/max-seek/retract/fast-slow-feed/port set —
+// the identical conceptual field group, mill-side — already lives under 'TOOL & CUT' (cornerData.js), so a
+// separate 'PROBE' family here would fragment the registry's vocabulary rather than a real difference in
+// kind. No live-render impact either way: 8 bindings total, at (not over) SECTION_THRESHOLD(8) — chrome never
+// renders regardless of the section name.
 export const FACE_PROBE_BINDING_SPECS = [
     { param: 'ahead', match: { type: 'assign', var: V.ahead }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Touched face is ahead of Z0 by', section: 'IDENTITY', default: FACE_PROBE_DEFAULTS.ahead,
       help: 'Zero means the face you touch IS Z0 — the ordinary touch-off. Type the facing allowance instead and the datum lands on the FINISHED face, so Z0 is still Z0 after facing.' },
     { param: 'tipRadius', match: { type: 'assign', var: V.tip }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Stylus radius', section: 'PROBE', default: FACE_PROBE_DEFAULTS.tipRadius,
+      label: 'Stylus radius', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.tipRadius,
       help: 'The one number between the trigger position and the surface. Wrong here = every Z wrong by the difference.' },
     { param: 'maxDist', match: { type: 'assign', var: V.maxDist }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Max seek', section: 'PROBE', default: FACE_PROBE_DEFAULTS.maxDist,
+      label: 'Max seek', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.maxDist,
       help: 'How far to travel before calling it a miss. Jog close first; this is a safety limit, not an approach.' },
     { param: 'retract', match: { type: 'assign', var: V.retract }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Retract between touches', section: 'PROBE', default: FACE_PROBE_DEFAULTS.retract,
+      label: 'Retract between touches', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.retract,
       help: 'How far the probe backs off (mm) after the fast find, before creeping in again at the slow feed. Big enough to clear the surface, small enough that the slow touch is short.' },
     { param: 'feedFast', match: { type: 'assign', var: V.feedFast }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Fast find feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedFast,
+      label: 'Fast find feed', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.feedFast,
       help: 'Feed for the FIRST approach (mm/min) — it only has to find the surface roughly, so it can be quick. The measurement comes from the slow touch, not this one.' },
     { param: 'feedSlow', match: { type: 'assign', var: V.feedSlow }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Slow touch feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedSlow,
+      label: 'Slow touch feed', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.feedSlow,
       help: 'Feed for the SECOND, measuring touch (mm/min). This is the number that decides accuracy — slower gives a more repeatable trigger point.' },
     { param: 'port', match: { type: 'assign', var: V.port }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Probe port', section: 'PROBE', default: FACE_PROBE_DEFAULTS.port,
+      label: 'Probe port', section: 'TOOL & CUT', default: FACE_PROBE_DEFAULTS.port,
       help: 'Which controller input the probe is wired to. Must match the physical port, or the touch is never seen and the tool keeps driving.' },
 ];
 

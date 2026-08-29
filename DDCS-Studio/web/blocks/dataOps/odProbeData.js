@@ -30,6 +30,9 @@ const WCS_OPTIONS = [['Active WCS', 'active'], ['G54', 'G54'], ['G55', 'G55'], [
 // ("re-resolved by the atom itself... it can't carry a live value yet"), so all 7 are DEFERRABLE-CANDIDATES:
 // eligible if/when rebuildOdProbe's numeric rebuild is replaced with a direct #var-identity bind like corner's.
 const REBUILD_REFUSAL = 'This value is re-resolved by the operation\'s own rebuild before the program is built — it can\'t carry a live value yet.';
+// t2401 (CLOSE THE REGISTRY) — same reasoning as faceProbeData.js's own comment: 'PROBE' mapped to the
+// canonical 'TOOL & CUT' (matching corner/edge/middle's identical mill-side field group), no live-render
+// impact (8 bindings, at not over SECTION_THRESHOLD(8)).
 export const OD_PROBE_BINDING_SPECS = [
     // …a DIAMETER field bound to the DIAMETER socket. The rule exists because the failure is silent: a diameter
     // dropped into a radius socket makes every part exactly half size, with nothing on screen looking wrong.
@@ -37,22 +40,22 @@ export const OD_PROBE_BINDING_SPECS = [
       label: 'Measured bar Ø', section: 'IDENTITY', default: OD_PROBE_DEFAULTS.caliperDiameter,
       help: 'What the calipers read across the bar. After the touch the DRO shows exactly this diameter.' },
     { param: 'tipRadius', match: { type: 'assign', var: V.tip }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Stylus radius', section: 'PROBE', default: OD_PROBE_DEFAULTS.tipRadius,
+      label: 'Stylus radius', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.tipRadius,
       help: 'Compensated on the RADIUS, where the touch happens — so it moves the diameter by twice itself.' },
     { param: 'maxDist', match: { type: 'assign', var: V.maxDist }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Max seek', section: 'PROBE', default: OD_PROBE_DEFAULTS.maxDist,
+      label: 'Max seek', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.maxDist,
       help: 'How far to travel inward before calling it a miss. Jog close first.' },
     { param: 'retract', match: { type: 'assign', var: V.retract }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Retract between touches', section: 'PROBE', default: OD_PROBE_DEFAULTS.retract,
+      label: 'Retract between touches', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.retract,
       help: 'How far the probe backs off (mm) after the fast find, before creeping in again at the slow feed. Big enough to clear the surface, small enough that the slow touch is short.' },
     { param: 'feedFast', match: { type: 'assign', var: V.feedFast }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Fast find feed', section: 'PROBE', default: OD_PROBE_DEFAULTS.feedFast,
+      label: 'Fast find feed', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.feedFast,
       help: 'Feed for the FIRST approach (mm/min) — it only has to find the diameter roughly, so it can be quick. The measurement comes from the slow touch, not this one.' },
     { param: 'feedSlow', match: { type: 'assign', var: V.feedSlow }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Slow touch feed', section: 'PROBE', default: OD_PROBE_DEFAULTS.feedSlow,
+      label: 'Slow touch feed', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.feedSlow,
       help: 'Feed for the SECOND, measuring touch (mm/min). This is the number that decides accuracy — slower gives a more repeatable trigger point.' },
     { param: 'port', match: { type: 'assign', var: V.port }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
-      label: 'Probe port', section: 'PROBE', default: OD_PROBE_DEFAULTS.port,
+      label: 'Probe port', section: 'TOOL & CUT', default: OD_PROBE_DEFAULTS.port,
       help: 'Which controller input the probe is wired to. Must match the physical port, or the touch is never seen and the tool keeps driving.' },
 ];
 

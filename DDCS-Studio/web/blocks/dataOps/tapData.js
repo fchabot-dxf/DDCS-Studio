@@ -31,33 +31,38 @@ export const TAP_DEFAULTS = {
 // atoms surfacing already declares eligible; stockW/H/stockZ/originX/originY/offZ ride the same placementShift
 // text-bake, deferrable. The tap leaf's own x/y/pitch/depth/rpm/dwell are all plain num()-coerced magnitudes
 // (tap.js:16-18) with no branch on their value — deferrable.
+// t2401 (CLOSE THE REGISTRY) — sectioned by OWN structure (no live shell — the advisor's own t2381 count):
+// placement/position fields (WHERE it cuts) → GEOMETRY; the tapping mechanics + tool (HOW it cuts) → TOOL &
+// CUT — the same identity/geometry/tool-cut reading formWidgets.js's own SECTION_RANK comment gives. No
+// IDENTITY fields: tap has no "which variant" selector the way corner's `corner`/`probeSeq` do — every field
+// here is either a coordinate or a cutting parameter.
 const TAP_EXEC_BINDINGS = [
-    { param: 'wcs', tokenEligible: true, blockIndex: 1, key: 'wcs', type: 'enum', default: TAP_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
+    { param: 'wcs', tokenEligible: true, blockIndex: 1, key: 'wcs', type: 'enum', default: TAP_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'GEOMETRY' },
     // placement scalars (block 2, placeonstock)
-    { param: 'stockAttach', tokenEligible: true, blockIndex: 2, key: 'stockAttach', type: 'enum', default: TAP_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'pathDatum', tokenEligible: true, blockIndex: 2, key: 'pathDatum', type: 'enum', default: TAP_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockAttach', tokenEligible: true, blockIndex: 2, key: 'stockAttach', type: 'enum', default: TAP_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'GEOMETRY' },
+    { param: 'pathDatum', tokenEligible: true, blockIndex: 2, key: 'pathDatum', type: 'enum', default: TAP_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'GEOMETRY' },
     // t800 P1-residue — the stock block resolves from the GLOBAL stock (the stock modal), not per-op fields; formHidden like bore/contour/drill (the P5 sweep found tap still spilling them onto the form). Stays in the stack + Blocks + round-trip.
-    { param: 'stockDatum', tokenEligible: true, formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: TAP_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: TAP_DEFAULTS.stockW },
-    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: TAP_DEFAULTS.stockH },
-    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: TAP_DEFAULTS.stockZ },
-    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offX', type: 'number', default: TAP_DEFAULTS.originX },
-    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offY', type: 'number', default: TAP_DEFAULTS.originY },
-    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offZ', type: 'number', default: TAP_DEFAULTS.offZ },
+    { param: 'stockDatum', tokenEligible: true, formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: TAP_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, section: 'GEOMETRY' },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: TAP_DEFAULTS.stockW, section: 'GEOMETRY' },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: TAP_DEFAULTS.stockH, section: 'GEOMETRY' },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: TAP_DEFAULTS.stockZ, section: 'GEOMETRY' },
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offX', type: 'number', default: TAP_DEFAULTS.originX, section: 'GEOMETRY' },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offY', type: 'number', default: TAP_DEFAULTS.originY, section: 'GEOMETRY' },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offZ', type: 'number', default: TAP_DEFAULTS.offZ, section: 'GEOMETRY' },
     // tap params (block 3, the tap leaf) — plain num()-coerced magnitudes (tap.js:16-18), no branch on their value.
-    { param: 'x', tokenRefusal: 'This position is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'x', type: 'number', default: TAP_DEFAULTS.x },
-    { param: 'y', tokenRefusal: 'This position is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'y', type: 'number', default: TAP_DEFAULTS.y },
+    { param: 'x', tokenRefusal: 'This position is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'x', type: 'number', default: TAP_DEFAULTS.x, section: 'GEOMETRY' },
+    { param: 'y', tokenRefusal: 'This position is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'y', type: 'number', default: TAP_DEFAULTS.y, section: 'GEOMETRY' },
     {
-        param: 'pitch', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'pitch', type: 'number', default: TAP_DEFAULTS.pitch, widget: 'threadpick',
+        param: 'pitch', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'pitch', type: 'number', default: TAP_DEFAULTS.pitch, widget: 'threadpick', section: 'TOOL & CUT',
         label: 'Thread', help: 'Pick a standard thread (metric coarse/fine, imperial UNC/UNF) or Custom to type the pitch. Sets the mm lead that locks the feed.',
     },
-    { param: 'depth', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'depth', type: 'number', default: TAP_DEFAULTS.depth, label: 'Depth (mm)', help: 'Thread depth from engagement — roughly 1–1.5× the major Ø for a blind hole (leave room at the bottom for the tap chamfer + chips).' },
-    { param: 'rpm', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'rpm', type: 'number', default: TAP_DEFAULTS.rpm, label: 'RPM', help: 'Low — 300–500 rpm. The pitch-locked feed is derived from this.' },
-    { param: 'dwell', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'dwell', type: 'number', default: TAP_DEFAULTS.dwell, label: 'Stabilize dwell (s)', help: 'A brief pause after the spindle starts, before feeding in.' },
+    { param: 'depth', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'depth', type: 'number', default: TAP_DEFAULTS.depth, label: 'Depth (mm)', help: 'Thread depth from engagement — roughly 1–1.5× the major Ø for a blind hole (leave room at the bottom for the tap chamfer + chips).', section: 'TOOL & CUT' },
+    { param: 'rpm', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'rpm', type: 'number', default: TAP_DEFAULTS.rpm, label: 'RPM', help: 'Low — 300–500 rpm. The pitch-locked feed is derived from this.', section: 'TOOL & CUT' },
+    { param: 'dwell', tokenRefusal: 'This value is re-resolved by the tap atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 3, key: 'dwell', type: 'number', default: TAP_DEFAULTS.dwell, label: 'Stabilize dwell (s)', help: 'A brief pause after the spindle starts, before feeding in.', section: 'TOOL & CUT' },
     // rigid: picks between two structurally different cycles (a 7-line G84 canned cycle vs. a 9-line floating-holder
     // M3/M4 sequence, tap.js:21-43) — different line count/content, hardware-safety-gated. Categorical, not deferrable.
     {
-        param: 'rigid', tokenRefusal: 'Picks between two structurally different tapping cycles (a canned G84 cycle vs. a floating-holder M3/M4 sequence) — a categorical choice gated on declared spindle hardware, not a value inside one.', blockIndex: 3, key: 'rigid', type: 'bool', default: TAP_DEFAULTS.rigid, widget: 'toggle', label: 'Rigid tap (G84)',
+        param: 'rigid', tokenRefusal: 'Picks between two structurally different tapping cycles (a canned G84 cycle vs. a floating-holder M3/M4 sequence) — a categorical choice gated on declared spindle hardware, not a value inside one.', blockIndex: 3, key: 'rigid', type: 'bool', default: TAP_DEFAULTS.rigid, widget: 'toggle', label: 'Rigid tap (G84)', section: 'TOOL & CUT',
         // t2121 — `clearWhenOff` is the ONLY field in the whole app that opts into userOpView.js's checkbox
         // auto-clear (declared per-field on purpose — see that file's own comment on why it must not be generic).
         // ⚠ the tip now names BOTH vendor steps, not just the spindle: O10180 (slib-m.nc:1775-1781) is
@@ -109,7 +114,11 @@ export function tapDataDef() {
         ],
         children: appendToolSel(appendEntry(exec)),
     }];
-    const def = userOpFromStack('tap_data', 'Tap (data)', stack, [...toolBindingsFor(stack), ...TAP_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    // t2401 — toolNum (toolBindingsFor) carries no `section:` at all in its own shared spec (deriveBindings.js;
+    // TOOL_BINDING_SPECS is registry-wide, deliberately unsectioned there) — every consumer sections it locally,
+    // same as contourData.js's own precedent. tap's own tool belongs alongside its other cutting parameters.
+    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL & CUT' }));
+    const def = userOpFromStack('tap_data', 'Tap (data)', stack, [...toolNum, ...TAP_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = tapPreviewGeometry;
     def.entryPoint = ENTRY_POINT;
     def.zRuler = { depthParam: 'depth', depthOnly: true };   // t2044 — the depth-only ruler (tap has no stepdown — a single threading pass): axis + total-depth grip, no pass ticks
