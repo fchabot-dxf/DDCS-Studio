@@ -3499,7 +3499,7 @@ and culling/renaming Blockly's native context-menu entries. The canvas keeps its
 
 ### 44. CANVAS FIND — search the blocks that are THERE, not just the palette
 
-*(owner-approved 2026-08-08 sweep-adjacent; rides the editor search box shipped at t2383 so the two feel
+*(owner-approved explicitly 2026-08-28 — "4 yes"; rides the editor search box shipped at t2383 so the two feel
 identical. The palette search (blocksApp.js:291) filters what you can ADD; nothing searches a 98-block stack.)*
 
 Same find bar contract as the editor's: n-of-m count, Enter/arrows cycle, Esc closes — but a match pans the
