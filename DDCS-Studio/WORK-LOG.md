@@ -63567,3 +63567,42 @@ JSON reporter; CI's own `dot`+`html` untouched.
 
 Full suite (this turn's own closing gate) reported separately below — it also dogfoods this very change.
 
+### Full suite — `npm test` (both tiers, the closing gate AND the dogfood run)
+
+**2920 passed, 6 failed, 22 flaky (all recovered on isolated re-run), 26 skipped, 34m31s** e2e; node tier 238/
+238, 4.5s. Captured stdout: **146,125 bytes total** — but 146,125 is the WRONG number to headline, because it
+includes the pre-existing, untouched node tier's own verbose test-code console output (`[VIRTUAL IO]`/`[DDCS]`
+diagnostic prints from the actual tests, not this turn's own reporter). Isolated the `test:e2e` section alone
+— the actual subject of BACKLOG #54 — with `awk`: **2,782 bytes, 35 lines.** Against the measured baseline
+(525,566 / 541,230 bytes, t2405's/t2403's own `list`-reporter e2e runs): **a ~99.5% reduction** — from ~530KB
+to under 3KB for the identical tier. Watched live during the run too (a separate `Monitor` task polling
+`progress.md`): 20 distinct updates captured, `Progress` climbing 0→108/2974 with a fresh `Heartbeat` every
+time, well before the run itself even finished — the file-update mechanism is not a claim, it was watched
+happening.
+
+The 35-line e2e console output itself: a start line, 12 heartbeat lines (~2min apart, 34.5min run), 6 `[FAIL]`
+lines (one per hard failure, printed immediately, not batched), and the final `DONE` summary — exactly the
+designed shape.
+
+### The 6 hard failures — a real, honest finding, not waved away
+
+This run's own numbers (6 failed, 22 flaky) read HIGHER than the last several turns' own full-suite baselines
+(0-3 failed, 10-14 flaky) — worth a real look given the dispatch's own explicit "if the reporter change makes
+the suite itself unreliable, that is a stop-the-turn finding." Re-ran all 6 in isolation: `cam-slot-edit-s3`,
+`collapsible-panes-752`, `formfield-authoring-1610`, `open-as-modal-1625`, `pane-visual-host-programmatic-
+1762` (20 tests across the 5 specs, one Playwright invocation) — **all 20 passed clean**, including the exact
+failing test name from the full run (`cam-slot-edit-s3`'s own "Edit a UNIVERSAL slot" case, 10.4s). `middle-
+superset` (a 4-way-sharded, CPU-heavy 14336-combo structural sweep, run separately since each shard alone
+takes ~18s) — **all 6 of its own tests passed clean too**, 1.2m total.
+
+Considered whether the reporter's OWN per-test file writes could be adding contention: `fs.writeFileSync`
+runs in the ONE main orchestrator process (Playwright reporters always do — the 6 workers dispatch
+`onTestEnd` over IPC, they never touch the filesystem for this), a few KB, sequentially, no concurrent
+writers — implausible as a meaningful CPU/browser-resource contributor next to 6 parallel Chromium instances,
+and none of the 6 failures' own error messages mention progress files, timing near a write, or anything
+reporter-shaped. All 6 have deep prior-turn history (3-73 mentions each) and recovered instantly once removed
+from the 6-way parallel load — the SAME contention class this session has documented repeatedly, not a new
+one. **Not a stop-the-turn finding** — the reporter did not destabilize the suite; this run's own numbers sit
+within the established noise band (a concurrently-active advisor session, confirmed real this same session,
+is at least as plausible an explanation for one noisier run as anything this turn touched).
+
