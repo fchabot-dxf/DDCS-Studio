@@ -3650,11 +3650,15 @@ checks stay (dangling still needs catching).
 
 > ⭐ **The reproduction gap IS the lead.** t2391 drag-tested with the harness's pointer and saw the canvas
 > follow; the owner's real gesture does not. ⭐ **TOUCH ELIMINATED 2026-08-29 — owner: "drag on desktop."**
-> The failing drag is a MOUSE on the PC, so the axis is not the input kind. Prime suspect is now
-> **returning-user state** (the t2345 class exactly: the harness's fresh profile passes, the owner's
-> long-lived browser breaks — bootstrap/localStorage-dependent). Discriminator the owner can run in ten
-> seconds: the same drag in an INCOGNITO window — follows there = state-dependent confirmed; still dead
-> there = environment/build, and say which browser. ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
+> The failing drag is a MOUSE on the PC — and ⭐ **"phone is same" (owner, same session)**: BOTH the owner's
+> devices fail while the harness passes. The common factor is therefore not the device or the input kind but
+> **what both devices share and the harness lacks: the owner's own WORKSPACE DATA and returning-user state.**
+> The harness boots a DEFAULT machine config ([[agent-tests-use-default-config-not-users]]) — a real
+> workspace's stock/feature/machine values reaching both devices is the standing suspect (e.g. a value that
+> makes the canvas redraw silently fail while the writeback half still lands). Two owner discriminators, ten
+> seconds each: (1) the drag in an INCOGNITO window — follows there = data/state confirmed; (2) if confirmed,
+> EXPORT the workspace (.ddcs) so the probe turn reproduces with the owner's real data instead of the
+> default. ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
 > feature canvas (the `?debug=drag` dragProbe pattern that cracked the splitter saga — passive listeners,
 > on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
 > writes) still sequences BEFORE the commit-on-release fix, per its own entry.
