@@ -62922,3 +62922,53 @@ unchanged; survey still green.
 No production source touched — Rule 1b doesn't strictly apply, but the dispatch's own "full suite at the
 end" does; run once, after the tail below, covering both.
 
+## t2399 TAIL (own commit) — BACKLOG #48 item 5, THIRD offer, scoped to TWO families: `progend` retract/park
+## + `drillcycle.cycle` → q/dwell
+
+Same `dynamic`+`fieldsFor`+`allFields` shape t2393 shipped for holecycle/param.js. `progEndBlock`
+(`wizards/ops/program.js`): `retractZ` only means anything when `retract` is on, `parkX`/`parkY` only when
+`park` is on (both read by `emit`'s own `footerBlock` call) — every combination showed all 4 boxes
+regardless. `drillCycleBlock` (`wizards/ops/cnc.js`): `q` (peck depth) only matters for `cycle:'peck'`,
+`dwell` only for `cycle:'dwell'` (both read in `emit`) — every other cycle showed both.
+
+### A second live-caught bug, landing the first
+
+`fieldsFor` is called from bridge.js's own `apply()` with RAW `getFieldValue()` results for the `dynamic`-
+listed fields. A Blockly checkbox reads back UPPERCASE `'TRUE'`/`'FALSE'` — a different shape than `emit`'s
+own already-resolved op params, which is what `program.js`'s existing `truthy()` helper was written for (it
+only rejects LOWERCASE `'false'`/`0`/`'0'`/real `false`). Reusing `truthy()` in the new `fieldsFor` passed
+`'FALSE'` (uppercase) as truthy, so `park:'FALSE'` still showed `retractZ` and hid `parkX`/`parkY` — the
+exact opposite of what the toggle asked for. Invisible on a FRESH block (init-time `apply()` runs before any
+`fields:{...}` override lands, so it reads the block's own DEFAULTS — which happen to already read
+"truthy-ish" either way) — only surfaced by deliberately testing the OFF state on a loaded/overridden block.
+Fixed with a small dedicated check (`v === true || v === 'TRUE'`) instead of reusing `truthy()`, which stays
+untouched and correct for `emit`'s own, differently-shaped params.
+
+### Verified live
+
+Built blocks via `Blockly.serialization.blocks.append` + a forced `_ddcsApplyDyn()` recompute (the same
+public hook `blocksApp.js`'s own "Block options…" popup calls) across 3 scenarios: retract-on/park-off/
+cycle-peck, retract-off/park-on/cycle-dwell, and cycle-drill alone — all 10 field-visibility assertions
+passed only after the checkbox fix; failed correctly beforehand (confirmed by re-running before reverting
+the fix). Round-trip confirmed separately: a hidden field still holds its declared value (Blockly visibility
+never touches the underlying stored value). `tests/multi-op-progend-1828.spec.js` + `tests/atom-gating.spec.js`
+rerun green — emit itself untouched. Screenshot: `verification/t2399-tail-dynamic-gating.png` (4 blocks, two
+scenarios each, visually confirming the correct fields show/hide per row).
+
+BACKLOG #48 item 5 updated: 2 of its 6 remaining families now shipped (progend, drillcycle); 4 remain (slot/
+surfaceraster/pocketfill/surfacefill entry, region/pocketfill shape, tap.rigid, contourfill's helix offer) —
+counted plainly in the item's own bracket note.
+
+### Files changed
+
+`web/wizards/ops/program.js` — `progEndBlock` gains `allFields`/`dynamic`/`fieldsFor`.
+
+`web/wizards/ops/cnc.js` — `drillCycleBlock` gains `allFields`/`dynamic`/`fieldsFor`.
+
+`BACKLOG.md` — item 5's bracket note + numbered list updated (2 families closed, named; 4 remain, named).
+
+`DDCS-Studio/verification/t2399-tail-dynamic-gating.png` (new).
+
+No test spec persisted (matching t2393's own precedent for this exact mechanism — verified live during the
+turn, not ratcheted as a permanent spec).
+

@@ -31,6 +31,19 @@ export const drillCycleBlock = {
     type: 'drillcycle', label: 'Drill Cycle', kind: 'leaf', category: 'Toolpaths',
     defaults: { cycle: 'peck', x: '', y: '', z: -5, r: 2, q: 1, dwell: 0, feed: 200 },
     fields: ['cycle', 'x', 'y', 'z', 'r', 'q', 'dwell', 'feed'],
+    allFields: ['cycle', 'x', 'y', 'z', 'r', 'q', 'dwell', 'feed'],
+    // t2399 (BACKLOG #48 item 5) — `q` (peck depth) only means anything for `cycle:'peck'`, `dwell` only for
+    // `cycle:'dwell'` (both read below in `emit`, each gated on the SAME check) — every OTHER cycle showed both
+    // boxes regardless, the same dead-field shape t2393 fixed for holecycle's pattern/cycle split.
+    dynamic: 'cycle',
+    fieldsFor(p) {
+        const cycle = String((p && p.cycle) || 'peck');
+        const f = ['cycle', 'x', 'y', 'z', 'r'];
+        if (cycle === 'peck') f.push('q');
+        else if (cycle === 'dwell') f.push('dwell');
+        f.push('feed');
+        return f;
+    },
     gate: (d) => noFlow(d) ? 'no canned cycles — use the Drill wizard' : null,
     // Native canned cycle (modal): give X/Y to drill at a point, or leave blank to use the current position;
     // cancel with the Cancel Cycle atom (G80). G82 dwell P is in the dialect's dwell units. Classic grbl has no
