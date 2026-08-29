@@ -520,13 +520,26 @@ async function buildWorkspace() {
   // the target DOM element (wizardManager.js:542-579), not on the manager instance, so borrowing the SAME
   // singleton `openLiveAsModal` already reuses (this file, `window.ddcsStudio.wizardManager`) is safe: it never
   // renders into the pane's `blk_`-prefixed containers and the modal's un-prefixed ones at once (one gesture at a
-  // time). `update` stays a no-op — blocksApp already re-renders the pane reactively on canvas change; routing it
-  // through the real manager's own `update()` would re-render whichever wizard THAT considers active, which is a
-  // different (and, for the pane, wrong) concept.
+  // time).
+  //
+  // t2409 (BACKLOG #46) — `update` staying `{}` left a SECOND severance the comment above never anticipated:
+  // userOpView.js's own delegated field-write listener (the one `render()` wires per instance, "any widget
+  // input/change... re-runs update()") calls `_mgr.update()` SYNCHRONOUSLY on every canvas-drag frame — the exact
+  // mechanism the sim-start marker's own `onDrag` already leans on (userOpView.js:800, `mgr.update()`) to repaint
+  // mid-drag. On the WIZARD's own host `_mgr` is the real wizardManager, whose `update()` resolves straight back
+  // to `view.update(this)` (wizardManager.js:458-461) — a stub here meant the pane's frame-exact redraw call was
+  // always a no-op, confirmed live via ?debug=feat: writes climbed 0→27 across a drag while redraws stayed 0.
+  // blocksApp's OWN reactive re-render (reproject()→renderLiveForm()→`blkView.view.update(blkMgr())`, called
+  // below at both call sites) is real, but it rides Blockly's own async change-event queue, not this frame's own
+  // synchronous handler — which is why t2405's local runs only ever saw a delayed catch-up, never a same-frame
+  // repaint. Routing `update()` to `blkView.view.update(blkMgr())` (NOT the real wizardManager, whose own
+  // `activeView()` would resolve to whichever wizard IT considers open — a different and, for this pane, wrong
+  // target) gives the pane the SAME self-contained, frame-exact redraw the wizard host already has, without
+  // touching what a wizard elsewhere in the app considers active.
   function blkMgr() {
     const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
     return {
-      update() {},
+      update() { blkView.view.update(blkMgr()); },
       preview3D: (...a) => { if (wm) wm.preview3D(...a); },
       previewVarSeed: (...a) => { if (wm) wm.previewVarSeed(...a); },
     };

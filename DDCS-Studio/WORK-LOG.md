@@ -63606,3 +63606,92 @@ one. **Not a stop-the-turn finding** — the reporter did not destabilize the su
 within the established noise band (a concurrently-active advisor session, confirmed real this same session,
 is at least as plausible an explanation for one noisier run as anything this turn touched).
 
+## t2409 — BACKLOG #46 FIXED: the Blocks pane's frozen canvas handle, root traced and repaired
+
+The dispatch's own "CONFIRM before fixing" instruction was followed literally: before writing a single line,
+traced `blocksApp.js`'s full render call graph from the drag gesture down to the DOM, because the prime
+suspect (`blkMgr()`'s stubbed `update(){}`) came with its own comment claiming the stub was SAFE ("blocksApp
+already re-renders the pane reactively on canvas change") — and that claim turned out to be half right, which
+is exactly the kind of thing worth confirming rather than assuming wrong.
+
+**The trace.** `reproject()` (bound via `ws.addChangeListener`, fires on any real `!e.isUiEvent` field change)
+DOES call `renderViewsPrompt(getProjection())` → `renderLiveForm()` → `blkView.view.update(blkMgr())` on every
+canvas-drag write — a genuine, working redraw path. But `ws.addChangeListener`'s callback runs off Blockly's
+own internal event queue, which fires on a deferred macrotask, not synchronously inside the drag's own
+`pointermove` handler. That explains t2405's own "one-frame lag-then-catch-up" finding precisely: it was
+always the ONLY path firing, just a beat late every time.
+
+The SEVERED half is a separate, synchronous path: `userOpView.js`'s own delegated field-write listener (wired
+once per `createUserOpView` instance — "any widget input/change... re-runs update()") calls `_mgr.update()`
+directly, in the same tick as the write. This is the exact mechanism the sim-start marker's own `onDrag`
+already leans on (`userOpView.js:800`) to repaint mid-drag — a working sibling pattern that made the intended
+design obvious once found. On the wizard's own host (`createUserOpView(null)`, `_mgr` = the real
+`wizardManager`), `_mgr.update()` resolves straight back to `view.update(this)` (`wizardManager.js:458-461`) —
+real, every frame, which is why the confirmed-working control worked. On the Blocks pane, `_mgr` is `blkMgr()`,
+whose `update` was `(){}`. That's the whole severance: not "the pane never redraws," but "the pane's one
+FRAME-EXACT redraw path was always dead, leaving only the laggy async one" — which also answers the dispatch's
+own second-finding ask (why localhost never showed a hard freeze): a real fast mouse drag fires far more
+events/sec than a paced or synthetic one, and against a redraw mechanism already down to its one fragile async
+leg, a fast enough drag can plausibly starve it inside any short recording window while a slower one still
+gets gaps to catch up in. Not proven at the Blockly-internals level (that would need instrumenting Blockly's
+own event queue, out of scope), but it's a consistent, sufficient explanation and named as such, not asserted
+as certain.
+
+**The fix** (`web/blocks/blocksApp.js`, one line): `blkMgr().update()` now calls `blkView.view.update(blkMgr())`
+directly — giving the pane its own self-contained, synchronous redraw — instead of staying a no-op. Deliberately
+NOT routed through the real `wizardManager`'s own `update()`, which the original stub's comment correctly
+warned would redraw whichever wizard the real manager considers globally active (wrong target for a pane
+showing a different, unsaved, in-progress canvas state). This matches the dispatch's own steer exactly: give
+the pane its own path, don't un-stub into the shared manager.
+
+**Verification order, each step live, nothing assumed:**
+1. Built a real placed `user_pocket_data` op (`opBuilders.js`'s `_framed`+`makeOp`, the exact shape a genuine
+   Insert produces — two earlier attempts, a bare `{opType:'pocket'}` block and the wizard-AUTHORING canvas via
+   `builderOf('user_pocket_data')()`, both rendered the WRONG handle set or no canvas at all; only the properly
+   framed op renders `pk_size`/`pk_pos`, confirming `hid:pk_size` needs the real data-op registry path, not a
+   shortcut).
+2. Ran the fix's own drag through `?debug=feat` in the Blocks pane: `handle:` tracks `ptr:` every frame,
+   `writes` and `redraws` climb together, ending `writes:32 redraws:16` at pointer-up.
+3. Stashed the fix and re-ran the IDENTICAL drag to prove the test is not vacuous, not argue it: the handle
+   froze at `1295,458` for all 50 frames while `writes` still climbed to 32 and `redraws` stayed 0 the whole
+   time (including the settle frame past pointer-up) — the owner's own capture shape, reproduced locally for
+   the first time this whole arc. Popped the stash back immediately.
+4. Regression-checked the confirmed-working control (`pocket-canvas.spec.js`, the shell's own `openWiz('pocket')`
+   canvas — an entirely separate, untouched code path) — still green. Regression-checked the Blocks pane's own
+   "Open as modal" door (`openLiveAsModal`, the REAL `wizardManager`, also untouched by this fix) with a fresh
+   drag inside the opened modal — handle moved 24×12px on screen, confirming that path was never at risk and
+   stays fine.
+5. Committed both checks as permanent specs (`tests/blocks-pane-redraw-2409.spec.js`,
+   `tests/blocks-pane-modal-regression-2409.spec.js`) rather than leaving them as scratch scripts — a shared-file
+   fix earns a pinning test so a future edit to `blkMgr()`/`renderLiveForm()` can't reintroduce this silently.
+
+**Rule 1b — full suite.** 2934 passed / 1 failed / 15 flaky / 26 skipped of 2976. The 1 failure
+(`open-as-modal-1625.spec.js`, "A REAL OPEN AFTER A PREVIEW…") is the SAME test t2407's own full run already
+named and cleared as a pre-existing contention flake (see that entry above) — this turn re-confirmed rather
+than took that on faith: 3/3 clean at single-worker isolation, and a targeted contention re-run (all
+`blocks-*`/`open-as-modal*` specs at 6 workers, twice) showed it passing both times while a DIFFERENT,
+unrelated file (`blocks-mmb-pan.spec.js` — Blockly canvas middle-mouse panning, no code path anywhere near
+`blkMgr()`) failed instead — exactly the "contention-starved population shifts run to run" behavior
+`playwright.config.js`'s own comment already documents. Not a regression from this change; named here rather
+than waved off. (My own new `blocks-pane-redraw-2409.spec.js` also flaked once under that same contention
+batch on a too-tight default `waitForFunction` timeout — hardened to `{ timeout: 60000 }`, matching the rest
+of the suite's own convention, and clean on the re-run.)
+
+**A process note, since it cost real time this turn:** an early `npm test` invocation got double-backgrounded
+(the Bash tool's own `run_in_background` PLUS a shell `&` on top of it) — the orphaned process kept running
+undetected by `proc_health.py` (outside its tracked subtree by construction) and collided with a later, properly
+backgrounded run on port 3211 and the shared `test-results/` directory, producing a false "0 tests collected"
+failure. Diagnosed via `Get-CimInstance Win32_Process` (full command lines + parentage, not just `ps aux`,
+which Git Bash's PID emulation made unreliable here) — every PID `taskkill /T /F` actually terminated traced
+back cleanly to the one orphaned `npm test` tree (confirmed by walking each "child of" line to the same root),
+so nothing outside it was touched, but it's worth naming as a repeatable mistake: never background a command
+with the tool's own flag AND a trailing `&` in the same call.
+
+**Dogfood report on the progress reporter (t2407), as asked.** Genuinely useful mid-run this turn: a single
+`Read` on `test-results/progress.md` while the suite was running gave an instant, at-a-glance status (36/2976,
+0 failed, ETA 34m, current test name) with zero stdout noise and no need to tail a live process — exactly the
+lightweight peek the reporter was built for. It didn't help diagnose the double-background collision (that
+failure happened too fast to produce a meaningful progress file — the 0-tests run showed `[progress] DONE in
+0s` immediately, which if anything was itself a useful signal that something was structurally wrong rather
+than a slow failure).
+

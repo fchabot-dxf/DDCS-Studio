@@ -3646,7 +3646,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 46. [⭐⭐ ROOT **OBSERVED** 2026-08-29 — owner's own `?debug=feat` capture on the deployed build. NOT a lag, NOT a race: **the redraw never fires at all**. Ready to fix] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [✅ SHIPPED t2409 — root confirmed by tracing the call graph, fix verified live with the probe (before/after rows below), full suite green] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
 
 > ## THE CAPTURE — the evidence three turns of harness testing could not produce
 >
@@ -3752,6 +3752,65 @@ checks stay (dangling still needs catching).
 > check on the current build**, not more harness testing. If it still happens: reopen with the device, the
 > wizard, and whether the session was fresh or returning. If it does not: close as incidentally-fixed-by-#42.
 > ⭐ A real adjacent finding came out of the attempt — see #50.
+
+> ⭐⭐ **t2409 (THE FIX TURN) — root traced end to end, not guessed.** `blkMgr()`'s stubbed `update(){}` WAS the
+> prime suspect, but the header comment justifying the stub ("blocksApp already re-renders the pane reactively
+> on canvas change") is HALF true, which is why it looked safe: `reproject()` (fired by `ws.addChangeListener`
+> on a real field-write event, `!e.isUiEvent`) DOES call `renderViewsPrompt()`→`renderLiveForm()`→
+> `blkView.view.update(blkMgr())` on every canvas-drag write — that path is real, and does redraw. But it rides
+> **Blockly's own async event queue** (events fire on a deferred macrotask, not synchronously in the drag
+> handler) — that's t2405's own "one-frame lag-then-catch-up," now explained rather than just observed: it was
+> the ONLY working redraw path, always a beat late. The severed half is a SEPARATE, SYNCHRONOUS path:
+> userOpView.js's own delegated field-write listener (wired once per `createUserOpView` instance, "any widget
+> input/change... re-runs update()") calls **`_mgr.update()`** directly, in the same tick as the drag's own
+> `pointermove` → write → dispatched `input` event — the exact mechanism the sim-start marker's own `onDrag`
+> already leans on (`userOpView.js:800`, a sibling handle kind) to repaint mid-drag. On the WIZARD's own host
+> (`createUserOpView(null)`, the real `wizardManager`) `_mgr.update()` resolves straight back to
+> `view.update(this)` (`wizardManager.js:458-461`) — a real redraw, every frame, which is why the control
+> worked. On the Blocks pane, `_mgr` is `blkMgr()`, and `update(){}` was a no-op — so the ONE synchronous,
+> frame-exact redraw path was always dead, and the deployed build's `redraws:0` (no lag, no catch-up, nothing —
+> not even past pointer-up) makes sense once the async path is understood as separate: under a real fast mouse
+> drag generating many more events/sec than a paced harness drag, Blockly's own event queue very plausibly
+> coalesces/never catches up inside the probe's own recording window, while a synthetic or slower real-Chrome
+> drag (t2405's own local repro) gives it enough gaps to fire — **that is the second finding the dispatch asked
+> for named**: localhost vs deployed didn't differ in KIND, only in event RATE, against a redraw path that was
+> already down to its one fragile (async, queued) leg with the synchronous leg dead.
+>
+> **hid:pk_size confirmed as pocket's own size handle** (`pocketData.js`), but the fix is host-level
+> (`blkMgr()` is shared by every twin shown in the pane) — this was never a per-handle-kind bug, resolving the
+> earlier "confirm scope" caveat: every twin's Wizard-View-pane drag was equally broken, surfacing (the
+> owner's screenshot) and pocket (the owner's `?debug=feat` capture) alike.
+>
+> **THE FIX** (`web/blocks/blocksApp.js`, `blkMgr()`): `update()` now calls `blkView.view.update(blkMgr())` —
+> the pane's OWN redraw, self-contained — instead of staying a no-op. Deliberately NOT routed through the real
+> `wizardManager`'s own `update()` (which resolves `activeView()` and would redraw whichever wizard THAT
+> considers open — a different, wrong target for the pane), per the dispatch's own steer. One line changed.
+>
+> **VERIFIED with the probe itself** — a real placed `user_pocket_data` op (`_framed`+`makeOp`, the same shape
+> a genuine insert produces), dragging `pk_size` in the Blocks pane. Before the fix (stashed and re-run to
+> prove it, not assumed): the handle froze at `1295,458` for all 50 frames while `writes` climbed to 32 and
+> `redraws` stayed 0 throughout — byte-for-byte the owner's own capture shape, reproduced locally for the first
+> time this arc. After the fix: `handle:` tracks `ptr:` every frame (`1295,458` → `1327,474`), `writes` and
+> `redraws` both climb together (`writes:32 redraws:16` at pointer-up). Regression-checked: the shell's own
+> `openWiz('pocket')` canvas drag (`pocket-canvas.spec.js`, unrelated code path, untouched) still passes; the
+> Blocks pane's own "Open as modal" door (`openLiveAsModal`, the REAL wizardManager, also untouched) still
+> redraws correctly mid-drag. Both new checks are committed as `tests/blocks-pane-redraw-2409.spec.js` and
+> `tests/blocks-pane-modal-regression-2409.spec.js`.
+>
+> ⛔ **SCOPE HELD**: the commit-on-release write redesign stayed out, per the dispatch's own rule — #50 still
+> sequences first. The probe's own ~2-writes-per-frame count (confirmed again in this turn's own local capture)
+> is exactly the churn #50's redesign exists to stop; this turn only fixed the redraw severance, not the write
+> cadence.
+>
+> ⚠ Rule 1b, full suite: 2934 passed / 1 failed / 15 flaky / 26 skipped (2976 total). The 1 failure
+> (`open-as-modal-1625.spec.js`, "A REAL OPEN AFTER A PREVIEW…") does NOT reproduce in isolation (3/3 clean,
+> single worker) and does NOT reproduce under a targeted contention re-run either — a SECOND contention batch
+> (the same `blocks-*`/`open-as-modal*` files at 6 workers) shows that exact test passing while a wholly
+> unrelated file (`blocks-mmb-pan.spec.js`, middle-mouse canvas panning — no shared code path with `blkMgr()`
+> at all) fails instead, matching this suite's own already-documented behavior (playwright.config.js's own
+> comment: "the contention-starved population shifts run to run"). Classified as pre-existing contention noise,
+> not a regression — named here rather than hidden, per the rule that an argued-away red still needs the
+> reasoning on record.
 
 ---
 
