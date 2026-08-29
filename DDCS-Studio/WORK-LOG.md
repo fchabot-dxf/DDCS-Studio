@@ -62343,3 +62343,96 @@ All 7 pieces shipped: piece 1 (t2385), pieces 3/4/5 (t2387), pieces 2/6/7 (t2389
 DELIBERATELY-LEFT-ALONE items (gate/optionGate blobs, matchvar/atomType free text) — the second is now
 SUPERSEDED by the owner's own later ruling, recorded above and in formField.js's own header, not re-litigated.
 
+## t2391 — BACKLOG #46 (Wizard-View canvas drag): NO CODE SHIPPED — the reported symptom could not be
+reproduced, but a DIFFERENT, more general, more severe defect was found, isolated, and confirmed live; a
+narrow attempted fix was reverted after it proved unsafe. Full investigation trail below — every claim has a
+live before/after result, per the dispatch's own explicit "OBSERVE FIRST, four theories died in one afternoon
+on this class of bug" instruction. TAIL (BACKLOG #44, canvas find) NOT started — this ate the whole turn.
+
+### What I could NOT reproduce, despite trying hard
+
+"Canvas doesn't follow the finger during a drag" — tested via direct `PointerEvent` dispatch on the real
+`.fc-handle` SVG element (`#blk_userVizContainer svg`, found via `pane-visual-host-programmatic-1762.spec.js`'s
+own selectors — `#blk_userVizContainer`/`#blk_wiz_user_form`, NOT the `#blk-form`/`#blk-formpane` ids I first
+guessed from reading `renderLiveForm()` alone, which are the OLD flat-branch host, unused when `hasTree` is
+true — a live-caught wrong assumption before any drag testing even started):
+
+- surfacing's `sf_pos` handle (kind `move`, `noSnap:false`) — single move, 8-step paced drag, and a 15-step
+  rapid burst with NO inter-event delay — every configuration showed `FeatureCanvas.render(activeHandle=true)`
+  firing on every `pointermove`, the handle's own `cx`/`cy` visibly advancing each step, and the bound form
+  field (`originX`) staying in exact sync throughout.
+- corner's two handles (`reposition_pos` and `__simstart0`) — same result, both handles, both routes (placed-op
+  via `openWiz`+`insertWiz`, and authored/Customize via `ddcsEditWizardDef`).
+- drill: no `.fc-handle` at all rendered for the default "Single hole" pattern (not tested further under a
+  patterned setting — noted as an open gap, not a finding).
+
+Conclusion, stated plainly: in every scenario I could construct, the canvas visibly follows the drag, live,
+today. If the owner's phone genuinely shows a frozen canvas, either it needs a MORE specific repro than
+anything above (a particular twin/handle/pattern I didn't try, a touch-specific code path, or a race that only
+manifests at real human mouse-move rates far faster than my Playwright-scripted 20ms-spaced events), or the
+proximate cause is the defect below manifesting as visible LAG under a real fast continuous drag rather than a
+hard freeze — I cannot tell which from here, and did not want to guess further without a sharper repro.
+
+### What I DID confirm, precisely, with a clean isolating control
+
+1. **`writeAuthoredValue` (devMode.js) fires on EVERY `pointermove`, not once on release** — confirmed via a
+   temporary `window.__DBG_writeAuthoredValue` hook: an 8-step drag produced 8 separate calls (one per param
+   per step), each landing a real `setFieldValue` on the underlying Blockly block — Blockly's own
+   `ws.undoStack_` grew by 14 entries for one drag gesture. This directly contradicts the ruling's "ONE write
+   lands in the block → one undo step."
+
+2. **The app's REAL undo (`window.ddcsUndo`, saveStates.js — NOT `ws.undo()`, confirmed to be the actual
+   user-facing mechanism) does not revert the drag's value AT ALL, even after 6 consecutive presses.** Not
+   "needs many presses" — literally zero effect; `originX` stayed at its post-drag value through 6 undos.
+
+3. **⭐ THE ACTUAL ROOT, isolated by a clean control comparison, NOT the drag mechanism at all:**
+   - A single typed edit (`f.value='99'` + ONE `input` + ONE `change`) undoes PERFECTLY: `0 → 99 → (undo) → 0`.
+   - 8 RAPID `input`-only writes to the SAME field, direct script, **zero canvas/drag code involved at all**
+     (`f.value=String(i*3); f.dispatchEvent(new Event('input'))`, 20ms apart): `0 → 24 → (undo) → 24`, i.e.
+     completely undo-invisible — byte-identical symptom to the canvas-drag case.
+   - This PROVES the defect is a general one in the undo/snapshot system's (`saveStates.js`) handling of
+     rapid successive `input` events on a bound field — canvas dragging is just ONE way to produce that
+     pattern (a form-driven macro filling several fields fast, or a fast programmatic multi-field update,
+     would trigger the identical loss). The BACKLOG entry's own framing ("canvas drag") named the SYMPTOM'S
+     most visible trigger, not the actual mechanism.
+   - **Hypothesis tested and REFUTED before I trusted it**: manually firing a `change` event after the drag
+     (simulating what a missing `onDragEnd` hook might supply) did NOT restore undo — ruled out "missing
+     `change` event" as the cause. Glad I checked before writing that as the fix; it would have shipped a
+     no-op.
+
+### The fix I tried, and REVERTED — proof it was unsafe, not proof it was wrong
+
+Before finding the rapid-input isolation above, I tried the ruling's literal shape: defer `writeAuthoredValue`
+in `blocksApp.js`'s `onFieldWrite` callback until a canvas-handle `pointerup` (tracked via event delegation on
+the stable `root` element, buffering `{param: value}` per drag, flushing once on release). This DID achieve
+"one `writeAuthoredValue` call, at release" (confirmed: exactly 1 call per param, not 8) — but a live
+re-check of the SAME drag sequence afterward showed the canvas's own handle position **stopped updating
+during the drag** in at least one test run (`FeatureCanvas.render(activeHandle=true)` never fired mid-drag;
+only two `render(active=false)` calls landed, both after release). I do not fully understand why — my working
+theory is that userOpView.js's OWN independent live-redraw path (`_inlineUpdate`/`_throttledUpdate`, wired at
+userOpView.js:439-453, genuinely separate from `onFieldWrite` and confirmed to redraw a PLACED op's canvas
+with no Blockly write involved at all) has some dependency on the HEAVIER `reproject()`-driven render cycle
+that I broke by suppressing it — the two redraw pathways are more coupled than they first appeared. Rather
+than ship a change I can't fully explain and had ONE contradictory observation against, I reverted it (`git
+checkout --` on all 4 touched files: blocksApp.js, devMode.js, featureCanvas.js, panelTypes.js — confirmed
+clean via `git status`) and did not carry it forward.
+
+### Where this leaves it
+
+- The reported "canvas doesn't follow" is UNREPRODUCED. The CONFIRMED, general, and more severe defect
+  (rapid-input sequences are invisible to undo, canvas-drag or not) is very likely related — probably the
+  REAL substance behind the report, whether or not the visual freeze itself reproduces — but its fix lives in
+  `saveStates.js`'s gesture/debounce logic (unexamined this turn beyond confirming `window.ddcsUndo` /
+  `flushPendingGesture` is the real entry point), not in the canvas/writeback files I spent the turn in.
+- Next step, concretely: instrument `saveStates.js`'s own snapshot scheduling (`history`/`ptr`,
+  `flushPendingGesture`, the `GESTURE_QUIET_MS`-style settle logic if any) against the SAME isolating
+  8-rapid-`input` repro above (no canvas needed) — a much smaller, faster, more targeted harness than anything
+  drag-shaped, now that the drag angle is ruled out as the actual mechanism.
+- No code shipped. `git status` clean at hand-back. BACKLOG #46 stays open, its own heading untouched (nothing
+  to tag — rule 8 applies to closures, not investigations).
+
+### BACKLOG #44 (canvas find) — NOT STARTED
+
+Per the dispatch's own explicit permission ("if the drag fix eats the turn, hand back without the tail and say
+so") — the investigation above consumed the full turn. Zero lines of #44 written.
+
