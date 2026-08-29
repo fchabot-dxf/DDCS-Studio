@@ -3646,7 +3646,47 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 46. [⛔ REOPENED 2026-08-29 — OWNER-CONFIRMED on ≥V2026.08.29.8: "no handle wont follow my movement." The harness (t2391, extensive) cannot reproduce what the owner's device shows — DEVICE/STATE-DEPENDENT, the t2345-t2357 pattern again] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [⭐⭐ ROOT **OBSERVED** 2026-08-29 — owner's own `?debug=feat` capture on the deployed build. NOT a lag, NOT a race: **the redraw never fires at all**. Ready to fix] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+
+> ## THE CAPTURE — the evidence three turns of harness testing could not produce
+>
+> Owner's overlay, one real drag, `hid:pk_size` on `svg:feature-canvas` (22 frames, abridged):
+>
+> ```
+> f0    ptr:2059,516   handle:2060,512   writes:0    redraws:0
+> f8    ptr:2065,509   handle:2060,512   writes:5    redraws:0
+> f14   ptr:2083,491   handle:2060,512   writes:17   redraws:0
+> f21   ptr:2090,485   handle:2060,512   writes:27   redraws:0
+> ▲ up  ptr:2090,485   handle:2060,512   writes:27   redraws:0
+> ```
+>
+> ⭐ **Three facts, each decisive:**
+> 1. **The handle's rendered position NEVER changes** — `2060,512` for all 22 frames, through 31px of pointer
+>    travel and past pointer-up. The freeze is real and total; not the "one-frame lag-then-catch-up" t2405
+>    reproduced locally.
+> 2. **The write path is HEALTHY** — 27 writes, ~2/frame, tracking the pointer. Nothing is broken there.
+> 3. ⛔ **`redraws:0`. Not once, in any frame.** The redraw the probe watches is never called. `viewBox`
+>    is also unchanged, so this is not a viewport/transform artifact.
+>
+> ⇒ **The loop is severed on exactly one side.** This is the owner's original report — *"the block value
+> moves but not the gui"* — now OBSERVED rather than inferred, on the deployed build, with numbers.
+>
+> ### THE FIX TURN'S OWN LEADS
+> - ⚠ **First establish what the probe counts as a "redraw"** — `redraws:0` may mean *the specific function
+>   featProbe hooks* never fires, while some other render path runs. The frozen `handle:` numbers prove the
+>   VISUAL never updates either way, so the bug is real — but the fix depends on which function should have
+>   been called.
+> - ⭐⭐ **THE CONTROL EXISTS: the wizard MODAL's own canvas drag.** If that one updates live for the owner,
+>   diffing the two paths' redraw wiring locates this immediately — same handles, same canvas code, one
+>   works. Establish that first; it is likely a five-minute answer.
+> - ⚠ **t2405 reproduced neither symptom locally** (it saw lag-and-catch-up, i.e. redraws DID fire) —
+>   so something differs between the harness/localhost and the deployed build. That difference is a second
+>   finding worth naming even after the fix.
+> - ⚠ `hid:pk_size` suggests a POCKET-family handle, though the owner's screenshot showed surfacing —
+>   confirm which twin/handle before assuming scope; the fix may be per-handle-kind, not global.
+> - ⛔ **#50 (undo-blind rapid writes) still sequences BEFORE the commit-on-release half** of the ruled
+>   design — but note the capture shows ~2 writes PER FRAME today, which is exactly the mid-drag churn
+>   commit-on-release exists to stop.
 
 > ⭐ **The reproduction gap IS the lead.** t2391 drag-tested with the harness's pointer and saw the canvas
 > follow; the owner's real gesture does not. ⭐ **TOUCH ELIMINATED 2026-08-29 — owner: "drag on desktop."**
