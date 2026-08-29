@@ -62606,3 +62606,55 @@ failed, 10 flaky (all recovered on retry), 26 skipped, 23.7m.**
 Item 3 (the magic `z`/`by` scope names, 8 files) is next if the turn has room; item 5 (remaining mode-gated
 families) after that, partial credit explicitly sanctioned by the dispatch.
 
+## t2393 ITEM 3 (own commit) — BACKLOG #48 item 3: the magic scope names `z`/`by`, a combo suggestion, not a
+gate — the fix-shape decided WITH THE FILE IN HAND, and why
+
+`stepover.js:84`, `fill.js:36,44`, `pocketfill.js:120-129` (`pocketfill` AND `pocketwall`, the second block in
+that file), `contourfill.js:40-41`, `surfaceFill.js:11-12`, `fillText.js:28`, `contour.js:185` — 9 block defs
+across 8 files (`pocketfill.js` has two) all declare `z: 'z'` (some also `by: 'by'`), a field whose value is an
+EXPRESSION evaluated against the scope `blockEmitter.js:396` publishes when a Step Down container wraps them
+(`child.z = -L; child.by = by`). A mistyped name (`Z`, a stray space) makes `evalExpr` throw; whatever reads
+the result falls back to `num(p.z, 0)` — the fill cuts at the stock top, silently.
+
+### The fix-shape decision, read from the file, not guessed
+
+The dispatch's own two offered shapes were a MUST-MATCH PICKER or DROPPING the name requirement entirely.
+Neither fits: the field is a genuine EXPRESSION socket (`evalExpr`, not a bare variable read) — `fill.js`'s
+own docstring says the pattern runs "at the depth the enclosing Step Down exposes as scope `z`," and an
+operator can legitimately type `z + 5` / `z * 2` for a manual per-pass offset. A picker (must-match) would
+BREAK that legitimate override; dropping the field (hardcode `scope.z` with nothing editable) would remove it
+entirely. Chose a THIRD shape: a suggestion combo — reusing `comboField.js` (BACKLOG #42 piece 7, "a spelling
+aid, not a gate") exactly as-is, adding one more `comboKind` (`z`/`by`, offering `['z','by']` as candidates).
+Free text/expressions stay first-class (confirmed live: `z + 5` sets and reads back unchanged); the two REAL
+scope names are the type-ahead suggestion, nudging a typo toward the correct spelling without blocking a
+legitimate override.
+
+### Scoping, without an 8-file allowlist
+
+`fieldKind()`'s new check: `(field === 'z' || field === 'by') && def.defaults[field] === field` — a field
+whose OWN DEFAULT equals its OWN NAME is self-describing as "read this name out of scope" (an ordinary
+numeric Z field defaults to a NUMBER, never the literal string `'z'`), so every one of the 9 defs qualifies
+by construction with no per-file/per-type list to maintain or fall out of sync — the same declare-once
+economy `CORNER_COLOUR`'s bare-name match already banks on for its own two genuinely-unique field names.
+
+### VERIFIED
+
+All 9 block types (`stepover`, `fillzigzag`, `fillconcentric`, `pocketfill`, `pocketwall`, `contourfill`,
+`surfacefill`, `fillText`, `contour`) confirmed live: `Z`/`BY` fields (where declared) are `FieldCombo`
+instances, default value `'z'`/`'by'` preserved unchanged, datalist candidates exactly `['z','by']`, a typed
+expression override (`z + 5`) still accepted verbatim. (Screenshot attempt abandoned: same limitation as
+t2389's own units/section combo — a native `<datalist>` popup is OS-rendered and never appears in a page
+screenshot; DOM inspection is the real verification, as it was there.)
+
+Full suite (Rule 1b, bridge.js + comboField.js are shared): **2922 passed, 0 failed, 16 flaky (all recovered
+on retry), 26 skipped, 24.1m.**
+
+### Files changed (this commit only)
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — the `fieldKind()` self-referential-default check.
+
+`web/blocks/blockly/comboField.js` (Rule 1b, shared) — one more `comboKind` branch (`z`/`by` → `['z','by']`).
+
+Item 5 (the remaining mode-gated families) is next if the turn has room — partial credit explicitly
+sanctioned by the dispatch ("do as many as fit WELL, report which").
+

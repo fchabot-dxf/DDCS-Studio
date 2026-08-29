@@ -14,6 +14,15 @@
  */
 const SECTION_CANON = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
 const UNITS_FIXED = ['mm', 'mm/min', 'in', 'deg', 'rpm', '%'];
+// t2393 (BACKLOG #48 item 3) — the MAGIC SCOPE NAMES: `z`/`by` fields on 8 fill/contour blocks hold an
+// EXPRESSION evaluated against the scope Step Down publishes (blockEmitter.js:396, `child.z = -L; child.by =
+// by`) — a bare `z: 'z'`/`by: 'by'` default IS "read the enclosing Step Down's own level," and a mistyped
+// name (`Z`, a stray space) makes `evalExpr` throw, silently falling back to the stock top. NOT a picker
+// (must-match) and NOT dropped (the field is a genuine EXPRESSION socket — an operator can legitimately type
+// `z + 5`/`z * 2` for a manual offset from the Step Down's level, which a hard gate would break) — a
+// suggestion combo is the middle ground: the two real scope names as type-ahead candidates, free expressions
+// still first-class, exactly piece 7's own "spelling aid, not a gate" precedent.
+const SCOPE_NAMES = ['z', 'by'];
 let uid = 0;
 
 export function installComboField(Blockly) {
@@ -28,6 +37,7 @@ export function installComboField(Blockly) {
          *  suggest itself), or the fixed units list — plain suggestions, never a gate. */
         _candidates() {
             if (this.comboKind === 'units') return UNITS_FIXED;
+            if (this.comboKind === 'z' || this.comboKind === 'by') return SCOPE_NAMES;   // t2393 — comboKind is the field's own bare name (jsonDef()'s existing convention), not a synthetic kind
             if (this.comboKind === 'section') {
                 const blk = this.getSourceBlock();
                 const ws = blk && blk.workspace;

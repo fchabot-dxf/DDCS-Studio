@@ -237,6 +237,12 @@ export function fieldKind(def, field) {
         if (field === 'section' || field === 'units') return 'combo';
     }
     if (def.kind === 'formfield' && (field === 'matchvar' || field === 'atomType' || field === 'whenparam')) return 'picker';
+    // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
+    // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
+    // scope" — a signal genuinely unique to this pattern (an ordinary numeric Z field defaults to a NUMBER,
+    // never the literal string 'z'), so this is narrow by construction without needing a `def.kind`/`def.type`
+    // allowlist across the 8 files that use it.
+    if ((field === 'z' || field === 'by') && def.defaults && def.defaults[field] === field) return 'combo';
     if (optionsFor(def, field)) return 'dropdown';
     const sock = def.sockets && def.sockets[field];
     if (sock === 'region') return 'region';
