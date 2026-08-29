@@ -3586,7 +3586,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 48. THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
+### 48. [✅ ITEMS 1-4 SHIPPED t2393 — 4 commits, each suite-gated. OPEN: item 5 only, the remaining mode-gated families (slot/surfaceraster/pocketfill/surfacefill entry · progend retract/park · region/pocketfill shape · tap.rigid · drillcycle.cycle · contourfill's helix offer) — a tail-sized fieldsFor pass reusing t2393's own pattern] THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
 
 *(same sweep. These are places the canvas shows something false or silently destroys a value.)*
 
