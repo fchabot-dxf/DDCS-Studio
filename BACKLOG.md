@@ -3800,6 +3800,28 @@ The reference behaviour, from the screenshot:
   is unusable on phones.
 - Per-entry icons like Explorer's are OPTIONAL — only if the codebase's existing glyph conventions cover
   them for free; do not draw an icon set for this.
+- ⭐ **Owner, same session: "the context menu should follow theme."** The popup/flyout (and the Blockly
+  context menu it hangs off, if it does not already) styles from the app's THEME TOKENS — light/dark and the
+  skin tokens — never hardcoded colours. ⚠ Remember the house rule: token defaults live at `:root`, never on
+  the consumer ([[css-token-default-must-live-at-root]]); check what the t2387 popup hardcodes today.
 
 **VERIFY:** screenshots desktop hover + touch tap; near-right-edge flip shown; the existing entries all
 still fire.
+
+---
+
+### 53. THE DANGLING-CAPTION FIX MISSED A PATH — "options" renders as a bare word on number rows
+
+*(owner screenshot, 2026-08-29, during the on-device #42 check — which otherwise PASSED: long-press opens
+the popup, an enabler reveals `help` with the cursor in it. But every `param_field` row in the shot trails
+the word `options` with NO box after it, on number-widget rows where options should not appear at all.)*
+
+t2387 found and fixed exactly this class — `jsonDef` bakes literal captions as separate unnamed labels, so
+hiding a field left its caption floating — but the fix evidently covers ONE hiding path and not the other.
+⚠ Establish with the file in hand which path leaks: the ENABLER hide (shown = non-empty) vs the WIDGET-driven
+hide (`fieldsFor` says the field does not apply). The screenshot's rows are un-revealed number rows, so the
+widget path is the suspect. Same treatment as t2387's fix, applied to whichever path missed it — and a check
+across the other captioned fields (nmin/nmax/nstep/units, whenparam/whenis) so this is the last of the class.
+
+**STILL REAL IF:** open any twin's Parameter Group, look at a number-widget row — a trailing bare `options`
+word means still real.
