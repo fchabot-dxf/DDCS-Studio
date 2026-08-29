@@ -105,11 +105,23 @@ import { test, expect } from '@playwright/test';
  * too — both fully sectioned by their own structure (GEOMETRY/TOOL & CUT), no COMPLETENESS_EXCEPTIONS entry
  * remains for either.
  *
- * ⭐ GOAL STATE, now reached: every remaining `VOCABULARY_EXCEPTIONS` entry is a live-shell `reason:'shell'`
- * case (the shell decides, every time — never harmonised away). `COMPLETENESS_EXCEPTIONS` carries exactly
- * ONE remaining entry, `pocket_data` — a real, no-live-shell gap, but a separate turn's own bug (a stale
- * ratchet testing the wrong render mode, per its own note above), not this survey's to fix. `TREE_MODE_TWINS`/
- * `MOOT_TWINS` are the 2 structurally-exempt classes, each with a stated mechanism, not a silent escape hatch.
+ * ⭐ UPDATED t2403 (FINISH THE REGISTRY) — `user_pocket_data` CLOSED, the 32nd and last twin. Its own
+ * `entryX`/`entryY`/`toolNum` rendered UNBOXED live because pocket's real render is FLAT (`hasTreeLayout()`
+ * false — its uiChildren uses `section`/`grid_container`/`field_ref`, which that check does not recognize)
+ * while its own t2301 ratchet spec exercised `renderUiTree` regardless, never seeing what users actually see.
+ * Fixed both halves: sectioned all 3 (GEOMETRY/TOOL & CUT, matching every other field already in that array
+ * — see pocketData.js's own t2403 comment), and the spec now covers the LIVE flat path (`mode:'flat'`, pocket-
+ * form-reproduction-2301.spec.js) so this class cannot recur — pocket's own real chrome (GEOMETRY/TOOL & CUT)
+ * genuinely differs from its shell's 4 hardcoded names (SHAPE/TOOL/TOOL & STEPOVER/DEPTH & FEED), pinned as
+ * two independent truths rather than a false equality (`formReproduction.js`'s new opt-in
+ * `expectedSectionTitles`/`expectedShellSectionTitles`, used ONLY by pocket — every other caller unchanged).
+ *
+ * ⭐⭐ GOAL STATE REACHED, REGISTRY-WIDE: **`COMPLETENESS_EXCEPTIONS` is now EMPTY** — every one of the 32
+ * registered twins is fully sectioned. Every remaining `VOCABULARY_EXCEPTIONS` entry is a live-shell
+ * `reason:'shell'` case (the shell decides, every time — never harmonised away). `TREE_MODE_TWINS`/
+ * `MOOT_TWINS` are the only 2 structurally-exempt classes, each with a stated mechanism, not a silent escape
+ * hatch. **32 of 32 twins now match their shell exactly OR are deliberately, explicitly ruled** — the arc's
+ * registry half is CLOSED.
  */
 
 // t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not
@@ -137,21 +149,12 @@ const MOOT_TWINS = ['user_pause_confirm'];
 // THIS turn's own dispatched scope. Each carries the exact missing-param set as of t2381's own measurement —
 // closing the gap (adding sections) must ALSO remove the entry here, or the exact-match assertion below
 // catches the drift either way (a shrunk gap not reflected here, or a widened one).
-const COMPLETENESS_EXCEPTIONS = {
-    // tap_data/bore_data CLOSED at t2401 — sectioned by own structure (no live shell): placement/position
-    // fields → GEOMETRY, cutting mechanics + tool → TOOL & CUT (tapData.js's own comment gives the full
-    // identity/geometry/tool-cut reasoning; boreData.js matches the convention its own surrounding array
-    // fields already used). toolNum (the shared, deliberately-unsectioned TOOL_BINDING_SPECS) sectioned
-    // locally at each def-builder's own call site, same as contourData.js's own precedent.
-    //
-    // t2381's OWN surprise finding: pocket was marked "ratcheted" at t2301, but that spec forces `renderUiTree`
-    // regardless of `hasTreeLayout()` — and pocket's REAL live render is FLAT (hasTreeLayout() is false for
-    // it), where these three (SHARED-deriver-sourced: toolNum from toolBindingsFor, entryX/entryY from
-    // entryBindingsFor — the same trio contour/surfacing/text needed local .map() overrides for) render
-    // UNBOXED. Live-confirmed via window.openWiz('user_pocket_data') this same turn. See this file's own
-    // header comment for the full account.
-    user_pocket_data: ['entryX', 'entryY', 'toolNum'],
-};
+// t2401 CLOSED tap_data/bore_data (sectioned by own structure — placement/position → GEOMETRY, cutting
+// mechanics + tool → TOOL & CUT). t2403 CLOSED pocket_data (36/39 → 39/39 — see pocket-form-reproduction-
+// 2301.spec.js's own header for the full account: entryX/entryY/toolNum were rendering UNBOXED because
+// pocket's real live render is FLAT, not the tree its own t2301 spec exercised). EMPTY as of t2403 — see this
+// file's own header note.
+const COMPLETENESS_EXCEPTIONS = {};
 
 // VOCABULARY exceptions — a twin using a section name OUTSIDE SECTION_RANK's own three, for one of two
 // reasons, each labeled explicitly:

@@ -63192,3 +63192,76 @@ open-as-modal-1625, pane-visual-host-programmatic-1762, viz3d-handle-theme-2155,
 workspace-roundtrip) — the established parallel-contention pattern, no new names this run. No regressions
 from either registry-closure piece or the tail.
 
+## t2403 — FINISH THE REGISTRY: pocket, the 32nd and last twin, CLOSED (32/32)
+
+### The real diagnosis, confirmed before touching anything
+
+`hasTreeLayout()` (userOpView.js, the LIVE copy — the invariant spec keeps its own hand-synced duplicate)
+recognizes ONLY `split_horizontal`/`split_vertical` nodes as "tree mode." `pocketDataStack`'s own `uiChildren`
+uses `section`/`grid_container`/`field_ref` instead — a genuine tree-shaped placement schema, but not the ONE
+shape that check looks for — so `hasTreeLayout(pocketDataDef().template)` is FALSE and pocket's real render
+goes through `renderOpForm` (FLAT mode, driven by each binding's own `section:` string), the SAME mechanism
+WCS/ATC/comm/tap/bore all use. Confirmed live this turn: pocket's ENTIRE hand-authored uiChildren tree —
+including its own `usage_text` and `code_preview` nodes, not just the field placement — is DEAD DATA for the
+live render; `renderOpForm` never reads `uiChildren` at all, tree-shaped or not. `entryX`/`entryY` (declared
+inline in `POCKET_BINDING_SPECS`, no shared deriver behind them) and `toolNum` (the shared, deliberately-
+unsectioned `TOOL_BINDING_SPECS` — same gap tap/bore had at t2401) carried no `section:` — the 3 fields
+rendered UNBOXED, outside every `.form-sec`, exactly as t2381 first flagged.
+
+### The fix — consistent with pocket's own existing convention, not invented
+
+Sectioned `entryX`/`entryY` → `GEOMETRY` (matching every other placement field already in `POCKET_BINDING_
+SPECS` — the array already uses ONLY canonical `GEOMETRY`/`TOOL & CUT` via its own `G`/`T` constants) and
+`toolNum` → `TOOL & CUT` locally at the spread site (`TOOL_BINDING_SPECS.map((b) => ({...b, section:'TOOL &
+CUT'}))`), the same precedent contourData.js/tapData.js/boreData.js already set for this exact shared-spec
+gap. Live-confirmed: 39/39 bindings now sectioned, ZERO unboxed fields (`[data-param]` elements outside any
+`.form-sec`), chrome renders GEOMETRY then TOOL & CUT (39 rows > `SECTION_THRESHOLD`(8), 2 sections). Non-
+vacuity proven: removed `entryX`'s section, confirmed the field jumps to the tail of the render order
+(unsectioned sorts last under the rank scheme), restored.
+
+### The spec — now covers the path users actually see
+
+`pocket-form-reproduction-2301.spec.js` (t2301) exercised `renderUiTree` unconditionally — testing a path
+pocket's own users never reach. Switched to `mode:'flat'` (`tests/support/formReproduction.js`'s own t2375
+addition, built for exactly this shape, previously used only by contour/slot): `EXPECTED_ORDER` is pocket's
+own real, full 39-field flat-render order (hand-captured live, not derived from the declaration — the
+engine's own non-vacuity contract); `EXPECTED_ORPHANS` is `[]` (flat mode has no orphan concept).
+
+One genuine wrinkle the switch surfaced: pocket's own chrome (canonical GEOMETRY/TOOL & CUT) does NOT match
+its shell's own 4 hardcoded section labels (SHAPE/TOOL/TOOL & STEPOVER/DEPTH & FEED) — resectioning pocket to
+the shell's own names (the comm/t2401 harmonization shape) was not this turn's own dispatched scope (closing
+the 3-field boxing gap + the spec's blind spot was). Rather than assert a FALSE equality or silently drop the
+chrome check, added an opt-in pair to the SHARED engine — `expectedSectionTitles`/`expectedShellSectionTitles`
+— that pins both sides as independent truths (the t2399 shape) when a caller sets them; every OTHER consumer
+(drill/contour/slot/surfacing/text) leaves them unset and keeps the original shell-equality check byte-for-
+byte unchanged (reran all 5 — 15 tests, all green). Non-vacuity proven on the new branch too: perturbed
+`expectedSectionTitles` to a wrong value, confirmed the pin fails correctly, restored.
+
+Existing pocket suites rerun green (42 tests: pocket-data-emit — 144 cases, 0 diffs; pocket-in-place;
+pocket-rides-raster-1406; pocket-tenant-extraction-1391). Emit untouched throughout — only `section:` and the
+test's own render mode changed.
+
+### The registry invariant — 32/32, goal state fully reached
+
+`user_pocket_data` removed from `COMPLETENESS_EXCEPTIONS`, which is now **EMPTY**. Every one of the 32
+registered twins is fully sectioned; every remaining `VOCABULARY_EXCEPTIONS` entry is a verified `reason:
+'shell'` case; `TREE_MODE_TWINS`/`MOOT_TWINS` are the only 2 structurally-exempt classes, each with a stated
+mechanism. **32 of 32 twins now match their shell exactly or are deliberately, explicitly ruled — the arc's
+registry half is CLOSED.**
+
+### Files changed
+
+`web/blocks/dataOps/pocketData.js` — `entryX`/`entryY` gain `section: G`; `toolNum`'s shared spec gains a
+local `section: T` override.
+
+`tests/pocket-form-reproduction-2301.spec.js` — rewritten to `mode:'flat'`, pinning the real live order +
+zero orphans + both-sides section-title truths.
+
+`tests/support/formReproduction.js` — new optional `expectedSectionTitles`/`expectedShellSectionTitles` pair,
+opt-in only, every existing caller unchanged.
+
+`tests/twin-section-invariant-2381.spec.js` — `COMPLETENESS_EXCEPTIONS` emptied; header comment updated to
+the reached 32/32 goal state.
+
+`DDCS-Studio/verification/t2403-pocket-sectioned.png` (new).
+

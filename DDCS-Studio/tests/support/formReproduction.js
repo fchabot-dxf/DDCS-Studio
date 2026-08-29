@@ -63,6 +63,16 @@ const ROW_SELECTOR = '.form-row, .grid-2, .grid-3';   // the union both existing
  *    unbound, this def is the single-slot template, see slotData.js's own header comment) — filtered out of
  *    the shell's own section list before the flat-mode comparison, so a real future regression (a bound field
  *    silently losing its section) still fails loudly.
+ *  - expectedSectionTitles (t2403, pocket): when set, test 2's chrome check stops comparing the render's own
+ *    section titles against the LIVE SHELL's — it pins them independently instead, against THIS array (the
+ *    render's real chrome) and `expectedShellSectionTitles` (the shell's own real labels, hand-derived same as
+ *    always). For a twin sectioned with the CANONICAL vocabulary (SECTION_RANK) rather than harmonized to a
+ *    shell that uses its own one-off names (pocket: GEOMETRY/TOOL & CUT vs the shell's SHAPE/TOOL/TOOL &
+ *    STEPOVER/DEPTH & FEED — a real, legitimate divergence, not a bug), forcing chrome-name equality would be
+ *    a FALSE assertion; leaving the check out entirely would silently stop testing chrome at all. Pinning both
+ *    sides as their own truths (the t2399 shape) keeps the axis meaningful without asserting something false.
+ *    Every OTHER caller (drill/contour/slot) leaves this unset and keeps the original shell-equality check,
+ *    unchanged.
  */
 export function registerFormReproductionSuite(cfg) {
     const {
@@ -71,6 +81,7 @@ export function registerFormReproductionSuite(cfg) {
         registerExplicitly = false, defaultsExport, baseParamsCustom = null,
         editParam = 'depth', editValue = '17.5', expectedBeforeValue,
         mode = 'tree', expectedFrontierSections = [],
+        expectedSectionTitles = null, expectedShellSectionTitles = null,
     } = cfg;
 
     test(`${wizardLabel}-form-reproduction: declared ${mode === 'flat' ? 'bindings place' : 'tree places'} fields in the same structure as the shell`, async ({ page }) => {
@@ -180,8 +191,16 @@ export function registerFormReproductionSuite(cfg) {
             expect(tree.usage).toBe(shell.usage);
             expect(tree.codeLabel).toBe(shell.codeLabel);
         }
-        const expectedSections = shell.sectionTitles.filter((t) => !expectedFrontierSections.includes(t));
-        expect(tree.sectionTitles).toEqual(expectedSections);
+        if (expectedSectionTitles) {
+            // t2403 — pocket's own real divergence: the render's chrome (canonical GEOMETRY/TOOL & CUT) does
+            // NOT match the shell's own one-off names — pinned independently, not asserted equal, per this
+            // file's own header note on `expectedSectionTitles`.
+            expect(tree.sectionTitles).toEqual(expectedSectionTitles);
+            if (expectedShellSectionTitles) expect(shell.sectionTitles).toEqual(expectedShellSectionTitles);
+        } else {
+            const expectedSections = shell.sectionTitles.filter((t) => !expectedFrontierSections.includes(t));
+            expect(tree.sectionTitles).toEqual(expectedSections);
+        }
     });
 
     test(`${wizardLabel}-form-reproduction: an edit in the declared tree reaches the op model and comes back`, async ({ page }) => {

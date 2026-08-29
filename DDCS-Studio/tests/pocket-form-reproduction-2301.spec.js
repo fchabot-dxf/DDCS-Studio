@@ -1,68 +1,67 @@
 import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 /**
- * WIZARDS-AS-DATA — the arc's SECOND `uiChildren` reproduction (t2301), after drill (t2299). Pocket's tree
- * (blocks/dataOps/pocketData.js, `pocketDataStack`) reproduces `#wiz_pocket`'s hardcoded shell (index.html:
- * 463-541) structurally — same section order, same field order, same per-shape grouping (rect w/h vs circle/
- * polygon dia+sides). Pinned here on the same three independent axes drill's own reproduction test uses
- * (structure+orphan set / live-shell wording / an edit reaching the real emit path), so this test compares
- * tree vs shell rather than tree vs a hardcoded list and cannot pass vacuously.
+ * WIZARDS-AS-DATA — t2301/t2403: pocket's own form reproduction, ratcheted.
  *
- * Pocket was deliberately chosen over a second drill-shaped twin BECAUSE it has a real shape-type switch
- * (rect/circle/polygon/ellipse show different dimension fields) — but the gate found the dispatched mechanism
- * (guard/whenGuard) does not apply: POCKET_BINDING_SPECS already carries a per-FIELD `when` clause for every
- * shape-conditional param (the exact mechanism drill's own pattern-switch groups already used, t2299), so the
- * tree places rectDimGroup/circleDimGroup as plain always-present grid_containers and lets each field's own
- * binding-level `when` decide visibility — no guard/pruneGuards involvement, mirroring pocketData.js's own
- * header comment for the full account.
+ * t2301 built this spec in TREE mode (`renderUiTree` over `pocketDataStack`'s own `field_ref`/`grid_container`/
+ * `section` uiChildren) and it passed — but it was testing a path pocket's own LIVE render never takes.
+ * `hasTreeLayout()` (userOpView.js) only recognizes `split_horizontal`/`split_vertical` nodes as "tree mode";
+ * pocket's uiChildren uses `section`/`grid_container`/`field_ref` instead, which that check does not
+ * recognize, so `hasTreeLayout(pocketDataDef().template)` is FALSE and pocket's real render goes through
+ * `renderOpForm` (FLAT mode, driven by each binding's own `section:` value) — the SAME mechanism WCS/ATC/comm
+ * use, not the tree walker this spec exercised. LIVE-CONFIRMED at t2381 (`window.openWiz('user_pocket_data')`)
+ * and again this turn: pocket's entire hand-authored uiChildren tree (including its own `usage_text`/
+ * `code_preview` nodes) is DEAD DATA for the live render — `renderOpForm` never reads `uiChildren` at all,
+ * tree or not.
  *
- * t2373 — REFACTORED onto tests/support/formReproduction.js (extracted alongside drill-form-reproduction-
- * 2299.spec.js, structurally near-identical to it). Same EXPECTED_ORDER, same EXPECTED_ORPHANS, same three
- * axes, same strictness as before the extraction — nothing softened, including pocket's own real differences
- * from drill (no explicit registerUserOp call needed; baseParamsCustom instead of spreading POCKET_DEFAULTS).
+ * FIXED t2403: `entryX`/`entryY` (declared inline in `POCKET_BINDING_SPECS`, no shared deriver) and `toolNum`
+ * (the shared `TOOL_BINDING_SPECS`, deliberately unsectioned there — see deriveBindings.js's own comment)
+ * carried no `section:` at all, so they rendered UNBOXED, outside every `.form-sec`. Sectioned `entryX`/
+ * `entryY` → `GEOMETRY` (matching every other placement field already in that array) and `toolNum` → `TOOL &
+ * CUT` locally at the spread site (`TOOL_BINDING_SPECS.map((b) => ({...b, section:'TOOL & CUT'}))`), the same
+ * precedent contourData.js/tapData.js/boreData.js already set for the same shared-spec gap. All 39 bindings
+ * now render boxed — confirmed live, zero orphans.
+ *
+ * THIS SPEC now covers the LIVE path (`mode: 'flat'`) so the class cannot recur: `EXPECTED_ORDER` is pocket's
+ * own real, full flat-render field order (hand-captured live, not derived from the declaration — the engine's
+ * own non-vacuity contract), `EXPECTED_ORPHANS` is `[]` (flat mode has no orphan concept — every bound field
+ * lands in a section box or a bare row, never falls out of the tree).
+ *
+ * SECTION-TITLE DIVERGENCE, left AS-IS, deliberately: pocket's own bindings use the CANONICAL vocabulary
+ * (GEOMETRY/TOOL & CUT — every OTHER field in `POCKET_BINDING_SPECS` already did before this turn), so the
+ * live chrome reads "GEOMETRY" / "TOOL & CUT" — but the shell's own hardcoded section labels (index.html)
+ * read "SHAPE" / "TOOL" / "TOOL & STEPOVER" / "DEPTH & FEED". Resectioning pocket to the shell's own 4 names
+ * (the comm/t2401 harmonization shape) was NOT this turn's own dispatched scope (fixing the 3-field boxing
+ * gap + the spec's own blind spot was) — `expectedSectionTitles`/`expectedShellSectionTitles` pin BOTH sides
+ * as their own independent truths (the t2399 shape) rather than asserting a false equality or silently
+ * dropping the chrome check.
  */
 
 const EXPECTED_ORDER = [
-  // SHAPE section — shapeGroup
-  'shape', 'strategy', 'originX', 'originY', 'offZ',
-  'stockAttach', 'pathDatum',   // path_anchor: re-parented, hidden rows (order fixed by formWidgets.js's own loop)
-  // rectDimGroup
-  'w', 'h',
-  // circleDimGroup
-  'dia', 'sides',
-  // TOOL section
-  'toolNum', 'rpm',
-  // TOOL & STEPOVER section
-  'toolDia', 'stepoverPct', 'wallOffset',
-  // DEPTH & FEED section
-  'depth', 'stepdown', 'clearance', 'wcs', 'feed', 'plunge',
+    'wcs', 'originX', 'originY', 'stockAttach', 'pathDatum', 'stockDatum', 'stockW', 'stockH', 'stockZ', 'offZ',
+    'shape', 'w', 'h', 'dia', 'sides', 'entryX', 'entryY', 'strategy', 'direction', 'stepoverPct',
+    'entry', 'rampAngle', 'helixDia', 'helixPitch', 'restTool', 'restDia', 'restStepover', 'toolDia',
+    'wallOffset', 'feed', 'material', 'depth', 'stepdown', 'passes', 'confirmEvery', 'plunge', 'clearance',
+    'rpm', 'toolNum',
 ];
 
-// Bindings with no shell-visible equivalent at all — caught by formWidgets.js's own orphan fallback rather
-// than placed by the tree. Confirmed by grepping index.html AND pocketView.js for every one of these ids —
-// zero hits either place, not assumed. See pocketData.js's own header comment for the full account.
-const EXPECTED_ORPHANS = [
-  'stockDatum', 'stockW', 'stockH', 'stockZ',                        // formHidden, invisible either way
-  'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch',       // DEPTH ENTRY cluster — no shell UI ever
-  'restTool', 'restDia', 'restStepover',                              // REST MACHINING cluster — no shell UI ever
-  'material',                                                         // feedsuggest — same orphan class as drill's
-  'passes', 'confirmEvery', 'entryX', 'entryY',
-].sort();
-
 registerFormReproductionSuite({
-  wizardLabel: 'pocket',
-  dataModule: '/blocks/dataOps/pocketData.js',
-  defFactory: 'pocketDataDef',
-  shellOpenArg: 'pocket',
-  shellId: 'wiz_pocket',
-  expectedOrder: EXPECTED_ORDER,
-  expectedOrphans: EXPECTED_ORPHANS,
-  refStackModule: '/wizards/pocketWizard.js',
-  refStackExport: 'pocketStack',
-  dataOptypeExport: 'POCKET_DATA_OPTYPE',
-  registerExplicitly: false,   // pocket_data is registered at app boot — no explicit registerUserOp needed (matches tests/pocket-data-emit.spec.js's own convention)
-  baseParamsCustom: { shape: 'rect', w: 80, h: 60 },
-  editParam: 'depth',
-  editValue: '17.5',
-  expectedBeforeValue: 4,   // POCKET_DEFAULTS.depth
+    wizardLabel: 'pocket',
+    dataModule: '/blocks/dataOps/pocketData.js',
+    defFactory: 'pocketDataDef',
+    shellOpenArg: 'pocket',
+    shellId: 'wiz_pocket',
+    mode: 'flat',
+    expectedOrder: EXPECTED_ORDER,
+    expectedOrphans: [],
+    expectedSectionTitles: ['GEOMETRY', 'TOOL & CUT'],
+    expectedShellSectionTitles: ['SHAPE', 'TOOL', 'TOOL & STEPOVER', 'DEPTH & FEED'],
+    refStackModule: '/wizards/pocketWizard.js',
+    refStackExport: 'pocketStack',
+    dataOptypeExport: 'POCKET_DATA_OPTYPE',
+    registerExplicitly: false,   // pocket_data is registered at app boot — no explicit registerUserOp needed (matches tests/pocket-data-emit.spec.js's own convention)
+    baseParamsCustom: { shape: 'rect', w: 80, h: 60 },
+    editParam: 'depth',
+    editValue: '17.5',
+    expectedBeforeValue: 4,   // POCKET_DEFAULTS.depth
 });

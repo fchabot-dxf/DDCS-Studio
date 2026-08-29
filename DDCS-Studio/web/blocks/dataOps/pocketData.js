@@ -269,10 +269,13 @@ const POCKET_BINDING_SPECS = [
     // decide whether to SPLICE AN EXTRA G0 LINE into the emitted text (blockEmitter.js:567-570) — presence/absence
     // of an entire line, the same class as confirmEvery ("decides whether the step exists at all"), not a magnitude
     // merely re-resolved downstream. NOT deferrable (corrected from my own first pass, which under-weighted this).
-    { param: 'entryX', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
-    { param: 'entryY', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
-    // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each instantiate).
-    ...TOOL_BINDING_SPECS,
+    { param: 'entryX', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', section: G },
+    { param: 'entryY', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', section: G },
+    // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each
+    // instantiate). t2403 — `TOOL_BINDING_SPECS` carries no `section:` in its own SHARED spec (deriveBindings.js,
+    // deliberately unsectioned there); mapped locally to `T` here, same precedent contourData.js/tapData.js/
+    // boreData.js already set (each sections toolNum to fit its own layout rather than touching the shared spec).
+    ...TOOL_BINDING_SPECS.map((b) => ({ ...b, section: T })),
 ];
 
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
