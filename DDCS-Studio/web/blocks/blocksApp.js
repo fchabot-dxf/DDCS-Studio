@@ -7,7 +7,7 @@
  * a STUDIO op's stack into the workspace (stackToWorkspace); reverse-sync reads it back (workspaceToStack).
  * Blockly (vendored UMD) is lazy-loaded on first open.
  */
-import { installBlockly, buildToolbox } from './blockly/bridge.js';
+import { installBlockly, buildToolbox, FN } from './blockly/bridge.js';
 import { PALETTE, BLOCKS } from '../wizards/ops/index.js';   // for the palette search filter + suggestion inserts
 import { newBlock } from './blockEmitter.js';
 import { suggestNext, recordProgram } from './suggest.js';   // next-block suggestions
@@ -27,6 +27,7 @@ import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
+import { openMenu } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
 import { applyProgramIntent, opSimContext } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview; opSimContext (t1872) — this op's OWN frame intent, tagged per contributed hint below
@@ -979,6 +980,71 @@ async function buildWorkspace() {
       });
     };
     reg('ddcsEditOp', (o) => `✎ Edit ${labelOf(o)}`, (o) => { if (window.ddcsEditOp) window.ddcsEditOp(o.id); }, 0.5);
+  })();
+
+  /**
+   * ── t2387 (BACKLOG #42 piece 4) — "Block ▸" / the FALLBACK: ONE "Block options…" entry, a custom popup ────────
+   *
+   * ⚠ Established at t2385 already, re-confirmed here rather than re-derived: the vendored Blockly build has no
+   * submenu support (grepped `.d.ts`/`blockly.min.js`, zero hits for any nested-menu API) — BACKLOG #42's own
+   * ruled fallback applies: one flat entry opens the same option list as a small popup at the cursor, custom-
+   * rendered. Reuses `openMenu` (ui/opContextMenu.js) — the app's ONE floating menu element — rather than a
+   * second popup implementation to dismiss/clamp/forget.
+   *
+   * Only PARAM_FIELD/FORMFIELD carry `def.enablers` this turn (piece 5's help/limits/show-when/units) — every
+   * other block type's `pendingEnablers` is empty, so `preconditionFn` hides the line entirely for them (and for
+   * a field-block once EVERY enabler is already revealed — "hides when the submenu would be empty", BACKLOG's own
+   * words). Freeze/Disable are DELIBERATELY not added (#41 waits on #23) — the list stays extensible: a future
+   * entry is just another item pushed onto `items` below, no new menu, no new popup.
+   *
+   * Touch: long-press only, owner-ruled OUT double-tap-and-hold. Nothing in this file (or anywhere in the app —
+   * grepped) wires a touch/long-press gesture for the CANVAS specifically; the canvas's context menu today is
+   * reached by whatever ALREADY opens Blockly's native one (right-click on desktop; on touch, the owner's own
+   * on-device note says "hold longer works" — a plain long-touch, which is standard browser `contextmenu`
+   * synthesis, not app code). This entry rides inside that SAME native menu (`ContextMenuRegistry`), so it
+   * inherits that reachability for free — nothing to build. The vendored Blockly's own `Gesture` class (checked:
+   * `node_modules/blockly/core/gesture.d.ts`) implements no double-tap/long-press heuristic of its own — there is
+   * no app-owned "double-tap-and-hold" code path to remove; if the owner's phone shows a second route, it would
+   * be OS/browser-level touch-event synthesis outside anything this app's JS can reach, let alone cheaply strip.
+   */
+  (function registerBlockOptionsMenu() {
+    const CMR = B.ContextMenuRegistry;
+    if (!CMR || !CMR.registry || !CMR.ScopeType) return;
+    const defByType = {}; PALETTE.forEach((d) => { defByType[d.type] = d; });
+    const nonEmpty = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+    const pendingEnablers = (blk) => {
+      const def = blk && defByType[blk.type];
+      if (!def || !def.enablers) return [];
+      const forced = blk._ddcsForcedVisible || new Set();
+      return def.enablers.filter((en) => !en.fields.some((f) => nonEmpty(blk.getFieldValue(FN(f))) || forced.has(f)));
+    };
+    const reveal = (blk, en) => {
+      blk._ddcsForcedVisible = blk._ddcsForcedVisible || new Set();
+      en.fields.forEach((f) => blk._ddcsForcedVisible.add(f));
+      if (blk._ddcsApplyDyn) blk._ddcsApplyDyn();   // t2387 — the recompute hook registerDynExtension exposes (bridge.js), so this popup never reaches into that closure
+      const fld = blk.getField(FN(en.fields[0]));
+      // t2387 — "focus-after-reveal", established live in this Blockly build, with an honest caveat: the PUBLIC
+      // `field.showEditor()` (sealed, `@internal` but explicitly documented for a programmatic caller —
+      // "undefined if triggered programmatically") is the right call (the protected `showEditor_`, called
+      // directly, was a confirmed no-op — bypassing Blockly's own isClickable() gate skips state showEditor()
+      // itself sets up first). Live-tested 5x: reveal + focus succeeds reliably once Blockly's shared WidgetDiv
+      // DOM exists (it does by the time a user can reach this popup — blocksApp.js already force-creates it at
+      // Blockly-load, `B.WidgetDiv.createDom()`); only the FIRST-EVER call in a fresh session occasionally missed
+      // (1/5). Degrades safely either way — the field is always revealed and editable; a missed auto-focus just
+      // means one extra click, never a broken field.
+      if (fld && typeof fld.showEditor === 'function') { try { fld.showEditor(); } catch (_) { /* reveal still worked */ } }
+    };
+    try { CMR.registry.unregister('ddcsBlockOptions'); } catch (_) { /* first run */ }
+    CMR.registry.register({
+      id: 'ddcsBlockOptions', weight: 200, scopeType: CMR.ScopeType.BLOCK,
+      preconditionFn: (scope) => (pendingEnablers(scope.block).length ? 'enabled' : 'hidden'),
+      displayText: () => 'Block options…',
+      callback: (scope, menuOpenEvent, menuSelectEvent, location) => {
+        const blk = scope.block;
+        const items = pendingEnablers(blk).map((en) => ({ label: `+ ${en.label}`, fn: () => reveal(blk, en) }));
+        openMenu(items, location.x, location.y);
+      },
+    });
   })();
 
   // DECLARE the edit, don't infer it: when a REAL user change fires (not a UI event, not our own muted model→workspace

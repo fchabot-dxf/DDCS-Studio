@@ -62119,3 +62119,120 @@ shared by every dynamic/cam-locked block in the app (Rule 1b: bridge.js and the 
 shared), each requiring live isolation before the fix could be trusted; rushing straight into 6 more new
 mechanisms on the same turn risked exactly the kind of unverified shared-file change Rule 1b warns against.
 
+## t2387 — BACKLOG #42 CLUSTER 1 (pieces 3, 4, 5): the "Block options…" popup + its 4 enablers + the
+show-when sentence — a SECOND real bug found and fixed live before it shipped
+
+t2385's own two shared-mechanism fixes (getField visibility, addOnChange composition) unblocked this cluster
+exactly as t2387's own dispatch predicted: the enablers' hide-on-empty needed the SAME inline-field hiding.
+
+### Piece 5 — enablers: `def.enablers = [{label, fields:[...]}]`, read generically by `registerDynExtension`
+
+`help`, `nmin`/`nmax`/`nstep`, `units` (param_field + formfield) and `whenparam`/`whenis` (formfield only) now
+hide once empty, composing with the existing widget-based `show` set as ONE test — applicable AND (non-empty
+OR forced) — never two mechanisms fighting, per the dispatch's own explicit requirement. `_ddcsForcedVisible`
+(a plain per-block-instance `Set`, never serialized) is set by the popup's own reveal action; SHOWN = NON-
+EMPTY holds because nothing new is written to storage — a field's own value is the only truth, so a reload
+with the field still empty goes back to hidden. `registerDynExtension`'s onChange now also watches the
+enabler fields themselves (not just `dynamic`'s own), else a JSON-loaded block's real (non-empty) value would
+never trigger the recompute that was supposed to reveal it — caught live before it shipped a THIRD silently-
+broken consumer of this same extension.
+
+### A SECOND real bug, live-caught by a screenshot before it shipped: hiding a field's BOX left its CAPTION
+WORD dangling
+
+First pass: `def.enablers` correctly toggled the NAMED value field's visibility (confirmed via `isVisible()`
+in an isolated Playwright probe on a fresh block) — but a real twin's Parameter Group screenshot
+(`user_surfacing_data`, `originX` row) showed `help options min max step units` still printed as bare,
+box-less words. Root cause: `jsonDef()`'s `message0` bakes a field's caption ("help") as a STRING LITERAL —
+Blockly's own message-parser turns that into an UNNAMED implicit `field_label`, entirely separate from the
+NAMED value field (`FN(f)`) that `setVisible()` was toggling. Hiding the box never touched the caption text
+sitting in front of it. Fixed narrowly: only a field a def lists in `enablers` now gets an EXPLICITLY named
+label (`FN(f)+'_LBL'`) instead of the embedded string, so `registerDynExtension`'s `apply()` can toggle
+label+box together. Every other field on every other block (nothing but param_field/formfield declares
+`enablers`) keeps the byte-identical literal-text path — confirmed by the full suite staying green. Re-
+screenshotted after the fix: the same row now shows nothing past `options` when empty — the actual "wall of
+boxes" reduction the whole backlog entry exists to deliver.
+
+### Piece 3 — sentence-shaped show-when
+
+`whenparam`/`whenis` (formfield only, t1640's own established pair) render as "show when [param] is [value]" —
+a name-keyed special case in `jsonDef()` (like the existing `isSection`/`isOpunit` prefix-dropping precedent),
+not a per-def flag, since grepped: no other def anywhere declares either field name. Same two fields, same
+storage — only the face text changed. Composes with piece 5's enabler-gating (the whole sentence hides until
+either field holds a value or the popup's "+ show-when condition" reveals it).
+
+### Piece 4 — "Block ▸" / the ruled FALLBACK: one "Block options…" entry, a custom popup
+
+Re-confirmed t2385's own finding rather than re-deriving it: the vendored Blockly has no submenu support
+(grepped, zero hits). Registered ONE `ContextMenuRegistry` entry (`blocksApp.js`, alongside the existing
+`ddcsEditOp` precedent) — `preconditionFn` hides it entirely unless the block has `def.enablers` AND at least
+one group still pending (BACKLOG's own words: "hides when the submenu would be empty"); the popup itself
+reuses `openMenu` (`ui/opContextMenu.js`) — the app's ONE floating menu element — rather than a second
+implementation to dismiss/clamp/forget. Clicking an entry sets `_ddcsForcedVisible`, calls the new
+`block._ddcsApplyDyn()` hook `registerDynExtension` now exposes (so the popup never reaches into that
+closure), then calls the field's own `showEditor()` to focus it.
+
+Freeze/Disable are DELIBERATELY absent (#41 waits on #23) — the popup's `items` array is just a list; a future
+entry is one more push, no new menu, no new popup.
+
+### Touch — established, nothing built
+
+Grepped the whole app: no long-press/double-tap gesture exists for the CANVAS specifically (the only
+`attachLongPress` user is the editor's own op menu, t1452). The vendored Blockly's `Gesture` class (checked:
+`node_modules/blockly/core/gesture.d.ts`) implements no double-tap/long-press heuristic of its own either.
+The canvas's native context menu today is reached however the owner's own on-device note already confirmed
+("hold longer works", 2026-08-28) — standard browser `contextmenu` synthesis on long-touch, not app code — and
+this entry rides inside that SAME native menu, so it inherits that reachability for free. There is no
+app-owned "double-tap-and-hold" code path to remove; if the owner's phone shows a second route, it is
+OS/browser-level touch synthesis outside anything this app's JS can reach, let alone cheaply strip. Reported
+per the dispatch's own escape hatch rather than building a fix for code that doesn't exist.
+
+### "Focus-after-reveal" — established live, with an honest caveat
+
+The protected `showEditor_` (bypassing Blockly's own `isClickable()` gate) was a confirmed no-op immediately
+after a reveal (no widgetDiv, no error, `document.activeElement` stayed `<body>`). The PUBLIC `field.showEditor()`
+(sealed/`@internal`, but explicitly documented for a programmatic caller) is the right call — live-tested 5x in
+isolation: reliable once Blockly's shared WidgetDiv DOM exists (it does by the time a user can reach this
+popup — `blocksApp.js` already force-creates it at Blockly-load, `B.WidgetDiv.createDom()`); only the
+FIRST-EVER call in a brand-new page session missed once (1/5), a fresh-session artifact unlikely to matter in
+real usage. Degrades safely either way: the field is always revealed and editable, a missed auto-focus just
+costs one extra click.
+
+### VERIFIED, both at the API level and visually
+
+Isolated Playwright probes (deleted after use): fresh `param_field`/`formfield` blocks — enabler fields start
+hidden, the popup lists exactly the pending groups, clicking one reveals label+box together and removes that
+group from the popup on reopen, the sentence pair reveals together. Real-twin screenshots
+(`verification/t2387-{1..4}-*.png`, kept): `user_surfacing_data`'s Parameter Group collapsed (rows already
+holding real values — `w`/`h`/`rpm`/etc. — correctly stayed expanded, proving the gate is content-driven, not
+a blanket collapse); the native right-click menu showing "Block options…"; the custom popup open with its
+three pending entries; the same row after clicking through all three, fields revealed with labels intact.
+
+Full suite: **2925 passed, 0 failed, 8 flaky (all recovered on retry, none touching param_field/formfield/
+context-menu code), 26 skipped, 23.8m.** The t2381 registry invariant and every form-reproduction ratchet
+grepped clean of any failure line. Register-time output is untouched by construction — nothing here changes
+what `bindingsFromStack`/`paramFieldsFromStack` read, only how the authoring surface renders/hides fields.
+
+### Files changed
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — `jsonDef()`: named+independently-hideable labels for
+`enablers` fields, the `whenparam`/`whenis` sentence special-case; `registerDynExtension`: `enablers`
+emptiness-gating composed with the widget test, `_ddcsApplyDyn` exposed, onChange now watches enabler fields
+too, the label-toggle lockstep fix.
+
+`web/blocks/blocksApp.js` (Rule 1b, shared) — new `registerBlockOptionsMenu()` (the "Block options…"
+`ContextMenuRegistry` entry + reveal/focus logic), imports `FN` (bridge.js) and `openMenu` (opContextMenu.js).
+
+`web/wizards/ops/paramField.js` / `web/wizards/ops/formField.js` — `enablers` declarations.
+
+`DDCS-Studio/verification/t2387-1-collapsed-parameter-group.png`, `...-2-native-menu-block-options.png`,
+`...-3-popup-open.png`, `...-4-fully-enabled.png` (new).
+
+### NOT started this turn (pieces 2, 6, 7 of BACKLOG #42)
+
+Options editor, exact-name pickers, section/units combo-dropdown — the dispatch's own instruction: they are
+all custom-FIELD builds and belong together as the NEXT cluster so one field pattern serves three; explicitly
+told not to start them even if the turn felt light. It did not feel light — this cluster's own live-caught
+dangling-caption bug (a second genuine defect, found the same way t2385's two were: reasoning from the API
+alone said it worked, only a real screenshot proved it didn't) took real time to isolate and fix correctly.
+

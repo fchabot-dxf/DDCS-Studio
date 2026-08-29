@@ -71,6 +71,16 @@ export const formFieldBlock = {
     // t2385 (BACKLOG #42 piece 1) — the same per-def label map param_field's own block gained, for the same two
     // storage-key families both blocks share (see paramField.js's own header comment for the full account).
     labels: { dflt: 'default', nmin: 'min', nmax: 'max', nstep: 'step' },
+    // t2387 (BACKLOG #42 pieces 4+5) — the same enabler groups param_field's own block gained (see its header
+    // comment for the full mechanism account), plus this block's own `whenparam`/`whenis` pair — piece 3 renders
+    // that pair as a sentence ("show when [param] is [value]", jsonDef()'s own name-keyed special case); piece 5
+    // additionally hides the whole sentence until one side of it holds a value or the popup enables it.
+    enablers: [
+        { label: 'help text', fields: ['help'] },
+        { label: 'limits (min/max/step)', fields: ['nmin', 'nmax', 'nstep'] },
+        { label: 'units', fields: ['units'] },
+        { label: 'show-when condition', fields: ['whenparam', 'whenis'] },
+    ],
     fieldsFor(p) {
         const w = (p && p.widget) || 'number';
         const mode = (p && p.bindMode) || 'assign';

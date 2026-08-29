@@ -246,6 +246,17 @@ function jsonDef(def) {
     // The `section` block shows JUST its title (no "Section title" prefix): drop the label + the field-name for it.
     let message0 = isSection ? '' : (isOpunit ? '▨ %1 ·' : (isParamGroup ? def.label + ':' : def.label)), n = isOpunit ? 1 : 0;
     if (isOpunit) args0.push({ type: 'field_label', name: 'OPUNIT_LABEL', text: def.label });   // filled per-instance from opType by ddcs_opunit; the routing key (opType/defV) follows READ-ONLY
+    // t2387 (BACKLOG #42 piece 5) — live-caught before shipping: a field's caption word ("help"/"min"/…) is baked
+    // into message0 as a bare STRING LITERAL, which Blockly's own message-parser turns into an UNNAMED implicit
+    // `field_label` distinct from the named value field %n — hiding the NAMED field (`getField(FN(f)).setVisible`)
+    // never touches that implicit label, so an "enabled-hidden" field left a DANGLING caption word with no box next
+    // to it (confirmed live: a real twin's Parameter Group screenshot showed "help options min max step units" as
+    // bare orphaned text on every number-widget row). Fix: a field this def lists in `enablers` gets its OWN NAMED
+    // label field (`FN(f)+'_LBL'`) instead of embedding the word in the string — the SAME two-driver visibility
+    // toggle in `registerDynExtension` (below) then hides label+box together. Every other field (the large
+    // majority — nothing declares `enablers` except param_field/formfield) keeps the byte-identical literal-text
+    // path; this only changes shape for the handful of fields that opted into hide-when-empty.
+    const enablerFieldSet = new Set((def.enablers || []).flatMap((en) => en.fields));
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
         // t2385 (BACKLOG #42 piece 1) — a def MAY declare its own `labels: {field: 'friendly text'}` map so
@@ -255,8 +266,19 @@ function jsonDef(def) {
         // unrelated blocks — so widening IT would relabel every one of them, not just the def that asked).
         // Absent `labels` (every pre-existing def), this falls back to the raw field name — byte-identical
         // face text for every block that doesn't opt in.
-        const faceLabel = (def.labels && def.labels[f]) || f;
-        message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${faceLabel} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
+        // t2387 (BACKLOG #42 piece 3) — the ONE established sentence-shaped pair (formField.js's own `whenparam`+
+        // `whenis`, t1640): "whenparam [socket] whenis [socket]" reads as what it MEANS instead — "show when
+        // [socket] is [socket]" — same two fields, same storage, same precedent as isSection/isOpunit's own
+        // prefix-dropping just below. Name-keyed (not a per-def flag) because the pair is unique to these two
+        // field names across the whole registry — grepped, no other def declares either.
+        const sentenceLabel = f === 'whenparam' ? 'show when' : f === 'whenis' ? 'is' : null;
+        const faceLabel = sentenceLabel || (def.labels && def.labels[f]) || f;
+        if (enablerFieldSet.has(f) && !(isSection || isStructctl || isOpunit || isParamGroup)) {
+            args0.push({ type: 'field_label', name: FN(f) + '_LBL', text: faceLabel });   // t2387 — a NAMED, independently hideable caption (see the header note above)
+            message0 += ` %${++n} %${++n}`;
+        } else {
+            message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${faceLabel} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
+        }
         const desc = getDesc(f);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
@@ -441,18 +463,47 @@ function registerDynExtension(Blockly) {
             // (formfield: 'bindMode' picks assign-var vs op-param, 'widget' picks the config fields, independently) —
             // byte-identical for a bare string (wraps to a 1-element array, same single-field read as before).
             const dynFields = Array.isArray(def.dynamic) ? def.dynamic : [def.dynamic];
+            // t2387 (BACKLOG #42 piece 5) — a def MAY additionally declare `enablers: [{label, fields:[...]}]`:
+            // fields that are HIDDEN once empty even when their widget makes them applicable (help / limits /
+            // show-when / units — the "wall of boxes" the whole backlog entry exists to shrink), shown again once
+            // non-empty OR once the canvas's own "Block options…" popup (blocksApp.js) reveals the group. This
+            // composes with the widget-based `show` set below as ONE test (applicable AND (non-empty OR forced)) —
+            // never two mechanisms fighting, per the dispatch's own explicit requirement. `_ddcsForcedVisible` is a
+            // plain per-block-instance Set, NEVER serialized (no new stored state, per BACKLOG #42's own ruling) —
+            // it lives only as long as this in-memory block does, so a field revealed-but-left-empty goes back to
+            // hidden the moment the canvas reloads fresh (save/reload, undo past the reveal, a new page load).
+            const enablerFields = (def.enablers || []).flatMap((en) => en.fields);
+            const nonEmpty = (v) => v !== undefined && v !== null && String(v).trim() !== '';
             const apply = () => {
                 try {
                     const params = { ...def.defaults };
                     for (const df of dynFields) params[df] = this.getFieldValue(FN(df));
                     const show = new Set(def.fieldsFor(params).map(FN));
+                    if (enablerFields.length) {
+                        const forced = this._ddcsForcedVisible || new Set();
+                        for (const f of enablerFields) {
+                            if (!show.has(FN(f))) continue;   // not applicable to this widget anyway — the widget test wins either way
+                            if (!nonEmpty(this.getFieldValue(FN(f))) && !forced.has(f)) show.delete(FN(f));
+                        }
+                    }
                     all.forEach((f) => { const fld = this.getField(FN(f)); if (fld) fld.setVisible(show.has(FN(f))); });
+                    // t2387 — the enabler fields' own NAMED caption (jsonDef()'s `_LBL` twin, see its own header
+                    // note) toggles in LOCKSTEP with the value field it labels — a dangling "help" with no box
+                    // next to it is exactly the bug this second line exists to prevent.
+                    for (const f of enablerFields) { const lbl = this.getField(FN(f) + '_LBL'); if (lbl) lbl.setVisible(show.has(FN(f))); }
                     if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
                 } catch (e) { /* degrade to all-fields-visible */ }
             };
+            this._ddcsApplyDyn = apply;   // t2387 — exposed so the canvas's own "Block options…" popup (blocksApp.js) can force a recompute after setting `_ddcsForcedVisible`, without reaching into this closure
             addOnChange(this, function () {
                 if (this.isInFlyout || !this.workspace) return;
-                const v = dynFields.map((df) => this.getFieldValue(FN(df))).join('|');
+                // t2387 — watch the enabler fields too, not just `dynamic`'s own: a JSON-loaded block sets an
+                // optional field's real value AFTER this extension's initial `apply()` call (which only saw the
+                // still-empty default), and that value-set fires exactly this onChange — without watching it here,
+                // a loaded (non-empty) help/limits/units/show-when value would stay wrongly hidden forever, since
+                // nothing else ever re-runs `apply()` for it.
+                const watch = enablerFields.length ? [...dynFields, ...enablerFields] : dynFields;
+                const v = watch.map((df) => this.getFieldValue(FN(df))).join('|');
                 if (v === this._ddcsDyn) return;
                 this._ddcsDyn = v; apply();
             });

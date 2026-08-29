@@ -64,6 +64,17 @@ export const paramFieldBlock = {
     // every other field keeps its own name (already plain English or a short established term — `param`/`widget`/
     // `type`/`section`/`help`/`options`/`units` need no translation).
     labels: { dflt: 'default', nmin: 'min', nmax: 'max', nstep: 'step' },
+    // t2387 (BACKLOG #42 pieces 4+5) — the "wall of boxes" the whole backlog entry exists to shrink: `help`,
+    // `nmin`/`nmax`/`nstep` and `units` used to render unconditionally whenever `fieldsFor` made them widget-
+    // applicable. `enablers` (read generically by `ddcs_dynfields`, bridge.js) hides each GROUP until either a
+    // field in it already holds a value (a hand-authored/loaded def) or the canvas's own "Block options…" popup
+    // (blocksApp.js) reveals it — SHOWN = NON-EMPTY, no new stored state (the group's own field values ARE the
+    // truth; nothing new is serialized).
+    enablers: [
+        { label: 'help text', fields: ['help'] },
+        { label: 'limits (min/max/step)', fields: ['nmin', 'nmax', 'nstep'] },
+        { label: 'units', fields: ['units'] },
+    ],
     fieldsFor(p) {
         // t1562 — the SAME inherit-then-derive-from-type resolution paramFieldsFromStack/resolveFormWidget use:
         // an explicit widget wins; an empty one derives from `type` (WIDGET_BY_TYPE, one source, blocks/userOps.js).
