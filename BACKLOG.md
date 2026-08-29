@@ -3546,6 +3546,17 @@ DECLARES   assign.var, label.n        typing stays FULLY OPEN — this field is 
                                       thing is BORN. Picker = suggestions only (known
                                       ranges, scratch bands) + ⭐ one real warning:
                                       "this squats a reserved/persistent register"
+
+           ⭐ OWNER-REFINED ("variables are still only available in a certain range"):
+           open ≠ unbounded. The typed name is checked against the DIALECT's declared
+           register map (varMap.js RANGES/RESERVED — a machine fact, per-dialect) and
+           answers with a TRAFFIC LIGHT, never a gate:
+             · user/scratch range        → clean, nothing shown
+             · reserved / persistent     → visible warning naming whose register it is
+             · outside the map entirely  → error-level flag (a write to nowhere)
+           ⛔ NEVER a hard block — the app's own blocks deliberately write system
+           registers (hmiline → #1505, alignment → #1510-#1512), so every "forbidden"
+           write has a proven legitimate use. Warn, name it, let it through.
 REFERENCES goto targets               picker of what exists + typed NEW numbers allowed
 (forward-authorable)                  (people place the jump before the label) — the
                                       save-time check nets the ones never made
