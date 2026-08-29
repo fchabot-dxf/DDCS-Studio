@@ -3475,3 +3475,52 @@ The mill-family twins' Parameter Groups, before/after screenshots. ⭐⭐ Regist
 `bindingsFromStack`/`paramFieldsFromStack` must produce byte-identical specs for an untouched canvas — this
 turn changes the AUTHORING SURFACE, never the declaration it produces. The t2381 registry invariant and all
 seven form-reproduction ratchets stay green untouched.
+
+⛔ **Ruled OUT of the Blocks-UI sweep (owner, 2026-08-28: "1-2 no"):** on-canvas zoom controls / zoom-to-fit,
+and culling/renaming Blockly's native context-menu entries. The canvas keeps its bare chrome.
+
+---
+
+### 43. FORM ↔ BLOCK REVEAL — tap a form row, see its block; a block's "Show in form"
+
+*(owner-approved 2026-08-28, from the new-user sweep. The hardest new-user question in the Blocks tab is
+"what does this canvas have to do with my form?" — answer it by POINTING, not by a tutorial.)*
+
+- **Form → block:** activating a row in the live Wizard View pans the canvas to the block that makes it and
+  glows it (the existing glow convention). The two-way binding already exists (`renderLiveForm`,
+  blocksApp.js:474-478) — this adds NAVIGATION over the join that is already there.
+- **Block → form:** a `Show in form` entry in #42's `Block ▸` submenu, highlighting the row.
+- ⚠ Establish the gesture for form→block (a click already focuses the field for typing — maybe an affordance
+  on the row, or long-press). Do not steal focus from editing.
+
+**VERIFY:** on a big twin (corner, 23 fields), both directions land on the right target; screenshots.
+
+---
+
+### 44. CANVAS FIND — search the blocks that are THERE, not just the palette
+
+*(owner-approved 2026-08-08 sweep-adjacent; rides the editor search box shipped at t2383 so the two feel
+identical. The palette search (blocksApp.js:291) filters what you can ADD; nothing searches a 98-block stack.)*
+
+Same find bar contract as the editor's: n-of-m count, Enter/arrows cycle, Esc closes — but a match pans the
+canvas and glows the block. Match against block label + field values (a param name like `depth` must hit).
+⛔ Search only, no replace.
+
+---
+
+### 45. THE MILLING SNIPPETS HAND-ROLL WHAT THE ENGINE DECLARES — rebuild on real atoms, add surfacing
+
+*(owner-asked 2026-08-28: "does surfacing have a block snippet" — answer: NO, and the near-misses are fakes.)*
+
+`learnerLibrary.js`'s own discipline (its probe snippets: built from *the same atoms the wizards use, "so the
+later consolidation composes from it"*) is broken by its two milling snippets: `trace-square` and `face-pass`
+are hand-listed `move` atoms — a FACSIMILE of facing, no stepover/raster/boundary, free to drift from what the
+engine really does.
+
+- Rebuild `face-pass` on the real atom (`surfaceraster` with a small fixed area) — same learning value, and it
+  can never lie.
+- Add ONE surfacing snippet: "this block rasters an area" without the wizard's 30-field apparatus.
+- `trace-square` may legitimately stay hand-listed moves (its POINT is reading raw moves) — decide with the
+  file in hand and say which.
+
+**VERIFY:** snippets still drag in and run in the sim; the learner-library spec stays green.
