@@ -63468,3 +63468,14 @@ field).
 
 `BACKLOG.md` — #53's heading tagged `[✅ SHIPPED t2405]` per rule 8, body gained the closing account.
 
+### Full suite (both commits, run once at the end)
+
+**2938 passed, 0 failed, 10 flaky (all recovered on retry), 26 skipped, 24.9m.** Every one of the 10 flakes
+has deep prior-turn history (2-102 mentions each — formfield-authoring-1610, group-gesture, homing-refusal-
+reaches-twin-1898, middle-superset, open-as-modal-1625, pull-v41-wcs, send-history-real-path-2065, undo-
+reproject-echo, wizard-face-1599, workspace-manager-truth-1231), the established parallel-contention pattern,
+no new names this run. None touch this turn's own files (`web/debug/featProbe.js`, `web/app.js`, `web/
+blocks/blockly/bridge.js`) — the two tests that DO directly exercise the `ddcs_dynfields`/enabler mechanism
+(`blocks-edit-lag-788.spec.js`, `sim-socket-hide-820.spec.js`) both passed cleanly on their own, both before
+and within the full run. No regressions from either commit.
+
