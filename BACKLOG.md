@@ -3530,6 +3530,14 @@ field below defaults to a string, so typos are invisible until the machine runs 
    (`specializedPickers.js:22,36`). Same data, two affordances, split by surface.
 4. `flip.setup` → picker of the stack's `setup` indices (a typo today = the flip silently never applies).
 
+### ✅ SCOPE RULED — owner, 2026-08-28: *"we don't need to verify everything, but a var block should at
+least use the match search result gui, go to as well."*
+
+⇒ **Build items 1 and 2 only**: the GOTO family gets a picker of the stack's own labels, and the VAR-NAME
+fields get the searchable match-result picker — `assign` is the pilot (the #1 most-used block), and the other
+var fields take the SAME field type only where it drops in trivially. ⛔ Items 3 and 4 (tool/pin numbers,
+`flip.setup`) are OUT of scope for now — recorded here, not licensed. No sweeping verification layer.
+
 ⛔ Typing FILTERS candidates, never commits a free value (#42's ruled control shape). ⚠ Depends on t2385's
 searchable-picker mechanism — sequence AFTER it and REUSE what it built. Save-time loud checks stay (dangling
 still needs catching).
