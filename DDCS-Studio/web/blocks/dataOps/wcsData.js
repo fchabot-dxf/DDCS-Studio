@@ -30,11 +30,23 @@ const WRAP = 3;
 // every other post, not encoded ignorance — see userOpView.js's own activePostWcsSync comment).
 const WCS_PICKER_GATE = { param: '_wcsPickerOk', is: false, tip: 'This controller has no per-WCS-index register — it zeroes whichever WCS frame is currently active, and can\'t target a specific one.' };
 const WCS_SYNC_GATE = { param: '_wcsSyncOk', is: false, tip: 'Dual-gantry slave sync is a DDCS-Expert-specific register write — no equivalent on this controller.' };
+// t2381 — SECTION MISMATCH, fixed: the shell (index.html:1196-1237) declares THREE sections — FEATURE
+// CONTEXT (axisX/axisY/axisZ), WCS (sys), OPTIONS (sync/slave) — but this array declared only two
+// (`GEOMETRY` covering sys+axisX/Y/Z, `OPTIONS` unchanged) and in the WRONG field order (sys first; the
+// shell puts the axis checkboxes first). Reordered + resectioned to match exactly — same mechanism as
+// t2375's contour fix (array position, not just the `section:` string, drives formWidgets.js's own
+// rendered grouping — see contourData.js's own header comment above CONTOUR_EXEC_BINDINGS for the full
+// account). `GEOMETRY`/`TOOL & CUT`/`IDENTITY` are SECTION_RANK's own canonical whitelist, unrelated to
+// this shell's own real section names — using them here would have been the SAME class of bug the mill
+// family had (a hardcoded-whitelist-shaped name standing in for the shell's own).
 const WCS_EXEC_BINDINGS = [
-    { param: 'sys', tokenEligible: true, blockIndex: 0, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'GEOMETRY', gate: WCS_PICKER_GATE },
-    { param: 'axisX', tokenEligible: true, blockIndex: 0, key: 'axisX', type: 'bool', default: WCS_DEFAULTS.axisX, label: 'Zero X', section: 'GEOMETRY' },
-    { param: 'axisY', tokenEligible: true, blockIndex: 0, key: 'axisY', type: 'bool', default: WCS_DEFAULTS.axisY, label: 'Zero Y', section: 'GEOMETRY' },
-    { param: 'axisZ', tokenEligible: true, blockIndex: 0, key: 'axisZ', type: 'bool', default: WCS_DEFAULTS.axisZ, label: 'Zero Z', section: 'GEOMETRY' },
+    // FEATURE CONTEXT
+    { param: 'axisX', tokenEligible: true, blockIndex: 0, key: 'axisX', type: 'bool', default: WCS_DEFAULTS.axisX, label: 'Zero X', section: 'FEATURE CONTEXT' },
+    { param: 'axisY', tokenEligible: true, blockIndex: 0, key: 'axisY', type: 'bool', default: WCS_DEFAULTS.axisY, label: 'Zero Y', section: 'FEATURE CONTEXT' },
+    { param: 'axisZ', tokenEligible: true, blockIndex: 0, key: 'axisZ', type: 'bool', default: WCS_DEFAULTS.axisZ, label: 'Zero Z', section: 'FEATURE CONTEXT' },
+    // WCS
+    { param: 'sys', tokenEligible: true, blockIndex: 0, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'WCS', gate: WCS_PICKER_GATE },
+    // OPTIONS
     { param: 'sync', tokenEligible: true, blockIndex: 0, key: 'sync', type: 'bool', default: WCS_DEFAULTS.sync, label: 'Sync A Axis (Dual Gantry)', section: 'OPTIONS', gate: WCS_SYNC_GATE },
     { param: 'slave', tokenEligible: true, blockIndex: 0, key: 'slave', type: 'enum', default: WCS_DEFAULTS.slave, widget: 'dropdown', widgetConfig: { options: SLAVE_OPTIONS }, label: 'Slave', section: 'OPTIONS', gate: WCS_SYNC_GATE },
 ];

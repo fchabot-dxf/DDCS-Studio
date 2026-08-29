@@ -61710,3 +61710,126 @@ None. Investigation only — `git status` confirms no code, test, or doc changes
 itself (the corner survey used a scratch spec, deleted before this entry was written; the mill-family's own
 before/after-screenshot sibling-module technique was not needed since nothing was fixed).
 
+## t2381 — THE REGISTRY-WIDE SECTION INVARIANT (survey → declared exceptions → hard gate), WCS ratcheted,
+## and the pocket surprise the invariant surfaced on its own first run
+
+The advisor took the measurement t2379's own finding implied: of 32 twins, 14 have NO live shell (the 6
+probes + 7 lathe + homing/bore/tap/io_step/pause_confirm) — the migration for those is already complete by
+definition, nothing to prove. 6 are already ratcheted (drill/pocket/contour/slot/surfacing/text). The
+remaining 8 (6 ATC + comm + wcs) have live shells and are the real remaining arc. Answered the t2379
+methodology question: the "every binding sectioned, canonical vocabulary" property is a REGISTRY invariant,
+not a per-wizard one — build it ONCE, table-driven, survey first, declared exceptions (not a silent escape
+hatch). Then WCS, since the turn had room; ATC explicitly deferred to its own turn.
+
+### THE INVARIANT — `tests/twin-section-invariant-2381.spec.js` (new)
+
+Iterates `U.listUserOps()` (all 32 registered twins) directly against each `def.bindings` array — no live
+shell needed, so this works uniformly across shell-having and shell-less twins alike. Two checks:
+
+1. **COMPLETENESS** — every binding carries a non-empty `section:`. Exempts TREE-mode twins entirely
+   (`hasTreeLayout(def.template)` true — currently only `user_drill_data`): `.section` isn't their placement
+   mechanism at all, `renderUiTree`'s own explicit `uiChildren` tree is, so an "unsectioned" binding there is
+   a different mechanism, not a gap.
+2. **VOCABULARY** — every section name used is one of `SECTION_RANK`'s own three (`IDENTITY`/`GEOMETRY`/
+   `TOOL & CUT`), UNLESS the twin has a live shell that legitimately dictates its own names (t2375's/t2377's
+   own governing rule — the shell decides). Widening the canonical list to swallow every shell's own
+   vocabulary would make this check vacuous for everyone; naming each diverging twin explicitly keeps it
+   meaningful for every twin not on the list.
+
+Both exception lists are the KNOWN SET asserted EXACTLY (t2299's/t2301's own `EXPECTED_ORPHANS` shape) — a
+closed gap not removed from the list fails as a STALE exception, a widened gap not reflected fails the same
+way, and an undeclared new gap (a future twin that forgets its own section) fails as unresolved. Proven
+non-vacuous on all three failure branches by perturbation: (1) shrinking a completeness exception's own known
+list → caught as stale; (2) removing a completeness exception entirely → caught as undeclared; (3) removing a
+vocabulary exception entirely → caught as undeclared. Also caught, for real, mid-turn: fixing WCS's own
+vocabulary (below) immediately made its own OLD exception entry go stale — the invariant flagged its own
+list needing an update before I'd even finished writing this entry, which is the exact tripwire behavior it
+was built for.
+
+### THE SURVEY RESULT — the actual t2381 measurement, not a guess
+
+**14 CLEAN** (complete + canonical, zero exception needed): atc_length, atc_check, corner, edge, middle,
+rotary_center, rotary_clock, alignment, homing, and all 5 lathe cutting ops. **1 TREE-EXEMPT**: drill.
+**12 VOCABULARY EXCEPTIONS**: contour/slot/surfacing/text (shell-verified, t2375/t2377) + wcs (shell-verified,
+THIS turn) + atc_test/atc_change/atc_table/comm (has a shell, not yet checked against it) + io_step and
+lathe_faceprobe/lathe_odprobe (**no** live shell, divergence unexplained — flagged, not excused). **5
+COMPLETENESS EXCEPTIONS** (a real absence, out of this turn's own dispatched scope): atc_warmup_data (0/4, has
+a shell — a future ATC-turn fix), tap_data (2/20) and bore_data (25/37, no shell), pause_confirm (0/1, no
+shell, likely moot below `SECTION_THRESHOLD`), and **pocket_data (36/39)**.
+
+### THE POCKET SURPRISE — the invariant survey found a real gap on an "already ratcheted" wizard
+
+`user_pocket_data` is missing `section:` on exactly `entryX`/`entryY`/`toolNum` (the SAME shared-deriver-
+sourced trio — `toolBindingsFor`/`entryBindingsFor` — that needed a local `.map()` override in contour/
+surfacing/text). Traced why t2301's own ratchet never caught it: `formReproduction.js`'s own engine
+deliberately forces `renderUiTree` for BOTH drill and pocket regardless of `hasTreeLayout()`'s own verdict
+(documented in that file's own header — matching drill's real shape, which DOES have a `split_horizontal`
+switch). But `hasTreeLayout(pocketDataDef().template)` is actually **FALSE** — pocket's real live render goes
+through FLAT mode (`renderOpForm` directly), where these three fields render UNBOXED. Live-confirmed via
+`window.openWiz('user_pocket_data')`: `.form-sec-title` shows only `GEOMETRY`/`TOOL & CUT`, and all three
+fields sit outside any `[data-section]` ancestor — the exact orphan-render symptom contour/surfacing/text had
+before their own t2375/t2377 fixes. **Not fixed this turn** — flagged in the invariant's own declared
+exception list with the full trace, since fixing it belongs to a turn that owns pocket, not a registry-wide
+survey turn. Pocket's own t2301 tree-mode spec still passes (it tests a real mechanism, just not the live
+one) — nothing about it needs reverting.
+
+### WCS — the section MISMATCH, fixed (the mill-family shape, on the 8th remaining wizard)
+
+`wcsData.js`'s own `WCS_EXEC_BINDINGS` used `SECTION_RANK`'s canonical `GEOMETRY` for `sys`/`axisX`/`axisY`/
+`axisZ` — a name that happened to be in the whitelist, but not the shell's own real section. The shell
+(index.html:1196-1237) declares THREE: `FEATURE CONTEXT` (the axis checkboxes), `WCS` (the system dropdown),
+`OPTIONS` (sync/slave) — the twin had two, and `sys` sat in the wrong array position (first; the shell puts
+the checkboxes first). Reordered + resectioned to match exactly, same mechanism as t2375's contour fix.
+Emit proven byte-identical: `wcs-dialect-emit.spec.js`, `wcs-emit-resolved.spec.js`, `wcs-in-place.spec.js`
+(5/5, unchanged).
+
+**Not registered on `formReproduction.js`'s shared engine** — a genuine methodology finding, not a workaround:
+that engine's own "wording" test compares RENDERED `.form-sec-title` chrome against the shell, but
+`formWidgets.js`'s own `sectionize` gate (`SECTION_THRESHOLD = 8`) means a form with ≤8 rows never renders
+section fold chrome AT ALL, by design ("a short form doesn't need folding"). WCS has exactly 6 bindings —
+below threshold — so comparing DOM section titles would be a FALSE NEGATIVE (the shell's static HTML shows 3
+section-label spans unconditionally; the twin's dynamic chrome correctly shows none). Confirmed live: the
+before/after screenshots (`verification/t2381-wcs-{before,after}.png`) show NO section boxes in either —
+same visual result — but the field ORDER differs (before: sys first; after: axisX/Y/Z first, matching the
+shell). Wrote `tests/wcs-form-reproduction-2381.spec.js` (new) instead: verifies the DECLARATION directly
+(every binding's own `section:` property, compared against a hand-derived shell field-to-section map) plus
+field order via live DOM (real regardless of whether chrome renders) plus edit-reaches-emit. Proven
+non-vacuous by perturbation (swapped `axisY`'s expected section, confirmed red, restored).
+
+### FULL SUITE
+
+**2904 passed / 1 failed / 10 flaky / 26 skipped (24.9m).** The 1 failure —
+`middle-superset.spec.js` shard 1/4, a `Test timeout of 60000ms exceeded` on a 14336-combo structural sweep,
+3/3 tries — is a PLAIN TIMEOUT under full-suite load, not an assertion failure, and touches `middleData.js`/
+`middleWizard.js`/`whenGuard.js`/`blockEmitter.js`, none of which this turn changed. Re-ran
+`middle-superset.spec.js` in ISOLATION: **6/6 passed, 13.3s** (well under the 60s cap) — confirming pure load-
+contention, not a regression. Same repeat-name pattern this file has shown as FLAKY in every prior full-suite
+run this session (t2375, t2377) — this run it happened to exhaust both retries instead of recovering on one.
+**FAILED COUNT attributable to this turn: 0.** None of the 10 flaky names touch wcs/twin-section-invariant or
+either new spec file — all repeat names from earlier turns' own full-suite runs.
+
+### THE COUNT — 7 of 32 twins now shell-verified or (for the 14 shell-less) registry-verified complete
+
+Ratcheted with a live-shell reproduction spec: drill, pocket*, contour, slot, surfacing, text, **wcs** (7).
+*pocket carries a real, now-declared gap (above) — its own t2301 spec still passes, tests a real mechanism.
+Registry-verified complete (no shell needed, self-consistency proven): the 6 probes + drill's own tree
+exemption. Remaining WITH a live shell, genuinely untouched: the 6 ATC wizards (its own dispatched turn) +
+comm. Remaining WITHOUT a live shell, genuinely incomplete (flagged, not fixed): tap, bore, atc_warmup*,
+pause_confirm (*atc_warmup has a shell — future ATC-turn scope), plus io_step's and lathe_faceprobe/
+odprobe's own unexplained vocabulary divergence (no shell to justify either way).
+
+### Files changed
+
+`web/blocks/dataOps/wcsData.js` — `WCS_EXEC_BINDINGS` reordered + corrected `section:` values.
+
+`tests/twin-section-invariant-2381.spec.js` (new) — the registry-wide invariant, survey-first, declared
+exceptions, proven non-vacuous on all three failure branches.
+
+`tests/wcs-form-reproduction-2381.spec.js` (new) — WCS's own ratchet spec (declaration-direct, not DOM-chrome,
+per the `SECTION_THRESHOLD` finding above), proven non-vacuous.
+
+`DDCS-Studio/verification/t2381-wcs-{before,after}.png` (new) — the before/after screenshots (field order
+differs; section chrome absent in both, correctly, below threshold).
+
+No tail — none dispatched this turn.
+
