@@ -63182,3 +63182,13 @@ state that never appears, restored.
 
 No test spec persisted (same precedent as t2399's own tail — verified live during the turn).
 
+### Full suite (all 4 commits, run once at the end)
+
+**2938 passed, 0 failed, 10 flaky (all recovered on retry), 26 skipped, 23.9m.** Neither of this turn's own
+specs (`comm-form-reproduction-2399`, `twin-section-invariant-2381`) appear in the flaky list — all 6/1 clean
+on first try. Every one of the 10 flakes has deep prior-turn history in this file (3-71 mentions each —
+blocks-live-form, form-section-collapse-820, formfield-loud-mismatch-1636, hardening-1241, middle-superset,
+open-as-modal-1625, pane-visual-host-programmatic-1762, viz3d-handle-theme-2155, wizard-manager-1617,
+workspace-roundtrip) — the established parallel-contention pattern, no new names this run. No regressions
+from either registry-closure piece or the tail.
+
