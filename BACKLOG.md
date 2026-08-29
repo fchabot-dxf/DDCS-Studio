@@ -3462,14 +3462,39 @@ impossible to fill meaningfully for that row's widget.** Its sibling `formfield`
 - `matchvar` / `atomType` free text — a RECORDED decision (formField.js header: typos are caught loudly at
   save by t1636's `formfieldMatchReport`). Do not re-litigate.
 
-### ✅ RULED — owner, 2026-08-28: "A"
+### ✅ RULED — owner, 2026-08-28: "A", then sharpened twice the same day
 
-`section` and `units` become **combo dropdown-with-custom-entry**: section offers the canonical
-IDENTITY/GEOMETRY/TOOL & CUT plus the def's own existing names; units offers mm/in/°/rpm/%; **both still
-accept anything typed**. ⛔ Never a closed dropdown — 12 shells legitimately dictate their own section names
-(the t2381 invariant's own exception list), and a new unit must never need a code change. The dropdown is a
-spelling aid, not a gate: typed free text remains first-class, and the t2381 invariant stays the thing that
-catches a wrong section name — not this widget.
+`section` becomes **combo dropdown-with-custom-entry**: the canonical IDENTITY/GEOMETRY/TOOL & CUT plus the
+def's own existing names, still accepting anything typed. ⛔ Never closed — 12 shells legitimately dictate
+their own section names (the t2381 invariant's own exception list); the invariant polices names, not this
+widget.
+
+⭐⭐ **THE GENERAL PRINCIPLE — owner: "wherever we need an exact variable name don't allow typing", control
+shape: "a search with dropdown option or an actual dropdown."** An input whose value must MATCH an exact name
+is a **picker** — a plain dropdown where the list is short, a SEARCHABLE dropdown (typing FILTERS the
+candidates, never commits a free value) where it is long. Free text remains first-class only where any string
+is valid (label, help, section, custom display-only units).
+
+Applied to this block, exact-name inputs become pickers populated from what actually exists:
+
+```
+units       the MAGIC pair 'mm' / 'mm/min' (they key inch conversion, formWidgets.js:83-88)
+            are dropdown entries; other units stay typed, display-only verbatim
+whenparam   picker of the def's own SIBLING params
+relToRow    picker of the op's declared sim-start rows
+matchvar    picker of the assign vars ACTUALLY IN THIS STACK      ┐ ⭐ SUPERSEDES the
+atomType    picker of the atom types actually in this stack       ┘ t1636 free-text decision
+```
+
+⚠ **The matchvar/atomType row supersedes a recorded decision** (formField.js's own header: deliberately not a
+live dropdown, typos caught at save by `formfieldMatchReport`). Owner overruled 2026-08-28 — update that
+header comment when building. ⛔ **`formfieldMatchReport` STAYS** as the save-time backstop: a picker prevents
+typos but not DANGLING — a var picked correctly and then deleted from the stack still needs the loud check.
+
+Feasibility notes for the worker: Blockly `FieldDropdown` accepts an options FUNCTION (per-instance live
+lists from this block's own root stack); a searchable variant likely needs a custom field — established
+precedent (`field_cornergrid`/`field_regionpick`/`field_coordlist`, bridge.js:253-255). Establish which the
+build supports and say which you shipped.
 
 ### VERIFY
 
