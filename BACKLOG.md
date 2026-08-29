@@ -3943,7 +3943,27 @@ widened condition reproduces the exact `NO_LBL_FIELD` gap on a previously-broken
 
 ---
 
-### 54. THE FULL SUITE HAS NO PROGRESS SURFACE — and its current reporter burns the worker's context
+### 54. [✅ SHIPPED t2407 — 530KB→2.8KB stdout, three surfaces live. ⏳ ONE FOLLOW-UP BELOW: compact the md] THE FULL SUITE HAS NO PROGRESS SURFACE — and its current reporter burns the worker's context
+
+> ### ⏳ FOLLOW-UP — owner, 2026-08-29 watching it run: *"compact the progress md ui to be less tall."*
+>
+> The six-row vertical table renders very tall (a full screen for six numbers). Collapse to **four lines**,
+> and drop the table entirely — a markdown table cannot be short:
+>
+> ```
+> ## Suite progress
+> ████████████████░░░░░░  71.6%
+> **2132 / 2976** · ✅ 2098 · ❌ 1 · ⚠ 10 · ⊘ 23 · 19m5s elapsed · ~7m left
+> `tests/whatever-is-running.spec.js`
+> ```
+>
+> - ⛔ **No table** — one bar line, one stats line, one current-spec line.
+> - ⭐ Fix the **empty header row** (`| | |` renders as a blank strip) — it disappears with the table.
+> - ⚠ Establish whether the bar should keep its backticks: they force monospace (so the blocks align) but
+>   render it as inline code. If a plain bar aligns acceptably in the preview, drop them; if not, keep and
+>   say why.
+> - Keep the heartbeat/stale marker and every number — this is a LAYOUT change, nothing is removed.
+> - `progress.html` may want the same slimming; use judgement, it has more room.
 
 *(owner-asked 2026-08-29: "is there a way to indicate progress on full suite… like a progress bar", then
 ruled the surface after two rounds — ⛔ NOT the terminal, ⛔ NOT the chat (a sent message cannot redraw), and
