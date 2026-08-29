@@ -518,7 +518,20 @@ function registerDynExtension(Blockly) {
                             if (!nonEmpty(this.getFieldValue(FN(f))) && !forced.has(f)) show.delete(FN(f));
                         }
                     }
-                    all.forEach((f) => { const fld = this.getField(FN(f)); if (fld) fld.setVisible(show.has(FN(f))); });
+                    // t2393 (BACKLOG #48 item 1) — LIVE-CAUGHT REGRESSION from t2385's own fix, before it shipped
+                    // a SECOND broken consumer: t2385 switched `getInput→getField` to fix INLINE fields (text/
+                    // dropdown/checkbox, packed into one shared Input — getInput could never find them), but a
+                    // plain NUMERIC field (holecycle's cols/dia/w/…, array's own cols/dx/dy/…) is an `input_value`
+                    // SOCKET, not a Field at all — `getField(FN(f))` returns undefined for one, so `all.forEach`
+                    // silently touched nothing for every value-socket field. Confirmed live: `array`'s own
+                    // `dynamic:'pattern'` (the very first, pre-t2385 consumer of this mechanism, all-numeric
+                    // fields) has been silently NOT hiding anything since t2385 shipped — undetected because
+                    // nothing asserted per-field VISIBILITY for it, only round-trip/emit correctness, which this
+                    // never touches. `getInput` is the correct reader for a socket (confirmed: `Input` has its
+                    // own `setVisible`, the ORIGINAL pre-t2385 mechanism) — checking BOTH per field, in the order
+                    // most fields actually are (inline fields outnumber sockets registry-wide), covers both
+                    // shapes with the one shared loop instead of two mechanisms that each covered half.
+                    all.forEach((f) => { const target = this.getField(FN(f)) || this.getInput(FN(f)); if (target) target.setVisible(show.has(FN(f))); });
                     // t2387 — the enabler fields' own NAMED caption (jsonDef()'s `_LBL` twin, see its own header
                     // note) toggles in LOCKSTEP with the value field it labels — a dangling "help" with no box
                     // next to it is exactly the bug this second line exists to prevent.

@@ -606,7 +606,29 @@ export const holeCycleBlock = {
     // are visible per `pattern`, exactly as the `array` block already does.
     allFields: ['pattern', 'cycle', 'x', 'y', 'z0', 'x0', 'y0', 'depth', 'peck', 'pitch', 'holeDia', 'toolDia', 'feed', 'clearance',
         'cols', 'rows', 'dx', 'dy', 'count', 'spacing', 'angle', 'dia', 'startAngle', 'w', 'h', 'nx', 'ny', 'skip'],
-    dynamic: 'pattern',
+    // t2393 (BACKLOG #48 item 1) — `dynamic: 'pattern'` declared alone had NO `fieldsFor`, and `ddcs_dynfields`
+    // (bridge.js) bails silently without one — so every one of the 28 fields rendered ALWAYS on the #3
+    // most-used block: a `single` hole showed grid+circle+rect+line config at once, the exact `param_field`
+    // defect BACKLOG #42 fixed elsewhere. Two independent gates, both structural (never emptiness-based — a
+    // pattern/cycle FULLY OWNS its own fields, unlike #42's optional enablers): `pattern` picks exactly one of
+    // grid/circle/line/rect's own field group (`array.js`'s own `patternPoints` is the authoritative reader —
+    // `count`/`dia`/`startAngle` for circle, `count`/`spacing`/`angle` for line, `w`/`h`/`nx`/`ny` for rect,
+    // `cols`/`rows`/`dx`/`dy` for grid, nothing extra for single); `cycle` picks `peck` OR `pitch`+`holeDia`+
+    // `toolDia` (holecycle.js:408-410's own peck-vs-pitch branch, `boreRadius` at :140 reading holeDia/toolDia
+    // — bore-only arithmetic; peck's own body never reads either, only the universal fit-refusal does, at
+    // whatever value is already stored).
+    dynamic: ['pattern', 'cycle'],
+    fieldsFor(p) {
+        const pattern = String((p && p.pattern) || 'single');
+        const cycle = String((p && p.cycle) || 'peck');
+        const f = ['pattern', 'cycle', 'x', 'y', 'z0', 'x0', 'y0', 'depth', 'feed', 'clearance', 'skip'];
+        if (cycle === 'peck') f.push('peck'); else f.push('pitch', 'holeDia', 'toolDia');
+        if (pattern === 'grid') f.push('cols', 'rows', 'dx', 'dy');
+        else if (pattern === 'circle') f.push('dia', 'count', 'startAngle');
+        else if (pattern === 'line') f.push('count', 'spacing', 'angle');
+        else if (pattern === 'rect') f.push('w', 'h', 'nx', 'ny');
+        return f;
+    },
     scratch: HOLE_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
     /**
      * THE DECLARED FLOW LABELS (t1381). A body carrying `N`/`GOTO` must have labels that are unique across the whole

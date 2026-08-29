@@ -18,6 +18,16 @@ export const paramBlock = {
     type: 'param', label: 'param', kind: 'reporter', category: 'Wizard Inputs',
     defaults: { name: 'value', widget: 'number', value: 0, options: '' },
     fields: ['name', 'widget', 'value', 'options'],   // `options` (presets) only matters for the dropdown widget
+    // t2393 (BACKLOG #48 item 1) — `options` used to render ALWAYS, even for number/slider/toggle where it does
+    // nothing (the comment above already said so — the field just never enforced it). Reuses the SAME
+    // `ddcs_dynfields` mechanism param_field/formfield/holecycle now all ride.
+    allFields: ['name', 'widget', 'value', 'options'],
+    dynamic: 'widget',
+    fieldsFor(p) {
+        const f = ['name', 'widget', 'value'];
+        if ((p && p.widget) === 'dropdown') f.push('options');
+        return f;
+    },
     reduce: (p, scope, rc) => {
         const v = p.value;
         if (v && typeof v === 'object' && rc) return rc(v);   // a reporter plugged into the default socket

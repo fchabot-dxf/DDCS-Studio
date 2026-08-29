@@ -62479,3 +62479,81 @@ All 5 pinning tests confirmed GREEN after the fix. Full suite (Rule 1b, bridge.j
 Item 2 (holecycle's dead dynamic + param.js) is next, its own commit — this data-loss item stands alone per
 the dispatch's own instruction, shippable even if the rest of the turn stalls.
 
+## t2393 ITEM 2 (own commit) — BACKLOG #48 item 1: holecycle's dead `dynamic`, param.js's always-visible
+options — AND a live-caught REGRESSION in the shared mechanism from my own t2385 work, affecting `array` too
+
+`holecycle` (the #3 most-used block) declared `dynamic: 'pattern'` with no `fieldsFor` — `ddcs_dynfields`
+(bridge.js) bails silently without one, so all 28 fields rendered ALWAYS (grid+circle+rect+line+peck+bore
+config all at once). Wrote `fieldsFor`, gated on TWO independent axes (never emptiness-based, unlike #42's
+enablers — a pattern/cycle fully OWNS its own field group): `pattern` picks exactly one of
+grid/circle/line/rect's own fields (`array.js`'s own `patternPoints` — the ACTUAL point generator both
+`holecycle` and the plain `array` block share — is the authoritative per-pattern field list, not a guess:
+circle reads `dia`/`count`/`startAngle`, line reads `count`/`spacing`/`angle`, rect reads `w`/`h`/`nx`/`ny`,
+grid reads `cols`/`rows`/`dx`/`dy`, single reads nothing extra); `cycle` picks `peck` OR
+`pitch`+`holeDia`+`toolDia` (holecycle.js:408-410's own peck-vs-pitch branch; `boreRadius`, :140, reads
+holeDia/toolDia for bore-only arithmetic — peck's own body never touches either, only the universal fit-
+refusal does, at whatever value is already stored). `dynamic` widened from `'pattern'` to `['pattern',
+'cycle']`. `param.js`'s own `options` field (BACKLOG's own #42-echo: "still carries #42's options-DSL +
+always-visible pair") got the same one-field `dynamic:'widget'` + `fieldsFor` treatment — `options` now shows
+only for the `dropdown` widget, matching its own header comment ("`options` (presets) only matters for the
+dropdown widget") for the first time.
+
+### A SECOND, more consequential finding: my own t2385 fix silently broke `array`'s dynamic gating (and would
+have broken this turn's new holecycle/param work too, undetected, if not live-caught)
+
+Verifying holecycle live (fresh isolated blocks, `getField('COLS')?.isVisible()` etc.) came back `undefined`
+for EVERY numeric field — `pattern`/`cycle`/`skip` (dropdown/text) had real names; `x`/`depth`/`cols`/`dia`/
+`peck`/… (all numbers) did not. `fieldKind()` classifies a numeric default as kind `'value'` →
+`{type:'input_value', check:'Number'}` — a value SOCKET (with a `math_number` shadow), never a Blockly
+`Field` at all. `registerDynExtension`'s `apply()` (bridge.js), since t2385, calls ONLY `this.getField(FN(f))`
+— t2385's own fix for INLINE fields (text/dropdown/checkbox, packed into one shared Input `getInput` could
+never reach), which silently regressed the OPPOSITE case: a value-socket field has no Field for `getField` to
+find either, so `apply()` toggled nothing for any of them. Confirmed live this has been broken since t2385
+shipped for `array` too — the array block (t1520's own header: "the ARRAY block's four-member `pattern`
+list") is ALL-NUMERIC fields for cols/rows/dx/dy/count/spacing/angle/dia/startAngle, and was `dynamic`'s very
+FIRST consumer, pre-dating t2385 — undetected because nothing asserts per-field VISIBILITY for it, only
+round-trip/emit correctness, which visibility toggling never touches.
+
+Fixed at the ONE shared site: `all.forEach((f) => { const target = this.getField(FN(f)) || this.getInput(FN(f)); if (target) target.setVisible(...); })`
+— tries the Field first (the common case, inline fields outnumber sockets registry-wide), falls back to the
+Input (the socket case) — one loop covering both field shapes instead of two mechanisms each covering half.
+Re-verified live: holecycle single+peck now correctly shows 9 of 28 fields; grid+bore-step shows a DIFFERENT
+9 (pattern+cycle fields swap in); `array` grid shows cols/rows/dx/dy and hides dia/spacing, circle the
+reverse. Screenshot: `verification/t2393-holecycle-dynamic.png`.
+
+### VERIFIED
+
+Isolated field-visibility checks (both patterns × both cycle branches on holecycle, both widget states on
+param, both pattern states on array) all correct. Screenshot confirms the visual "wall of boxes" reduction on
+the real block face (single+peck: 9 fields shown, was 28; grid+bore-step: a different 9). Emit/register-time
+output untouched by construction — `dynamic`/`fieldsFor` is a rendering-visibility concern only, never reads
+by `holeCycleLines`/`patternLines`/`reduce`.
+
+Full suite (Rule 1b, bridge.js is shared): **2923 passed, 2 failed, 13 flaky (recovered), 26 skipped, 24.2m.**
+Both failures investigated individually, per Rule 1b, and confirmed PRE-EXISTING/PINNING, not regressions:
+- `undo-reproject-echo.spec.js:46` — grepped: this EXACT test failed-then-recovered-on-retry-#1 in ALL THREE
+  prior turns' own full-suite logs (t2385/t2387/t2389), byte-identical failure signature each time (a 6000ms
+  `waitX` timeout on the SAME assertion) — a long-standing flake unrelated to anything touched this turn
+  (it edits a plain `move` block, which declares no `dynamic` at all). This run it failed on retry #2 as well
+  (unlucky timing variance), still the same pre-existing flake, not new.
+- `open-as-modal-1625.spec.js:127` — NEVER failed in t2385/t2387/t2389 (clean first-attempt pass all three
+  times, ~45s runtime — an inherently slow, timeout-sensitive test). Re-ran the exact gesture (Customize
+  corner → click `#blkOpenModal` → modal opens) in isolation with the test's own declared viewport
+  (1700×1000) — passed cleanly. Corner's own template carries no `holecycle`/`param`/`array` blocks, so
+  there's no plausible mechanism for this turn's change to reach it; the full-suite failure is attributed to
+  timing/resource contention under the full 2900+ test load, not a functional break.
+
+### Files changed (this commit only)
+
+`web/blocks/blockly/bridge.js` (Rule 1b, shared) — `registerDynExtension`'s `apply()`: the `getField||getInput`
+fallback (fixes the array regression + makes holecycle/param's new gating actually work).
+
+`web/wizards/ops/holecycle.js` — `dynamic: ['pattern','cycle']` + `fieldsFor`.
+
+`web/wizards/ops/param.js` — `allFields`, `dynamic: 'widget'`, `fieldsFor`.
+
+`DDCS-Studio/verification/t2393-holecycle-dynamic.png` (new).
+
+Items 3-5 of BACKLOG #48 (magic scope names, undefaulted fields, the remaining mode-gated families) not yet
+attempted — continuing if the turn has room.
+
