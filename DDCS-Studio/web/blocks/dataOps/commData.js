@@ -36,25 +36,34 @@ const SUPERSET_PARAMS = { ...COMM_DEFAULTS, msg: SENT.msg, slot1: SENT.slot1, sl
 
 export const COMM_DATA_OPTYPE = 'user_comm_data';
 
-/** STRUCTURAL toggles (drive the guard prune, NO value socket) + the value-swap knobs that ride the recompose. */
+/** STRUCTURAL toggles (drive the guard prune, NO value socket) + the value-swap knobs that ride the recompose.
+ *  t2401 — RESECTIONED + REORDERED to the shell's own 3 sections in the shell's own DOM order (index.html:
+ *  1100-1213): FEATURE CONTEXT (type, mode) → GEOMETRY (val, cycle, msg) → ADVANCED (id, dest, statusColor,
+ *  statusDwell, slot1-4). Was 'TYPE'/'GEOMETRY' (2 invented sections, GEOMETRY absorbing the shell's own
+ *  GEOMETRY+ADVANCED) — see comm-form-reproduction-2399.spec.js's own header for the full t2399 account of
+ *  the mismatch this fixes, and formWidgets.js's own SECTION_RANK comment for why 'FEATURE CONTEXT' needed a
+ *  registry-wide rank addition before this reorder could actually render in the shell's own order (GEOMETRY's
+ *  canonical rank otherwise sorts it first regardless of array position). Array order here now IS the shell's
+ *  own field order — reordering carries no emit risk (commDataStack()/applyCommRecompose never read binding
+ *  array order, only `bindingSpecs` matched by #var/atom identity over the pruned stack). */
 export const COMM_STRUCT_BINDINGS = [
-    { param: 'type', type: 'enum', default: COMM_DEFAULTS.type, label: 'Type', help: 'popup / status / numeric input / beep / dwell.', section: 'TYPE', widgetConfig: { options: [['Popup', 'popup'], ['Status', 'status'], ['Input', 'input'], ['Beep', 'beep'], ['Dwell', 'dwell']] } },
-    { param: 'popupMode', type: 'enum', default: COMM_DEFAULTS.popupMode, label: 'Popup Mode', help: 'Toast (-5000) / OK-Cancel (1) / Binary (3).', section: 'TYPE', when: { param: 'type', is: 'popup' }, widgetConfig: { options: [['Toast', -5000], ['OK/Cancel', 1], ['Binary', 3]] } },
-    { param: 'statusMode', type: 'enum', default: COMM_DEFAULTS.statusMode, label: 'Status Mode', help: 'Standard (1) / Persistent (-3000).', section: 'TYPE', when: { param: 'type', is: 'status' }, widgetConfig: { options: [['Standard', 1], ['Persistent', -3000]] } },
+    { param: 'type', type: 'enum', default: COMM_DEFAULTS.type, label: 'Type', help: 'popup / status / numeric input / beep / dwell.', section: 'FEATURE CONTEXT', widgetConfig: { options: [['Popup', 'popup'], ['Status', 'status'], ['Input', 'input'], ['Beep', 'beep'], ['Dwell', 'dwell']] } },
+    { param: 'popupMode', type: 'enum', default: COMM_DEFAULTS.popupMode, label: 'Popup Mode', help: 'Toast (-5000) / OK-Cancel (1) / Binary (3).', section: 'FEATURE CONTEXT', when: { param: 'type', is: 'popup' }, widgetConfig: { options: [['Toast', -5000], ['OK/Cancel', 1], ['Binary', 3]] } },
+    { param: 'statusMode', type: 'enum', default: COMM_DEFAULTS.statusMode, label: 'Status Mode', help: 'Standard (1) / Persistent (-3000).', section: 'FEATURE CONTEXT', when: { param: 'type', is: 'status' }, widgetConfig: { options: [['Standard', 1], ['Persistent', -3000]] } },
 ];
 export const COMM_VALUESWAP_BINDINGS = [
-    { param: 'msg', type: 'string', default: COMM_DEFAULTS.msg, label: 'Message', help: 'The text shown to the operator (popup / status / input prompt).', section: 'GEOMETRY' },
-    { param: 'statusColor', type: 'number', default: COMM_DEFAULTS.statusColor, label: 'Status Color (BGR)', help: 'Status-bar colour (-1 = default green).', section: 'GEOMETRY', when: { param: 'type', is: 'status' } },
-    { param: 'statusDwell', type: 'number', default: COMM_DEFAULTS.statusDwell, label: 'Status Dwell (ms)', help: 'Keep the status message visible this long (0 = none).', section: 'GEOMETRY', when: { param: 'type', is: 'status' } },
-    { param: 'id', type: 'string', default: COMM_DEFAULTS.id, label: 'Target #', help: 'The variable the numeric input writes (50-499).', section: 'GEOMETRY', when: { param: 'type', is: 'input' } },
-    { param: 'dest', type: 'string', default: COMM_DEFAULTS.dest, label: 'Dest var', help: 'Optional: copy the entered value to a persistent var.', section: 'GEOMETRY', when: { param: 'type', is: 'input' } },
     { param: 'val', type: 'number', default: COMM_DEFAULTS.val, label: 'Value', help: 'Beep duration / dwell ms.', section: 'GEOMETRY' },
     { param: 'cycle', type: 'number', default: COMM_DEFAULTS.cycle, label: 'Cycle (ms)', help: 'Beep pulse width (0 = single beep).', section: 'GEOMETRY', when: { param: 'type', is: 'beep' } },
+    { param: 'msg', type: 'string', default: COMM_DEFAULTS.msg, label: 'Message', help: 'The text shown to the operator (popup / status / input prompt).', section: 'GEOMETRY' },
+    { param: 'id', type: 'string', default: COMM_DEFAULTS.id, label: 'Target #', help: 'The variable the numeric input writes (50-499).', section: 'ADVANCED', when: { param: 'type', is: 'input' } },
+    { param: 'dest', type: 'string', default: COMM_DEFAULTS.dest, label: 'Dest var', help: 'Optional: copy the entered value to a persistent var.', section: 'ADVANCED', when: { param: 'type', is: 'input' } },
+    { param: 'statusColor', type: 'number', default: COMM_DEFAULTS.statusColor, label: 'Status Color (BGR)', help: 'Status-bar colour (-1 = default green).', section: 'ADVANCED', when: { param: 'type', is: 'status' } },
+    { param: 'statusDwell', type: 'number', default: COMM_DEFAULTS.statusDwell, label: 'Status Dwell (ms)', help: 'Keep the status message visible this long (0 = none).', section: 'ADVANCED', when: { param: 'type', is: 'status' } },
     // the binary-popup button labels (mode 3) — clean #1510-1513 sockets (bound via COMM_BINDING_SPECS); these are their form fields
-    { param: 'slot1', type: 'string', default: COMM_DEFAULTS.slot1, label: 'Button 1', help: 'Binary-popup button label.', section: 'GEOMETRY', when: { param: 'popupMode', is: 3 } },
-    { param: 'slot2', type: 'string', default: COMM_DEFAULTS.slot2, label: 'Button 2', help: 'Binary-popup button label.', section: 'GEOMETRY', when: { param: 'popupMode', is: 3 } },
-    { param: 'slot3', type: 'string', default: COMM_DEFAULTS.slot3, label: 'Button 3', help: 'Binary-popup button label.', section: 'GEOMETRY', when: { param: 'popupMode', is: 3 } },
-    { param: 'slot4', type: 'string', default: COMM_DEFAULTS.slot4, label: 'Button 4', help: 'Binary-popup button label.', section: 'GEOMETRY', when: { param: 'popupMode', is: 3 } },
+    { param: 'slot1', type: 'string', default: COMM_DEFAULTS.slot1, label: 'Button 1', help: 'Binary-popup button label.', section: 'ADVANCED', when: { param: 'popupMode', is: 3 } },
+    { param: 'slot2', type: 'string', default: COMM_DEFAULTS.slot2, label: 'Button 2', help: 'Binary-popup button label.', section: 'ADVANCED', when: { param: 'popupMode', is: 3 } },
+    { param: 'slot3', type: 'string', default: COMM_DEFAULTS.slot3, label: 'Button 3', help: 'Binary-popup button label.', section: 'ADVANCED', when: { param: 'popupMode', is: 3 } },
+    { param: 'slot4', type: 'string', default: COMM_DEFAULTS.slot4, label: 'Button 4', help: 'Binary-popup button label.', section: 'ADVANCED', when: { param: 'popupMode', is: 3 } },
 ];
 
 // VALUE bindings by identity over the pruned stack — the clean scalar sockets. Slots stay #1510-1513 assigns; the status

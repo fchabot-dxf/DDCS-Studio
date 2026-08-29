@@ -87,9 +87,21 @@ import { test, expect } from '@playwright/test';
  * future turn, same shape as t2383's atc_change fix. comm_data was also the SURVEY's last has-a-shell-but-
  * unratcheted entry — with it landed, only io_step/lathe_faceprobe/lathe_odprobe's own no-shell vocabulary
  * gaps remain genuinely unresolved (see their own comments below, unchanged this turn).
+ *
+ * ⭐ UPDATED t2401 (CLOSE THE REGISTRY) — comm_data HARMONIZED: t2399's own reading of "do not harmonise" was
+ * corrected (it guards the SHELL, not the twin) — commData.js resectioned to the shell's own 3 names in the
+ * shell's own DOM order, `'shell-unharmonized'` relabeled back to `'shell'`. Landing this needed a REGISTRY-
+ * WIDE fix first: `SECTION_RANK` gained `'FEATURE CONTEXT'` (formWidgets.js) — the shell's own GEOMETRY
+ * section otherwise sorts ahead of any unranked name regardless of array order, which would have silently
+ * defeated a same-name resection. `user_wcs_data`'s own exception NARROWED as a result (FEATURE CONTEXT is
+ * now canonical, so only OPTIONS/WCS remain outside it — no behavior change for WCS itself, confirmed).
  */
 
-const SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
+// t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not
+// an import — unchanged from before this turn; kept in sync by hand same as always). See formWidgets.js's
+// own comment for why: comm's shell puts 'FEATURE CONTEXT' before 'GEOMETRY', and GEOMETRY's own canonical
+// rank otherwise sorts it first regardless of array order.
+const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
 
 // TREE-mode twins: `.section` is not their placement mechanism (renderUiTree's own uiChildren tree is).
 // Exempt from the COMPLETENESS check. If this list ever needs a second entry, that is itself worth a look —
@@ -145,14 +157,17 @@ const VOCABULARY_EXCEPTIONS = {
     // "TOLERANCE"); the other 7 bindings have no shell field at all and keep the canonical GEOMETRY/
     // TOOL & CUT split — verified (atc-batch-form-reproduction-2383.spec.js).
     user_atc_check_data: { reason: 'shell', sections: ['TOLERANCE'] },
-    // t2381 — fixed THIS SAME turn: WCS's shell (index.html:1196-1237) declares FEATURE CONTEXT/WCS/OPTIONS,
-    // none of which are SECTION_RANK's own three — reproducing the shell means diverging from the canonical
-    // vocabulary entirely here, verified byte-for-byte (wcs-form-reproduction-2381.spec.js).
-    user_wcs_data: { reason: 'shell', sections: ['FEATURE CONTEXT', 'OPTIONS', 'WCS'] },
-    // t2399 — VERIFIED against the real shell (comm-form-reproduction-2399.spec.js) and found NOT to match it
-    // (shell: FEATURE CONTEXT/GEOMETRY/ADVANCED; twin: TYPE/GEOMETRY, plus a scrambled field order) — dispatched
-    // "reproduce, do not harmonise, record inconsistencies," so left AS-IS. See this file's own t2399 update note.
-    user_comm_data: { reason: 'shell-unharmonized', sections: ['TYPE'] },   // GEOMETRY (its other section) is already canonical
+    // t2381 — fixed at t2381; NARROWED at t2401 — WCS's shell (index.html:1196-1237) declares FEATURE
+    // CONTEXT/WCS/OPTIONS. 'FEATURE CONTEXT' became CANONICAL at t2401 (added to SECTION_RANK for comm's own
+    // sake — see this file's own t2401 update note), so only WCS/OPTIONS remain outside it. Still verified
+    // byte-for-byte (wcs-form-reproduction-2381.spec.js, unchanged and still green).
+    user_wcs_data: { reason: 'shell', sections: ['OPTIONS', 'WCS'] },
+    // t2399/t2401 — HARMONIZED at t2401: resectioned to the shell's own 3 names in the shell's own DOM order
+    // (comm-form-reproduction-2399.spec.js). 'FEATURE CONTEXT' and 'GEOMETRY' are now canonical (the latter
+    // always was); only 'ADVANCED' remains outside SECTION_RANK — verified byte-for-byte against the shell,
+    // reason relabeled from 'shell-unharmonized' back to 'shell' (t2399's own reading of "do not harmonise"
+    // was corrected: that instruction guards the shell, not the twin).
+    user_comm_data: { reason: 'shell', sections: ['ADVANCED'] },
     // NO live shell (advisor's own t2381 count), yet uses a non-canonical name — unlike comm's own `TYPE`
     // (which at least has a shell that MIGHT justify it), io_step has no shell to justify anything. Flagged,
     // not excused: this is exactly the "twin is wrong, not the vocabulary" question the dispatch named,

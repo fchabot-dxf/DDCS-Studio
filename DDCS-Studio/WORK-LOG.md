@@ -62985,3 +62985,62 @@ mismatch-1636, gateway-mismatch-gate-1229, group-gesture, middle-superset, pane-
 initializing), recovered on the immediate retry; unrelated to anything this turn touched (comm/progend/
 drillcycle). No regressions.
 
+## t2401 — CLOSE THE REGISTRY, piece 1: COMM HARMONIZED (own commit)
+
+The advisor corrected t2399's own reading of "reproduce, do not harmonise": that instruction guards the
+SHELL (never edit it to make a test pass), not the twin. The twin's declaration changes to match — same
+precedent as WCS/t2381 and the ATC batch/t2383, which t2399 had (defensibly, per its own note) read as
+departed-from.
+
+### A real obstacle, live-caught before the resection could land
+
+Simply renaming `commData.js`'s sections to the shell's own 3 names (FEATURE CONTEXT / GEOMETRY / ADVANCED)
+in the shell's own array order would NOT have reproduced the shell's real order. Proven with an isolated
+probe first: `formWidgets.js`'s own `SECTION_RANK` ranks `'GEOMETRY'` explicitly (`['IDENTITY','GEOMETRY',
+'TOOL & CUT']`), which sorts it BEFORE any unranked section regardless of array declaration position — an
+unranked section declared FIRST still rendered SECOND behind a ranked 'GEOMETRY'. Comm's shell happens to use
+the literal string "GEOMETRY" for its OWN 2nd section (not 1st) — a name collision with the app's own
+canonical rank-1 name that WCS/ATC's own harmonizations never hit (none of their shell names collide with a
+SECTION_RANK entry).
+
+Fixed at the shared layer, deliberately, not worked around: `SECTION_RANK` gained `'FEATURE CONTEXT'`,
+ranked directly after `'IDENTITY'` — the same conceptual slot ("what it is" before "where it is"), the shell's
+own literal vocabulary preserved rather than renamed. Checked for collateral impact BEFORE landing: WCS is
+the only other twin using `'FEATURE CONTEXT'`, and its own 2 other sections (WCS/OPTIONS) stay unranked/tied
+— no order change for it (confirmed: its own spec, unchanged, stays green). Rule 1b (formWidgets.js is
+shared) — full suite run at the end, see below.
+
+### The resection itself
+
+`commData.js`'s `COMM_STRUCT_BINDINGS`/`COMM_VALUESWAP_BINDINGS` resectioned + REORDERED to the shell's own
+DOM order: FEATURE CONTEXT (type, popupMode, statusMode) → GEOMETRY (val, cycle, msg) → ADVANCED (id, dest,
+statusColor, statusDwell, slot1-4). Was `'TYPE'`/`'GEOMETRY'` (2 invented names, GEOMETRY absorbing both the
+shell's real GEOMETRY and ADVANCED). Array reordering carries no emit risk — `commDataStack()`/
+`applyCommRecompose` never read binding array order, only `bindingSpecs` matched by #var/atom identity over
+the pruned stack (confirmed: `tests/comm-twin.spec.js`, unchanged, stays green — 0 diffs across the type
+sweep × HMI + non-HMI).
+
+`tests/comm-form-reproduction-2399.spec.js` flipped from recording the divergence to asserting the match —
+all 5 tests pass; non-vacuity re-proven with 3 fresh perturbations (a twin section rename, a shell section
+rename, and reverting the SECTION_RANK fix itself — each caught the exact right test, each reverted clean,
+`git diff` empty before moving on). Registry invariant (`twin-section-invariant-2381.spec.js`) updated: its
+own hand-duplicated `SECTION_RANK` copy gained `'FEATURE CONTEXT'` too; `user_comm_data`'s exception narrowed
+to `{reason:'shell', sections:['ADVANCED']}` (was `shell-unharmonized`/`['TYPE']`); `user_wcs_data`'s narrowed
+to `['OPTIONS','WCS']` (FEATURE CONTEXT is canonical now, so it drops out of WCS's own exception too).
+Panel wiring reconfirmed untouched (same dedicated test as t2399, still passing).
+
+Screenshots: `verification/t2401-{shell,twin}-comm.png` — visually confirms FEATURE CONTEXT → GEOMETRY →
+ADVANCED in both, same order, same names.
+
+### Files changed
+
+`web/ui/formWidgets.js` (Rule 1b, shared) — `SECTION_RANK` gains `'FEATURE CONTEXT'`.
+
+`web/blocks/dataOps/commData.js` — resectioned + reordered to the shell's own 3 sections/order.
+
+`tests/comm-form-reproduction-2399.spec.js` — divergence assertions flipped to match assertions.
+
+`tests/twin-section-invariant-2381.spec.js` — local `SECTION_RANK` copy synced; comm/WCS exceptions updated.
+
+`DDCS-Studio/verification/t2401-{shell,twin}-comm.png` (new).
+

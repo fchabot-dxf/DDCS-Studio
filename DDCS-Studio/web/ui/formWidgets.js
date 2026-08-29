@@ -1237,7 +1237,15 @@ export function renderOpForm(host, bindings) {
     // which put the tool/cut scalars (feeds, radius, port) ABOVE the fields that decide what the op IS — corner opened
     // on "Max Probe Dist" and you scrolled to find WHICH CORNER. Ranked, the form reads the way the op is decided:
     // what it is → where it is → how it cuts. An unlisted section keeps its declaration order after the ranked ones.
-    const SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
+    // t2401 — `FEATURE CONTEXT` added: comm's own shell (index.html) puts its "what type of op is this" section
+    // BEFORE its own `GEOMETRY` — and GEOMETRY's canonical rank already sorts it ahead of any UNRANKED name
+    // regardless of array order (confirmed live: an unranked 'FEATURE CONTEXT' declared FIRST still rendered
+    // AFTER 'GEOMETRY'). Comm's own FEATURE CONTEXT plays the identical role IDENTITY plays elsewhere ("what
+    // it is" before "where it is") — ranking it explicitly, right after IDENTITY, reproduces the shell's real
+    // order without renaming the shell's own vocabulary. Safe for WCS (the only other FEATURE CONTEXT user):
+    // its own WCS/OPTIONS sections stay unranked/tied, so this only reorders relative to GEOMETRY, which WCS
+    // never declares — confirmed no behavior change (wcs-form-reproduction-2381.spec.js stays green).
+    const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
     const rankOf = (sec) => { const i = SECTION_RANK.indexOf(String(sec || '').toUpperCase()); return i < 0 ? SECTION_RANK.length : i; };
     units.sort((a, b) => rankOf(sectionOf(a)) - rankOf(sectionOf(b)));   // Array#sort is stable → order WITHIN a section is untouched
     const secList = []; for (const u of units) { const s = sectionOf(u); if (s && !secList.includes(s)) secList.push(s); }
