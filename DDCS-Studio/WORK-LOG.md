@@ -61833,3 +61833,187 @@ differs; section chrome absent in both, correctly, below threshold).
 
 No tail — none dispatched this turn.
 
+## t2383 — THE ATC BATCH: all 6 wizards ratcheted (2 collapsed a fabricated multi-section split into the
+## shell's own real single section; one a real field-ORDER bug live-caught) + a tail, the editor find bar
+
+All 6 ATC wizards (atc_warmup, atc_check, atc_length, atc_table, atc_change, atc_test) have live shells —
+the mill-family "reproduce the shell exactly" methodology applies unchanged. Started with atc_warmup (t2381's
+own flagged completeness gap) per the dispatch's own instruction, then the other five.
+
+### THE SIX WIZARDS, EACH GENUINELY DIFFERENT — not a uniform fix shape
+
+- **atc_warmup** — ABSENCE closed (0/4 → 4/4): the shell (index.html:917-940) has exactly ONE section,
+  "WARM-UP SEQUENCE", covering all 4 fields; array order already matched, only `section:` was missing.
+- **atc_check** — the shell (index.html:900-907) has exactly ONE real input field (`tolerance`, under
+  "TOLERANCE"); the other 7 bindings have NO shell field at all (edited via Settings → ATC/Probes, per the
+  shell's own settings-hint text). Only `tolerance`'s section was wrong (was `GEOMETRY`); fixed. The other 7
+  keep their existing `GEOMETRY`/`TOOL & CUT` grouping — no shell mandate either way.
+- **atc_length** — SURVEYED, NOT CHANGED: the shell (index.html:870-888) has ZERO input fields for ANY of its
+  7 bindings — a pure Settings-driven wizard (settings-hint + a "⚙ ATC Settings…" button only). No shell
+  field grouping exists to reproduce; the current `GEOMETRY`/`TOOL & CUT` split stands as-is.
+- **atc_table** — the shell's own real section name (index.html:957) is "TOOL TABLE → CONTROLLER"; the twin
+  used the shorter `'TABLE'`. Corrected (name only — already one section, already complete).
+- **atc_change** — MISMATCH fixed: the shell (index.html:972-1033) has exactly ONE section ("TOOL CHANGE")
+  covering every visible field, differentiated only by conditional show/hide `<div>`s per method (never a
+  second section header); the twin had invented THREE (`METHOD`/`POSITION`/`FIRMWARE`). Collapsed to the
+  shell's one name. **ALSO a genuine field-ORDER bug, live-caught** (`window.openWiz('atc_change')`, default
+  m6 state): the shell's own DOM order is `_setup` (the "⚙ ATC Settings…" button, BEFORE the section label
+  itself) → method → callMacro → x/y/z → zClear → fixedT → orient; the array had `fixedT` before
+  `x`/`y`/`z`/`zClear`. Reordered to match — proven correct via the live field-order check, not assumed from
+  reading the array. NOT fixed (a separate, larger, DELIBERATELY-DEFERRED gap, named in the file's own header
+  comment — "per-method gating... lands in E2"): the shell also has three AUTO-method checkboxes (m300/
+  cover/confirm) with no binding in the twin at all. Recorded, not added — out of this turn's own scope.
+- **atc_test** — MISMATCH fixed: the shell (index.html:1036-1074) has exactly ONE section ("ATC COMMISSIONING
+  TEST"); the twin had invented THREE (`TEST`/`DRAWBAR`/`POCKETS`). Collapsed to the shell's one name. Field
+  order already matched (mode, cycles, dwellMs — the visible drawbar-mode subset — appear in that order in
+  both places), no reorder needed.
+
+### THE SECTION_RANK SORT SURFACES AGAIN — atc_check's/atc_length's own field order isn't array order
+
+Both wizards use CANONICAL section names (`GEOMETRY`/`TOOL & CUT`) — both IN `SECTION_RANK`'s own whitelist —
+so the STABLE sort actively reorders them: `GEOMETRY`-ranked fields render before `TOOL & CUT`-ranked ones
+REGARDLESS of which came first in the source array (`blockHeight`/`safeZ` before `maxDist`/`retract`/
+`f_fast`/`f_slow`/`port`, though the array declares the opposite order) — pre-existing behavior, live-
+confirmed (not assumed) via `window.openWiz`/direct render, and correctly reflected in the ratchet spec's own
+`expectedOrder` rather than guessed from the array.
+
+### NONE OF THE 6 IS ON `formReproduction.js`'s SHARED ENGINE — the SAME methodology finding as WCS (t2381),
+### now confirmed to recur across a whole batch
+
+Every one of the 6 has ≤9 bindings — below `formWidgets.js`'s own `SECTION_THRESHOLD = 8` — so section fold
+CHROME never renders for any of them, by design ("a short form doesn't need folding"). Comparing rendered
+`.form-sec-title` chrome against the shell would be a false negative for all six. `tests/atc-batch-form-
+reproduction-2383.spec.js` (new, one file, all 6 wizards) verifies the DECLARATION directly (every binding's
+own `section:` property, against a hand-derived shell mapping) plus field ORDER via live DOM (real regardless
+of whether chrome renders). Proven non-vacuous by perturbation on both the section-mapping assertion
+(atc_check) and the field-order assertion (atc_change).
+
+### EMIT — every wizard's own byte-identical, proven, re-run this same turn
+
+`atc-warmup-as-data.spec.js`, `atc-check-in-place.spec.js`, `atc-length-in-place.spec.js`,
+`atc-table-twin.spec.js`, `atc-change-twin.spec.js` (re-run AFTER the field reorder too), `atc-test-twin.spec.js`
+— all green, unchanged (37 tests across the full ATC/WCS/invariant set, run together at the end).
+
+### THE REGISTRY INVARIANT (t2381) — exception lists updated as gaps closed, exactly the tripwire it was
+### built for
+
+`atc_warmup_data`'s own COMPLETENESS exception CLOSED entirely (removed from the list). `atc_test_data`/
+`atc_change_data`/`atc_table_data` moved from `'unverified'` VOCABULARY exceptions to `'shell'`-verified ones.
+`atc_check_data` gained a NEW vocabulary exception (`TOLERANCE`). `atc_warmup_data` gained a NEW vocabulary
+exception (`WARM-UP SEQUENCE` — closing the completeness gap surfaced a fresh non-canonical name). `atc_length_
+data` stays CLEAN, untouched. **The invariant caught its own staleness live, twice, mid-turn** — running it
+right after the ATC fixes (before updating the exception lists) failed exactly as designed, naming the exact
+stale entries; this is the tripwire behavior t2381 was built for, now proven on a real subsequent turn, not
+just in theory.
+
+### FULL SUITE
+
+**2921 passed / 0 failed / 12 flaky / 26 skipped (23.8m).** None of the 12 flaky names touch anything this
+turn changed (ATC files, editorFind.js, index.html, styles.css, the invariant spec, either new spec file) —
+all repeat/new names on unrelated files (blocks-live-form, fork-to-custom, form-section-collapse, gateway-
+quiet-offline, group-gesture, gui-blocks-reauthor, header-workspace-name, middle-superset, pane-visual-host-
+programmatic-1762, pull-v41-wcs, wcs-sync-gate-1906 ×2). None were HARD reds requiring the "pinning old
+behaviour vs regression" call the advisor's own watch item names — every one recovered on its own retry.
+
+### THE COUNT — 12 of 32 twins now shell-verified or (for the 14 shell-less) registry-verified complete
+
+Shell-verified with a live-shell reproduction spec: drill, pocket*, contour, slot, surfacing, text, wcs,
+atc_warmup, atc_check, atc_table, atc_change, atc_test (12; *pocket carries its own still-open t2381 gap).
+Registry-verified complete (no shell needed): the 6 probes + drill's own tree exemption. Surveyed, correctly
+left as-is: atc_length (zero shell fields to reproduce). Remaining WITH a live shell, genuinely untouched:
+comm (its own future turn). Remaining WITHOUT a live shell, genuinely incomplete (flagged at t2381, not
+fixed): tap, bore, pause_confirm, plus io_step's/lathe_faceprobe's/lathe_odprobe's own unexplained vocabulary.
+
+### Files changed (MAIN ARC — the ATC batch + registry invariant; the editor find-bar TAIL is its own commit,
+### logged separately below)
+
+`web/blocks/dataOps/atcWarmupData.js`, `atcCheckData.js`, `atcTableData.js` — `section:` fixes (absence
+closed / one field corrected / name corrected).
+
+`web/blocks/dataOps/atcChangeData.js`, `atcTestData.js` — section MISMATCH collapsed to the shell's own
+single name; `atcChangeData.js` also reordered to match the shell's own field order (a real bug, live-caught).
+
+`web/blocks/dataOps/atcLengthData.js` — comment only (surveyed, not changed).
+
+`tests/atc-batch-form-reproduction-2383.spec.js` (new) — the 6-wizard declaration-direct ratchet spec, proven
+non-vacuous.
+
+`tests/twin-section-invariant-2381.spec.js` — exception lists updated to match the ATC batch's own fixes.
+
+`DDCS-Studio/verification/t2383-atc_{warmup,check,table,change,test}-{before,after}.png` (new) — the
+before/after screenshots (atc_length has none — nothing changed to show).
+
+## t2383 TAIL — THE EDITOR FIND BAR, its own commit (owner-requested, two amendments on placement)
+
+The G-code editor (`editorManager.js`) is a plain `<textarea>`, so the browser's own Ctrl+F can never see its
+content — a long program was unsearchable, full stop. Built a small find bar: Ctrl+F or a toggle opens it,
+live match count (n of m), Enter/Shift+Enter or the ▲/▼ buttons cycle matches, Esc closes, each match scrolls
+into view and is SELECTED in the real textarea (native `setSelectionRange`, reusing the exact line-height math
+`editorManager.js`'s own `_scrollToLine` already uses for a violation-row jump — not a second convention).
+SEARCH ONLY, per the dispatch — no replace (a separate feature with its own overwrite hazards). Case-
+insensitive by default.
+
+### TWO PLACEMENT AMENDMENTS, both absorbed before landing
+
+Built the toggle first as a `.editor-toolbar` button (insert/undo/redo/delete/copy cluster) per the dispatch's
+own original wording. Amendment 1 arrived (owner re-circled the spot): move it to the LEFT of that same
+cluster. Amendment 2 arrived immediately after, EXPLICITLY superseding amendment 1: the owner's real target
+was the editor pane's own TOP-LEFT CHIP ROW (`.editor-strip-chrome` — the cluster holding the duration chip
+and the pre-flight badge, both JS-inserted via `timeChip.js`/`preflightBadge.js`), positioned just right of
+those two, matching THEIR chip styling (a small pill, `order:2` in CSS — the same declared-order convention
+`timeChip.js`'s own comment already states: "order:2... places it between the badge and the toolbar
+regardless of DOM position") rather than the bordered `.toolbar-btn` square amendment 1 asked for. Moved the
+button to `.editor-strip-chrome`, re-styled it as `.editor-find-chip` (pill shape, matching `.time-estimate-
+chip`'s own CSS almost token-for-token), added an `.active` state so the chip visibly highlights while the
+bar is open. The button's own `id` (`#editor-find-btn`) never changed, so `editorFind.js`'s own wiring and
+the spec's own locators needed zero changes for the move — only the HTML location + CSS.
+
+### A REAL CONTRAST BUG, live-caught by a screenshot before it shipped
+
+The find input's typed text was INVISIBLE — `color: rgb(16,16,16)` on `background: rgb(17,17,17)`, near-black-
+on-near-black. Not a guess: a screenshot taken while wiring up the feature showed an apparently-empty input
+despite `el.value` holding the typed query. Root cause: the shared `input, select, textarea` rule (styles.css,
+t2085 P4e) sets `color`/`background` from theme custom-properties that resolved dark here; my own bare
+`.editor-find-input` class selector, despite (0,1,0) specificity beating the tag rule's (0,0,1), wasn't
+winning outright against whatever else in the cascade was also targeting inputs. Fixed by scoping the
+selector to `#editor-findbar .editor-find-input` (ID + class) and hardcoding the two colors rather than
+chasing which theme token was the real culprit — confirmed via `getComputedStyle` before AND after (before:
+`rgb(16,16,16)` text on `rgb(17,17,17)` bg; after: `rgb(238,238,238)` on `rgb(17,17,17)`), then re-
+screenshotted to confirm the query is now legible.
+
+### THE APP'S OWN LIVE REPROJECTION, caught while writing the test — not a bug in this feature
+
+A naive test seed put "F600" on two consecutive G-code lines, expecting 2 matches; the app's own live
+reprojection (already documented — context-menu-pass-1452.spec.js's own precedent, "it re-projects real
+G-code") normalizes a repeated, UNCHANGED modal F-word down to one explicit occurrence — correct G-code
+behavior (the second line doesn't need to repeat an unchanged feed rate), not a defect. Rewrote the test's
+own seed to put every searched string inside `( … )` comments, which are inert to that pipeline, so the
+spec's own match counts are ground truth rather than a guess about what survives reprojection.
+
+### VERIFIED live, driving the real gesture — 6 new Playwright tests, plus a non-vacuity proof
+
+`tests/editor-find-2383.spec.js` (new): Ctrl+F opens + focuses + selects the first match; multi-match count +
+Enter/Shift+Enter cycling (with wrap); the ▲/▼ buttons do the same; a no-match query shows `0/0` and flags
+the input; Esc closes and the chip re-opens/toggles it; **Ctrl+F is scoped to the editor pane** — typing it
+while focus sits in an unrelated real `<input>` elsewhere on the page does NOT open the bar (a synthetic probe
+input, added and removed by the test itself, not a mock). Proven non-vacuous by perturbation: disabled the
+Enter-key cycle handler, confirmed the multi-match test goes red, restored it, confirmed green again. Two
+screenshots (`verification/t2383-editor-find-chip-closed.png`, `...-editor-find-bar.png`) show the chip in
+its final resting spot beside the duration chip, and the bar open with a match highlighted.
+
+### Files changed (the TAIL — its own commit)
+
+`web/ui/editorFind.js` (new) — the find-bar module: match computation, cycling, scroll+select, the Ctrl+F
+pane-scoping guard.
+
+`web/index.html` — the find bar's own DOM (`#editor-findbar`, mounted inside `.editor-code`) + the toggle
+chip (`#editor-find-btn`, mounted inside `.editor-strip-chrome` per amendment 2) + the boot-sequence wiring
+call (`installEditorFind()`, alongside `initEditorOpHover()`).
+
+`web/styles.css` — `.editor-findbar`/`.editor-find-input`/`.editor-find-count`/`.editor-find-nav` (the bar's
+own chrome) + `.editor-find-chip` (the toggle's chip styling, matching `.time-estimate-chip`).
+
+`tests/editor-find-2383.spec.js` (new) — 6 tests, proven non-vacuous.
+
+`DDCS-Studio/verification/t2383-editor-find-chip-closed.png`, `...-editor-find-bar.png` (new).
+

@@ -33,11 +33,15 @@ export const ATC_WARMUP_DEFAULTS = { rpm1: 6000, time1: 30, rpm2: 12000, time2: 
 //   0 comment · 1 comment · 2 comment · 3 confirm · 4 spindle(off) · 5 coolant(off) · 6 comment · 7 message ·
 //   8 spindle(stage1) · 9 dwell(stage1) · 10 comment · 11 message · 12 spindle(stage2) · 13 dwell(stage2) ·
 //   14 spindle(off) · 15 message · 16 label · 17 endprogram
+// t2383 — SECTION ABSENCE, fixed: none of these four carried `section:` at all before this turn (t2381's own
+// registry survey flagged it, 0/4). The shell (index.html:917-940) declares exactly ONE section — "WARM-UP
+// SEQUENCE" — covering all four fields, already in the shell's own order, so no reorder was needed, only the
+// `section:` addition.
 const ATC_WARMUP_EXEC_BINDINGS = [
-    { param: 'rpm1', blockIndex: 8, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm1 },
-    { param: 'time1', blockIndex: 9, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time1 },
-    { param: 'rpm2', blockIndex: 12, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm2 },
-    { param: 'time2', blockIndex: 13, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time2 },
+    { param: 'rpm1', blockIndex: 8, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm1, section: 'WARM-UP SEQUENCE' },
+    { param: 'time1', blockIndex: 9, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time1, section: 'WARM-UP SEQUENCE' },
+    { param: 'rpm2', blockIndex: 12, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm2, section: 'WARM-UP SEQUENCE' },
+    { param: 'time2', blockIndex: 13, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time2, section: 'WARM-UP SEQUENCE' },
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).

@@ -35,14 +35,18 @@ const TEMPLATE_MAGAZINE = [{ tool: 1, x: 100, y: 50, z: -20 }, { tool: 2, x: 150
 
 /** The op params (the run-form): the MODE selector + the drawbar scalars + the pockets scalars. All FORM fields (no value
  *  socket — the recompose bakes every value from the CURRENT settings via atcTestStack, exactly like homing's seek values). */
+// t2383 — SECTION MISMATCH, fixed: the shell (index.html:1036-1074) declares exactly ONE section-label —
+// "ATC COMMISSIONING TEST" — covering every field, differentiated only by conditional show/hide `<div>`s per
+// mode (never a second section header). This array previously invented THREE names (TEST/DRAWBAR/POCKETS)
+// that appear nowhere in the shell. Collapsed to the shell's own single name for every entry.
 export const ATC_TEST_STRUCT_BINDINGS = [
-    { param: 'mode', type: 'enum', widget: 'segmented', default: ATC_TEST_DEFAULTS.mode, label: 'Test', help: 'Drawbar cycle test = cycle the release/lock N times + verify the sensors; Pocket dry-run = visit each taught magazine pocket at clearance Z.', section: 'TEST', widgetConfig: { options: [['Drawbar cycle', 'drawbar'], ['Pocket dry-run', 'pockets']] } },
-    { param: 'cycles', type: 'number', default: ATC_TEST_DEFAULTS.cycles, label: 'Cycles', help: 'How many release/lock cycles the drawbar test runs.', section: 'DRAWBAR' },
-    { param: 'dwellMs', type: 'number', default: ATC_TEST_DEFAULTS.dwellMs, label: 'Dwell (ms)', help: 'Settle time after each release / lock, before the sensor wait.', section: 'DRAWBAR' },
-    { param: 'first', type: 'number', default: ATC_TEST_DEFAULTS.first, label: 'First pocket', help: 'The first magazine pocket the dry-run visits.', section: 'POCKETS' },
-    { param: 'count', type: 'number', default: ATC_TEST_DEFAULTS.count, label: 'Pockets', help: 'How many pockets (from the first) the dry-run visits.', section: 'POCKETS' },
-    { param: 'zClear', type: 'number', default: ATC_TEST_DEFAULTS.zClear, label: 'Z clearance (mach)', help: 'The MACHINE Z the tool retracts to between pockets.', section: 'POCKETS' },
-    { param: 'descend', type: 'bool', default: ATC_TEST_DEFAULTS.descend, label: 'Descend to pocket Z', help: 'Also descend to each pocket’s taught Z at the stop (a full-height alignment check), then retract.', section: 'POCKETS' },
+    { param: 'mode', type: 'enum', widget: 'segmented', default: ATC_TEST_DEFAULTS.mode, label: 'Test', help: 'Drawbar cycle test = cycle the release/lock N times + verify the sensors; Pocket dry-run = visit each taught magazine pocket at clearance Z.', section: 'ATC COMMISSIONING TEST', widgetConfig: { options: [['Drawbar cycle', 'drawbar'], ['Pocket dry-run', 'pockets']] } },
+    { param: 'cycles', type: 'number', default: ATC_TEST_DEFAULTS.cycles, label: 'Cycles', help: 'How many release/lock cycles the drawbar test runs.', section: 'ATC COMMISSIONING TEST' },
+    { param: 'dwellMs', type: 'number', default: ATC_TEST_DEFAULTS.dwellMs, label: 'Dwell (ms)', help: 'Settle time after each release / lock, before the sensor wait.', section: 'ATC COMMISSIONING TEST' },
+    { param: 'first', type: 'number', default: ATC_TEST_DEFAULTS.first, label: 'First pocket', help: 'The first magazine pocket the dry-run visits.', section: 'ATC COMMISSIONING TEST' },
+    { param: 'count', type: 'number', default: ATC_TEST_DEFAULTS.count, label: 'Pockets', help: 'How many pockets (from the first) the dry-run visits.', section: 'ATC COMMISSIONING TEST' },
+    { param: 'zClear', type: 'number', default: ATC_TEST_DEFAULTS.zClear, label: 'Z clearance (mach)', help: 'The MACHINE Z the tool retracts to between pockets.', section: 'ATC COMMISSIONING TEST' },
+    { param: 'descend', type: 'bool', default: ATC_TEST_DEFAULTS.descend, label: 'Descend to pocket Z', help: 'Also descend to each pocket’s taught Z at the stop (a full-height alignment check), then retract.', section: 'ATC COMMISSIONING TEST' },
 ];
 
 /** The wrapped `user_root` template — the E0 superset (both mode arms guarded), machine-frame sim (ATC = G53): FORCE the

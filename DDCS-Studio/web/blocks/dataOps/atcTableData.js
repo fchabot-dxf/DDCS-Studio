@@ -32,11 +32,15 @@ export const ATC_TABLE_DEFAULTS = { includeLengths: true, includePockets: true }
 // includePockets writes #1330/#1350/#1370 — the ATC pocket/model registers, governed by the SEPARATE `atc` cap, which
 // t1890 found encodes an EVIDENCE GAP on V4.1/DM500 (not a confirmed absence — see WORK-LOG t1890) — left UNGATED
 // this turn, pending the advisor's ruling on atc; its own help text already names the "mapped ATC model" caveat.
+// t2383 — SECTION NAME, corrected: the shell (index.html:957) declares "TOOL TABLE → CONTROLLER", not the
+// shorter 'TABLE' this array used — same single section either way (only 3 bindings, well below
+// formWidgets.js's own SECTION_THRESHOLD=8, so chrome doesn't render regardless — the WCS/atc_warmup
+// situation), but the DECLARATION should still name the shell's own string exactly.
 export const ATC_TABLE_STRUCT_BINDINGS = [
-    { param: 'includeLengths', type: 'bool', default: ATC_TABLE_DEFAULTS.includeLengths, label: 'Write tool lengths', help: 'Emit the library tool-length writes (#[table base + T−1]).', section: 'TABLE',
+    { param: 'includeLengths', type: 'bool', default: ATC_TABLE_DEFAULTS.includeLengths, label: 'Write tool lengths', help: 'Emit the library tool-length writes (#[table base + T−1]).', section: 'TOOL TABLE → CONTROLLER',
         gate: { param: '_toolTableOk', is: false, tip: 'This controller has no in-program tool-length table to write to.' } },
-    { param: 'includePockets', type: 'bool', default: ATC_TABLE_DEFAULTS.includePockets, label: 'Write pocket positions', help: 'Emit the magazine pocket XYZ writes (needs a controller with a mapped ATC model).', section: 'TABLE' },
-    { param: '_setup', type: 'bool', widget: 'action', action: 'atcTableEdit', default: false, label: 'Edit table…', help: 'Open Settings → ATC: the tool library (lengths) + the magazine (pocket XYZ) — the ONE source this macro writes.', section: 'TABLE' },
+    { param: 'includePockets', type: 'bool', default: ATC_TABLE_DEFAULTS.includePockets, label: 'Write pocket positions', help: 'Emit the magazine pocket XYZ writes (needs a controller with a mapped ATC model).', section: 'TOOL TABLE → CONTROLLER' },
+    { param: '_setup', type: 'bool', widget: 'action', action: 'atcTableEdit', default: false, label: 'Edit table…', help: 'Open Settings → ATC: the tool library (lengths) + the magazine (pocket XYZ) — the ONE source this macro writes.', section: 'TOOL TABLE → CONTROLLER' },
 ];
 
 /** CURRENT table the emit unrolls — the LIVE tools[]/magazine[] (never a frozen snapshot). */

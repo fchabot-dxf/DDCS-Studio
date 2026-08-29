@@ -28,7 +28,12 @@ export const ATC_CHECK_BINDING_SPECS = [
     { param: 'port',        type: 'number', default: ATC_CHECK_DEFAULTS.port,        label: 'Setter Port', help: 'The controller input port the tool-setter signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value', gate: TT_GATE },
     { param: 'blockHeight', type: 'number', default: ATC_CHECK_DEFAULTS.blockHeight, label: 'Setter Block Height', help: 'The height of the fixed tool-setter block — subtracted from the machine Z at touch to give the measured tool length.', section: 'GEOMETRY', match: { type: 'assign', var: '#6' },  key: 'value', gate: TT_GATE },
     { param: 'safeZ',       type: 'number', default: ATC_CHECK_DEFAULTS.safeZ,       label: 'Safe Z',      help: 'The machine Z to retract to after the touch.', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value', gate: TT_GATE },
-    { param: 'tolerance',   type: 'number', default: ATC_CHECK_DEFAULTS.tolerance,   label: 'Tolerance',   help: 'The tool FAILS if the measured length deviates from the stored value by more than ± this (mm).', section: 'GEOMETRY', match: { type: 'assign', var: '#20' }, key: 'value', gate: TT_GATE },
+    // t2383 — SECTION MISMATCH, fixed: the shell (index.html:900-907) declares ONE real input field —
+    // `tolerance`, under its own "TOLERANCE" section — everything else here (maxDist/retract/f_fast/f_slow/
+    // port/blockHeight/safeZ) has no shell-visible field at all (edited via Settings → ATC/Probes instead,
+    // per the shell's own settings-hint text) and keeps its existing GEOMETRY/TOOL & CUT grouping as the
+    // closest reasonable home, unchanged — no shell mandate exists for them either way.
+    { param: 'tolerance',   type: 'number', default: ATC_CHECK_DEFAULTS.tolerance,   label: 'Tolerance',   help: 'The tool FAILS if the measured length deviates from the stored value by more than ± this (mm).', section: 'TOLERANCE', match: { type: 'assign', var: '#20' }, key: 'value', gate: TT_GATE },
 ];
 
 export const ATC_CHECK_DATA_OPTYPE = 'user_atc_check_data';

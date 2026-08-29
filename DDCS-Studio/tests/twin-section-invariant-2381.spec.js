@@ -65,6 +65,16 @@ import { test, expect } from '@playwright/test';
  *     path pocket's own users actually see. Flagged here, not fixed — pocket's own EXPECTED_ORPHANS-based
  *     tree-mode spec still passes (it tests a real, if not the live, mechanism); a real fix belongs to a
  *     turn that owns pocket, not a registry-wide invariant survey.
+ *
+ * ⭐ UPDATED t2383 (THE ATC BATCH) — the counts above are t2381's own snapshot; the exception lists below are
+ * current. atc_warmup_data's own COMPLETENESS gap CLOSED (its shell has exactly one section, "WARM-UP
+ * SEQUENCE" — added to all 4 bindings, no reorder needed). atc_test_data/atc_change_data/atc_table_data moved
+ * from 'unverified' VOCABULARY exceptions to 'shell'-verified ones — each had invented section names its own
+ * shell never uses (atc_test/atc_change each fabricated THREE names where the shell has exactly ONE; see
+ * `atc-batch-form-reproduction-2383.spec.js`'s own header for the full per-wizard account, including a real
+ * field-ORDER fix on atc_change, live-caught). atc_check_data gained a NEW vocabulary exception (`TOLERANCE`,
+ * its one real shell field, corrected from the wrong `GEOMETRY`). atc_length_data stays CLEAN, untouched —
+ * its shell has zero input fields for any of its bindings, so there was nothing to reproduce.
  */
 
 const SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
@@ -79,8 +89,6 @@ const TREE_MODE_TWINS = ['user_drill_data'];
 // closing the gap (adding sections) must ALSO remove the entry here, or the exact-match assertion below
 // catches the drift either way (a shrunk gap not reflected here, or a widened one).
 const COMPLETENESS_EXCEPTIONS = {
-    // has a live shell — the mill-family-shaped fix (a future ATC-batch turn) applies here directly.
-    user_atc_warmup_data: ['rpm1', 'time1', 'rpm2', 'time2'],
     // no live shell (advisor's own t2381 count) — a real internal gap, not a shell-reproduction bug.
     user_tap_data: ['toolNum', 'wcs', 'stockAttach', 'pathDatum', 'stockDatum', 'stockW', 'stockH', 'stockZ', 'originX', 'originY', 'offZ', 'x', 'y', 'pitch', 'depth', 'rpm', 'dwell', 'rigid'],
     user_bore_data: ['toolNum', 'wcs', 'stockAttach', 'pathDatum', 'stockDatum', 'stockW', 'stockH', 'stockZ', 'originX', 'originY', 'pattern', 'skip'],
@@ -104,15 +112,27 @@ const COMPLETENESS_EXCEPTIONS = {
 //                  wizard, own future turn's job) OR no live shell exists and the divergence has NOT been
 //                  investigated (flagged, not excused).
 const VOCABULARY_EXCEPTIONS = {
+    // t2383 — fixed THIS turn: the shell (index.html:917-940) declares exactly ONE section, "WARM-UP
+    // SEQUENCE", verified byte-for-byte (atc-batch-form-reproduction-2383.spec.js). Also closed the same
+    // twin's own COMPLETENESS exception (was 0/4, now 4/4) — see this file's own t2383 update note above.
+    user_atc_warmup_data: { reason: 'shell', sections: ['WARM-UP SEQUENCE'] },
     user_contour_data: { reason: 'shell', sections: ['SHAPE', 'SIDE & TOOL', 'DEPTH & FEED'] },
     user_slot_data: { reason: 'shell', sections: ['ENDPOINTS', 'TOOL', 'TOOL & WIDTH', 'DEPTH & FEED'] },
     user_surfacing_data: { reason: 'shell', sections: ['AREA', 'TOOL', 'TOOL & STEPOVER', 'DEPTH & FEED'] },
     user_text_data: { reason: 'shell', sections: ['TEXT', 'TOOL', 'TOOL & FILL', 'DEPTH & FEED'] },
-    // has a live shell (advisor's own t2381 count: ATC + COMM + WCS = the 8 remaining) — vocabulary not yet
-    // checked against it; a future ATC/COMM/WCS-turn job, not asserted correct here.
-    user_atc_test_data: { reason: 'unverified', sections: ['TEST', 'DRAWBAR', 'POCKETS'] },
-    user_atc_change_data: { reason: 'unverified', sections: ['METHOD', 'POSITION', 'FIRMWARE'] },
-    user_atc_table_data: { reason: 'unverified', sections: ['TABLE'] },
+    // t2383 — fixed THIS turn: the shell (index.html:1036-1074) declares exactly ONE section ("ATC
+    // COMMISSIONING TEST"), verified byte-for-byte (atc-batch-form-reproduction-2383.spec.js).
+    user_atc_test_data: { reason: 'shell', sections: ['ATC COMMISSIONING TEST'] },
+    // t2383 — fixed THIS turn: the shell (index.html:972-1033) declares exactly ONE section ("TOOL CHANGE"),
+    // verified byte-for-byte (atc-batch-form-reproduction-2383.spec.js).
+    user_atc_change_data: { reason: 'shell', sections: ['TOOL CHANGE'] },
+    // t2383 — fixed THIS turn: the shell's own real name (index.html:957) is "TOOL TABLE → CONTROLLER",
+    // verified byte-for-byte (atc-batch-form-reproduction-2383.spec.js).
+    user_atc_table_data: { reason: 'shell', sections: ['TOOL TABLE → CONTROLLER'] },
+    // t2383 — the shell (index.html:900-907) has exactly ONE real input field (`tolerance`, under
+    // "TOLERANCE"); the other 7 bindings have no shell field at all and keep the canonical GEOMETRY/
+    // TOOL & CUT split — verified (atc-batch-form-reproduction-2383.spec.js).
+    user_atc_check_data: { reason: 'shell', sections: ['TOLERANCE'] },
     // t2381 — fixed THIS SAME turn: WCS's shell (index.html:1196-1237) declares FEATURE CONTEXT/WCS/OPTIONS,
     // none of which are SECTION_RANK's own three — reproducing the shell means diverging from the canonical
     // vocabulary entirely here, verified byte-for-byte (wcs-form-reproduction-2381.spec.js).

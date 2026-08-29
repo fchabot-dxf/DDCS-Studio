@@ -24,6 +24,12 @@ export const ATC_LENGTH_DEFAULTS = { blockHeight: 50, safeZ: 10, maxDist: 100, r
 // t1890 — every field here feeds the SAME macro, whose whole purpose is a tool-table WRITE (atcLengthWizard.js's
 // `TO('#103','#102')`); gated uniformly on `_toolTableOk` (true for every DDCS variant + rs274ngc/centroid, false
 // only for grbl — a confirmed structural absence, see userOpView.js's own activePostToolTable comment).
+// t2383 — SURVEYED, NOT CHANGED: the shell (index.html:870-888) has NO input fields for any of these seven
+// at all — just a settings-hint pointing to Settings → ATC/Probes and a "⚙ ATC Settings…" button. Every one
+// of these params is edited via that Settings modal, never inline here — so there is no shell field grouping
+// to reproduce for this wizard (unlike atc_check, which has exactly one real shell field — see that file's
+// own t2383 note). The existing GEOMETRY/TOOL & CUT split (already canonical, already complete) stands as
+// the reasonable status quo, not a mismatch to fix.
 const TT_GATE = { param: '_toolTableOk', is: false, tip: 'This controller has no in-program tool-length table to write to.' };
 export const ATC_LENGTH_BINDING_SPECS = [
     { param: 'maxDist',     type: 'number', default: ATC_LENGTH_DEFAULTS.maxDist,     label: 'Max Plunge',  help: 'How far the tool searches down toward the setter before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value', gate: TT_GATE },
