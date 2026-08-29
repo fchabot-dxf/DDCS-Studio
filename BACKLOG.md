@@ -3508,6 +3508,78 @@ and culling/renaming Blockly's native context-menu entries. The canvas keeps its
 
 ---
 
+### 47. EXACT-NAME REFERENCES ON THE EMIT-SIDE BLOCKS ARE FREE TEXT — extend #42's picker principle to them
+
+*(from the 2026-08-28 block-def sweep, all 136 defs audited with file:line. The principle is ALREADY
+owner-ruled in #42 — "wherever we need an exact variable name don't allow typing"; this entry is its
+extension to the cutting-side blocks. Weighted by usage: these are the hottest blocks in the registry.)*
+
+⚠ **No cross-check exists anywhere**: `lint.js:63` only inspects fields whose DEFAULT is a number; every
+field below defaults to a string, so typos are invisible until the machine runs them.
+
+1. ⭐⭐ **Jump targets** — `goto.n` / `ifgoto.goto` / `probecheck.goto` / `confirm.cancel` / `hmiconfirm.cancel`
+   name a `label` block's number as a typed free number (53+ uses of the flow trio). Candidate list = the
+   label blocks in the same stack. `holecycle.js:9-16` documents this exact class silently skipping every
+   hole after the first. → picker of the stack's own labels.
+2. ⭐ **Macro-var names** — 15+ blocks (`assign.var`, `proberead.var`, `setworkoffset.value`,
+   `tooloffset.tool/value`, `wcswrite.addrVar`, `radiuscomp.*`, `safehop/clearlift.saveVar/workClear`, …)
+   type `#nnn` free. The registries EXIST (`data/varMap.js` RANGES/RESERVED, `universalScratch.opBands()`,
+   per-dialect vars) and never reach the canvas. A typo emits a legal write to a register nobody owns.
+3. **Tool / pin numbers** — `tool.n`, `toolsel.toolNum`, `probe.port`, `outpin.pin`, `waitinput.pin`: bare
+   number sockets while the form side already has `tool_library_picker` / `declared_io_picker`
+   (`specializedPickers.js:22,36`). Same data, two affordances, split by surface.
+4. `flip.setup` → picker of the stack's `setup` indices (a typo today = the flip silently never applies).
+
+⛔ Typing FILTERS candidates, never commits a free value (#42's ruled control shape). ⚠ Depends on t2385's
+searchable-picker mechanism — sequence AFTER it and REUSE what it built. Save-time loud checks stay (dangling
+still needs catching).
+
+---
+
+### 48. THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
+
+*(same sweep. These are places the canvas shows something false or silently destroys a value.)*
+
+1. ⭐⭐ **`holecycle` (the #3 most-used block) declares `dynamic: 'pattern'` — and it is DEAD.** No `fieldsFor`,
+   and `bridge.js:396` bails without one, so all 28 fields render always (grid+circle+rect+line at once).
+   The exact `param_field` defect of #42, hotter block. `param.js:19-20` also still carries #42's options-DSL
+   + always-visible pair. ⚠ Reuse t2385's inline-field-hiding mechanism; `bridge.js:408` can only hide VALUE
+   SOCKETS by itself (`camField.js:32` says so).
+2. ⭐⭐ **Silent value destruction — the t1520 iron rule, still violated in three dropdowns:** `layout.kind`
+   offers 2 of `LAYOUT_TYPES`' 14 (`bridge.js:204` vs `panelTypes.js:51-66`) and `panel` misses `commscreen`
+   — a value outside the list is REWRITTEN to option[0] on canvas round-trip: a wizard silently loses its 2D
+   layout. `flip.axis` offers Z/A/B/C it cannot mean. **This item is data-loss class; do it first.**
+3. ⭐ **The magic scope names `'z'`/`'by'`** on 8 fill/contour blocks (`stepover.js:84`, `fill.js:36,44`,
+   `pocketfill.js:120-129`, `contourfill.js:40-41`, `surfaceFill.js:11-12`, `fillText.js:28`, `contour.js:185`):
+   must exactly match what Step Down publishes into scope (`blockEmitter.js:396`); mistype `Z` →
+   `evalExpr` throws → `num(p.z, 0)` → **the fill cuts at the stock top**. Decide the fix-shape with the file
+   in hand (picker of scope names, or stop requiring the name at all) — do not just document it.
+4. **Declared-but-undefaulted fields render as unguarded text**: `radiuscomp.rawAxis` (an axis letter,
+   `radiuscomp.js:17` vs `:22`) and `clearlift.planeFellBack` (a BOOLEAN — typing "false" is truthy,
+   `saferetract.js:101-102`,`:122`). Also `waitinput.var` is rendered and read by nothing (`cnc.js:98,103-115`).
+5. The mode-gated families (`slot`/`surfaceraster`/`pocketfill`/`surfacefill` entry → ramp/helix fields;
+   `progend` retract/park; `region`/`pocketfill` shape → dia/sides vs w/h; `tap.rigid` → dwell;
+   `drillcycle.cycle` → q/dwell) — same dynamic treatment, and `contourfill` offers `helix` its emit silently
+   coerces to plunge (`contourfill.js:52`).
+
+---
+
+### 49. HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
+
+*(same sweep. ~10 of 136 defs carry a `help` string — every one is authoring metadata, not a cutting op.)*
+
+- **Every top-15 block has NO tooltip**: `assign`, `move`, `probe`, `label/goto/ifgoto`, `progstart/progend`,
+  `holecycle`, `proberead`, `setworkoffset`, `spindle`, `dwell`… (`bridge.js:269` falls back to
+  "<label> (<category>)"). The declared help slot exists (1c) — this is a CONTENT pass, no machinery.
+- **Faces print raw JS keys** (`bridge.js:251`): a machinist reads `lhs [#1920] op [!=] rhs`, `spinUp`,
+  `stepoverPct`, `dur cyc`, `confirmEvery`. t2385's label-map slot generalizes — fill it for the top ~20.
+- `bridge.js:164`'s tooltip fallback is literally "The stepoverPct parameter" — cover the ~25 uncovered
+  high-traffic names in the `DESCRIPTIONS` map (`bridge.js:97-163`).
+- ⚠ Write help text from the MACHINIST's side ("Skips to line N when the probe misses"), never restate the
+  field name. One pass, one commit, screenshots of a few hover states.
+
+---
+
 ### 46. THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
 
 *(owner-reported live 2026-08-28: **"in wiz preview moving the feature gui move the block value but not the
