@@ -218,9 +218,58 @@ that layout reproduces the wizard indistinguishably — form, gating and preview
 
 ---
 
-## Execution Plan: Porting the Pilots
+## ⭐⭐ THE FIVE RUNGS — the one vocabulary, owner-approved 2026-08-28
 
-To complete this transition, we must port the remaining legacy wizards. We will use **Corner Probe** as our initial pilot, followed by **Edge**, **Middle**, and **Pocket**.
+⚠ **This replaces `Phase 0/1/2` below, and the ad-hoc words used in dispatches** (twin / declared /
+reproduced / ratcheted). **Why the change:** "Phase 1" describes what THE PROJECT is doing; a rung describes
+what state ONE WIZARD is in — and a rung is *checkable per wizard*, which is exactly what the phase wording
+kept letting us get wrong. The arc's remaining size was miscounted **twice in one day** (once as ~30, once as
+~26; the truth was 8) because the status was read from prose instead of measured.
+
+```
+1  DATA      the op exists as data — {template, bindings}, forkable
+2  FORM      it declares its own form LAYOUT, not just its G-code
+3  MATCH     that form matches the hand-written shell it must replace
+4  LOCKED    a reproduction spec pins the match, so they cannot drift
+5  ONLY      the hand-written shell is DELETED — the twin IS the wizard
+```
+
+Each rung needs the one below it. ⭐⭐ **5 is the destination.** "Wizards as data" never meant two things kept
+in sync — it meant **one thing left**.
+
+### ⛔ RUNGS 3 AND 4 ARE MEANINGLESS ONCE A SHELL IS RETIRED
+
+**A wizard at ONLY has no shell to MATCH against or LOCK to.** That is not skipped work — *it is completion*,
+and reading it as a gap is the single most expensive mistake this document has caused. ⇒ **A twin whose shell
+is gone is DONE.** ⛔ Never "reproduce" a retired shell: t2379 recovered corner's from `cbe08b03^` and found a
+6-section legacy design with different field ids — reproducing it would REVERT a shipped simplification.
+
+### THE CENSUS — measured 2026-08-28 by `grep 'id="wiz_*"' index.html`, not read from prose
+
+```
+ONLY     18   probes(6: corner edge middle alignment rotary_center rotary_clock)
+              lathe(7)  homing  bore  tap  io_step  pause_confirm
+LOCKED    6   drill  pocket  contour  slot  surfacing  text
+FORM      8   ATC(6: change check length table test warmup)  comm  wcs   ← ALL that remains
+```
+
+⇒ **The arc is 8 wizards from LOCKED, then one deletion pass from done.**
+
+### ⚠ THE LAST STEP IS UNPLANNED, AND IT IS A DELETION
+
+Nothing has scoped taking the mill six from **LOCKED → ONLY**: deleting `#wiz_drill` and its five siblings
+from `index.html`. That is the arc's actual final act and it carries real risk. ⚠ **Also UNMEASURED:** whether
+the Save-dialog "Panel Layout"/"Preview Rig" dropdowns (old Phase 2 below) are still reachable — t2365 made a
+fork inherit its source's declared form instead, but nobody has checked whether the dropdowns still exist for
+the hand-built path. **Measure before claiming either way.**
+
+---
+
+## ⛔ SUPERSEDED — the original phase plan, kept for provenance only
+
+⚠ **Do not execute this section.** Its pilots are all finished — corner, edge and middle are at **ONLY**;
+pocket is **LOCKED**. Phase 0's blocks exist. It is here because it records *why* the mechanism looks as it
+does, not what to do next.
 
 ### Phase 0: Building the Foundational Simple Blocks
 Before we tackle any complex modals, we will build a set of simple, standard Blockly blocks that require zero UI engineering but are crucial for the architecture:

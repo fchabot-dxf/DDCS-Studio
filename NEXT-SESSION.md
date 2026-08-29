@@ -89,6 +89,18 @@ asserting the known divergences **exactly** — e.g. text's unbound `rpm` fronti
 property belongs to the registry, so one table-driven test covers the mill family too and catches every future
 twin with no new file.
 
+## ⭐ THE VOCABULARY — use these five words, not `Phase 0/1/2` (owner-approved 2026-08-28)
+
+Full definition + census: [`wizards_as_data_transition_plan.md`](wizards_as_data_transition_plan.md), section
+**THE FIVE RUNGS**. A rung is a property of ONE WIZARD and is *checkable*; a "phase" was a property of the
+project and is what let the remaining size be miscounted twice in one day.
+
+```
+DATA → FORM → MATCH → LOCKED → ONLY          ONLY 18 · LOCKED 6 · FORM 8
+                                ⛔ MATCH and LOCKED are meaningless once
+                                   the shell is retired — ONLY is DONE
+```
+
 ⚠ **One consequence is already filed:** BACKLOG #39 — a *guarded* wizard forked from a **placed op** loses its
 guard arms and refuses (loudly, correctly). Blast radius today is small precisely because only two forms are
 declared; **it grows with every form ported**, so #39 wants closing early in the breadth run, not after it.
