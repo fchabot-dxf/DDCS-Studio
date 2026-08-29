@@ -4074,3 +4074,53 @@ confidently sitting at 47% forever.
 
 **VERIFY:** run a real suite, watch `progress.md` update in the markdown preview, confirm the worker's own
 captured stdout shrank dramatically, and confirm a killed run leaves a stale-marked file rather than a lie.
+
+---
+
+### 55. THE DRAG COMMITS, THEN REVERTS — the release restores the value the op had on entering the Blocks tab
+
+*(owner, 2026-08-29, testing t2409's fix on V2026.08.29.12: "the rect now correctly drags but on release it
+changes back to the value it was when entering blocks tab.")*
+
+⭐⭐ **Almost certainly PRE-EXISTING and newly VISIBLE, not a regression from t2409.** Before that fix the
+canvas never moved during a drag at all — so a snap-back on release had nothing visible to snap back *from*.
+Fixing the redraw half exposed the second half of the same severed loop. Treat it as the rest of #46, not as
+damage.
+
+### THE OWNER'S OWN CAPTURE — the fix is provably correct THROUGH release
+
+`?debug=feat`, `hid:sf_size` (surfacing), abridged:
+
+```
+f0    ptr:2135,505   handle:2132,509   writes:0    redraws:0     ← pre-move
+f3    ptr:2128,513   handle:2128,513   writes:4    redraws:3
+f7    ptr:2096,540   handle:2096,540   writes:12   redraws:7
+▲ up  ptr:2055,560   handle:2055,560   writes:20   redraws:12
+```
+
+⭐ **`handle` equals `ptr` on every frame, including the pointer-up frame**, and redraws climb with writes.
+⇒ The drag, the redraw and the release are all CORRECT. **The revert happens AFTER the probe's last frame**,
+outside its window — a post-release event.
+
+### THE LEAD
+
+⚠ **Establish, do not assume**: 20 writes land during the drag, yet the value reverts to the ENTRY-TIME one —
+so the suspicion is that the drag writes and the post-release rebuild read **two different stores**. Candidate:
+`blocksApp`'s reactive `reproject()` (async, fires after the gesture — t2409's own commit message names it as
+"always a beat late") rebuilds the pane from the block model / `opBlk.data` params, while the drag's writes
+went to the live def or DOM and never reached those params. If so, ANY full re-render would restore the old
+value; the release is just the first one that happens.
+
+- ⭐ **Extend the probe past release** — it currently records one settle frame after `up`. Log the handle
+  position and the model's own param value for ~2 seconds afterwards; the frame where they diverge names the
+  culprit call.
+- ⭐ **The same control still applies**: the wizard's own host does NOT revert. Diff what it commits on
+  release against what the pane does.
+- ⛔ Do not "fix" this by suppressing the post-release re-render — that would hide a genuine
+  two-stores-disagree defect. Find which store is authoritative and make the drag write to it.
+- ⚠ This is also exactly what the ruled **commit-on-release** design (#46) would formalize — one authoritative
+  write at the end. It stays sequenced behind **#50** (rapid writes invisible to undo), and the ~2-writes-per-
+  frame in both captures keeps arguing for it.
+
+**STILL REAL IF:** drag a feature handle in the Blocks tab's Wizard View, release, and watch the value —
+returning to what it was when you entered the tab means still real.
