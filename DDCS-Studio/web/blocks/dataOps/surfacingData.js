@@ -66,12 +66,21 @@ export const SURFACING_DEFAULTS = {
  *
  * (clearance is still deliberately NOT bound — frontier #3 fan-out to progstart + the fill leaf. surfacefill's
  *  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
+ *
+ * t2377 — SECTION ABSENCE, fixed: only `wcs` and `zMode` (SURFACING_STRUCT, below) carried `section:` at all
+ * before this turn, and both the WRONG name (`'COORDINATES'`, a section the shell does not have). Same
+ * mechanism as t2375's contour/slot fix (see contourData.js's own header comment above CONTOUR_EXEC_BINDINGS
+ * for the full account of why array order, not just the `section:` string, drives formWidgets.js's own
+ * rendered grouping) — reordered into four contiguous groups matching the shell (index.html:745-791) exactly:
+ * AREA (originX/originY/offZ/[hidden stock+jog fields]/w/h) -> TOOL (toolNum/rpm) -> TOOL & STEPOVER
+ * (strategy/toolDia/stepoverPct) -> DEPTH & FEED (depth/stepdown/zMode/wcs/feed/plunge). confirmEvery and the
+ * entry/rampAngle/helixDia/helixPitch cluster have no shell field at all (grepped index.html's own
+ * wiz_surfacing block, zero hits) — twin-only, the same orphan class contour/drill/pocket already carry;
+ * placed in DEPTH & FEED, the closest conceptual fit. entryX/entryY (also no shell field) sit in AREA, next
+ * to the other geometry fields — the same placement contour gave its own entryX/entryY.
  */
 const SURFACING_BINDING_SPECS = [
-    // t1704 — wcs is a plain value default (`wcs.params = { wcs: params.wcs || 'active' }`, no comparison anywhere
-    // else in surfacingStack) — unlike corner/middle's wcs, which forks WHICH content lands in several atoms.
-    { param: 'wcs', tokenEligible: true, match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'COORDINATES',
-        gate: { param: 'zMode', is: 'skim', tip: 'Skim faces RELATIVE to the jog start — there is no WCS frame to select.' } },   // t986 — grey (data-op-gated) in Skim
+    // AREA
     // placement scalars (placeonstock) — origin owned by the placement now (region is local-0-based).
     // t1706 CORRECTION (was wrongly `tokenEligible` under Act 2 — found live, driving the real app, Act 3):
     // surfacingStack's OWN JS never touches these, but the placeonstock ATOM's fold does — placeShiftFromParams
@@ -82,59 +91,65 @@ const SURFACING_BINDING_SPECS = [
     // layer one step further downstream — the gap this correction closes. Deferrable: the arithmetic itself is
     // simple (a corner-anchor offset), so a future redesign emitting SYMBOLIC offsets instead of baked literals
     // could make these eligible — not something the current text-shift mechanism does.
-    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
-    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
-    { param: 'stockAttach', tokenEligible: true, match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'pathDatum', tokenEligible: true, match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'stockDatum', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
-    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
-    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
-    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
-    // depth pass (stepdown)
-    { param: 'depth', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'depth', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
-    { param: 'stepdown', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'stepdown', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
-    // t1706 CORRECTION (found live, driving the real app — Act 2's survey checked only the wizard layer, not
-    // this atom's own emit): surfaceraster.js's confirmEvery = Math.max(0, Math.round(num(...))) — a threshold
-    // decision (whether the confirm-pause mechanism exists at all), not a value carried through untouched.
-    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', match: { type: 'surfaceraster' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
-    // geometry + cut (the surfacefill leaf)
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX, section: 'AREA' },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY, section: 'AREA' },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ, section: 'AREA' },
+    { param: 'stockAttach', tokenEligible: true, match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'AREA' },
+    { param: 'pathDatum', tokenEligible: true, match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, section: 'AREA' },
+    { param: 'stockDatum', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, section: 'AREA' },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW, section: 'AREA' },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH, section: 'AREA' },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ, section: 'AREA' },
     // t1704 — w/h are NOT eligible: surfacingWizard.js's generate() compares `w<=0||h<=0` to decide whether ANY
     // cutting atom exists at all (an empty program vs the real stack), in ADDITION to feeding the placement bbox —
     // a live token can't tell JS whether the faced area is degenerate before the program is built.
-    { param: 'w', tokenRefusal: 'Width and height decide whether the program has any cutting moves at all (zero degrades to an empty program) and set the placed area\'s bounding box — the program\'s SHAPE depends on this number before it can be built.', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", match: { type: 'surfaceraster' }, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
-    { param: 'h', tokenRefusal: 'Width and height decide whether the program has any cutting moves at all (zero degrades to an empty program) and set the placed area\'s bounding box — the program\'s SHAPE depends on this number before it can be built.', help: "Height of the faced area (Y).", match: { type: 'surfaceraster' }, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
+    { param: 'w', tokenRefusal: 'Width and height decide whether the program has any cutting moves at all (zero degrades to an empty program) and set the placed area\'s bounding box — the program\'s SHAPE depends on this number before it can be built.', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", match: { type: 'surfaceraster' }, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm', section: 'AREA' },
+    { param: 'h', tokenRefusal: 'Width and height decide whether the program has any cutting moves at all (zero degrades to an empty program) and set the placed area\'s bounding box — the program\'s SHAPE depends on this number before it can be built.', help: "Height of the faced area (Y).", match: { type: 'surfaceraster' }, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm', section: 'AREA' },
+    // TOOL & STEPOVER
+    // t1704 — strategy is a value-select (parallel/concentric) written straight into the raster atom's OWN field;
+    // unlike pocket's `strategy` (which also gates whether an extra wall-finish block is appended), surfacing's
+    // never branches which atoms get built — the row-vs-ring choice is the atom-kernel's own internal logic.
+    { param: 'strategy', tokenEligible: true, help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", match: { type: 'surfaceraster' }, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS }, section: 'TOOL & STEPOVER' },
     // t1704 — toolDia/stepoverPct are DEFERRABLE-CANDIDATES: the JS here is a clamp (Math.max) then a single value
     // into one atom param (surfacingWizard.js:99, surfaceraster.js's stepoverPctOf) — no atom-count effect, no
     // branch. A controller-side MAX()-equivalent expression could compute the same clamp; that's an act-3 design
     // option, not something this wizard does today (num()/Math.max still discard a token before either runs).
-    { param: 'toolDia', tokenRefusal: 'The cutter diameter is clamped and used to derive the stepover before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Cutter diameter (mm). The stepover is derived from it at the machine, so changing the tool on the pendant re-derives the raster.", match: { type: 'surfaceraster' }, key: 'toolDia', type: 'number', default: SURFACING_DEFAULTS.toolDia, units: 'mm' },
-    { param: 'stepoverPct', tokenRefusal: 'Combined with the tool diameter to resolve the stepover before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Stepover as a PERCENTAGE of the cutter. The intent is the percentage; the millimetre is only its consequence, and the macro header re-derives it — which is why a stored mm is not bound here.", match: { type: 'surfaceraster' }, key: 'stepoverPct', type: 'number', default: SURFACING_DEFAULTS.stepoverPct, units: '%' },
-    // t1704 — strategy is a value-select (parallel/concentric) written straight into the raster atom's OWN field;
-    // unlike pocket's `strategy` (which also gates whether an extra wall-finish block is appended), surfacing's
-    // never branches which atoms get built — the row-vs-ring choice is the atom-kernel's own internal logic.
-    { param: 'strategy', tokenEligible: true, help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", match: { type: 'surfaceraster' }, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
-    { param: 'feed', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
-    { param: 'plunge', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
-    // t996 — RPM binding → the framing progstart. SOCKET-HELD: blank → the socket keeps the spindleHeadPatch Head
-    // default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
-    // t1704 — DEFERRABLE-CANDIDATE: programFraming.js's rpm-fallback is a single comparison picking ONE number for
-    // ONE atom field, not an atom-count decision.
-    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
+    { param: 'toolDia', tokenRefusal: 'The cutter diameter is clamped and used to derive the stepover before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Cutter diameter (mm). The stepover is derived from it at the machine, so changing the tool on the pendant re-derives the raster.", match: { type: 'surfaceraster' }, key: 'toolDia', type: 'number', default: SURFACING_DEFAULTS.toolDia, units: 'mm', section: 'TOOL & STEPOVER' },
+    { param: 'stepoverPct', tokenRefusal: 'Combined with the tool diameter to resolve the stepover before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Stepover as a PERCENTAGE of the cutter. The intent is the percentage; the millimetre is only its consequence, and the macro header re-derives it — which is why a stored mm is not bound here.", match: { type: 'surfaceraster' }, key: 'stepoverPct', type: 'number', default: SURFACING_DEFAULTS.stepoverPct, units: '%', section: 'TOOL & STEPOVER' },
+    // DEPTH & FEED — depth pass (stepdown)
+    { param: 'depth', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'depth', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm', section: 'DEPTH & FEED' },
+    { param: 'stepdown', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'stepdown', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm', section: 'DEPTH & FEED' },
+    // t2377 — confirmEvery has NO shell field at all — twin-only, same orphan class contour/drill/pocket carry.
+    // t1706 CORRECTION (found live, driving the real app — Act 2's survey checked only the wizard layer, not
+    // this atom's own emit): surfaceraster.js's confirmEvery = Math.max(0, Math.round(num(...))) — a threshold
+    // decision (whether the confirm-pause mechanism exists at all), not a value carried through untouched.
+    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', match: { type: 'surfaceraster' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', section: 'DEPTH & FEED', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    // t1704 — wcs is a plain value default (`wcs.params = { wcs: params.wcs || 'active' }`, no comparison anywhere
+    // else in surfacingStack) — unlike corner/middle's wcs, which forks WHICH content lands in several atoms.
+    { param: 'wcs', tokenEligible: true, match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'DEPTH & FEED',
+        gate: { param: 'zMode', is: 'skim', tip: 'Skim faces RELATIVE to the jog start — there is no WCS frame to select.' } },   // t986 — grey (data-op-gated) in Skim
+    { param: 'feed', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min', section: 'DEPTH & FEED' },
+    { param: 'plunge', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min', section: 'DEPTH & FEED' },
     // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
     // t1704 — entry is a value-select written straight into the raster atom's own field; unlike slot's `entry`
     // (which forces the literal, non-raster arm when ==='helix'), surfacing's never branches which atoms get
     // built — ramp/helix descent is the atom-kernel's own internal logic, same shape as `strategy` above.
-    { param: 'entry', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
+    { param: 'entry', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', section: 'DEPTH & FEED', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
     // t1706 CORRECTION (found live — Act 2's survey checked only the wizard layer, not the atom's own emit):
     // rampAngle is baked into a tan()-derived literal inside the ramp move's macro expression (surfaceraster.js
     // ~1045: "the tangent is baked; the angle is a form field, not a knob") — trig computed at generate time, no
     // live-word support. helixPitch DIRECTLY drives the helix's move COUNT (surfaceraster.js:673, Math.ceil(...)
     // *24 — a real loop count, non-deferrable). helixDia feeds the same helix's computed RADIUS baked into every
     // winding's coordinates (surfaceraster.js:1528). None carry a live word today.
-    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move) before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
-    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
-    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', match: { type: 'surfaceraster' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
+    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move) before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'DEPTH & FEED', help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
+    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, section: 'DEPTH & FEED', help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
+    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', match: { type: 'surfaceraster' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, section: 'DEPTH & FEED', help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
+    // TOOL — t996 — RPM binding → the framing progstart. SOCKET-HELD: blank → the socket keeps the
+    // spindleHeadPatch Head default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it
+    // (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
+    // t1704 — DEFERRABLE-CANDIDATE: programFraming.js's rpm-fallback is a single comparison picking ONE number for
+    // ONE atom field, not an atom-count decision.
+    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'TOOL', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
 ];
 
 /** The body bindings for a surfacing twin, derived BY IDENTITY over the ALREADY-WRAPPED stack — so the
@@ -146,14 +161,16 @@ export function surfacingBindingsFor(stack) { return deriveBindingsFor(stack, SU
 export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack());
 
 // t986 — the STRUCTURAL Z-mode toggle (NO value socket): it drives the applySkimStructure postInstantiate fork, not a
-// block param. Grouped in a COORDINATES section with the WCS dropdown; Skim greys the WCS (structGate below → data-op-gated).
+// block param. Grouped with the WCS dropdown in the shell's own DEPTH & FEED section (t2377 — was the WRONG,
+// non-existent 'COORDINATES' name; see the fix note above SURFACING_BINDING_SPECS). Skim greys the WCS
+// (structGate below → data-op-gated).
 // t1609 — EXPORTED: the hand-coded surfacing modal consumes THIS declaration for its Z-mode field (options, label,
 // help, default) — one source, no copied list in the view. The paired WCS gate rides SURFACING_BINDINGS (the wcs
 // binding's `gate`), already exported above.
 export const SURFACING_STRUCT = [
     // t1704 — not deferrable: Normal (absolute, WCS-referenced) and Skim (whole-op relative, jog-anchored) are
     // different program FRAMINGS (makePlace vs makeSkim, different wrapper atoms) — not two values of one move.
-    { param: 'zMode', type: 'enum', tokenRefusal: 'Normal and Skim are two different program framings (absolute vs. whole-operation relative) — picking one decides which framing atoms get built, not a value inside one.', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'COORDINATES', widget: 'dropdown',
+    { param: 'zMode', type: 'enum', tokenRefusal: 'Normal and Skim are two different program framings (absolute vs. whole-operation relative) — picking one decides which framing atoms get built, not a value inside one.', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'DEPTH & FEED', widget: 'dropdown',
         widgetConfig: { options: [['Normal — WCS Z0', 'normal'], ['Skim — relative', 'skim']] },
         help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-operation RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
 ];
@@ -259,7 +276,23 @@ export function buildSurfacingTwinStack() {
  *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function surfacingDataDef() {
     const stack = buildSurfacingTwinStack();
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
+    // t2377 — reordered so formWidgets.js's own first-seen-wins section-box order comes out
+    // AREA -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED, matching the shell exactly (see the fix note above
+    // SURFACING_BINDING_SPECS for the full mechanism). toolNum (SHARED toolBindingsFor, no section at the
+    // source) and entryX/entryY (SHARED entryBindingsFor, stale 'GEOMETRY') are overridden LOCALLY via .map()
+    // here (Rule 1b: never edit deriveBindings.js itself). zMode (SURFACING_STRUCT — a separate array; the
+    // structural Z-mode toggle has no value socket) is spliced into DEPTH & FEED between confirmEvery and wcs,
+    // matching the shell's own field order there (depth, stepdown, [clearance — unbound frontier], zMode, wcs).
+    const derived = surfacingBindingsFor(stack);
+    const areaFields = derived.filter((b) => b.section === 'AREA');
+    const toolStepoverFields = derived.filter((b) => b.section === 'TOOL & STEPOVER');
+    const depthFeed = derived.filter((b) => b.section === 'DEPTH & FEED');
+    const wcsIdx = depthFeed.findIndex((b) => b.param === 'wcs');
+    const depthFeedFields = [...depthFeed.slice(0, wcsIdx), ...SURFACING_STRUCT, ...depthFeed.slice(wcsIdx)];
+    const rpmField = derived.filter((b) => b.section === 'TOOL');
+    const entryXY = entryBindingsFor(stack).map((b) => ({ ...b, section: 'AREA' }));
+    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL' }));
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...areaFields, ...entryXY, ...toolNum, ...rpmField, ...toolStepoverFields, ...depthFeedFields]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.previewVarSeed = startMarkerVarSeed;   // t1648/t1650 — the ONE declared seed shape (see startMarkerVarSeed above)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)

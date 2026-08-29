@@ -61514,3 +61514,128 @@ ratchet specs, proven non-vacuous.
 
 No tail — the dispatch explicitly said not to bolt one on.
 
+## t2377 — FINISH THE MILL FAMILY: surfacing's section ABSENCE + text's section ABSENCE (the hard one) fixed
+## — all six mill-family wizards now ratcheted (drill, pocket, contour, slot, surfacing, text)
+
+Same shape as t2375 (contour+slot), this turn: surfacing (the t2375-slot shape — mostly absence, `wcs`/`zMode`
+carried a WRONG hardcoded `'COORDINATES'` name, a section the shell doesn't have at all) and text (flagged as
+the hard one going in — ZERO section metadata, AND three-source assembly at textData.js's own assembly line:
+`toolBindingsFor(stack)` + `TEXT_BINDINGS` + `entryBindingsFor(stack)`, the first and third SHARED across the
+whole mill family via `deriveBindings.js`). TAIL: none, per dispatch.
+
+### SURFACING — the absence, fixed
+
+`surfacingData.js`'s `SURFACING_BINDING_SPECS` (~24 specs) reordered + given real `section:` values matching
+the shell (index.html:745-791) exactly: **AREA** (originX, originY, offZ, [hidden stock+jog fields], w, h) →
+**TOOL & STEPOVER** (strategy, toolDia, stepoverPct) → **DEPTH & FEED** (depth, stepdown, [confirmEvery — no
+shell field], zMode, wcs, feed, plunge, [entry/rampAngle/helixDia/helixPitch — no shell field]). `zMode`
+(SURFACING_STRUCT, a separate array — the structural Z-mode toggle has no value socket) and `wcs`'s own
+`section:` both corrected from the stale, non-existent `'COORDINATES'` to `'DEPTH & FEED'`, matching the
+shell's own grouping (WORK WCS sits alongside DEPTH/DEPTH PASS/CLEARANCE/FEED/PLUNGE, not standalone).
+`toolNum` (SHARED `toolBindingsFor`) and `entryX`/`entryY` (SHARED `entryBindingsFor`, stale `'GEOMETRY'`)
+overridden LOCALLY via `.map()` inside `surfacingDataDef()`'s own assembly (Rule 1b — `deriveBindings.js`
+untouched), `zMode` spliced into the DEPTH & FEED group between `confirmEvery` and `wcs` (its own shell
+position). Emit proven byte-identical: `node --test tests/node/surfacing-as-data.test.mjs` (2/2, unchanged) +
+`zmode-modal-1609.spec.js` (4/4, unchanged).
+
+### TEXT — the absence, fixed (the hard one)
+
+`textData.js`'s `TEXT_EXEC_BINDINGS` (~26 bindings) reordered + given real `section:` values matching the
+shell (index.html:820-857) exactly: **TEXT** (text, height, strokeWidth, width, slant, [hidden x/y], originX,
+originY, offZ, [hidden stock fields], spacing, plus the 7-field orphan cluster — font/rotation/lineSpacing/
+align/snSlot/snWidth/snIncrement, none of which have ANY shell field — appended in their own pre-existing
+relative order) → **TOOL & FILL** (toolDia, stepoverPct) → **DEPTH & FEED** (depth, stepdown, feed, plunge —
+clearance is the declared unbound frontier; text has NO wcs/zMode block at all, unlike surfacing/contour/
+slot). `toolNum`/`entryX`/`entryY` — the SHARED-deriver-sourced trio the dispatch specifically flagged as the
+hazard — overridden LOCALLY via `.map()` inside `textDataDef()`'s own assembly, the EXACT technique t2375's
+contour fix and this same turn's surfacing fix both already used successfully; `deriveBindings.js` itself
+untouched (Rule 1b). A genuine structural finding surfaced along the way and left AS-IS, not "fixed": `rpm`
+is a declared UNBOUND frontier for text SPECIFICALLY (frozen at the Settings default — see the file's own
+pre-existing header note), unlike every other mill-family wizard which binds it — so text's own TOOL section
+renders `toolNum` alone, no form-visible `rpm` row. Real, pre-existing, correctly reflected in
+`EXPECTED_ORDER`, not smoothed over to look uniform with the others. Emit proven byte-identical:
+`text-as-data.spec.js` (2/2, unchanged, including the cross-dialect sweep).
+
+### LIVE VERIFICATION + BEFORE/AFTER SCREENSHOTS — same methodology as t2375
+
+Opened both twins for real, compared `.form-sec-title` + `[data-param]` field order against each shell's own
+`window.openWiz(...)` render — both MATCH exactly (ignoring hidden/orphan fields, as expected):
+
+```
+surfacing  twin: AREA, TOOL, TOOL & STEPOVER, DEPTH & FEED    shell: AREA, TOOL, TOOL & STEPOVER, DEPTH & FEED
+text       twin: TEXT, TOOL, TOOL & FILL, DEPTH & FEED        shell: TEXT, TOOL, TOOL & FILL, DEPTH & FEED
+```
+
+Before/after screenshots (same sibling-module technique as t2375 — rendered the OLD `git show HEAD:...`
+bindings from a same-directory sibling module so relative imports resolved unchanged, never overwriting the
+real files in place) saved to `verification/t2377-{surfacing,text}-{before,after}.png`, sibling modules deleted
+immediately after. Surfacing BEFORE: one `GEOMETRY`-ranked box (entryX/entryY only — the ONLY binding pair
+that happened to carry a `SECTION_RANK`-recognized name, so it rendered artificially first) + a `COORDINATES`
+box (zMode/wcs) + everything else unboxed. Text BEFORE: **zero section chrome at all** — every field in raw,
+scrambled array order with un-labelled param-name fallbacks. Both AFTER: correctly-named, correctly-populated,
+correctly-ordered section boxes matching their shells.
+
+### TWO COLLATERAL REBASELINES — found by the required full-suite run, same class as t2371's own
+
+First full-suite run: 2 hard fails, BOTH pre-existing tests asserting the OLD, WRONG behavior this turn's fix
+correctly changes (not a regression in the sense of broken behavior — the fix working as intended broke a
+test that had encoded the bug):
+
+- `param-group-rows-1605.spec.js` — asserted `entryX`/`entryY` render FIRST in the surfacing Customize pane,
+  because they were the twin's ONLY `'GEOMETRY'`-sectioned fields (matching `SECTION_RANK`'s hardcoded
+  whitelist), so `renderOpForm` artificially promoted them ahead of every real (but unranked) section — a
+  SYMPTOM of the absence bug, not a declared intent, and the test's own comment said so in its own words
+  ("This assertion was stale... toolNum leads the UNRANKED group, not the whole form"). Now that entryX/entryY
+  correctly carry `section: 'AREA'` (matching the shell, alongside originX/originY/w/h), the artificial
+  promotion is gone — updated the assertion to check AREA's own first-declared pair (`originX`/`originY`)
+  renders first, and `toolNum`'s new correct index (13, inside the TOOL section).
+- `surfacing-skim-form-986.spec.js` — asserted `zMode`/`wcs` sit in a section whose name contains
+  `'COORDINATE'` — checking the OLD wrong name against itself, never against the shell (which has no
+  `COORDINATES` section at all). Updated to assert `'DEPTH & FEED'`, the shell's own real section for these
+  two fields, and retitled the test + its header comment to match.
+
+Both are the SAME class of legitimate collateral rebaseline t2371 hit once (`pane-surface-scroll-1766.spec.js`'s
+own fixture field) — a stale test encoding the bug's own symptom as if it were a spec, corrected once the real
+fix landed, not smoothed over or reverted. Re-ran both specs standalone (green), then re-ran the FULL suite a
+second time to confirm zero collateral damage remained.
+
+### FULL SUITE — run twice (the required rebaseline re-run)
+
+Run 1 (before the two rebaselines): 2895 passed / **2 failed** (both fixed above) / 13 flaky / 26 skipped
+(23.7m). Run 2 (after): **2900 passed / 0 failed** / 10 flaky / 26 skipped (23.6m). FAILED COUNT attributable
+to this turn's own fix, run 2: **0**. The t1766 reproject-echo race (`wizard-face-1599.spec.js`) — flagged by
+t2373, watched at t2375 — did NOT appear in EITHER run's flaky list at all this turn: reporting plainly per
+the watch item, no sign of degrading, consistent with its own documented "rarely, only under sustained load"
+behavior. None of the flaky names in run 2 touch surfacing/text/formReproduction.js or either new spec file —
+all repeat names from earlier turns' own full-suite runs (middle-superset, pane-visual-host-programmatic-1762,
+pull-v41-wcs, undo-reproject-echo, workspace-manager-1223 among them).
+
+### THE MILL FAMILY IS NOW FULLY RATCHETED — the number the owner asked for
+
+**6 of 6 mill-family wizards carry a `mode:'flat'` or tree-mode reproduction spec, proven non-vacuous, pinned
+against their own shell: drill, pocket (t2299/t2301, tree mode), contour, slot (t2375, flat mode), surfacing,
+text (t2377, flat mode).** 18/18 form-reproduction tests green together (`tests/support/formReproduction.js`
++ 6 spec files). Zero wizards remain with a section-metadata gap in this family. Per the dispatch: the
+remaining arc is probes → ATC → lathe, on the engine built across t2373/t2375/t2377.
+
+### Files changed
+
+`web/blocks/dataOps/surfacingData.js` — `SURFACING_BINDING_SPECS` + `SURFACING_STRUCT` reordered/corrected
+`section:` values; `surfacingDataDef()`'s assembly reworked to interleave `toolNum`/`entryX`/`entryY`/`zMode`
+into the right section groups.
+
+`web/blocks/dataOps/textData.js` — `TEXT_EXEC_BINDINGS` reordered + given real `section:` values (was zero);
+`textDataDef()`'s assembly reworked the same way.
+
+`tests/support/formReproduction.js`, `tests/surfacing-form-reproduction-2377.spec.js`,
+`tests/text-form-reproduction-2377.spec.js` (new) — no engine changes needed this turn (`mode:'flat'` already
+built at t2375); two new ratchet specs, both proven non-vacuous by perturbation.
+
+`tests/param-group-rows-1605.spec.js`, `tests/surfacing-skim-form-986.spec.js` — the two collateral
+rebaselines, updated to assert the NEW correct (shell-matching) section behavior.
+
+`DDCS-Studio/verification/t2377-{surfacing,text}-{before,after}.png` (new) — the before/after screenshots.
+
+No tail — the dispatch explicitly said not to bolt one on ("text alone may eat the turn" — it did not; both
+landed in one turn).
+

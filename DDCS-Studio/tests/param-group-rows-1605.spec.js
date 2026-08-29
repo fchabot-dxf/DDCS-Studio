@@ -68,15 +68,19 @@ test('Customize Surfacing — the param_group renders as its rows, not a placeho
     expect(r.fields, 'the rows are the DECLARED ones (spot-checked)').toEqual(expect.arrayContaining(['depth', 'stepdown', 'toolDia', 'feed']));
     // t1754 — ROOT-CAUSED against the pane's own contract (saving this exact stack as a custom wizard, then
     // comparing the saved def's bindings against these rendered fields): membership matches EXACTLY (30/30,
-    // including zMode and passes — both ARE in the saved bindings, so the pane is right to show them), and once
-    // entryX/entryY are set aside, the REST of the order matches the save byte-for-byte too. Only entryX/entryY's
-    // position differs — and that is `renderOpForm`'s DECLARED SECTION_RANK (t1239, formWidgets.js: `['IDENTITY',
-    // 'GEOMETRY', 'TOOL & CUT']`, "op-defining-fields-at-top") legitimately promoting them: they are the surfacing
-    // twin's only GEOMETRY-sectioned fields, so they rank ahead of every unranked (COORDINATES/no-section) field —
-    // toolNum included. This assertion was stale (written as if canvas/declared-bindings order were render order,
-    // which SECTION_RANK deliberately overrides); toolNum leads the UNRANKED group, not the whole form.
-    expect(r.fields.slice(0, 2), 'GEOMETRY-sectioned fields (entryX/entryY) rank first (t1239 SECTION_RANK)').toEqual(['entryX', 'entryY']);
-    expect(r.fields.indexOf('toolNum'), 'toolNum leads the unranked group, right after the ranked GEOMETRY fields').toBe(2);
+    // including zMode and passes — both ARE in the saved bindings, so the pane is right to show them).
+    //
+    // t2377 REBASELINE — this assertion used to check that entryX/entryY rendered FIRST, promoted ahead of
+    // every other field by `renderOpForm`'s own SECTION_RANK whitelist (t1239, formWidgets.js: `['IDENTITY',
+    // 'GEOMETRY', 'TOOL & CUT']`) purely because entryX/entryY were the twin's ONLY 'GEOMETRY'-sectioned
+    // bindings at the time — a SYMPTOM of the section-metadata ABSENCE bug t2377 fixed (see surfacingData.js's
+    // own header comment above SURFACING_BINDING_SPECS), not a real declared intent. entryX/entryY now
+    // correctly carry `section: 'AREA'` (matching the shell's own field grouping, alongside originX/originY/w/h
+    // — not a hardcoded-whitelist name), so the artificial front-of-form promotion is GONE: the render order
+    // now follows the real section order AREA -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED, and the first two
+    // fields are AREA's own first-declared pair.
+    expect(r.fields.slice(0, 2), 'AREA-sectioned fields (originX/originY) render first, matching the shell\'s own field order').toEqual(['originX', 'originY']);
+    expect(r.fields.indexOf('toolNum'), 'toolNum sits in the TOOL section, after AREA\'s own fields (originX..h, entryX, entryY)').toBe(13);
 });
 
 test('Customize Corner — the full row set renders too (post-guard-render)', async ({ page }) => {
