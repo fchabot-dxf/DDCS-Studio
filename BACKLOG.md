@@ -3283,3 +3283,107 @@ choice for a dust collector, and that is entirely the machine owner's call.
 
 The bench at `10.0.0.50` has **no ATC at all**, so anything the sim claims about gripper or drawbar sensors
 there is provably invented. No writes needed to observe it.
+
+---
+
+### 41. YOU CANNOT REMOVE A FIELD FROM A WIZARD'S FORM — the app silently undoes it
+
+*(owner-reported live 2026-08-28: **"i delete blocks and row of form field dont get removed"**. Diagnosed
+across four dead theories — recorded below so nobody re-walks them.)*
+
+**There is no way to do it today. Not awkward — absent.** Both routes fail, differently and silently:
+
+```
+delete the formfield block   →  param stays frozen ✅   the ROW COMES BACK ❌   silently
+disable the formfield block  →  works this session  →   forgotten on reload    (see #23)
+```
+
+⭐ **The row is not stale — it is being PUT BACK.** `formWidgets.js:1669-1686`: after the declared tree places
+its rows, a fallback net walks every bound param and appends any row not in the host. The binding lives in
+`def.bindings`, not in the block, so deleting the block never removes the parameter — and the net restores its
+row from the binding that is still there.
+
+⚠ **Two derivations disagree**, which is why this is confusing to diagnose:
+
+```
+formWidgets.js:1022-1028   rows come FROM THE BLOCKS  → deleting drops the row     ✅
+formWidgets.js:1669-1686   the orphan net walks BINDINGS → appends it back         ❌
+```
+
+⛔ **The net is not the bug — its SILENCE is.** It exists for a real reason, cited in its own comment: at
+t1605 corner's 7 structural bindings *silently vanished from the face*, leaving params that still drove G-code
+while being uneditable. `orphanCount` was added at t1561 to make that observable **to tests** — never to the
+user. The owner performed a deliberate gesture, the app quietly undid it, and said nothing.
+
+### ⭐⭐ THE RULING — three states, owner-designed 2026-08-28. The state space is CLOSED.
+
+```
+            in form?   emits?
+ KNOB         yes       yes      the default
+ FROZEN       no        yes      "stop asking me" — a shop's fixed value
+ DISABLED     no        no       owner: "disabled is removed from emit"
+ ────────────────────────────
+ (yes, no) = a knob that does nothing → meaningless, cannot exist
+```
+
+⇒ **Three valid states, a ladder of progressive removal**: out of the form, then out of the program.
+
+⛔ **DISABLE ≠ FREEZE — the owner corrected the advisor on exactly this.** Disable means *it does not happen*,
+which is its meaning on every other block in the app. Freeze means *it still happens, you just stop being
+asked.* Opposites on the only thing that matters. Collapsing them would give `disable` a second meaning in one
+place and keep the first everywhere else.
+
+### THE GESTURE — right-click, owner-chosen
+
+Sits next to Disable, so the distinction is visible **at the moment of choosing**. ⭐ And because freezing does
+not delete the block, **the block is its own handle** — right-click again to unfreeze. Reversibility is free
+and there is no second surface to keep in sync.
+
+### THE VISUAL — two independent channels, isomorphic to the state space
+
+```
+ KNOB       expanded, full colour                in the form, editable
+ FROZEN     collapsed to `depth = 6.0`,          not in the form, still emits
+            full colour, tagged "not in form"
+ DISABLED   greyed + hatched                     doesn't emit at all
+
+ "is it in the form?" → SHAPE      "does it emit?" → COLOUR
+```
+
+⛔ **NOT low opacity** (owner's first idea, talked through and dropped): greying is *desaturate + lighten
+toward the canvas*; opacity is *blend toward the canvas*. **The same operation** — the eye cannot tell which
+route was taken, so it collides with disabled at any zoom, on any theme. Two answers on one channel.
+
+⭐ The form config vanishing IS the "removed from form" signal — label/widget/default exist only to build a
+row. Strip them and what remains is an assignment, which is what the param now is. Words over a glyph on the
+author canvas: a padlock says *locked*, a crossed-eye says *hidden where?*; **"not in form"** needs no learning.
+
+### THE WORK — smaller than it looks
+
+1. ⛔ **`frozen` is a declared property of the BINDING, never Blockly block state.** That is #23's whole lesson:
+   `opFromMarker` regenerates children from params, so anything on the block is forgotten on reload. As a
+   binding property it survives, round-trips, and becomes assertable by the form-reproduction ratchets free.
+2. Suppress the orphan net for params the author **deliberately** unplaced — and only those. ⛔ Do not disable
+   the net: it must still catch an accidentally-lost row, which is the failure it was built for.
+3. The right-click item + the collapsed rendering.
+
+⭐ **The parameter ALREADY survives deleting its block** — so freezing is not new behaviour, it is making that
+accident *intentional and declared*.
+
+⚠ **DEPENDS ON #23** (ruled + approved 2026-08-26, never built): persisted disable. Today a disabled child
+silently comes back on after a reload. **Frozen inherits that same bug** unless stored as a binding property
+from the start.
+
+### ⚠ FOUR DEAD THEORIES — do not re-walk these
+
+1. *"the field-change handler doesn't fire for formfields"* — it does; only `sc_*` and op-header edits take the
+   early `return` into `replaceOp`. Everything else reaches `reproject()` (`blocksApp.js:1124`).
+2. *"the Wizard View only renders while editing a custom op"* — a stale comment (`blocksApp.js:474`). The
+   `show` predicate at `:749` includes `def.bindings.length`, true for every twin.
+3. *"a label edit isn't 'structure', so only values sync"* — refuted by the owner: **deleting** a block is
+   unambiguously structural and still doesn't remove the row.
+4. *"deriveAuthoredDef throws and the catch keeps the last good form"* — plausible (`:568`) but not the cause.
+
+### STILL REAL IF
+
+Open any wizard in Blocks, delete a `formfield` block, and look at the form. **Row still there = STILL REAL.**
