@@ -3438,7 +3438,11 @@ impossible to fill meaningfully for that row's widget.** Its sibling `formfield`
                                       │ + units
    ```
 
-   Reachable as right-click on desktop, double-tap-and-hold on the owner's phone — a gesture they already use.
+   Reachable as right-click on desktop, and on touch as a SINGLE LONG-PRESS held still — ⭐ **owner-verified
+   on-device 2026-08-28** (*"hold longer works"*), so ⛔ NO gesture engineering is in this entry's scope: the
+   canvas already opens its menu on the platform gesture; double-tap-and-hold also works and stays. (The
+   editor's own `attachLongPress` at opContextMenu.js:69-74 documents the platform thresholds if anything
+   nearby ever needs them: 500ms, 10px slop.)
    - Registration rides the `ContextMenuRegistry` precedent (blocksApp.js:966 — per-block scope, precondition
      `hidden` where inapplicable; the "Block" line itself hides when the submenu would be empty).
    - ⚠ **Establish with the build in hand whether this vendored Blockly's context menu supports a SUBMENU.**
