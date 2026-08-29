@@ -3586,7 +3586,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 48. [✅ ITEMS 1-4 SHIPPED t2393 — 4 commits, each suite-gated. item 5: ✅ `progend` retract/park + `drillcycle.cycle` SHIPPED t2399; ✅ `contourfill`'s helix offer + `tap.rigid`→`dwell` SHIPPED t2401 (own commit). OPEN: item 5's remaining mode-gated families (slot/surfaceraster/pocketfill/surfacefill entry-fields · region/pocketfill shape → dia/sides vs w/h) — same tail-sized fieldsFor pass] THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
+### 48. [✅ SHIPPED — items 1-4 t2393 (4 commits); item 5 t2399 (progend/drillcycle) + t2401 (contourfill helix + tap.rigid→dwell) + t2403 (slot/surfaceraster/pocketfill/surfacefill entry-fields + region/pocketfill shape)] THE BLOCK FACE LIES — dead dynamic config, magic scope names, dropdowns that eat values
 
 *(same sweep. These are places the canvas shows something false or silently destroys a value.)*
 
@@ -3607,8 +3607,8 @@ checks stay (dangling still needs catching).
 4. **Declared-but-undefaulted fields render as unguarded text**: `radiuscomp.rawAxis` (an axis letter,
    `radiuscomp.js:17` vs `:22`) and `clearlift.planeFellBack` (a BOOLEAN — typing "false" is truthy,
    `saferetract.js:101-102`,`:122`). Also `waitinput.var` is rendered and read by nothing (`cnc.js:98,103-115`).
-5. The mode-gated families (`slot`/`surfaceraster`/`pocketfill`/`surfacefill` entry → ramp/helix fields;
-   `region`/`pocketfill` shape → dia/sides vs w/h) — same dynamic treatment. ✅ `contourfill`'s own `helix`
+5. ✅ CLOSED. The mode-gated families (`slot`/`surfaceraster`/`pocketfill`/`surfacefill` entry → ramp/helix
+   fields; `region`/`pocketfill` shape → dia/sides vs w/h) — same dynamic treatment. ✅ `contourfill`'s own `helix`
    offer (its emit silently coerced it to plunge, `contourfill.js:52`) SHIPPED t2401 — `selects: {entry:
    ['plunge','ramp']}` on `contourFillBlock` (the established t1520 per-atom override), not a shared-domain
    edit. ✅ `tap.rigid` → `dwell` SHIPPED t2401 — a compound `gate` (rigid ticked AND `_rigidOk`, mirroring
@@ -3618,6 +3618,15 @@ checks stay (dangling still needs catching).
    bridge.js's `apply()`, and a Blockly checkbox reads back uppercase `'TRUE'`/`'FALSE'` — reusing the file's
    own `truthy()` (which only rejects lowercase `'false'`) silently passed `'FALSE'` as truthy, so `park`'s OFF
    state still showed retractZ / hid parkX-Y. Fixed with a dedicated raw-field check, not `truthy()`.
+   ✅ SHIPPED t2403 — the last four families: `slotBlock`/`surfaceRasterBlock`/`pocketFillBlock`/
+   `surfaceFillBlock` each gained the entry→rampAngle/helixDia/helixPitch gate (slot.js's own comment at
+   :71-75 is the reference semantics, matching t2393/t2399's `dynamic`+`fieldsFor`+`allFields` shape exactly);
+   `pocketFillBlock`/`pocketWallBlock`/`regionBlock` each gained the shape→dia+sides (circle/polygon) vs w+h
+   (rect/ellipse) gate. `regionBlock`'s own `w` field genuinely means DIAMETER for circle/polygon but WIDTH
+   for rect/ellipse (region.js:12-19) — a per-shape-reactive LABEL would need new machinery (`jsonDef()`'s
+   `labels` map is static, not reactive to the live `shape` field); noted in a comment rather than built, per
+   the dispatch's own instruction. Live-verified across 13 scenarios spanning all 5 files (slot/surfaceraster/
+   pocketfill/pocketwall/surfacefill/region); 295 existing tests across every touched file rerun green.
 
 ---
 
@@ -3637,7 +3646,16 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 46. [⏸ NOT REPRODUCED t2391 — owner re-check needed on ≥V2026.08.29.3 before any further work] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [⛔ REOPENED 2026-08-29 — OWNER-CONFIRMED on ≥V2026.08.29.8: "no handle wont follow my movement." The harness (t2391, extensive) cannot reproduce what the owner's device shows — DEVICE/STATE-DEPENDENT, the t2345-t2357 pattern again] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+
+> ⭐ **The reproduction gap IS the lead.** t2391 drag-tested with the harness's pointer and saw the canvas
+> follow; the owner's real gesture does not. Prime suspect: **touch vs mouse** — the harness has no real
+> multi-touch, t2371's own pinch tests had to synthesize PointerEvents, and a touch drag may ride a different
+> event path whose redraw half is broken while the writeback half works. Second suspect: returning-user
+> state (the t2345 class). ⇒ Next turn is an INSTRUMENTED investigation, not a fix: a read-only probe on the
+> feature canvas (the `?debug=drag` dragProbe pattern that cracked the splitter saga — passive listeners,
+> on-screen rows, the owner reproduces in ten seconds and screenshots the overlay). ⛔ #50 (undo-blind rapid
+> writes) still sequences BEFORE the commit-on-release fix, per its own entry.
 
 > **t2391 (no code changed):** extensive live drag testing (surfacing + corner, both routes, paced + rapid)
 > could NOT reproduce the dead-GUI symptom — the canvas followed. The worker tried the ruled fix anyway, saw
