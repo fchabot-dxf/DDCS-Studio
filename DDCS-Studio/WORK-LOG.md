@@ -63788,5 +63788,88 @@ mechanism bug, a test fixture bug.
 
 Not covered: touch tap-to-toggle on real hardware (only synthetic `TouchEvent`s — no physical touch device
 available this session, same honest limit as #51). Rule 1b: `blocksApp.js`/`opContextMenu.js`/`styles.css`
-are all shared — full suite below.
+are all shared — full suite came back 2939 passed / 1 failed / 15 flaky / 26 skipped (the same
+`open-as-modal-1625` contention flake, third turn running, already ruled out as caused by this arc).
+
+## t2413 — BACKLOG #55 FIXED: the drag never wrote to the canonical store on ANY input method
+
+The dispatch's own instructions were followed in order: extend the probe first, establish the store
+disagreement, THEN fix — not the other way around.
+
+**The probe extension** (`web/debug/featProbe.js`): it used to log one settle frame after pointer-up; now it
+keeps sampling for 2s past release (`postUpUntil`, the existing `loop()`'s own cadence and dedup, just kept
+alive longer) and logs a `model:` fingerprint alongside the handle position — `window.ddcsGetBlockProgram()`'s
+own first op's `params`, JSON-stringified. Generic by construction (the Blocks pane's live editor holds
+exactly one op at a time, so "the first op block" needs no per-field-name plumbing) and it's the SAME read
+any other debug/live-form caller already uses, not a new accessor. The redraw MutationObserver stays alive
+through the extended window too, since a post-release revert would itself be a redraw.
+
+**Ran it on a real drag before touching a single line of app code.** The result reframed the whole ticket:
+`model:` sat at the ENTRY value (`w:80,h:60`) for every frame of the drag AND the full 2s past release — not
+"commits then reverts," but never moves at all. The reported "revert on release" is the first re-render that
+ever actually reads the canonical store; everything before that point was reading the FORM's own live DOM
+input values, which the t2409 fix correctly redraws from — a real, working loop that just never touches the
+store a fresh render pulls from.
+
+**Confirmed the write function itself, not the symptom.** Called `writeAuthoredValue(ws, 'w', 999)` directly
+in the browser: returns `false`. Traced why by reading `devMode.js` closely rather than guessing from the
+name: it resolves its target through `deriveAuthoredDef(ws)`'s own `bindings`, which come from
+`collectAuthoring()` — an AUTHORING-canvas mechanism (exposed-knob checkboxes, now literally vestigial per
+its own comment: "the EXPOSE_ checkbox this reads no longer exists anywhere... exposures is always []") or a
+`param_field`/`param` block physically on the canvas. A normally placed op (Insert → Blocks tab) has neither —
+confirmed live, `defBindingsLen: 0` — so `writeAuthoredValue` silently no-ops for every field of every placed
+op, unconditionally. Confirmed this is NOT canvas-drag-specific: a plain typed edit into the same form field,
+driven by directly setting `.value` and dispatching a real bubbling `input` event (the same thing a keystroke
+does), showed the identical revert before the fix — proving the severance lives in the write path, not the
+drag gesture. (Playwright's own `.fill()` turned out to silently no-op on this specific field in this harness
+— confirmed by comparing against the manual dispatch, which worked cleanly — a test-tooling quirk, chased
+down with a `console.trace()` inside `userOpView.js`'s own `render()` before concluding it wasn't an app bug;
+every check in this turn drives the DOM manually instead.)
+
+**Established the authoritative store by reading the code, not guessing.** `stackBridge.js`'s
+`workspaceToStack` (what `window.ddcsGetBlockProgram()` ultimately calls) reads an `op`-type block's own
+`params` straight off its `.data` JSON blob — never by re-deriving from its exec atom children.
+`deriveLiveWizard()`'s own `placedOpFallback` branch already reads exactly that (`opBlock.params`) to seed the
+form/canvas on every render. So `.data.params` is the one store both the read side (what seeds the form) and
+`ddcsGetBlockProgram()` (what a fresh render, and the owner's own eyes, ultimately check against) agree on —
+confirmed, not assumed, before writing the fix.
+
+**A second bug, found by adding real debug tracing rather than assuming the first fix attempt was correct**:
+the first attempt (routing the write to `deriveLiveWizard()`'s own computed `opBlock`) silently did nothing —
+`opBlock` came back `undefined` every time. Traced with a one-line debug log and found the actual bug:
+`deriveLiveWizard()` computes `opBlock` (needed for the EXISTING `placedOpFallback` logic already in that
+function) but never included it in its own `return { def, stack, authoredHere, customizing, userRoot,
+placedOpFallback }` statement. Added it. Confirmed every other caller of `deriveLiveWizard()` destructures by
+named field (never spreads or enumerates keys), so adding a field to the return is purely additive.
+
+**The fix** (`web/blocks/blocksApp.js`, `blkView`'s own `onFieldWrite`): for a placed (not authored) op, patch
+the op's own Blockly block `.data` JSON directly (`meta.params[param] = value`, no `setFieldValue` — there is
+no atom-level target for it to write to) and call `reproject()` to refresh `programModel.js`'s own cached
+stack — a direct `.data` mutation fires no Blockly change event, so nothing else would ever refresh
+`getStack()`/`window.ddcsGetBlockProgram()` for this write. `reproject()` is the same call an ordinary
+Blockly-native op-field edit already triggers through the event system; this just invokes it directly since
+the `.data` patch deliberately bypasses that system (there being no field to set). Deliberately does NOT
+rebuild the op's own exec atoms — `mergeOpBlocks`'s own job, which reloads the whole workspace and is far too
+heavy to call on every drag frame — keeping the ruled commit-on-release redesign (#46/#50) out of this turn's
+scope, exactly as dispatched.
+
+**Verification, every claim live:** a typed edit and a real drag both confirmed persisting past a 2s settle
+window via `window.ddcsGetBlockProgram()` (not just the visible form/canvas); reverted the fix and re-ran the
+same two checks — both correctly fail against the pre-fix code, proving the new spec isn't vacuous; the
+shell's own `pocket-canvas.spec.js` (the confirmed control) and t2409's/t2411's own permanent specs all still
+green after this turn's edit to the same shared file. Committed as
+`tests/blocks-pane-drag-persist-2413.spec.js` (2 tests).
+
+**A real node-tier catch, not a rubber-stamp.** The first full-suite run failed `test:node` outright:
+`op-lookup-scan-1968` (the ratchet against a well-known bug CLASS — a shallow `.find(b => b.type === 'op')`
+over a program stack, which silently misses an op nested inside a `multi_step` import wrapper, the exact shape
+11+ prior sites shipped this bug as) flagged my OWN new `modelFingerprint()` in `featProbe.js` — it used
+exactly that shallow shape. Fixed by routing through `window.ddcsFlattenOps` (the canonical recursive answer,
+already exposed for this exact purpose) instead of a raw `.find()`. Node-tier back to 238/238; the scanner did
+its job.
+
+**BACKLOG #56 filed**, per the dispatch's own explicit instruction: `open-as-modal-1625.spec.js`'s "A REAL
+OPEN AFTER A PREVIEW…" is now the sole/dominant full-suite failure FOUR turns running (t2407/t2409/t2411/
+t2413), each turn independently re-confirming it's not that turn's own regression. Filing it stops a fifth
+turn from repeating the same triage.
 

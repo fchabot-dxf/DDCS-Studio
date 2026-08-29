@@ -4185,7 +4185,7 @@ captured stdout shrank dramatically, and confirm a killed run leaves a stale-mar
 
 ---
 
-### 55. THE DRAG COMMITS, THEN REVERTS — the release restores the value the op had on entering the Blocks tab
+### 55. [✅ SHIPPED t2413 — root was NOT the drag, NOT release-timing: writeAuthoredValue silently no-ops for every placed op on EVERY input method, confirmed by direct call before touching any code] THE DRAG COMMITS, THEN REVERTS — the release restores the value the op had on entering the Blocks tab
 
 *(owner, 2026-08-29, testing t2409's fix on V2026.08.29.12: "the rect now correctly drags but on release it
 changes back to the value it was when entering blocks tab.")*
@@ -4232,3 +4232,97 @@ value; the release is just the first one that happens.
 
 **STILL REAL IF:** drag a feature handle in the Blocks tab's Wizard View, release, and watch the value —
 returning to what it was when you entered the tab means still real.
+
+> ⭐⭐ **t2413 — FIXED. The root was neither "the drag" nor "release timing" — established, not assumed,
+> before writing a line of code.** Extended `web/debug/featProbe.js` exactly as asked: it now keeps sampling
+> for 2s past pointer-up (not one settle frame) and logs a `model:` fingerprint alongside the handle position
+> (`window.ddcsGetBlockProgram()`'s own first op's `params`, JSON-stringified — a generic signal, no per-op
+> field-name plumbing needed since the pane holds exactly one op at a time). Ran it on a real drag: `model:`
+> stayed at the ENTRY value for every single frame, through the whole drag AND the whole 2s post-release
+> window — not "changes then reverts," but **never changes at all**. The "revert" the owner sees is the FIRST
+> re-render that ever reads the canonical store, exposing a write that was never there.
+>
+> Confirmed by calling the write function directly (`writeAuthoredValue(ws, 'w', 999)`) rather than inferring
+> from the symptom: it returns `false`. Traced why: it resolves its target through `deriveAuthoredDef(ws)`'s
+> own `bindings`, an AUTHORING-canvas concept — an exposed-knob checkbox (now vestigial, `collectAuthoring`'s
+> own comment: "the EXPOSE_ checkbox this reads no longer exists anywhere... exposures is always []") or a
+> `param_field`/`param` block on the canvas. A normally PLACED op (bar → Insert → Blocks tab) has NEITHER —
+> `deriveAuthoredDef` returns `bindings: []` for it, always, confirmed live (`defBindingsLen: 0`). **This is
+> not specific to canvas drags at all** — a plain TYPED edit into the SAME form field, driven the same way any
+> keystroke would, showed the identical symptom (form value AND model both reverting to 80) before the fix,
+> proving the severance is in the write PATH itself, not the drag gesture.
+>
+> **Which store is authoritative, established by reading the actual code, not guessed**: `stackBridge.js`'s
+> `workspaceToStack` (what `window.ddcsGetBlockProgram()` ultimately calls) reads an `op`-type block's own
+> `params` straight off its `.data` JSON — never by re-deriving from its exec atoms. `deriveLiveWizard()`'s own
+> `placedOpFallback` branch already reads exactly that (`opBlock.params`) to SEED the form/canvas on every
+> render. So `.data`'s own `params` IS the one store both the read side (form seed) and `ddcsGetBlockProgram()`
+> agree on — the fix routes the write there directly, per the dispatch's own instruction, rather than chasing
+> `writeAuthoredValue`'s own (wrong-for-this-case) nested-atom-socket target.
+>
+> A second, independent bug compounded the first and would have sunk even a correct write: `deriveLiveWizard()`
+> computes `opBlock` (the placed op's own stack record, carrying the `.id` needed to reach the live block) but
+> never included it in its own return statement — any `placedOpFallback`-gated caller destructuring `opBlock`
+> got `undefined`. Found by adding a debug trace rather than assuming the new code was wrong on the first
+> failed attempt — the fix worked the moment both bugs were closed together.
+>
+> **THE FIX** (`web/blocks/blocksApp.js`, `blkView`'s own `onFieldWrite`): for a placed (not authored) op,
+> patches the op's own Blockly block `.data` JSON directly (`meta.params[param] = value`) — no `setFieldValue`,
+> no target to write one to — then calls `reproject()` to refresh `programModel.js`'s own CACHED stack
+> (`getStack()`/`window.ddcsGetBlockProgram()` only updates via `setStack()`, and a direct `.data` mutation
+> fires no Blockly change event, so nothing else would refresh it). `deriveLiveWizard()` now returns `opBlock`
+> too. Deliberately does NOT rebuild the op's own exec atoms (`mergeOpBlocks`'s heavier job — a full workspace
+> reload, measured too costly to call every drag frame) — scoped to making the write reach the ONE store the
+> form/canvas already reads from, not the full commit-on-release redesign #46/#50 already rule out of scope
+> here (noted again: both this turn's own capture and the owner's keep showing ~2 writes/frame, still arguing
+> for it, still not this turn's job).
+>
+> **VERIFIED, every claim live:**
+> - A typed edit: `writeAuthoredValue` confirmed returning `false` pre-fix (`window.ddcsGetBlockProgram()`
+>   frozen at 80 through a 600ms settle); post-fix, both the form field AND `window.ddcsGetBlockProgram()`
+>   read 123, staying there through the same settle window.
+> - A real drag with the extended probe: `model:` climbs WITH the handle every frame (`w:80→81.34→…→101.46`,
+>   matching the pointer 1:1), and — the exact window #55 reports the revert in — stays at `w:101.463,
+>   h:49.268` for the full 2s post-release sampling window, confirmed independently via
+>   `window.ddcsGetBlockProgram()` after the probe stopped.
+> - Reverted the fix (`git stash`) and re-ran the same two checks: both correctly FAIL against the pre-fix
+>   code (the typed-edit check reads 80 instead of 123; the drag check sees `rightAfterUp === 80`, i.e. the
+>   drag itself never even briefly changed it) — proving the new spec isn't vacuous, not just asserting it.
+> - Regression: the shell's own `pocket-canvas.spec.js` (the confirmed-working control) still green; the
+>   Blocks pane's "Open as modal" door (t2409's own spec, real wizardManager, `onFieldWrite` unset there —
+>   never touched by this fix) still green; t2409's and t2411's own permanent specs all still green after this
+>   turn's edit to the same shared file.
+> - Committed as a permanent spec, `tests/blocks-pane-drag-persist-2413.spec.js` (2 tests).
+>
+> One test-tooling note, not an app bug: Playwright's own `.fill()` silently failed to commit a value on this
+> specific field in this harness (verified: a manual `.value=` + a real dispatched `input` event works
+> cleanly where `.fill()` left the field unchanged) — every check in this turn drives the DOM the same way a
+> real keystroke would rather than relying on `.fill()` here.
+
+---
+
+### 56. `open-as-modal-1625.spec.js`'s "A REAL OPEN AFTER A PREVIEW…" flakes under full-suite contention — 4 turns running
+
+*(filed t2413, per the advisor's own instruction: "if it appears a 4th time, stop and file it as its own entry
+rather than re-triaging it every turn.")*
+
+`open-as-modal-1625.spec.js › A REAL OPEN AFTER A PREVIEW gets its INSERT back — the preview chrome cannot
+leak` has been the SOLE (or dominant) full-suite failure four turns running: t2407 (6 failed, this one among
+them — before ANY of this arc's own `blocksApp.js` edits existed), t2409 (1 failed, this one alone), t2411 (1
+failed, this one alone), t2413 (1 failed, this one alone). Each turn re-confirmed it's not that turn's own
+regression (isolated single-worker runs pass 3/3 clean every time; a targeted contention rerun in t2409 showed
+it pass while a DIFFERENT unrelated file flaked instead, matching this suite's own documented
+"contention-starved population shifts run to run" behavior). That per-turn triage is real work repeated four
+times for the same finding — this entry exists so a fifth occurrence doesn't repeat it a fifth time.
+
+The test's own header (t1902) already names the mechanism: its preview auto-plays/loops the instant the
+wizard mounts, and that ongoing repaint can destabilize `#blkOpenModal`'s own actionability check for the
+NEXT click under load — `customizeCorner()`'s own `stopLiveSim()` call was added specifically to counter this,
+and evidently doesn't fully close it under 6-worker contention. Not investigated further this turn (out of
+scope for t2413's own dispatch) — worth a dedicated turn if it recurs, starting from: does `stopLiveSim` miss
+a SECOND animation source beyond `.pp-run.on`, or does the actionability wait itself need a longer/more
+tolerant window under measured contention.
+
+**STILL REAL IF:** a full-suite run shows this test (and only unrelated others, never a repeat of THIS one
+tied to a real code change) failing again on a turn that touches none of `blocksApp.js`/`opContextMenu.js`/
+`userOpView.js`/the preview-panel chain.

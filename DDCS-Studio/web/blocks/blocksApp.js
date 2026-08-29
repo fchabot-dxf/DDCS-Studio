@@ -504,7 +504,39 @@ async function buildWorkspace() {
   const blkView = createUserOpView('blk', {
     onFieldWrite(param, rawValue) {
       const n = Number(rawValue);
-      if (Number.isFinite(n)) { try { writeAuthoredValue(ws, param, n); } catch (_) { /* transient mid-edit miss is fine */ } }
+      if (!Number.isFinite(n)) return;
+      // t2413 (BACKLOG #55) — a PLACED (not authored/customized) op has NO Blockly-field target
+      // writeAuthoredValue can reach: its bindings live in the REGISTRY (matched onto nested exec atoms by
+      // identity, deriveBindings.js's own doctrine), never as deriveAuthoredDef's own exposure/param_field
+      // bindings — those stay [] for a placed op (confirmed live: writeAuthoredValue silently returns false,
+      // window.ddcsGetBlockProgram() never moves, not even transiently — the OWNER's "reverts on release" is
+      // really "never wrote at all," release just being the first re-render that exposes it). The canonical
+      // store for a placed op's CURRENT value is opBlk.data's own `params` JSON — deriveLiveWizard's own
+      // placedOpFallback already reads exactly that to SEED the form/canvas on every render, so THAT is the
+      // authoritative store per the dispatch's own instruction ("find which store is authoritative and make
+      // the drag write to it"), not the nested atom tree writeAuthoredValue was built to reach.
+      //
+      // Patching `.data` alone stops the FORM/CANVAS from reverting (deriveLiveWizard reads it fresh every
+      // render), but programModel.js's own getStack()/window.ddcsGetBlockProgram() is a CACHE, refreshed only
+      // by setStack() — and a direct `.data` mutation fires no Blockly change event, so `ws.addChangeListener`'s
+      // own reproject() trigger (the ONLY thing that normally calls setStack for a live edit) never sees it
+      // either. Calling reproject() explicitly closes that second half — it's the SAME call an ordinary
+      // Blockly-native op-field edit already triggers via the event system; this just invokes it directly
+      // since the direct `.data` patch bypasses that system on purpose (setFieldValue has no target to write
+      // to here — see above). Does NOT rebuild the op's own exec atoms (that stays the heavier mergeOpBlocks
+      // path, out of THIS turn's scope — the ruled commit-on-release redesign, #50, is where that belongs).
+      const { opBlock, placedOpFallback } = deriveLiveWizard();
+      if (placedOpFallback && opBlock) {
+        const blk = ws.getBlockById(opBlock.id);
+        if (blk) {
+          let meta = {}; try { meta = JSON.parse(blk.data || '{}'); } catch (_) { /* keep {} */ }
+          meta.params = { ...(meta.params || {}), [param]: n };
+          blk.data = JSON.stringify(meta);
+          reproject();
+          return;
+        }
+      }
+      try { writeAuthoredValue(ws, param, n); } catch (_) { /* transient mid-edit miss is fine */ }
     },
   });
   // t1746 ACT 1b-ii-FIX — which op blkView last showed, so renderLiveForm can tell a genuine fresh open (a
@@ -664,7 +696,10 @@ async function buildWorkspace() {
     const userRoot = authoredHere
       || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
       || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
-    return { def, stack, authoredHere, customizing, userRoot, placedOpFallback };
+    // t2413 (BACKLOG #55) — `opBlock` added to the return: onFieldWrite needs the placed op's own `.id` to reach
+    // the LIVE Blockly block (ws.getBlockById) and patch its `.data` — the fact was already computed above for
+    // `placedOpFallback`'s own use, just never handed back to a caller before now.
+    return { def, stack, authoredHere, customizing, userRoot, placedOpFallback, opBlock };
   }
 
   /**

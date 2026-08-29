@@ -62,17 +62,43 @@ function findHandle() {
     return svg.querySelector('.fc-handle');   // no data-hid on this handle — best-effort fallback (first one)
 }
 
+// t2413 (BACKLOG #55) — the MODEL's own committed value, read the same way every other debug/live-form caller
+// does (window.ddcsGetBlockProgram, already used throughout this app's own tests) — NOT the handle's screen
+// position, which BACKLOG #55's own capture already proved stays correct through release. The Blocks pane's
+// live editor holds exactly one op at a time, so "the first op block's own params" is a genuinely generic
+// fingerprint — no per-handle field-name plumbing needed. A drag writes SOMEWHERE (writes: already proves
+// that); this shows whether that write ever reaches the SAME store a post-release rebuild reads back from.
+// window.ddcsFlattenOps (programModel.js's flattenOps, exposed t1928) — NOT a shallow `.find(b=>b.type==='op')`
+// — op-lookup-scan-1968's own ratchet: a shallow top-level find silently misses an op nested inside a
+// multi_step import wrapper, the exact bug class 11+ prior sites were caught shipping.
+function modelFingerprint() {
+    try {
+        const prog = window.ddcsGetBlockProgram && window.ddcsGetBlockProgram();
+        if (!Array.isArray(prog) || !window.ddcsFlattenOps) return '—';
+        const op = window.ddcsFlattenOps(prog)[0];
+        return op ? JSON.stringify(op.params) : '(no op)';
+    } catch (_) { return 'ERR'; }
+}
+
 function measure() {
     const h = findHandle();
     const hb = h ? h.getBoundingClientRect() : null;
     const handlePos = hb ? `${Math.round(hb.left + hb.width / 2)},${Math.round(hb.top + hb.height / 2)}` : 'MISSING';
     const vb = svg ? (svg.getAttribute('viewBox') || '—') : '—';
     const ptr = lastX == null ? '—' : `${Math.round(lastX)},${Math.round(lastY)}`;
-    return `f${frame} ptr:${ptr} handle:${handlePos} viewBox:${vb} writes:${writeCount} redraws:${redrawCount}`;
+    return `f${frame} ptr:${ptr} handle:${handlePos} viewBox:${vb} writes:${writeCount} redraws:${redrawCount} model:${modelFingerprint()}`;
 }
 
+// t2413 (BACKLOG #55) — "the drag commits then reverts on release": the probe used to stop at ONE settle frame
+// after pointer-up, which is exactly the window the reported revert happens OUTSIDE of. `postUpUntil` keeps
+// the SAME loop (same cadence, same dedup) sampling for POST_UP_MS past release, so a post-release snap-back
+// shows up as an ordinary row — the handle position and `model:` fingerprint frozen together right up to the
+// frame they diverge, which names the exact call responsible instead of leaving it to happen off-screen.
+const POST_UP_MS = 2000;
+let postUpUntil = 0;
+
 function loop() {
-    if (!dragging) { raf = null; return; }
+    if (!dragging && performance.now() > postUpUntil) { raf = null; return; }
     frame++;
     const line = measure();
     if (line !== lastLine) {
@@ -120,7 +146,12 @@ document.addEventListener('change', () => { if (dragging) writeCount++; }, { cap
 ['pointerup', 'pointercancel'].forEach((t) => document.addEventListener(t, () => {
     if (!dragging) return;
     dragging = false;
-    if (mo) { mo.disconnect(); mo = null; }
+    // t2413 — keep observing redraws through the extended post-up window too (set BEFORE the mo.disconnect
+    // below is scheduled): a post-release revert would itself trigger a redraw, and that's exactly the signal
+    // being hunted for. The main loop() is already running (started at pointerdown) and keeps sampling on its
+    // own now that `postUpUntil` is set — no new rAF chain needed.
+    postUpUntil = performance.now() + POST_UP_MS;
+    if (mo) setTimeout(() => { if (mo) { mo.disconnect(); mo = null; } }, POST_UP_MS + 50);
     // one settle frame AFTER the authoritative onUp write, so the final state is in the record
     requestAnimationFrame(() => {
         frame++;
