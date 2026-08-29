@@ -3697,7 +3697,7 @@ modal's own canvas behaviour is UNTOUCHED — regression-check it.
 
 ---
 
-### 43. FORM ↔ BLOCK REVEAL — tap a form row, see its block; a block's "Show in form"
+### 43. [✅ SHIPPED t2397 — both directions, verified on corner (flat) + drill (tree). "Show in form" scoped to param_field/formfield: a multi-field atom has no single param to point at, a named asymmetry not a gap] FORM ↔ BLOCK REVEAL — tap a form row, see its block; a block's "Show in form"
 
 *(owner-approved 2026-08-28, from the new-user sweep. The hardest new-user question in the Blocks tab is
 "what does this canvas have to do with my form?" — answer it by POINTING, not by a tutorial.)*
