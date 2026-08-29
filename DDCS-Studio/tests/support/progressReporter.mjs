@@ -149,25 +149,16 @@ export default class ProgressReporter {
 
 function renderMd(d, pct) {
     const eta = d.status === 'running' ? fmtDuration(d.etaSec * 1000) : '—';
-    return `# Suite progress
+    // t2409 (owner: "compact the progress md ui to be less tall") — NO TABLE: a markdown table cannot be
+    // short, and its empty header row rendered as a blank strip. Four lines carry every number the ten-row
+    // table did. The bar keeps its backticks: monospace is what makes the block glyphs align in the preview.
+    return `\`${barChars(pct)}\` **${pct.toFixed(1)}%** · **${d.completed} / ${d.total}** · ${d.status}
 
-\`${barChars(pct)}\` **${pct.toFixed(1)}%**
+✅ ${d.passed} · ❌ ${d.failed} · ⚠ ${d.flaky} · ⊘ ${d.skipped} · ⏱ ${fmtDuration(d.elapsedSec * 1000)} · ETA ${eta}
 
-| | |
-|---|---|
-| Progress | ${d.completed} / ${d.total} |
-| Passed | ${d.passed} |
-| Failed | ${d.failed} |
-| Flaky | ${d.flaky} |
-| Skipped | ${d.skipped} |
-| Elapsed | ${fmtDuration(d.elapsedSec * 1000)} |
-| ETA | ${eta} |
-| Current | \`${d.currentSpec || '—'}\` |
-| Status | **${d.status}** |
-| Heartbeat | ${d.heartbeatAt} |
+\`${d.currentSpec || '—'}\`
 
-_If Status still reads "running" and Heartbeat is more than ${d.staleAfterSec}s old, the run has died — this
-file cannot mark itself dead, only stop updating._
+<sub>heartbeat ${d.heartbeatAt} — if this still says "running" and the heartbeat is over ${d.staleAfterSec}s old, the run died.</sub>
 `;
 }
 
