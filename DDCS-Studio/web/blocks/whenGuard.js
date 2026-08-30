@@ -32,6 +32,25 @@ const USER_DERIVE_GUARDS = new Map();
 export function setUserDeriveGuards(opType, fn) { if (typeof fn === 'function') USER_DERIVE_GUARDS.set(opType, fn); else USER_DERIVE_GUARDS.delete(opType); }
 export function getUserDeriveGuards(opType) { return USER_DERIVE_GUARDS.get(opType) || null; }
 
+// t2415 (BACKLOG #23) — does `blockType` sit DIRECTLY inside a `guard` anywhere in this exec template (a def's
+// own `.template`, the registry superset — guard blocks still present, unlike a PLACED/instantiated canvas,
+// where pruneGuards has already unwrapped a kept guard transparently, splicing its children in place). Returns
+// that guard's own `when` ({param,is}) or null. Shared by blocksApp.js (the sync-on-disable listener) and
+// disableGuard.js (the refusal guard, which must NOT refuse a declared-switchable child) — ONE lookup, not two
+// that could silently disagree about which children are switchable. Recurses `.children` only via `childrenOf`
+// (handles both the plain-array and mouth-keyed {LEFT,RIGHT} shapes) — `.uiChildren` is FORM/UI layout, never
+// exec structure, so it is deliberately not searched.
+export function findGuardWhenForBlockType(nodes, blockType, childrenOf) {
+    for (const n of (nodes || [])) {
+        if (!n) continue;
+        const kids = childrenOf(n.children);
+        if (n.type === 'guard' && kids.some((c) => c && c.type === blockType)) return (n.params && n.params.when) || null;
+        const found = findGuardWhenForBlockType(kids, blockType, childrenOf);
+        if (found) return found;
+    }
+    return null;
+}
+
 /** Prune a block tree for a param state: DROP a `guard` subtree whose `when` is false; UNWRAP a surviving guard (splice
  *  its children up in place). Recurses children + uiChildren; mutates in place (the caller passes a deep clone). After
  *  prune, NO `guard` blocks remain — the tree is the concrete shape for `params`. Returns the same (mutated) array —

@@ -24,6 +24,7 @@ import { findStrayTopBlockIds } from './programShape.js';   // t2281 — a block
 import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
+import { findGuardWhenForBlockType } from './whenGuard.js';   // t2415 (BACKLOG #23) — shared with disableGuard.js: does a declared guard wrap this block type?
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
@@ -503,8 +504,11 @@ async function buildWorkspace() {
   // renderer's delegated listener calls it.
   const blkView = createUserOpView('blk', {
     onFieldWrite(param, rawValue) {
-      const n = Number(rawValue);
-      if (!Number.isFinite(n)) return;
+      // t2415 (BACKLOG #23) — a checkbox now hands its real `.checked` boolean (userOpView.js's own delegated
+      // listener), not a numeric drag/typed value — accept both, rather than the number-only guard t2413 shipped
+      // (that turn's own use case, a drag handle, is always numeric; a structural bool toggle is not).
+      const value = typeof rawValue === 'boolean' ? rawValue : Number(rawValue);
+      if (typeof value === 'number' && !Number.isFinite(value)) return;
       // t2413 (BACKLOG #55) — a PLACED (not authored/customized) op has NO Blockly-field target
       // writeAuthoredValue can reach: its bindings live in the REGISTRY (matched onto nested exec atoms by
       // identity, deriveBindings.js's own doctrine), never as deriveAuthoredDef's own exposure/param_field
@@ -515,28 +519,42 @@ async function buildWorkspace() {
       // placedOpFallback already reads exactly that to SEED the form/canvas on every render, so THAT is the
       // authoritative store per the dispatch's own instruction ("find which store is authoritative and make
       // the drag write to it"), not the nested atom tree writeAuthoredValue was built to reach.
-      //
-      // Patching `.data` alone stops the FORM/CANVAS from reverting (deriveLiveWizard reads it fresh every
-      // render), but programModel.js's own getStack()/window.ddcsGetBlockProgram() is a CACHE, refreshed only
-      // by setStack() — and a direct `.data` mutation fires no Blockly change event, so `ws.addChangeListener`'s
-      // own reproject() trigger (the ONLY thing that normally calls setStack for a live edit) never sees it
-      // either. Calling reproject() explicitly closes that second half — it's the SAME call an ordinary
-      // Blockly-native op-field edit already triggers via the event system; this just invokes it directly
-      // since the direct `.data` patch bypasses that system on purpose (setFieldValue has no target to write
-      // to here — see above). Does NOT rebuild the op's own exec atoms (that stays the heavier mergeOpBlocks
-      // path, out of THIS turn's scope — the ruled commit-on-release redesign, #50, is where that belongs).
-      const { opBlock, placedOpFallback } = deriveLiveWizard();
+      const { def, opBlock, placedOpFallback } = deriveLiveWizard();
       if (placedOpFallback && opBlock) {
+        // t2415 — a STRUCTURAL binding (no blockIndex — drives the guard prune, e.g. drill's own holesEnabled)
+        // changes the op's own SHAPE (a whole child appears/vanishes), which a light `.data`-only patch can't
+        // reach — the LIVE CANVAS would keep showing the un-pruned atom while the stored param disagrees. It
+        // needs the SAME rebuild path the sc_* structural-control branch (below, in the change listener) and
+        // this file's own disable-gesture sync (BACKLOG #23) already use. A VALUE binding (has blockIndex, a
+        // socket substitution only) keeps t2413's own light patch — unchanged, still cheap enough per drag frame.
+        const binding = def && def.bindings && def.bindings.find((b) => b && b.param === param);
+        if (binding && binding.blockIndex == null && _ops) {
+          let meta = {}; try { meta = JSON.parse(opBlock.data || '{}'); } catch (_) { /* keep {} */ }
+          const params = { ...(meta.params || {}), [param]: value };
+          if (isOpBlockEdited(opBlock.id) && _ops.mergeOpBlocks) _ops.mergeOpBlocks(opBlock.id, params);
+          else if (_ops.replaceOp) _ops.replaceOp(opBlock.id, params);
+          return;
+        }
         const blk = ws.getBlockById(opBlock.id);
         if (blk) {
+          // Patching `.data` alone stops the FORM/CANVAS from reverting (deriveLiveWizard reads it fresh every
+          // render), but programModel.js's own getStack()/window.ddcsGetBlockProgram() is a CACHE, refreshed
+          // only by setStack() — and a direct `.data` mutation fires no Blockly change event, so
+          // `ws.addChangeListener`'s own reproject() trigger (the ONLY thing that normally calls setStack for a
+          // live edit) never sees it either. Calling reproject() explicitly closes that second half — it's the
+          // SAME call an ordinary Blockly-native op-field edit already triggers via the event system; this just
+          // invokes it directly since the direct `.data` patch bypasses that system on purpose (setFieldValue
+          // has no target to write to here — see above). Does NOT rebuild the op's own exec atoms (that stays
+          // the heavier mergeOpBlocks path above) — out of a VALUE binding's own scope, the ruled commit-on-
+          // release redesign (#50) is where a full per-frame rebuild belongs.
           let meta = {}; try { meta = JSON.parse(blk.data || '{}'); } catch (_) { /* keep {} */ }
-          meta.params = { ...(meta.params || {}), [param]: n };
+          meta.params = { ...(meta.params || {}), [param]: value };
           blk.data = JSON.stringify(meta);
           reproject();
           return;
         }
       }
-      try { writeAuthoredValue(ws, param, n); } catch (_) { /* transient mid-edit miss is fine */ }
+      if (typeof value === 'number') { try { writeAuthoredValue(ws, param, value); } catch (_) { /* transient mid-edit miss is fine */ } }
     },
   });
   // t1746 ACT 1b-ii-FIX — which op blkView last showed, so renderLiveForm can tell a genuine fresh open (a
@@ -1302,6 +1320,40 @@ async function buildWorkspace() {
     // e.reason including 'connect' — a disconnect/bump carries ['disconnect','bump'], never 'connect' alone.
     if (e.type === 'move' && e.reason && e.reason.includes('connect')) sfx('block.snap');
     if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject */ } }
+    // t2415 (BACKLOG #23) — a NATIVE Blockly "Disable Block" on an atom whose OP DEF declares it a SWITCHABLE
+    // child (wrapped in a `guard` in the REGISTRY template, e.g. drill's own holecycle pattern — see
+    // drillData.js's own DRILL_STRUCT_BINDINGS) SYNCS into the guard's own structural param, via the SAME
+    // merge/rebuild path the sc_* structural-control branch below already uses — so the disabled state is a
+    // REAL param the op carries, and opFromMarker's own regeneration on reimport prunes correctly instead of
+    // silently coming back enabled (BACKLOG #23's own reported hazard: "something the human deliberately
+    // turned OFF coming back ON without saying so"). ⚠ Checked live, not assumed: the guard is TRANSPARENT on
+    // the PLACED canvas — pruneGuards already unwrapped it at instantiate time (the default/kept case splices
+    // its children in place), so the disabled block's own LIVE PARENT is whatever atom the guard's children sat
+    // under (placeonstock, for drill), never the guard itself. The lookup is therefore against the DEF'S OWN
+    // template (the registry's superset, where the guard still exists), matched by the disabled block's TYPE —
+    // not a live-canvas parent walk. SCOPED strictly to a type a declared guard actually wraps — disabling an
+    // UNDECLARED child is left completely alone: pre-existing, Blockly-native, this-session-only, matching the
+    // ruling's own boundary (only an author-declared switchable child persists).
+    if (e.element === 'disabled' && _ops) {
+      try {
+        const blk = ws.getBlockById(e.blockId);
+        let opBlk = blk && blk.getSurroundParent && blk.getSurroundParent();
+        while (opBlk && opBlk.type !== 'op') opBlk = opBlk.getSurroundParent && opBlk.getSurroundParent();
+        if (blk && opBlk) {
+          let meta = {}; try { meta = JSON.parse(opBlk.data || '{}'); } catch (_) { /* keep {} */ }
+          const def = meta.opType && getUserDef(meta.opType);
+          const when = def && findGuardWhenForBlockType(def.template, blk.type, childrenOf);
+          if (when && when.param) {
+            const disabled = !!e.newValue;
+            const structValue = disabled ? !when.is : when.is;   // disabling FALSIFIES the guard's own when (drop); enabling restores it (keep)
+            const params = { ...(meta.params || {}), [when.param]: structValue };
+            // t156's own guard, mirrored: hand-edited children survive a merge, not a wholesale replace.
+            if (isOpBlockEdited(opBlk.id) && _ops.mergeOpBlocks) _ops.mergeOpBlocks(opBlk.id, params);
+            else if (_ops.replaceOp) _ops.replaceOp(opBlk.id, params);
+          }
+        }
+      } catch (_) { /* a sync miss must never break the native disable gesture itself */ }
+    }
     if (e.element === 'field' && _ops) {
       try {
         const blk = ws.getBlockById(e.blockId);

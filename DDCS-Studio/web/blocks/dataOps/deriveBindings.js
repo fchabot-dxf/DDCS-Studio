@@ -124,11 +124,17 @@ export function deriveBindingsFor(stack, specs) {
 // entry (firstRapidXY) to decide whether to SPLICE AN EXTRA G0 LINE into the emitted text — presence/absence of an
 // entire line, not a magnitude merely re-resolved downstream, so NOT deferrable either (same class as confirmEvery).
 const ENTRY_REFUSAL = 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.';
+// t2415 (BACKLOG #23) — EXTRACTED to a named export (was inline inside entryBindingsFor) so a def that ALSO needs
+// `bindingSpecs` (a structural-fork twin whose flat indices shift per prune state, e.g. drill's new switchable
+// pattern) can re-derive these EVERY build, the same way TOOL_BINDING_SPECS already lets a caller do for the
+// tool binding — entryBindingsFor itself is UNCHANGED, a thin wrapper over this same array, so every existing
+// caller (the ONE-TIME, frozen-`def.bindings` derivation every mill twin already does) is byte-identical.
+export const ENTRY_BINDING_SPECS = [
+    { param: 'entryX', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+    { param: 'entryY', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+];
 export function entryBindingsFor(stack) {
-    return deriveBindingsFor(stack, [
-        { param: 'entryX', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
-        { param: 'entryY', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
-    ]);
+    return deriveBindingsFor(stack, ENTRY_BINDING_SPECS);
 }
 
 /** t768 P1a — the TOOL-SELECTION spec: bind the op's declared tool NUMBER by IDENTITY (match the appended `toolsel`

@@ -129,10 +129,13 @@ test('THE CAM KNOBS — depth/peck expose on the drill op, holeDia/toolDia stay 
     await boot(page);
     const r = await page.evaluate(async () => {
         const { classifyExposable } = await import('/data/exposeClassifier.js');
-        const { drillDataDef } = await import('/blocks/dataOps/drillData.js');
+        const { drillDataDef, DRILL_DEFAULTS } = await import('/blocks/dataOps/drillData.js');
         const { boreDataDef } = await import('/blocks/dataOps/boreData.js');
         const pick = (c, k) => (c[k] ? { exposable: c[k].exposable, role: c[k].role, reason: c[k].reason } : null);
-        const d = classifyExposable(drillDataDef()), b = classifyExposable(boreDataDef());
+        // t2415 (BACKLOG #23) — drill is now a bindingSpecs def (the guarded holesEnabled toggle needs
+        // per-build re-derivation); classifyExposable must be given the ARM it's classifying (bore is
+        // unaffected — untouched this turn, still a frozen-bindings def, no params needed).
+        const d = classifyExposable(drillDataDef(), DRILL_DEFAULTS), b = classifyExposable(boreDataDef());
         return {
             drill: { depth: pick(d, 'depth'), peck: pick(d, 'peck'), feed: pick(d, 'feed'), dia: pick(d, 'dia') },
             bore: { depth: pick(b, 'depth'), pitch: pick(b, 'pitch'), holeDia: pick(b, 'holeDia'), toolDia: pick(b, 'toolDia') },

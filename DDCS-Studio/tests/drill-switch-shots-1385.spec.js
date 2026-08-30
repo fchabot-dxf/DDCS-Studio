@@ -120,8 +120,12 @@ test('SHOT 4 — the CAM pendant knob table for the switched drill op', async ({
     await boot(page);
     const r = await page.evaluate(async () => {
         const { classifyExposable } = await import('/data/exposeClassifier.js');
-        const { drillDataDef } = await import('/blocks/dataOps/drillData.js');
-        const c = classifyExposable(drillDataDef());
+        const { drillDataDef, DRILL_DEFAULTS } = await import('/blocks/dataOps/drillData.js');
+        // t2415 (BACKLOG #23) — drill is now a bindingSpecs def (the guarded holesEnabled toggle needs per-build
+        // re-derivation, cam-arm-classify-1410.spec.js's own "asked in the ABSTRACT — must stay fail-closed" rule
+        // applies here too): classifyExposable must be given the ARM it's classifying, the same way a real CAM
+        // pendant caller would (a placed op's own params), not asked with none.
+        const c = classifyExposable(drillDataDef(), DRILL_DEFAULTS);
         const rows = Object.entries(c).map(([param, v]) => ({ param, exposable: v.exposable, role: v.role, reason: v.reason }));
         // Render the declared table into the page so the screenshot shows the REASONS, which is the reviewable part.
         const host = document.createElement('div');

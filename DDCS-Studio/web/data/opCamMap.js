@@ -21,7 +21,7 @@ import { slotFromOp } from './opToSlot.js';
 import { stepoverPctOf, SURFACE_RASTER_AXES } from '../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover   // t1429 — and the ONE reading of which axes each clearing walk actually looks at, now that the pocket's macro IS that walk
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
-import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
+import { getUserDef, camFieldsFromStack, flattenBlocks, defaultParams } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive; t2415 — defaultParams: the canonical arm a bindingSpecs def's own classification needs (see camTableFromBindings)
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 import { num } from '../wizards/ops/util.js';   // t1444 — the pack gates read numbers the same way every emitter does
 import { slotTooSmall, slotToolRefusal, SLOT_CAM_PACK_REGS } from '../wizards/ops/slot.js';         // t1444 — the ONE too-small boundary + its sentence, shared with the emit   // t1512 — SLOT_CAM_PACK_REGS: the gate asks the envelope about the LIVE body the pack will emit, not the wizard's baked one
@@ -651,7 +651,16 @@ export function camTypeOf(op) {
 export function camTableFromBindings(def) {
     const valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
     if (!valueBindings.length) return null;
-    const cls = classifyExposable(def);
+    // t2415 (BACKLOG #23) — a `bindingSpecs` def (a guarded structural fork, e.g. drill's own new `holesEnabled`
+    // toggle) fails CLOSED when asked "in the abstract" (classifyExposable's own documented safety, exercised
+    // by cam-arm-classify-1410.spec.js's own `noParams` case) — a mis-aligned blockIndex lookup is worse than a
+    // conservative "expose nothing" answer. This function needs SOME concrete arm to classify against, and the
+    // CANONICAL default state (defaultParams — the same "which arm" every binding's own declared default
+    // already answers) is the one every existing def already agrees on, matching what DRILL_BINDINGS/
+    // CORNER_BINDINGS derive their OWN frozen form-rendering bindings against. A legacy (non-bindingSpecs) def
+    // is unaffected — defaultParams(def) is a harmless, ignored argument to classifyExposable's own `armed`
+    // check (`def.bindingSpecs && params`), which stays false for it exactly as before.
+    const cls = classifyExposable(def, defaultParams(def));
     const children = valueBindings.map((b) => {
         const exposable = !!(cls[b.param] && cls[b.param].exposable);
         return { type: 'cam_field', params: {

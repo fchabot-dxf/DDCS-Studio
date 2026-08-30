@@ -35,6 +35,11 @@ import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 const EXPECTED_ORDER = [
   // PATTERN section — geometryGroup
+  // t2415 (BACKLOG #23) — holesEnabled: the NEW structural toggle (the whole pattern, on/off), a genuine
+  // twin-only capability the shell never had (the shell has no concept of persisted disable at all) — leads
+  // the group, matching [[op-defining-fields-at-top]] (identity before geometry: whether the pattern exists
+  // at all is more foundational than what shape it is).
+  'holesEnabled',
   'pattern', 'skip', 'originX', 'originY', 'offZ',
   'stockAttach', 'pathDatum',   // path_anchor: re-parented, hidden rows (order fixed by formWidgets.js's own loop)
   'wcs',

@@ -64,7 +64,9 @@ import { userOpFromStack, flattenBlocks } from '../userOps.js';   // t2293 — f
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
-import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity; t1385 — the WHOLE map is by identity now (positional cannot survive the holecycle collapse)
+import { entryBindingsFor, toolBindingsFor, deriveBindingsFor, ENTRY_BINDING_SPECS, TOOL_BINDING_SPECS } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity; t1385 — the WHOLE map is by identity now (positional cannot survive the holecycle collapse); t2415 — ENTRY_BINDING_SPECS/TOOL_BINDING_SPECS, for bindingSpecs re-derivation (a guard that can drop holecycle shifts every sibling's own flat index)
+import { newBlock } from '../blockEmitter.js';   // t2415 (BACKLOG #23) — the `guard` wrapper around the switchable holecycle atom, same idiom every wizards/stacks/*.js GUARD helper already uses
+import { pruneGuards } from '../whenGuard.js';   // t2415 — collapse the guard for the canonical (default) form-rendering derivation, mirroring cornerData.js's own canonicalPrunedStack()
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
@@ -75,6 +77,11 @@ export const DRILL_DEFAULTS = {
     // placement (makePlace) — now bindable: the placeOnStock bbox snapshot is computed LIVE from the pattern at emit
     // (array.extent → place fold), so binding the placement scalars + a moved/attached pattern stays correct.
     stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, originX: 0, originY: 0, offZ: 0,
+    // t2415 (BACKLOG #23) — STRUCTURAL: the whole hole pattern, on or off. drill's ONE child atom (holecycle) stamps
+    // every hole in the pattern (array{drill} in the old shape) — "disable the third hole" has no stable referent
+    // (checked, per the ruling's own "verify representability per op" instruction), but "disable the pattern" does,
+    // since there is exactly one switchable child. Default true = today's byte-identical shape, guard kept/unwrapped.
+    holesEnabled: true,
 };
 
 /**
@@ -130,35 +137,35 @@ export const DRILL_BINDING_SPECS = [
     // PARAMS BELOW are the two the drill switch merges into one `holecycle` block, which is why they are matched by type.
     // pattern: picks between 5 structurally different point-generation/register-usage formulas (holecycle.js's
     // patternLines) AND fixes the baked hole COUNT (array.js's patternPoints) — the pocket-shape class, categorical.
-    { param: 'pattern', tokenRefusal: 'Picks between structurally different hole-pattern formulas and fixes how many holes get built — the program\'s SHAPE depends on this, not a value inside one.', match: { type: 'holecycle' }, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
-    { param: 'x0', tokenRefusal: 'This position is baked directly into every hole\'s move coordinate before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
-    { param: 'y0', tokenRefusal: 'This position is baked directly into every hole\'s move coordinate before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
+    { param: 'pattern', tokenRefusal: 'Picks between structurally different hole-pattern formulas and fixes how many holes get built — the program\'s SHAPE depends on this, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
+    { param: 'x0', tokenRefusal: 'This position is baked directly into every hole\'s move coordinate before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
+    { param: 'y0', tokenRefusal: 'This position is baked directly into every hole\'s move coordinate before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
     // t722 P2a — per-PATTERN field visibility (map the real fields): grid → cols/rows/dx/dy · circle → dia/startAngle/count ·
     // line → spacing/angle/count · rect → w/h/nx/ny (`count` is shared by circle + line). + labels (were cryptic param names).
     // cols/rows/count/nx/ny: each is a real hole-COUNT / loop-bound baked into the WHILE loop's trip count — never
     // deferrable (a controller can't retroactively resize an already-generated program).
-    { param: 'cols', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
-    { param: 'rows', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, key: 'rows', type: 'number', default: DRILL_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
-    { param: 'dx', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'dx', type: 'number', default: DRILL_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
-    { param: 'dy', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'dy', type: 'number', default: DRILL_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
-    { param: 'count', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time, and — for the bolt circle — the step angle between holes) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, key: 'count', type: 'number', default: DRILL_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
-    { param: 'spacing', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'spacing', type: 'number', default: DRILL_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
+    { param: 'cols', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
+    { param: 'rows', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'rows', type: 'number', default: DRILL_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
+    { param: 'dx', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'dx', type: 'number', default: DRILL_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
+    { param: 'dy', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'dy', type: 'number', default: DRILL_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
+    { param: 'count', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time, and — for the bolt circle — the step angle between holes) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'count', type: 'number', default: DRILL_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
+    { param: 'spacing', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'spacing', type: 'number', default: DRILL_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
     // angle/startAngle: a real Math.cos/Math.sin call bakes the direction vector — the controller has no trig, so
     // this can never move downstream (the same "DDCS macro language has no cosine" class as lathe polygon.js).
-    { param: 'angle', tokenRefusal: 'A trig calculation (the controller has no cosine/sine) bakes the line direction from this angle before the program is built — it can\'t be resolved at that point.', match: { type: 'holecycle' }, key: 'angle', type: 'number', default: DRILL_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
-    { param: 'dia', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Bolt-circle diameter — holes sit evenly on this circle.", match: { type: 'holecycle' }, key: 'dia', type: 'number', units: 'mm', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
-    { param: 'startAngle', tokenRefusal: 'A trig calculation (the controller has no cosine/sine) bakes the bolt-circle\'s starting position from this angle before the program is built — it can\'t be resolved at that point.', match: { type: 'holecycle' }, key: 'startAngle', type: 'number', default: DRILL_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
-    { param: 'w', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'w', type: 'number', units: 'mm', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
-    { param: 'h', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, key: 'h', type: 'number', units: 'mm', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
-    { param: 'nx', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time, and a per-hole branch threshold) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, key: 'nx', type: 'number', default: DRILL_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
-    { param: 'ny', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, key: 'ny', type: 'number', default: DRILL_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
+    { param: 'angle', tokenRefusal: 'A trig calculation (the controller has no cosine/sine) bakes the line direction from this angle before the program is built — it can\'t be resolved at that point.', match: { type: 'holecycle' }, optional: true, key: 'angle', type: 'number', default: DRILL_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
+    { param: 'dia', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, help: "Bolt-circle diameter — holes sit evenly on this circle.", match: { type: 'holecycle' }, optional: true, key: 'dia', type: 'number', units: 'mm', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
+    { param: 'startAngle', tokenRefusal: 'A trig calculation (the controller has no cosine/sine) bakes the bolt-circle\'s starting position from this angle before the program is built — it can\'t be resolved at that point.', match: { type: 'holecycle' }, optional: true, key: 'startAngle', type: 'number', default: DRILL_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
+    { param: 'w', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'w', type: 'number', units: 'mm', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
+    { param: 'h', tokenRefusal: 'This pitch is baked directly into a coordinate coefficient before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'holecycle' }, optional: true, key: 'h', type: 'number', units: 'mm', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'nx', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time, and a per-hole branch threshold) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'nx', type: 'number', default: DRILL_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
+    { param: 'ny', tokenRefusal: 'Sets how many holes get built into the program (a loop bound baked at build time) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'ny', type: 'number', default: DRILL_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
     // skip: parsed into a set at build time; its SIZE decides how many skip-guard lines (and whether the skip label
     // itself) exist — a count/branch decision on a string, no numeric "resolved value" a token could even represent.
-    { param: 'skip', tokenRefusal: 'Decides how many skip-guard lines (and whether the skip label) get built into the program — a build-time count decision, not a value inside one.', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", match: { type: 'holecycle' }, key: 'skip', type: 'string', default: DRILL_DEFAULTS.skip },
+    { param: 'skip', tokenRefusal: 'Decides how many skip-guard lines (and whether the skip label) get built into the program — a build-time count decision, not a value inside one.', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", match: { type: 'holecycle' }, optional: true, key: 'skip', type: 'string', default: DRILL_DEFAULTS.skip },
     // cut params (the peck `drill` leaf) — depth/peck ride holecycle.js's declared live-token seam (liveWord()), and
     // feed rides the shared val() pass-through — all genuinely eligible, not just "no branch found".
-    { param: 'depth', tokenEligible: true, match: { type: 'holecycle' }, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
-    { param: 'peck', tokenEligible: true, help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", match: { type: 'holecycle' }, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
+    { param: 'depth', tokenEligible: true, match: { type: 'holecycle' }, optional: true, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
+    { param: 'peck', tokenEligible: true, help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", match: { type: 'holecycle' }, optional: true, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
     // t2293 (BACKLOG arc, closing the wiring gap t2291's own gate found) — holeDia: the shell exposes it
     // unconditionally (drillView.js's own HOLE Ø field, shown for BOTH peck and bore) and it is NOT
     // method-entangled the way toolDia/pitch/ramp are (peck mode genuinely uses it — it's the drill bit size —
@@ -171,8 +178,8 @@ export const DRILL_BINDING_SPECS = [
     // 12)` fallback) rather than the shell's DIFFERENT hardcoded default (6) — binding must not also silently
     // change what a default-valued op emits; that pre-existing 6-vs-12 divergence between the shell and the
     // wizard-stack builder is real but predates this turn and is out of scope to fix here.
-    { param: 'holeDia', tokenRefusal: 'Feeds the build-time tool-fit refusal (a hole narrower than its tool refuses, on every cycle) — a categorical decision about whether the program builds at all, not a value inside one.', match: { type: 'holecycle' }, key: 'holeDia', type: 'number', units: 'mm', label: 'Hole Ø', help: "Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)." },
-    { param: 'feed', tokenEligible: true, match: { type: 'holecycle' }, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
+    { param: 'holeDia', tokenRefusal: 'Feeds the build-time tool-fit refusal (a hole narrower than its tool refuses, on every cycle) — a categorical decision about whether the program builds at all, not a value inside one.', match: { type: 'holecycle' }, optional: true, key: 'holeDia', type: 'number', units: 'mm', label: 'Hole Ø', help: "Hole diameter. Peck: this is your drill size. Bore: target hole size (must be ≥ tool Ø)." },
+    { param: 'feed', tokenEligible: true, match: { type: 'holecycle' }, optional: true, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
     // t2293 — clearance: the shell exposes it unconditionally (DEPTH & FEED's own CLEARANCE Z), not
     // method-entangled — but it is a genuine FAN-OUT (drillWizard.js's own drillStack sets it on BOTH the
     // framing progstart, via programFraming.js's makeStart, AND the holecycle leaf itself — confirmed by
@@ -183,8 +190,22 @@ export const DRILL_BINDING_SPECS = [
     // (pocketData.js:426-452's own comment: "one source, no fan-out bindings"), not a new mechanism invented
     // for this turn. `DRILL_DEFAULTS.clearance` (5) already matches both the shell's own default and
     // drillStack's own `num(params.clearance, 5)` fallback — no discrepancy to preserve here.
-    { param: 'clearance', tokenEligible: true, match: { type: 'holecycle' }, key: 'clearance', type: 'number', units: 'mm', default: DRILL_DEFAULTS.clearance, label: 'Clearance Z' },
+    { param: 'clearance', tokenEligible: true, match: { type: 'holecycle' }, optional: true, key: 'clearance', type: 'number', units: 'mm', default: DRILL_DEFAULTS.clearance, label: 'Clearance Z' },
     { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
+];
+
+/** t2415 (BACKLOG #23) — THE STRUCTURAL toggle binding: no `blockIndex`/`match` (it drives the guard prune, not a
+ *  value socket) — the same shape corner's own CORNER_STRUCT_BINDINGS (cornerData.js) already ships, applied to
+ *  the ONE thing drill's own template can representably switch: the whole pattern. Ridden BOTH as a form field
+ *  (so it round-trips through the ordinary form/canvas the same as any other param) AND, live, by the app's
+ *  "disable this block" sync (blocksApp.js) — right-click Disable Block on the holecycle atom (inside its own
+ *  `guard`) writes this param false, so the reimport-regenerated op prunes the pattern away instead of silently
+ *  re-enabling it (BACKLOG #23's own reported hazard). */
+export const DRILL_STRUCT_BINDINGS = [
+    // t2415 — section:'GEOMETRY', the CANONICAL binding-section vocabulary (twin-section-invariant-2381.spec.js's
+    // own registry-wide survey) — NOT 'PATTERN' (the form's own uiChildren section TITLE, a separate concept;
+    // corner's own structural bindings, e.g. probeZFirst, use 'GEOMETRY' the same way).
+    { param: 'holesEnabled', type: 'bool', default: DRILL_DEFAULTS.holesEnabled, label: 'Pattern Enabled', help: 'Turns the whole hole pattern on or off. Off removes every drilling/boring move from the program — the placement and framing stay, nothing gets cut. Mirrors disabling the pattern block on the canvas; the two stay in sync.', section: 'GEOMETRY' },
 ];
 
 /** The WRAPPED template — factored out of `drillDataDef` (t1385) so the binding derivation below and the def itself read
@@ -218,8 +239,26 @@ export const DRILL_BINDING_SPECS = [
 //       group's own field order therefore reads spacing→angle without its own adjacent count field, unlike the
 //       shell's `d_lcount,d_spacing,d_angle` grouping — a cosmetic reordering the reproduction test's own field-
 //       set/order/label comparison (drill-form-reproduction-*.spec.js) treats as one param, not two DOM ids.
+// t2415 (BACKLOG #23) — wrap the ONE switchable child (the holecycle atom, drill's whole pattern) in a `guard`
+// keyed to `holesEnabled`, the SAME idiom every wizards/stacks/*.js GUARD helper already uses (e.g.
+// cornerWizard.js's own `const GUARD = (when, kids) => {...}`). Scoped to placeonstock's own children — entry/
+// toolsel are appended AFTER this stack returns and stay OUTSIDE the guard, always present regardless of the
+// toggle (they are placement/tool markers, not part of the pattern). Kept when `is:true` (today's default,
+// byte-identical — pruneGuards unwraps a kept guard in place, so the flat shape matches the un-guarded stack
+// exactly); dropped when false, so instantiate()/opFromMarker correctly omit the whole pattern.
+function guardHolePattern(stack) {
+    for (const b of stack) {
+        if (b && b.type === 'placeonstock' && Array.isArray(b.children)) {
+            const g = newBlock('guard'); g.params = { when: { param: 'holesEnabled', is: true } }; g.children = b.children;
+            b.children = [g];
+        }
+    }
+    return stack;
+}
+
 function drillDataStack(p = DRILL_DEFAULTS) {
     const geometryGroup = { type: 'grid_container', params: { columns: 2 }, children: [
+        { type: 'field_ref', params: { param: 'holesEnabled' } },
         { type: 'field_ref', params: { param: 'pattern' } },
         { type: 'field_ref', params: { param: 'skip' } },
         { type: 'field_ref', params: { param: 'originX' } },
@@ -310,13 +349,19 @@ function drillDataStack(p = DRILL_DEFAULTS) {
                 RIGHT: [{ type: 'sim', params: { rotary: false, machine: false, magazine: false } }],
             },
         }],
-        children: appendToolSel(appendEntry(drillStack(p))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
+        children: appendToolSel(appendEntry(guardHolePattern(drillStack(p)))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing); t2415 — guardHolePattern wraps the pattern atom, entry/toolsel stay outside it
     }];
 }
 
 // The old `WRAP_PREFIX_COUNT = 4` offset is GONE, not moved: deriving over the already-wrapped stack finds the four
 // presentation blocks by scanning, so the hand-count that used to encode them has nothing left to encode.
-export const DRILL_BINDINGS = deriveBindingsFor(drillDataStack(DRILL_DEFAULTS), DRILL_BINDING_SPECS);
+// t2415 (BACKLOG #23) — derive the FROZEN, form-rendering `DRILL_BINDINGS` over a PRUNED canonical stack (the
+// guard around holecycle already collapsed at its default, `holesEnabled:true`), mirroring cornerData.js's own
+// `canonicalPrunedStack()` — NOT the raw un-pruned template, whose extra guard-node flat-slot would throw
+// every match:{type:'holecycle'} row's own derived blockIndex off by one. Byte-identical to before this turn:
+// a kept guard unwraps in place, so the pruned stack's own flat shape matches the pre-guard baseline exactly.
+function canonicalDrillStack() { const c = JSON.parse(JSON.stringify(drillDataStack(DRILL_DEFAULTS))); pruneGuards(c, DRILL_DEFAULTS); return c; }
+export const DRILL_BINDINGS = deriveBindingsFor(canonicalDrillStack(), DRILL_BINDING_SPECS);
 
 // t867 — FEEDS & SPEEDS: the material picker + advisory "Suggest feed" button (the feedsuggest composite widget). A
 // bindingless binding (no socket) next to Feed — drives NO G-code, so unset = byte-identical; a picked material round-
@@ -390,12 +435,20 @@ export function drillPatternGeometry(p, boreDia) {
 /** Build the drill-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
  *  is drillStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function drillDataDef() {
-    const stack = drillDataStack(DRILL_DEFAULTS);   // t1385 — ONE stack builder, shared with the binding derivation above
+    const stack = drillDataStack(DRILL_DEFAULTS);   // t1385 — ONE stack builder, shared with the binding derivation above; the TEMPLATE (unpruned superset — the guard around holecycle stays present, for instantiate()'s own per-build prune)
+    const canon = canonicalDrillStack();   // t2415 — the PRUNED canonical stack, for the FROZEN form-rendering derivations only (toolBindingsFor/entryBindingsFor would otherwise see the guard's own extra flat-slot)
     // t867 — the feeds-helper sits right after Feed (it fills that field).
-    const baseBindings = [...toolBindingsFor(stack), ...DRILL_BINDINGS, ...entryBindingsFor(stack)];
+    const baseBindings = [...toolBindingsFor(canon), ...DRILL_BINDINGS, ...entryBindingsFor(canon), ...DRILL_STRUCT_BINDINGS];
     const fdAt = baseBindings.findIndex((b) => b.param === 'feed');
     const bindings = fdAt < 0 ? [...baseBindings, MATERIAL_BINDING] : [...baseBindings.slice(0, fdAt + 1), MATERIAL_BINDING, ...baseBindings.slice(fdAt + 1)];
     const def = userOpFromStack('drill_data', 'Drill (data)', stack, bindings, 'form3d+2d', null, 'mill_datawiz');
+    // t2415 (BACKLOG #23) — re-derive the VALUE-socket bindings BY IDENTITY over the PRUNED stack every build
+    // (mirrors cornerData.js's own `def.bindingSpecs = CORNER_BINDING_SPECS`): once `holesEnabled` can drop
+    // holecycle, every sibling's flat index (tool/entry included, appended after it) shifts in the disabled
+    // state — a frozen blockIndex would silently write the wrong block's socket. The STRUCTURAL binding
+    // (holesEnabled itself) is NOT in this list — it has no blockIndex/match; withGuardDefaults reads it
+    // straight off def.bindings (already merged in above), the same as every other structural toggle.
+    def.bindingSpecs = [...TOOL_BINDING_SPECS, ...DRILL_BINDING_SPECS, ...ENTRY_BINDING_SPECS];
     def.previewGeometry = (p) => drillPatternGeometry(p, false);   // t716 — hole pattern + pos + pattern handles (diameter DISPLAY)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', depthOnly: true };   // t1026 — the depth-only ruler (peck drill has no stepdown): axis + total-depth grip, no pass ticks

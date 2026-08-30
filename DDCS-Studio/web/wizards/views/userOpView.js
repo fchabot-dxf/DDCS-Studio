@@ -443,7 +443,10 @@ export function createUserOpView(ns, opts) {
                 // the pane) without this shared file knowing anything about a Blockly workspace.
                 if (onFieldWrite) {
                     const f = e.target && e.target.closest && e.target.closest('[data-param]');
-                    if (f) onFieldWrite(f.dataset.param, f.value);
+                    // t2415 (BACKLOG #23) — a checkbox's own `.value` is a static 'on' regardless of checked
+                    // state (the DOM's own WYSIWYG default, not a live read) — `.checked` is the real state.
+                    // Every OTHER input kind (number/text/select) keeps reading `.value`, unchanged.
+                    if (f) onFieldWrite(f.dataset.param, f.type === 'checkbox' ? f.checked : f.value);
                 }
                 const ae = (typeof document !== 'undefined') ? document.activeElement : null;
                 const gesture = e && e.type === 'input' && ae && host.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT');

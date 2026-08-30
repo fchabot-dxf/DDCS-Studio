@@ -33,6 +33,8 @@ import { getBlockly } from './bridge.js';
 import { builderOf } from '../opBuilders.js';
 import { toast } from '../../ui/gateway/util.js';
 import { sfx } from '../../ui/sound.js';
+import { getUserDef, childrenOf } from '../userOps.js';
+import { findGuardWhenForBlockType } from '../whenGuard.js';   // t2415 (BACKLOG #23) — the SAME lookup blocksApp.js's own sync-on-disable listener uses: does a declared guard wrap this block type?
 
 // t2277's own helper (stackBridge.js) is module-private; this is the same one-line lookup, not a second
 // definition drifting from it — Blockly's MANUALLY_DISABLED constant, with the same string fallback.
@@ -62,6 +64,15 @@ export function installDisableGuard(ws) {
         if (!opBlk) return;   // not nested inside any op (a loose atom — a different, already-shipped concern)
         let meta = {}; try { meta = JSON.parse(opBlk.data || '{}'); } catch (_) { /* keep {} */ }
         if (!meta.opType || !builderOf(meta.opType)) return;   // a hand-built/non-generator op — disabling a child there round-trips as literal content, not this hazard
+        // t2415 (BACKLOG #23) — THE ESCAPE HATCH this guard's own header promised ("ask for a declared toggle
+        // on this field"): a child the op's own DEF wraps in a `guard` (drillData.js's own DRILL_STRUCT_
+        // BINDINGS, e.g.) now HAS somewhere for the disabled state to go — blocksApp.js's own sibling listener
+        // (the SAME `element:'disabled'` event) syncs it into that structural param, which DOES survive
+        // export/reimport (opFromMarker re-derives the guard's own prune from it). The premise this whole
+        // refusal exists for — "this state was never going to persist" — is exactly false for THAT child, so
+        // it is the one case left alone. Everything else (no declared guard) is refused exactly as before.
+        const def = getUserDef(meta.opType);
+        if (def && findGuardWhenForBlockType(def.template, blk.type, childrenOf)) return;
         try { blk.setDisabledReason(false, manuallyDisabledReason()); } catch (_) { /* older Blockly — nothing to revert */ }
         toast('A block disabled inside this op won’t survive export/reimport — the op rebuilds its own children from its parameters every time. Disable the whole op instead, or ask for a declared toggle on this field.', true);
         sfx('error');

@@ -4265,7 +4265,7 @@ captured stdout shrank dramatically, and confirm a killed run leaves a stale-mar
 
 ---
 
-### 55. [✅ SHIPPED t2413 — root was NOT the drag, NOT release-timing: writeAuthoredValue silently no-ops for every placed op on EVERY input method, confirmed by direct call before touching any code] THE DRAG COMMITS, THEN REVERTS — the release restores the value the op had on entering the Blocks tab
+### 55. [✅ SHIPPED t2413 + ⭐ OWNER-CONFIRMED ON THE DEPLOYED SITE 2026-08-29: "yes value stays" — root was NOT the drag, NOT release-timing: writeAuthoredValue silently no-oped for every placed op on EVERY input method, confirmed by direct call before touching any code] THE DRAG COMMITS, THEN REVERTS — the release restores the value the op had on entering the Blocks tab
 
 *(owner, 2026-08-29, testing t2409's fix on V2026.08.29.12: "the rect now correctly drags but on release it
 changes back to the value it was when entering blocks tab.")*

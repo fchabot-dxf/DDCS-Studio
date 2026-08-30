@@ -83,16 +83,19 @@ test('THE KEY — feed exposes under a place fold ONLY because the child declare
     await boot(page);
     const r = await page.evaluate(async () => {
         const { classifyExposable, blockedIndices } = await import('/data/exposeClassifier.js');
-        const { drillDataDef } = await import('/blocks/dataOps/drillData.js');
+        const { drillDataDef, DRILL_DEFAULTS } = await import('/blocks/dataOps/drillData.js');
         const { BLOCKS } = await import('/wizards/ops/index.js');
         const def = drillDataDef();
-        const withDecl = classifyExposable(def).feed;
+        // t2415 (BACKLOG #23) — drill is now a bindingSpecs def (the guarded holesEnabled toggle needs
+        // per-build re-derivation); classifyExposable must be given the ARM it's classifying, the same "asked
+        // in the abstract — must stay fail-closed" rule cam-arm-classify-1410.spec.js's own noParams case pins.
+        const withDecl = classifyExposable(def, DRILL_DEFAULTS).feed;
         // TAKE THE DECLARATION AWAY and re-ask. Nothing else changes — same template, same roles, same structure.
         const saved = BLOCKS.holecycle.absorbsPlacement;
         BLOCKS.holecycle.absorbsPlacement = false;
-        const without = classifyExposable(drillDataDef()).feed;
+        const without = classifyExposable(drillDataDef(), DRILL_DEFAULTS).feed;
         BLOCKS.holecycle.absorbsPlacement = saved;
-        const restored = classifyExposable(drillDataDef()).feed;
+        const restored = classifyExposable(drillDataDef(), DRILL_DEFAULTS).feed;
         // …and a body the emitter would NOT treat as self-framing (TWO children under the place) must stay blocked, because
         // `absorbingChild` is strict about that and the classifier reads the emitter's own predicate rather than its own.
         const mixed = [{ type: 'placeonstock', params: {}, children: [{ type: 'holecycle', params: {} }, { type: 'drill', params: {} }] }];

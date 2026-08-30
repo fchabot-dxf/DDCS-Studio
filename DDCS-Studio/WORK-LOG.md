@@ -63873,3 +63873,105 @@ OPEN AFTER A PREVIEW…" is now the sole/dominant full-suite failure FOUR turns 
 t2413), each turn independently re-confirming it's not that turn's own regression. Filing it stops a fifth
 turn from repeating the same triage.
 
+## t2415 — BACKLOG #23 SHIPPED: an author-declared switchable child persists its disabled state
+
+Drill's own pattern (per the entry's own example) is the pilot. The design question the dispatch asked me to
+settle with the code in hand — granularity, one param per switchable child vs. a single declared set — resolved
+to "one boolean structural binding per child," the exact shape corner's own `probeZFirst` already ships (no
+`blockIndex`/`match`, drives the guard prune). Reusing the established pattern rather than inventing an
+encoding meant the READ side (`pruneGuards`, `withGuardDefaults`, `resolveArm`) needed zero changes — only the
+WRITE side (persisting a native Blockly disable gesture into that param) was actually missing.
+
+**The template change**, `drillData.js`: `holecycle` (the ONE atom that stamps drill's whole pattern — an
+`array{drill}` in the pre-t1385 shape) is now wrapped in a `guard`, keyed to a new `holesEnabled` structural
+binding, default `true`. Verified byte-identical to the legacy `drillStack` at the default (a kept guard
+unwraps transparently, splicing its child back exactly where it was) via a direct node-level `instantiate()`
+vs `drillStack()` comparison before touching anything Playwright-side — cheap, fast, and it caught the FIRST
+real bug immediately: `deriveBindings` throws on a 0-match spec unless marked `optional`, and every one of
+drill's 22 `match:{type:'holecycle'}` rows needed it (the disabled state legitimately prunes the atom away
+entirely). Also converted drill from a frozen, one-time `def.bindings` derivation to `def.bindingSpecs` (the
+same per-build re-derivation corner already uses) — mirrored, not invented: `cornerData.js`'s own
+`canonicalPrunedStack()`/`CORNER_BINDINGS`/`bindingSpecs` split is the template this exactly follows, including
+extracting `entryBindingsFor`'s own previously-inline specs into an exported `ENTRY_BINDING_SPECS` (deriveBindings.js)
+so drill's `bindingSpecs` could include tool/entry alongside its own — a guard that can drop `holecycle` shifts
+every SIBLING's flat index too (tool/entry included, appended after it), which a frozen blockIndex would
+silently misread.
+
+**Finding the ACTUAL persistence gap took two live traces, not one.** First hypothesis: on the LIVE, PLACED
+canvas, the disabled block's own Blockly parent would BE the guard — wrong, and confirmed wrong live before
+building anything on top of it: `pruneGuards` already unwraps a KEPT guard at instantiate time (splicing its
+children in place), so by the time an op is sitting on the canvas in its normal, default-enabled state, the
+guard has ALREADY been collapsed away — there is no guard block on a live, placed canvas to walk up to. The
+correct lookup has to go through the op's own REGISTRY DEF (`def.template`, where the guard still exists,
+matched by the disabled block's own TYPE) — `findGuardWhenForBlockType`, written once in `whenGuard.js` and
+shared by both `blocksApp.js` (the new sync listener) and `disableGuard.js` (t2307's own refusal, which now
+needs to know the same fact) so the two mechanisms can never independently disagree about which children are
+declared switchable.
+
+**`disableGuard.js` (t2307) had to change too, and this was expected, not a surprise.** It refuses disabling
+ANY child inside a parametric op, unconditionally, because — per its own header — "this state was never going
+to persist." That premise is now false for exactly one class of child: a declared-switchable one. Added a
+single early-return gated on the same shared `findGuardWhenForBlockType` lookup; every undeclared child is
+still refused exactly as t2307 shipped it (its own 3-test suite, unmodified, stayed green throughout).
+
+**The sync itself needed the HEAVY rebuild path (`mergeOpBlocks`/`replaceOp`), not the light `.data`-only patch
+t2413 (BACKLOG #55) shipped** — traced, not assumed, after a first test run showed the disabled block still
+sitting on the canvas (enabled-looking) with the param correctly false, an inconsistent state. A structural
+toggle changes the op's own SHAPE (a whole child appears or vanishes), which a value-socket-only patch can't
+express; the SAME rebuild the pre-existing `sc_*` structural-control branch already uses closes it correctly —
+confirmed live, disabling `holecycle` now removes it from the canvas immediately, matching exactly what a
+fresh reimport with `holesEnabled:false` would build, never leaving the canvas and the stored param disagreeing
+even mid-session.
+
+**A second, genuinely independent gap, found by testing the form checkbox I'd added rather than assuming it
+worked because the mechanism above did.** `holesEnabled` needed a real form field (matching `probeZFirst`'s own
+precedent — a declared toggle should be visible, not hidden machinery) — and toggling it silently did nothing.
+Root: `userOpView.js`'s own delegated listener always read a field's `.value` when calling `onFieldWrite` —
+correct for every existing field kind, but a checkbox's own `.value` is a static `'on'` regardless of checked
+state (the DOM's own WYSIWYG default) — and separately, `onFieldWrite` itself (t2413's own code) only ever
+accepted `Number(rawValue)`, silently bailing on anything else (t2413's own scope was a numeric drag handle;
+a boolean never came through that path before). Fixed both: the delegated listener now reads `.checked`
+specifically for a checkbox (every other input kind unchanged), and `onFieldWrite` accepts a boolean, applying
+the SAME structural-vs-value routing split described above. Left broken, this would have been precisely the
+hazard the owner's own ruling names as the worst option — a control that visibly claims to persist and
+silently doesn't; worth naming plainly rather than treating as a minor followup, since finding it depended on
+testing the checkbox at all rather than trusting the disable-gesture mechanism to cover it by extension.
+
+**Verification, every claim live:** the entry's own acceptance bar — disable, export, REIMPORT, still
+disabled — proven via `opFromMarker('user_drill_data', exportedParams)` regenerating the op still pruned, not
+merely "the param survived in memory"; re-enabling via the form checkbox restores both the param and the
+canvas block; an undeclared child (`wcs`) is still refused, unchanged; the full `drill-*`/`lathe-part-drill`
+families (53 specs), `disable-guard-2307.spec.js` (unmodified), and t2409's/t2411's/t2413's own permanent specs
+across the shared files this turn touched (`blocksApp.js`, `userOpView.js`, `whenGuard.js`) all stayed green.
+Committed as `tests/drill-holes-enabled-persist-2415.spec.js` (5 tests).
+
+**Scope held deliberately**: BACKLOG #41 (freeze) was not built, per the dispatch's own explicit prohibition —
+but its own needs stayed in view throughout, since #41's own entry already calls `frozen` "a declared property
+of the BINDING," the identical shape this turn used for `holesEnabled` (just a different binding-level flag,
+not structural). The granularity decision (one boolean per switchable child, not a single declared set)
+generalises to it without any rework.
+
+**A mid-turn amendment tail item (mobile wizard buttons, ~8-10% bigger) was deferred**, per the amendment's own
+stated fallback ("only if #23 lands with room; if not, hand back and say so"). #23 alone surfaced two
+independent architectural gaps needing correct tracing rather than a rushed fix (the transparent-guard lookup,
+the checkbox write-back), and the tail's own ask (measure real device floors, check the header's priority-
+collapse ladder at several widths) deserves the same care in a turn of its own, not a hurried pass tacked onto
+an already-large one.
+
+**Rule 1b earned its keep a third time this arc.** The first full-suite run found 3 reds, all downstream
+consequences of converting drill to a `bindingSpecs` def (a genuinely wider blast radius than "add one
+binding" — every EXISTING caller of `classifyExposable(drillDataDef())` without a `params` argument now hits
+the classifier's own documented "asked in the abstract — fail closed" rule, which previously never applied to
+drill at all): `expose-absorbed-fold-1389.spec.js` and `live-depth-knob-1389.spec.js` both called it bare —
+fixed by passing `DRILL_DEFAULTS`, matching the SAME fix already made to `drill-switch-shots-1385.spec.js`
+during the main build. A THIRD, non-test call site — `opCamMap.js`'s own `camTableFromBindings` (dormant,
+"NOTHING calls this yet" per its own header, but exercised directly by these same two spec files) — got the
+more general fix: pass `defaultParams(def)` (an existing export, the canonical arm every def's own bindings
+already agree on) rather than a spec-specific default, so ANY future `bindingSpecs` def materialized through
+this path classifies correctly, not just drill. The THIRD failure, `twin-section-invariant-2381.spec.js`'s own
+registry-wide survey, caught a real authoring slip: `holesEnabled`'s own binding declared `section:'PATTERN'`
+— the form's own uiChildren SECTION TITLE, not a canonical BINDING-level section name
+(`GEOMETRY`/`TOOL & CUT`/etc.) — fixed to `'GEOMETRY'`, matching corner's own `probeZFirst`. All three are now
+verified via a targeted 67-spec re-sweep (drill family, disable-guard, both expose/knob specs, the section
+survey, cam-arm-classify) before re-running the full suite.
+
