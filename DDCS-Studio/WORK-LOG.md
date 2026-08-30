@@ -64538,3 +64538,84 @@ Files: `web/blocks/userOps.js`, `web/wizards/views/userOpView.js`, `web/blocks/b
 
 No `proc_health.py` leaks this turn — Playwright's own dev server and workers exit cleanly with the test run.
 
+## t2427 — BACKLOG #50 SHIPPED: rapid input-only writes weren't the whole hole — a SINGLE typed edit was equally undo-blind
+
+Followed my own t2391 suggestion, recorded verbatim in the BACKLOG entry: instrumented `saveStates.js` directly
+against the rapid-input repro instead of drag-testing. It overturned the entry's own inherited framing.
+
+**Not "rapid" specific.** Subscribed directly to `saveStates.js`'s exported `onChange()` and fired the exact
+repro live: a SINGLE typed edit into a placed op's Wizard-View-pane field created ZERO new undo entries — not
+just an 8-write burst. t2391's own "a single typed edit undoes PERFECTLY" control was a testing artifact: Undo
+happened to land on an earlier checkpoint that coincidentally already held the expected value, not evidence the
+edit itself was recorded. Confirmed by direct instrumentation before trusting the inherited claim, per this
+project's own standing discipline against treating plan text (or an inherited prior finding) as evidence.
+
+**ROOT, traced not guessed:** a placed op's VALUE-binding field write (`onFieldWrite`'s light `.data`-patch
+branch, `blocksApp.js` — t2413's own precedent, since a placed op has no live Blockly field for
+`setFieldValue`) mutates `.data` directly and calls `reproject()` explicitly. A direct `.data` mutation fires
+NO Blockly event at all (confirmed by that branch's own comment) — so `ws.addChangeListener`'s gesture-boundary
+listener (the ONE thing that ever calls `snapshotGesture`) never sees it. `reproject()`'s own
+`setStack(...,'blockly')` call is ALSO excluded from `programModel`'s own recording path in `saveStates.js`
+(its origin filter deliberately skips 'blockly', on the assumption every 'blockly'-origin change already
+reached a real Blockly event on the listener above — true for a canvas-native edit, false for this one). Net:
+this write path never created an undo checkpoint, one write or many — a genuine dead end in the recording
+graph, not a debounce-timing bug.
+
+**THE FIX** — explicitly NOT a lower `GESTURE_QUIET_MS` and NOT recording every event (the dispatch's own
+constraint: undo spam is its own defect, the debounce exists for a reason). Extracted the existing
+gesture-boundary listener's own open/reset logic into a small shared `noteGestureEvent(grp, isReal)`, then gave
+`onFieldWrite`'s placed-op light-patch branch its own call site, `noteUngroupedEdit()`, feeding the SAME
+`__ungrouped__` bucket a bare `block.setFieldValue()` call (no Blockly Gesture open) already uses — so a burst
+of rapid `.data` patches gets the identical debounce-batched recording everything else already gets, not a
+second special-cased path.
+
+**Verified live, each scenario checked before and after**: a single typed edit → exactly 1 undo entry (was 0);
+t2391's own 8-rapid-write repro → exactly 1 (was 0), undo correctly reverts the WHOLE burst in one step; a
+~27-write drag-rate burst (matching #46's own captured write count, no inter-event delay) → exactly 1, not
+dozens — confirming the fix, not undo spam. One test-timing wrinkle along the way: the drag-rate test initially
+read 0 even after a 1500ms wait — traced to surfacing's own heavy 2D/3D preview render (RECOMPUTE_MS-throttled,
+5 separate cycles for this burst per `window.__ddcsEditPerf()`) legitimately hogging the single JS thread long
+enough to delay the 200ms debounce timer's own firing past that wait window — not a fix defect, a real
+main-thread contention window between two pieces of the SAME app sharing one thread. Widened the test's own
+wait rather than touching the debounce itself.
+
+**Regression-checked**: the authored-canvas's real Blockly field edit (`writeAuthoredValue` → a genuine
+`setFieldValue`) is untouched — records the SAME count before and after this fix (a pre-existing, unrelated
+quirk: 3 entries for one input+change pair on this twin/param, confirmed identical on the reverted baseline —
+out of this turn's own scope, since #50 is specifically the placed-op path recording ZERO, not this path's own
+count).
+
+**⭐ #46's commit-on-release is now safely buildable** — the specific blocker cited when #46 deferred its second
+half ("the drag's one-write-one-undo contract would be silently unkeepable... while this gap exists") is
+closed: a rapid burst now coalesces to exactly one undo state regardless of write cadence, proven by the
+drag-rate test above. #46's own separate "mid-drag value churn" concern (many intermediate `.data` states
+landing during a drag — a different, still-open design question about WHEN a value should commit, not whether
+an eventual commit gets recorded) is untouched by this fix and stays open on its own terms.
+
+**One incidental, pre-existing red found and NOT chased**: the full suite's own `undo-reproject-echo.spec.js`
+"a real block-value edit is undoable" test failed. A/B'd directly — fails IDENTICALLY with `blocksApp.js`
+reverted to its pre-t2427 baseline, so unrelated to this turn. Grepped WORK-LOG: this exact test is already a
+long-documented, previously-filed flake (multiple prior turns, tracked as "#57" per t2419's own entry) —
+not re-investigated here, per this project's own scope discipline.
+
+**Full suite (Rule 1b — `blocksApp.js` is shared)**: 2974 passed / 3 failed / 14 flaky / 26 skipped. Of the 3
+reds: 2 are from this turn's own new test file (`undo-blind-writes-2427.spec.js`'s drag-rate and
+authored-canvas-regression tests) and re-ran clean in isolation each time checked — contention against a
+heavier neighboring test in the same run, not a defect (this session ran the file standalone repeatedly during
+development and it was consistently reliable alone). The third is the pre-existing, already-filed
+`undo-reproject-echo` flake above. Named individually rather than argued away in aggregate.
+
+**Non-vacuous, checked directly**: all 3 fix-dependent tests in `tests/undo-blind-writes-2427.spec.js` (single
+typed edit, 8-rapid-write, drag-rate burst) fail 3/3 against `blocksApp.js` reverted to its pre-fix baseline
+(all reporting 0 recorded entries) — confirmed via `git checkout HEAD --` + a scratch-copy restore of my own
+edit afterward (not the reverse — the edit was itself uncommitted this turn, so HEAD was the correct pre-change
+baseline to check against, and my own copy the correct thing to restore from).
+
+A throwaway investigation script (`tests/_scratch-t2427-investigate.spec.js`), used to instrument
+`saveStates.js`/`programModel.js`'s own origin events live before writing the permanent test or the fix, was
+deleted before this commit — its findings are folded into this entry and the permanent test file instead.
+
+Files: `web/blocks/blocksApp.js`, `tests/undo-blind-writes-2427.spec.js` (new), `BACKLOG.md`.
+
+No `proc_health.py` leaks this turn.
+

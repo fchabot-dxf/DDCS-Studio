@@ -3947,7 +3947,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 50. RAPID INPUT-ONLY WRITES ARE INVISIBLE TO UNDO
+### 50. [✅ SHIPPED t2427 — the "RAPID" framing was itself an artifact; a SINGLE typed edit was equally undo-blind, confirmed by instrumenting saveStates.js directly] RAPID INPUT-ONLY WRITES ARE INVISIBLE TO UNDO
 
 *(found t2391 while chasing #46, isolated with a clean control: a TYPED edit undoes fine; 8 rapid input-only
 writes to a field leave undo blind — 6 undo presses, zero effect. Worker-found, repro in hand, no code
@@ -3966,6 +3966,41 @@ rapid-input repro — smaller and faster than drag testing.
 
 **STILL REAL IF:** fire 8 rapid `input` events with value changes at any form field, press undo — if the
 values survive undo, still real.
+
+### ✅ SHIPPED t2427 — instrumented saveStates.js directly (this entry's own suggestion), followed it, and it overturned the entry's own "RAPID" framing
+
+⭐ **Not a rapid-specific hole.** Subscribing directly to `saveStates.js`'s own exported `onChange()` and firing
+the exact repro live showed **ZERO new undo entries for a SINGLE typed edit too** — not just a burst. The
+"typed edit undoes fine" control in this entry's own original finding was a testing artifact: Undo happened to
+land on an EARLIER checkpoint that coincidentally already held the expected value, not evidence the edit itself
+was ever recorded. Confirmed by direct instrumentation, not re-derived from the inherited framing.
+
+**ROOT:** a placed op's VALUE-binding field write (`onFieldWrite`'s light `.data`-patch branch, blocksApp.js —
+t2413's own precedent, since a placed op has no live Blockly field to `setFieldValue` on) mutates `.data`
+directly and calls `reproject()` explicitly. A direct `.data` mutation fires NO Blockly event at all, so
+`ws.addChangeListener`'s gesture-boundary listener (the ONE thing that calls `snapshotGesture`) never sees it —
+and `reproject()`'s own `setStack(...,'blockly')` call is ALSO excluded from `programModel`'s own recording
+path (saveStates.js's origin filter deliberately skips 'blockly', on the assumption every 'blockly'-origin
+change already reached a real Blockly event on the listener above — true for a canvas-native edit, false here).
+Net: this write path never created an undo checkpoint, one write or many.
+
+**THE FIX** — NOT a lower `GESTURE_QUIET_MS`, NOT recording every event (undo spam is its own defect, per this
+entry's own instruction): the placed-op light-patch branch now feeds the SAME `__ungrouped__` gesture bucket a
+bare `block.setFieldValue()` call (no Blockly Gesture open) already uses, via a small shared
+`noteGestureEvent(grp, isReal)` helper both paths now call — so a burst of rapid `.data` patches gets the
+identical debounce-batched recording everything else gets. Verified live: a single edit → exactly 1 undo entry
+(was 0); 8 rapid writes → exactly 1 (was 0); a ~27-write drag-rate burst (matching #46's own captured count) →
+exactly 1, not dozens. Regression-checked: the authored-canvas's real Blockly field edit (`writeAuthoredValue`)
+is untouched, same entry count before and after.
+
+⭐ **#46's commit-on-release is now safely buildable** — the specific blocker cited when #46 deferred it ("the
+drag's one-write-one-undo contract would be silently unkeepable") is closed: a rapid burst now coalesces to
+exactly one undo state regardless of write cadence. #46's own remaining "mid-drag value churn" concern (many
+intermediate `.data` states landing during a drag, not an undo-recording problem) is a separate, still-open
+design question this fix doesn't resolve on its own.
+
+Tests: `tests/undo-blind-writes-2427.spec.js` — 4 tests, all 3 fix-dependent ones confirmed failing (0 entries)
+against the pre-fix code before the fix was trusted.
 
 *(owner-reported live 2026-08-28: **"in wiz preview moving the feature gui move the block value but not the
 gui"** — the Blocks tab's Wizard View pane. Ruled the same day: **"complete the loop."**)*

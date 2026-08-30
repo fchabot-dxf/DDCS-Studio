@@ -591,6 +591,7 @@ async function buildWorkspace() {
           meta.params = { ...(meta.params || {}), [param]: value };
           blk.data = JSON.stringify(meta);
           reproject();
+          noteUngroupedEdit();   // t2427 (BACKLOG #50) — this write fires no Blockly event; see noteUngroupedEdit's own comment
           return;
         }
       }
@@ -1408,6 +1409,13 @@ async function buildWorkspace() {
     if (wait > 0) setTimeout(() => snapshotGesture('block edit'), wait);
     else snapshotGesture('block edit');
   }
+  function noteGestureEvent(grp, isReal) {
+    if (grp !== _gestureGroup) closeGesture();   // a genuinely NEW group (or a new ungrouped event) started → the previous one, if any, is over
+    _gestureGroup = grp;
+    if (isReal) _gestureHasRealEvent = true;
+    if (_gestureTimer) clearTimeout(_gestureTimer);
+    _gestureTimer = setTimeout(closeGesture, GESTURE_QUIET_MS);
+  }
   ws.addChangeListener((e) => {
     if (muteChanges) return;             // our own model→canvas echoes (renderFromModel) are never a human gesture
     // t2287 (found live, undo-reproject-echo.spec.js) — the "strict superset" claim above assumed every real
@@ -1419,13 +1427,24 @@ async function buildWorkspace() {
     // silently dropped it: a real edit that never became an undo state. Folding it under a stable sentinel group
     // gives it the same debounce-batched, deferred-past-place() recording as everything else, rather than a
     // special second path.
-    const grp = e.group || '__ungrouped__';
-    if (grp !== _gestureGroup) closeGesture();   // a genuinely NEW group (or a new ungrouped event) started → the previous one, if any, is over
-    _gestureGroup = grp;
-    if (!e.isUiEvent) _gestureHasRealEvent = true;
-    if (_gestureTimer) clearTimeout(_gestureTimer);
-    _gestureTimer = setTimeout(closeGesture, GESTURE_QUIET_MS);
+    noteGestureEvent(e.group || '__ungrouped__', !e.isUiEvent);
   });
+  // t2427 (BACKLOG #50) — a SECOND, more general hole of the SAME shape, found by instrumenting saveStates.js
+  // directly against the rapid-input repro (not "rapid" specific, confirmed live — see WORK-LOG): onFieldWrite's
+  // placed-op light `.data`-patch branch below (t2413's own precedent — a placed op's VALUE binding has no
+  // Blockly field to `setFieldValue` on, so it mutates `.data` directly and calls `reproject()` explicitly)
+  // NEVER fires a Blockly event at all — confirmed by blocksApp.js's own comment on that branch — so
+  // `ws.addChangeListener` above never sees it, and `reproject()`'s own `setStack(...,'blockly')` call is ALSO
+  // excluded from programModel's own recording path (saveStates.js's origin filter deliberately skips 'blockly',
+  // under the assumption every 'blockly'-origin change already reached a real Blockly event on the listener
+  // above — true for a canvas-native edit, false here). Net effect, proven live: a SINGLE typed edit into a
+  // placed op's Wizard-View-pane field creates ZERO undo entries, not just a rapid burst — the BACKLOG's own
+  // "rapid" framing was an artifact of testing against a richer pre-existing history where Undo happened to
+  // land on an earlier state that coincidentally held the same value, not evidence a single write is recorded.
+  // Routes through the SAME `__ungrouped__` bucket a bare `setFieldValue()` call already uses (this write
+  // ALSO has no Blockly Gesture open) — so a burst of rapid `.data` patches coalesces into the SAME one
+  // debounced undo entry a burst of rapid canvas events would, not a special second recording path.
+  function noteUngroupedEdit() { noteGestureEvent('__ungrouped__', true); }
 
   // ---- workspace events: structural change → re-emit + record edits ----
   ws.addChangeListener((e) => {
