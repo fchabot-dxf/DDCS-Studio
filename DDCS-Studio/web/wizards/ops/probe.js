@@ -8,6 +8,11 @@ import { num, val } from './util.js';
 
 export const probeBlock = {
     type: 'probe', label: 'Probe', kind: 'leaf', category: 'Move',
+    // t2431 (BACKLOG #49) — ⚠ FLAGGED: `level` was not confirmed against a real probe macro or the dialect's
+    // own probeMove implementation within this turn's budget — its likely meaning (a trigger-level/polarity
+    // setting for the probe input) is a guess from the field name and default, not an observed behaviour.
+    help: "Probes one axis: travels toward `to` and stops the instant the probe input trips, or refuses if it never does. Use it inside a probe cycle — the rapid-to-position and clearance moves around it are ordinary Move blocks.",
+    labels: { to: 'probe toward', port: 'probe input port' },
     defaults: { axis: 'Z', to: -10, feed: 100, port: 3, level: 0 },
     fields: ['axis', 'to', 'feed', 'port', 'level'],
     // to/feed/port accept literals OR #var/[expr] refs (probe macros probe to #8 at feed #3, port #5).

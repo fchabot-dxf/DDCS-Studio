@@ -7,12 +7,16 @@ import { num } from './util.js';
 
 export const labelBlock = {
     type: 'label', label: 'Label', kind: 'leaf', category: 'Control',
+    help: "Marks a jump target by number — a Goto or an If Goto block elsewhere in the program can jump here. Use it to mark the top of a loop or the point a probe failure skips back to.",
+    labels: { n: 'Label number' },
     defaults: { n: 1 }, fields: ['n'],
     emit: (p, dx, dy, dialect) => dialect.label(Math.max(0, Math.round(num(p.n, 1)))),
 };
 
 export const gotoBlock = {
     type: 'goto', label: 'Goto', kind: 'leaf', category: 'Control',
+    help: "Jumps straight to a label elsewhere in the program, no condition. Use it to loop back to a label, or to skip past a block of code entirely.",
+    labels: { n: 'Jump to label' },
     defaults: { n: 1 }, fields: ['n'],
     emit: (p, dx, dy, dialect) => dialect.goto(Math.max(0, Math.round(num(p.n, 1)))),
 };
@@ -21,6 +25,8 @@ export const gotoBlock = {
  *  (#1920 != 2) and the operator-cancel check (#1505 == 0); the dialect renders the controller's grammar. */
 export const ifGotoBlock = {
     type: 'ifgoto', label: 'If Goto', kind: 'leaf', category: 'Control',
+    help: "Jumps to a label only when the comparison is true — e.g. #1920 != 2 goto 3 skips ahead unless the probe found its target. Use it to branch on a probe result, an operator cancel, or any variable's value; if the comparison is false, the program just continues to the next line.",
+    labels: { lhs: 'if', op: '', rhs: '', goto: 'goto' },
     defaults: { lhs: '#1920', op: '!=', rhs: '2', goto: 1 }, fields: ['lhs', 'op', 'rhs', 'goto'],
     // t1581 — THE OTHER conditional, and it takes the OTHER precedent. This emits a REAL controller `IF … GOTO`,
     // so the branch survives into the G-code and the machine is the thing that reads it — the coordinate case.

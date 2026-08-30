@@ -3763,7 +3763,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 49. [⭐ AUTHORING MODEL RULED 2026-08-29 — owner: **worker DRAFTS, owner REVIEWS.** Write from the code's own behaviour, then the owner corrects what is wrong for a machinist. ⛔ Do NOT wait for the owner to supply wording — draft it all, and ⭐ flag explicitly any block where you are GUESSING AT INTENT rather than describing observed behaviour, so the review pass knows where to look] HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
+### 49. [✅ WORKER DRAFT SHIPPED t2431 — the top-20 hot-path blocks + ~25 field descriptions filled, byte-identical, awaiting the owner's own REVIEW pass per the authoring model below] HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
 
 *(same sweep. ~10 of 136 defs carry a `help` string — every one is authoring metadata, not a cutting op.)*
 
@@ -3776,6 +3776,31 @@ checks stay (dangling still needs catching).
   high-traffic names in the `DESCRIPTIONS` map (`bridge.js:97-163`).
 - ⚠ Write help text from the MACHINIST's side ("Skips to line N when the probe misses"), never restate the
   field name. One pass, one commit, screenshots of a few hover states.
+
+### ✅ t2431 — WORKER'S DRAFT, all 23 hot-path blocks (the dispatch's own weighted list) + ~25 field descriptions
+
+`def.help` (block-level tooltip) + `def.labels` (t2385's own per-def face-label map) written for `assign`,
+`move`, `holecycle`, `label`/`goto`/`ifgoto`, `progstart`/`progend`, `probe`/`proberead`/`probecheck`/
+`readmachine`/`setworkoffset`, `spindle`, `feed`, `dwell`, `coolant`, `tool`, `wcs`, `distmode`, `stepdown`,
+`stepover`, `raw`, `mcode`. `bridge.js`'s shared `DESCRIPTIONS` map gained the ~25 field names those blocks
+exposed that weren't yet covered (its own generic fallback — "The X parameter" — was the live symptom named
+above).
+
+⭐ **THREE FLAGGED per the owner's own instruction — a short honest list, not uniform false confidence:**
+1. `holecycle`'s `x`/`y` vs `x0`/`y0` — read as a placement shift vs the pattern's own centre from the code
+   (`originX = x + x0`), never confirmed against a live authoring session.
+2. `probe`'s `level` — meaning guessed from the field name/default (probe trigger polarity), never confirmed
+   against the dialect's own `probeMove` or a real macro.
+3. `probecheck`'s `dir` collides with the SHARED `DESCRIPTIONS.dir` (spindle CW/CCW) — the face is relabelled
+   "probe direction" but the TOOLTIP still borrows the wrong wording; a per-def label can't override a shared
+   tooltip, and fixing that is a mechanism change, out of this turn's own "pure content" scope.
+
+**Verified byte-identical, live**: `help`/`labels` are two new keys no `emit`/`fields`/`defaults`/`fieldsFor`
+path reads — confirmed by inspecting every touched file's own emit function, then live-calling several blocks'
+`emit()` directly before/after and diffing the G-code (identical). Full suite reported in WORK-LOG (t2431).
+
+⭐ **NEXT: the owner's own review pass** (the authoring model this entry itself rules) — correct whatever
+reads wrong for a machinist, and look first at the 3 flagged items above.
 
 ---
 

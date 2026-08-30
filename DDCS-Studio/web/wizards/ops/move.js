@@ -9,6 +9,7 @@ import { val } from './util.js';
 
 export const moveBlock = {
     type: 'move', label: 'Move', kind: 'leaf', category: 'Move',
+    help: "One motion to a position: rapid (G0) travels fast with no cutting, cut (G1) feeds through material at the given rate, probe (G31) travels until the probe touches and stops there. Leave an axis blank to leave it where it is.",
     defaults: { mode: 'cut', x: 0, y: 0, z: 0, feed: 2000 },
     fields: ['mode', 'x', 'y', 'z', 'feed'],
     // t1317 — ABSENCE IS NOT ZERO, declared where the fact lives. An axis word this move does not carry is a

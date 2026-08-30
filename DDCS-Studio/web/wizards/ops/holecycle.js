@@ -593,6 +593,18 @@ export function holeCycleAbsorbsRotation(p = {}) {
 
 export const holeCycleBlock = {
     type: 'holecycle', label: 'Holes (parametric)', kind: 'leaf', category: 'Toolpaths',
+    help: "Drills or bores a whole pattern of holes in one block — pick the layout (single, grid, line, bolt circle, or a rectangle's perimeter) and the cycle (peck drill, or bore by stepping down / by a helix). Depth and the peck/pitch increment can be adjusted from the pendant on a running program without editing the code.",
+    // t2431 (BACKLOG #49) — face labels for what would otherwise be raw JS keys. ⚠ FLAGGED, uncertain rather
+    // than guessed: `x0`/`y0` read as the pattern's own centre/origin (holePatternPoints feeds them straight to
+    // patternPoints' cx/cy) and `x`/`y` as a further shift added on top (`originX = x + x0`, holecycle.js:441) —
+    // most likely a placement/datum offset written by PlaceOnStock rather than something a machinist hand-types,
+    // but that split was not confirmed against a live authoring session, so the two label pairs below are a
+    // best-reading guess, not an observed fact — worth the owner's own look before trusting them.
+    labels: {
+        z0: 'Start Z', x0: 'Pattern origin X', y0: 'Pattern origin Y', x: 'Placement shift X', y: 'Placement shift Y',
+        holeDia: 'Hole Ø', toolDia: 'Tool Ø', clearance: 'Clearance Z', dx: 'Column spacing', dy: 'Row spacing',
+        nx: 'Columns (rect)', ny: 'Rows (rect)', dia: 'Bolt circle Ø', startAngle: 'Start angle', skip: 'Skip holes (e.g. 2,5)',
+    },
     defaults: {
         pattern: 'single', cycle: 'peck',
         x: 0, y: 0, z0: 0, x0: 0, y0: 0,

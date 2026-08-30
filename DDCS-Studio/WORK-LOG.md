@@ -64730,3 +64730,45 @@ match would quietly stop doing. 10/10 pass in the file.
 
 Files: `tests/blocks-context-flyout-2411.spec.js`.
 
+## t2431 — BACKLOG #49: help text + human labels for the top-20 blocks, content-only, verified byte-identical
+
+Pure content, per the dispatch's own framing — no new mechanism. `def.help` (the block-level tooltip,
+bridge.js:369) and `def.labels` (t2385's own per-def face-label map) already existed; this turn fills them,
+plus the ~25 uncovered field names in bridge.js's own shared, field-name-keyed `DESCRIPTIONS` map (the
+per-field tooltip fallback).
+
+**Every block named in the dispatch, all 23 of them (the hot path, weighted by t2379's own usage census)**:
+`assign`, `move`, `holecycle`, `label`/`goto`/`ifgoto`, `progstart`/`progend`, `probe`/`proberead`/
+`probecheck`/`readmachine`/`setworkoffset`, `spindle`, `feed`, `dwell`, `coolant`, `tool`, `wcs`, `distmode`,
+`stepdown`, `stepover`, `raw`, `mcode` — each got a `help` string written from the machinist's own side (what
+it does, when you'd reach for it) and, where the field names were genuinely raw JS keys on the block face
+(`spinUp`, `confirmEvery`, `z0`, `retractZ`, the whole `lhs`/`op`/`rhs`/`goto` row on If Goto), a `def.labels`
+map to relabel just that def's own face text — never the storage key.
+
+**THREE FLAGGED, not guessed at** (the dispatch's own explicit ask — a short honest list beats uniform
+false confidence):
+1. **`holecycle`'s `x`/`y` vs `x0`/`y0`** — read from the code as a placement shift added on top of the
+   pattern's own centre (`originX = x + x0`, holecycle.js:441), most likely written by PlaceOnStock rather than
+   hand-typed, but that split was never confirmed against a live authoring session. Labelled "Placement shift
+   X/Y" and "Pattern origin X/Y" as a best reading, not an observed fact.
+2. **`probe`'s `level`** — its meaning (a guess: probe input trigger polarity) comes from the field name and
+   default alone; never confirmed against the dialect's own `probeMove` implementation or a real probe macro.
+3. **`probecheck`'s `dir`** — collides with the SHARED `DESCRIPTIONS.dir` entry (spindle CW/CCW), which a
+   per-def label can't override for the tooltip (only the face text) — `dir` here is actually the PROBE
+   TRAVEL SIGN (confirmed from t1520's own comment in the same file), unrelated to spindle direction. Face
+   relabelled to "probe direction"; the tooltip itself still borrows the wrong wording, a real, structural gap
+   in the shared-map design rather than something this turn's own content could fix without a mechanism change
+   (out of scope, per the dispatch's own "pure content" framing).
+
+**VERIFIED BYTE-IDENTICAL, live, before trusting it**: every touched def gained ONLY two new, previously-unread
+keys (`help`, `labels`) — neither is referenced by any `emit`/`fields`/`defaults`/`selects`/`fieldsFor` path,
+confirmed by direct inspection of every touched file's own `emit` function (none reads `this.help` or
+`this.labels`). Live-checked directly: `assign`/`move`/`label`/`goto`/`ifgoto`'s own `emit()` calls, invoked
+directly with the same params before and after, produced byte-identical G-code lines; each touched block's own
+`fields`/`defaults` arrays read back unchanged. Full suite (Rule 1b — `bridge.js` and 18 op-def files are
+shared): **2978 passed / 0 failed / 17 flaky (all recovered) / 26 skipped, 26m48s.** Clean — content-only,
+proven so.
+
+Files: `web/blocks/blockly/bridge.js`, `web/wizards/ops/{assign,coolant,distmode,dwell,feed,flow,holecycle,
+macro,measure,move,probe,program,setworkoffset,spindle,stepdown,stepover,tool,wcs}.js`, `BACKLOG.md`.
+

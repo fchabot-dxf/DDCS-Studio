@@ -39,12 +39,15 @@ export const endProgramBlock = {
 
 export const mcodeBlock = {
     type: 'mcode', label: 'M-Code', kind: 'leaf', category: 'Signals',
+    help: "Sends a custom M-code the controller doesn't have its own block for — a dust collector, a probe wait, an accessory output. Check your controller's own M-code list before picking a number.",
+    labels: { code: 'M-code number' },
     defaults: { code: 154, note: '' }, fields: ['code', 'note'],   // raw custom M-code (accessory output / sensor wait / pause)
     emit: (p) => [line([M(Math.max(0, Math.round(num(p.code, 0))))], (p.note && String(p.note).replace(/[()]/g, '').trim()) || 'M-code')],
 };
 
 export const rawBlock = {
     type: 'raw', label: 'Raw G-code', kind: 'leaf', category: 'Signals',
+    help: "Drops the exact text you type straight into the program, unchanged — the escape hatch for anything none of the other blocks cover, a controller-specific line, or code pasted from elsewhere.",
     defaults: { text: '' }, fields: ['text'],   // verbatim escape hatch (e.g. a controller-specific G4 P / dwell)
     emit: (p) => [String(p.text ?? '')],
 };

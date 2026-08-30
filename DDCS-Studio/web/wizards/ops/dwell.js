@@ -4,6 +4,7 @@ import { num } from './util.js';
 
 export const dwellBlock = {
     type: 'dwell', label: 'Dwell', kind: 'leaf', category: 'Spindle & Feed',
+    help: "Pauses in place for the given number of seconds — everything else on hold. Use it to let the spindle spin up to speed, or to let coolant clear chips before the next move.",
     defaults: { sec: 1 },
     fields: ['sec'],
     emit: (p, dx, dy, dialect) => dialect.dwell(num(p.sec, 0)),

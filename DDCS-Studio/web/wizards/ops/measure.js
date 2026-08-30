@@ -8,6 +8,7 @@ import { num } from './util.js';
 
 export const probeReadBlock = {
     type: 'proberead', label: 'Probe Read', kind: 'leaf', category: 'Probing',
+    help: "Reads the machine's own position on the given axis at the moment of the last probe's contact into a variable — the raw touch point, before any offset math. Use it right after a Probe block to capture where it actually stopped.",
     defaults: { axis: 'Z', var: '#50' }, fields: ['axis', 'var'],
     scratch: [[50, 50]],   // t1085 — the default probe-result var this block INJECTS (data/universalScratch.js aggregates)
     emit: (p, dx, dy, dialect) => dialect.probeRead(p.axis || 'Z', p.var || '#50'),
@@ -34,6 +35,11 @@ export const probeCheckBlock = {
     //      mirrored `<=` + `+eps` for '-'). `#scratch` = the pre-probe DRO captured by probestart; `seek`/`dir`/`eps` come from
     //      probeSurface. NOTE: a real touch inside the LAST `eps` of travel reads as a miss — inherent to DRO-compare (eps default 0.05mm).
     //  (3) NEITHER (grbl/rs274/centroid) → an HONEST comment, never a guessed register.
+    help: "Checks whether the last Probe actually made contact — if it missed (travelled the full commanded distance without tripping), jumps to the given label instead of continuing blind. Put one after every Probe so a broken stylus or a missed part stops the program rather than cutting air.",
+    // t2431 — `dir` here is the PROBE TRAVEL SIGN, not a spindle direction (the shared DESCRIPTIONS tooltip for
+    // "dir" means spindle CW/CCW elsewhere in the registry and can't be overridden per-def) — relabelled on the
+    // face so it doesn't read as the wrong thing even though its tooltip still borrows the spindle wording.
+    labels: { dir: 'probe direction', seek: 'expected travel distance' },
     defaults: { axis: 'Z', goto: 1, dir: '+', seek: '', eps: 0.05 }, fields: ['axis', 'goto', 'dir', 'seek', 'eps'],
     // t1520 — `dir` is the PROBE TRAVEL SIGN (which way the DRO comparison faces), not a spindle direction. Declared so
     // the canvas keeps a '-'; it used to fall back to the shared cw/ccw list and invert the miss test on the way through.
@@ -55,6 +61,7 @@ export const probeCheckBlock = {
 
 export const readMachineBlock = {
     type: 'readmachine', label: 'Read Machine', kind: 'leaf', category: 'Probing',
+    help: "Reads the machine's own current position on the given axis into a variable — wherever the tool is right now, not a probe result. Use it to capture a reference position before a move you'll need to return to.",
     defaults: { axis: 'Z', var: '#57' }, fields: ['axis', 'var'],
     scratch: [[57, 57]],   // t1085 — the default machine-read var this block INJECTS
     // `mark` (optional, t897) — a DECLARED sim marker appended as a trailing comment (safeZframe saveMachineZNode uses

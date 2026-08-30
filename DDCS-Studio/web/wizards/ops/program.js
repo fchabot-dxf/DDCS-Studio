@@ -12,6 +12,8 @@ import { headerBlock, footerBlock } from '../cuttingBlocks.js';
 
 export const progStartBlock = {
     type: 'progstart', label: 'Program Start', kind: 'leaf', category: 'Program',
+    help: "The program's own header — switches to absolute positioning, starts the spindle at the given RPM/direction (with an optional spin-up pause), then rapids up to clearance height. Every program should start with exactly one of these.",
+    labels: { dir: 'direction', spinUp: 'spin-up dwell', skim: 'relative program (skim)' },
     defaults: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5, skim: false },
     fields: ['rpm', 'dir', 'spinUp', 'clearance', 'skim'],
     // t982 — `skim`: a relative (G91) op has no absolute WCS-Z, so the opening clearance can't be an absolute `G0 Z<clr>`;
@@ -26,6 +28,8 @@ const truthy = (v) => v !== false && v !== 'false' && v !== 0 && v !== '0';
 
 export const progEndBlock = {
     type: 'progend', label: 'Program End', kind: 'leaf', category: 'Program',
+    help: "The program's own footer — stops the spindle and coolant, retracts (optionally to a park position), then ends the program. Every program should end with exactly one of these.",
+    labels: { retractZ: 'retract to Z', parkX: 'park X', parkY: 'park Y', end: 'end code' },
     defaults: { spindleOff: true, coolantOff: true, retract: true, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' },
     fields: ['spindleOff', 'coolantOff', 'retract', 'retractZ', 'park', 'parkX', 'parkY', 'end'],
     allFields: ['spindleOff', 'coolantOff', 'retract', 'retractZ', 'park', 'parkX', 'parkY', 'end'],

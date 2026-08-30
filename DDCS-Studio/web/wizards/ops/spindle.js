@@ -8,6 +8,8 @@ import { num, val } from './util.js';
 
 export const spindleBlock = {
     type: 'spindle', label: 'Spindle', kind: 'leaf', category: 'Spindle & Feed',
+    help: "Turns the spindle on at the given RPM and direction, or off if RPM is 0. G-code is modal, so it stays running at that speed until the next Spindle block changes it.",
+    labels: { dir: 'direction' },
     defaults: { rpm: 12000, dir: 'cw' },
     fields: ['rpm', 'dir'],          // dir = cw (M3) / ccw (M4); rpm 0 → M5 (off)
     emit: (p) => {

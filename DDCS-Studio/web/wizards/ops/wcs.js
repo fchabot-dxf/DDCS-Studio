@@ -1,6 +1,7 @@
 /** wizards/ops/wcs.js — WCS-SELECT (Machine): choose the work coordinate system (G54…G59). */
 export const wcsBlock = {
     type: 'wcs', label: 'WCS', kind: 'leaf', category: 'Coordinates',
+    help: "Switches to the given work coordinate system (G54...G59) so every move below reads its X/Y/Z from that offset. Use it when a program cuts more than one part-zero — a second vise, a fixture with several stations.",
     defaults: { wcs: 'G54' },
     fields: ['wcs'],          // select: G54…G59
     emit: (p, dx, dy, dialect) => {

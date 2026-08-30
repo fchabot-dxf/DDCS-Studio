@@ -10,6 +10,8 @@
 // after every Nth pass EXCEPT the last). 0 → NO injection → byte-identical.
 export const stepdownBlock = {
     type: 'stepdown', label: 'Step Down', kind: 'depth', mouth: 'DO', category: 'Transforms',
+    help: "Repeats everything inside it once per depth level, from the surface down to the total depth — the same body cuts a little deeper each pass. Wrap a Wall or a pocket op in it for a multi-pass roughing cut instead of plunging straight to depth.",
+    labels: { to: 'total depth', by: 'depth per pass', confirmEvery: 'pause every N passes (0 = never)' },
     defaults: { to: 5, by: 1, confirmEvery: 0 },
     fields: ['to', 'by', 'confirmEvery'],
 };

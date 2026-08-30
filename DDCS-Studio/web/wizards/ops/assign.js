@@ -10,6 +10,7 @@
  */
 export const assignBlock = {
     type: 'assign', label: 'Set #', kind: 'leaf', category: 'Variables',
+    help: "Writes a value into a macro variable — #100 = 5. Use it to store a probe result, a running total, or anything you'll read back later in the program.",
     defaults: { var: '#100', value: '0', note: '' },
     fields: ['var', 'value', 'note'],
     scratch: [[100, 100]],   // t1085 — the default target this block WRITES

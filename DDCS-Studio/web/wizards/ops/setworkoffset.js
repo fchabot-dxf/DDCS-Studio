@@ -32,6 +32,8 @@ export const WCS_SELECTORS_REG = ['#578', ...WCS_SELECTORS];
 
 export const setWorkOffsetBlock = {
     type: 'setworkoffset', label: 'Set WCS Offset', kind: 'leaf', category: 'Coordinates',
+    help: "Writes the value into a WCS's axis offset — the step that turns a probed touch point into a usable part-zero. Different from a WCS block, which only SELECTS G54..G59; this one sets what that WCS actually means.",
+    labels: { wcs: 'which WCS', value: 'offset value' },
     defaults: { wcs: '#578', axis: 'X', value: '#50' }, fields: ['wcs', 'axis', 'value'],
     selects: { wcs: WCS_SELECTORS_REG },   // t1520 — its own default `#578` is IN the vocabulary it offers
     scratch: [[50, 50]],   // t1085 — the default value var it READS (#578 is the firmware active-WCS reg)
