@@ -3996,7 +3996,45 @@ engine really does.
 
 ---
 
-### 51. [✅ CLOSED 2026-08-29 — OWNER RE-CHECKED ON DEVICE: "now it works well." t2411 investigated, traced and live-simulated it, changed NO code, and correctly returned it as an owner re-check rather than "fixing" something that was not broken — the right call, vindicated] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+### 51. [⛔ REOPENED 2026-08-29 — owner, unambiguous: "panning with 2 fingers doesn't work, it just zooms, it should do BOTH". ⚠ The earlier close was the ADVISOR'S ERROR: an ambiguous multiple-choice answer ("now it works well") was read as a fix confirmation and the entry was closed on it. It was never fixed — t2411 changed no code] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+
+> ## ⛔⛔ WRONG SURFACE — THE ADVISOR FILED THIS AGAINST THE WRONG CANVAS
+>
+> Owner, 2026-08-29, clarifying: **"in blocks" / "block canvas."** This is the **BLOCKS TAB'S BLOCKLY
+> WORKSPACE**, NOT the feature canvas. The advisor filed it against the feature canvas because #32's
+> pinch-zoom lived there and the report arrived in that conversation — the same
+> [[confirm-the-referent-before-dropping]] error made twice in one day.
+>
+> ⇒ ⭐ **It also explains t2411's "already works":** they traced and simulated the FEATURE canvas, where
+> t2371's pinch does work. They answered the question as filed. The Blockly workspace was never examined.
+>
+> ## THE SYMPTOM
+>
+> On the **Blocks canvas**, two fingers ZOOM but do not PAN. Both must happen from the one gesture — spread
+> changes scale, midpoint movement translates the view, simultaneously. ⛔ NOT modes, NOT a toggle.
+>
+> ## THE LIKELY ROOT IS CONFIGURATION, NOT CODE
+>
+> `blocksApp.js:240` injects the workspace with:
+>
+> ```js
+> zoom: { controls: false, wheel: true, startScale: 0.9 },  // no `pinch` key
+> trashcan: false, move: { smoothScroll: true },            // no `drag` key
+> ```
+>
+> ⚠ **Establish with Blockly's own docs/defaults for THIS vendored version** (do not assume — the build has
+> already surprised us twice: no submenu support, no exposed DropdownDiv): `zoom.pinch` governs pinch-to-zoom
+> and `move.drag` governs drag-to-pan, and a partially-specified `move`/`zoom` object may or may not inherit
+> the rest of the defaults. If two-finger pan is simply an unset flag, this is a one-line fix — check that
+> first, before writing any gesture handling.
+>
+> ⭐ Blockly may already implement simultaneous pinch-zoom + two-finger pan natively; if so the work is
+> enabling it, not building it.
+>
+> **VERIFY:** ⚠ needs a REAL touch device — the harness has no true multi-touch (t2371's pinch tests had to
+> synthesize PointerEvents), so harness agreement is WEAK evidence here. If it cannot be driven convincingly,
+> say so plainly and it becomes an owner check rather than a claimed pass. ⛔ One-finger block DRAGGING must
+> remain unaffected, and the canvas must still pan by one-finger drag on empty space if it does today.
 
 *(owner, 2026-08-29, while testing the t2371 pinch-zoom: "2finger pinch should act as pan.")*
 
