@@ -64772,3 +64772,64 @@ proven so.
 Files: `web/blocks/blockly/bridge.js`, `web/wizards/ops/{assign,coolant,distmode,dwell,feed,flow,holecycle,
 macro,measure,move,probe,program,setworkoffset,spindle,stepdown,stepover,tool,wcs}.js`, `BACKLOG.md`.
 
+## t2433 — BACKLOG #49's three flags closed out (2 answered by the advisor's own sources, 1 a real code fix)
+
+**(1) `probe`'s `level` — ANSWERED, not a guess any more.** The trigger polarity of the probe input: 0 for a
+normally-open probe (contact CLOSES the circuit — the common case), 1 for normally-closed. Confirmed
+three independent ways (the ddcs-expert skill's own variable table, the vendor's own config text's literal
+"0: Normally open / 1: Normally closed", and a live differential toggle recorded in the owner's own
+FINDINGS.md). Wrote the tooltip for the operator, with NO register number in it — verified directly
+(`not.toMatch(/#\d/)`) per the owner's own wording caution: a setting number and a macro variable share
+digits on this controller, and a wrong number sends someone to the wrong table. FLAGGED comment removed.
+
+**(2) `holecycle`'s `x`/`y`/`z0` vs `x0`/`y0` — ANSWERED by checking the WIZARD's own bindings, not just this
+file's own math (the dispatch's own explicit ask before labelling either).** `drillData.js` binds the WIZARD
+form's own "Origin X/Y" and "Z offset" controls to a SEPARATE `placeonstock` wrapper atom's `offX`/`offY`/
+`offZ` — `absorbsPlacement:true` (on `holeCycleBlock`) is what feeds the RESULT into holecycle's OWN `x`/`y`/
+`z0` automatically. A machinist never types into `x`/`y`/`z0` directly — they only exist on the BLOCKS canvas,
+computed, never a wizard field. `x0`/`y0` ARE wizard-visible, already labelled there "Pattern origin X/Y"
+(`drillData.js`'s own pre-existing bindings) — this file's own Blocks-canvas labels now match that wording.
+Relabelled `x`/`y`/`z0` to say plainly they're computed, not a second set of knobs, rather than presenting an
+internal trio as if it were a real choice.
+
+**(3) `probecheck`'s `dir` colliding with the shared spindle-direction tooltip — a REAL CODE FIX, not wording,
+confirmed the diagnosis was right.** `bridge.js`'s `getDesc` now accepts an optional `def` and checks a NEW
+`def.fieldHelp = {field: 'tooltip text'}` map FIRST, falling back to the shared `DESCRIPTIONS` map when the
+def says nothing — the same per-def-beats-shared shape `def.labels` already uses for face text, kept as its
+OWN map since `labels` holds short face words and this holds full tooltip sentences (a different kind of
+content). Storage keys untouched; the shared `DESCRIPTIONS.dir` entry untouched too (spindle still needs it) —
+verified directly that `spindleBlock` has NO `fieldHelp` override and still reads the shared tooltip.
+
+**Swept for OTHER collisions, as asked — found 2 more field/def pairs, same class:**
+- `dir` on `radiuscomp.js` (t1520's own comment already named this one: the compensation SIGN, not spindle
+  direction) — same `fieldHelp` treatment.
+- `cycle` on `holecycle.js` — the shared `DESCRIPTIONS.cycle` ("Canned Cycle Type: Drill, Dwell, Peck, Bore")
+  names two options (`Drill`/`Dwell`) this block doesn't even offer (it's peck/bore-step/bore-helix only) —
+  actively misleading, not just vague. Found by cross-referencing every def-level `selects:` declaration
+  against the shared `SELECTS`/`DESCRIPTIONS` keys for a name used with a materially different vocabulary;
+  `mode` (move vs. hmi) was also checked and left alone — its shared tooltip ("Mode of operation") is generic
+  enough to not be WRONG for either, a different, milder case than `dir`/`cycle`'s actively-misleading text.
+
+**Verified live, both ways.** Read the ACTUAL rendered tooltip through Blockly's own field API (not just the
+raw `fieldHelp` property) on a real canvas: `probecheck`'s and `radiuscomp`'s own `DIR` dropdown fields each
+show their own correct, def-specific text, confirming the fix reaches the real hover a machinist sees, not
+just the source object. (`level` itself renders as an `input_value` socket + a `math_number` shadow, not a
+Blockly `Field` — no per-field tooltip to read the same way; its `fieldHelp` value was already confirmed via
+the SAME `getDesc(f, def)` call `jsonDef` uses for every field kind, so the mechanism is proven either way.)
+Emit re-checked directly for `radiuscomp`/`probecheck`/`holecycle` — byte-identical.
+
+**TAIL (BACKLOG #41's collapsed-block visual polish) — NOT attempted.** No materially different approach from
+the `.toString()` override tried and reverted at t2425 (it made the collapsed text worse, not better) — per
+the dispatch's own explicit instruction, a second attempt without a genuinely new idea is worse than leaving
+it open. Left open, named here rather than silently skipped.
+
+**Full suite (Rule 1b — `bridge.js` is shared)**: 2976 passed / 2 failed / 17 flaky (recovered) / 26 skipped,
+29m6s. Both reds are pre-existing, already-documented contention flakes, unrelated to this turn's own files
+(neither touches `bridge.js`/`holecycle.js`/`measure.js`/`probe.js`/`radiuscomp.js`): `open-as-modal-1625.spec.js`
+("A REAL OPEN AFTER A PREVIEW...") is the exact test t2409's own WORK-LOG entry already named as a documented
+suite-contention flake; `undo-blind-writes-2427.spec.js`'s "DRAG-SHAPED burst" is my own t2427/t2429 test,
+already established as needing generous wait margins under heavy preview-render contention. Both re-ran clean
+in isolation (0 failed, 0 flaky, 1-2 runs each) before trusting this.
+
+Files: `web/blocks/blockly/bridge.js`, `web/wizards/ops/{holecycle,measure,probe,radiuscomp}.js`, `BACKLOG.md`.
+

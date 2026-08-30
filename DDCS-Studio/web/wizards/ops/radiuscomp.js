@@ -14,6 +14,11 @@
  */
 export const radiuscompBlock = {
     type: 'radiuscomp', label: 'Radius comp', kind: 'leaf', category: 'Probing',
+    // t2433 (BACKLOG #49) — same `dir` collision the dispatch's own sweep asked for (measure.js's probecheck had
+    // the identical one): this def's `dir` is the compensation SIGN, not a spindle direction, but shared the
+    // spindle's own "dir" tooltip until `fieldHelp` (bridge.js) could override it per-def.
+    labels: { dir: 'compensation sign' },
+    fieldHelp: { dir: "Which side of the probe trigger the true surface sits on: + if it's on the trigger's positive-axis side, - if on the negative side. Getting it backwards puts the surface on the wrong side by twice the stylus radius." },
     defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '', rawAxis: '' },
     // t1520 — `dir` here is the COMPENSATION SIGN, not a spindle direction: declare the vocabulary so the canvas can hold
     // a '-' (it used to coerce it to the shared cw/ccw list's first option, flipping the surface by 2× the stylus radius).

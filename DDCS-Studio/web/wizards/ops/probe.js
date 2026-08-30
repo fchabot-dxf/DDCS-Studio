@@ -8,11 +8,14 @@ import { num, val } from './util.js';
 
 export const probeBlock = {
     type: 'probe', label: 'Probe', kind: 'leaf', category: 'Move',
-    // t2431 (BACKLOG #49) — ⚠ FLAGGED: `level` was not confirmed against a real probe macro or the dialect's
-    // own probeMove implementation within this turn's budget — its likely meaning (a trigger-level/polarity
-    // setting for the probe input) is a guess from the field name and default, not an observed behaviour.
     help: "Probes one axis: travels toward `to` and stops the instant the probe input trips, or refuses if it never does. Use it inside a probe cycle — the rapid-to-position and clearance moves around it are ordinary Move blocks.",
-    labels: { to: 'probe toward', port: 'probe input port' },
+    // t2433 (BACKLOG #49) — `level` ANSWERED (was flagged t2431): the probe input's trigger polarity, confirmed
+    // three independent ways (the ddcs-expert skill's own variable table, the vendor's own config text, and a
+    // live differential toggle recorded in the owner's own FINDINGS.md). Deliberately no register number in the
+    // wording — a SETTING number and a MACRO variable with the same digits mean different things on this
+    // controller, so a number here risks sending someone to the wrong table.
+    labels: { to: 'probe toward', port: 'probe input port', level: 'trigger polarity' },
+    fieldHelp: { level: "Which electrical state counts as contact: 0 for a normally-open probe (the common case — contact CLOSES the circuit), 1 for normally-closed (contact OPENS it). Must match how the probe is actually wired, or it will either never trigger or read as already triggered before it touches anything." },
     defaults: { axis: 'Z', to: -10, feed: 100, port: 3, level: 0 },
     fields: ['axis', 'to', 'feed', 'port', 'level'],
     // to/feed/port accept literals OR #var/[expr] refs (probe macros probe to #8 at feed #3, port #5).

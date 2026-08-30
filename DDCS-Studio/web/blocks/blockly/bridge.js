@@ -226,7 +226,15 @@ const DESCRIPTIONS = {
     seek: "Expected probe travel distance",
     eps: "Tolerance for the probe miss-check"
 };
-const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
+// t2433 (BACKLOG #49) — `DESCRIPTIONS` is keyed by BARE FIELD NAME across the WHOLE registry (t1520's own comment
+// above names the exact collision this closes: `dir` is spindle CW/CCW on progstart/spindle but the probe/
+// radiuscomp travel SIGN elsewhere — one name, two real meanings, and the shared map could only ever say one of
+// them). `def.fieldHelp = {field: 'tooltip text'}` lets a def override the shared entry for its OWN field,
+// falling back to it when the def says nothing — the same per-def-beats-shared shape `def.labels` already uses
+// for face text, kept as its own map rather than folded into `labels` (that one holds short face words; this
+// one holds full tooltip sentences, a different kind of content). `def` is OPTIONAL so the two `makeOpDef`
+// call sites below (a different, def-less block family) stay byte-identical, unchanged.
+const getDesc = (f, def) => (def && def.fieldHelp && def.fieldHelp[f]) || DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
 const optionsFor = (def, field) => {
     // t1520 — THE ATOM'S OWN VOCABULARY WINS. `SELECTS` below is keyed by BARE FIELD NAME, so one field name means one
@@ -391,7 +399,7 @@ function jsonDef(def) {
         } else {
             message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${faceLabel} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
         }
-        const desc = getDesc(f);
+        const desc = getDesc(f, def);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
         else if (k === 'coordlist') args0.push({ type: 'field_coordlist', name: FN(f), value: String(def.defaults[f] ?? '{"points":[],"z":0}'), tooltip: desc });

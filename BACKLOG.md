@@ -3763,7 +3763,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 49. [✅ WORKER DRAFT SHIPPED t2431 — the top-20 hot-path blocks + ~25 field descriptions filled, byte-identical, awaiting the owner's own REVIEW pass per the authoring model below] HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
+### 49. [✅ SHIPPED t2431 + t2433 — top-20 blocks/~25 field descriptions drafted, all 3 flags closed (2 answered, 1 a real fieldHelp override fix), 2 more same-class collisions found + fixed by the sweep] HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
 
 *(same sweep. ~10 of 136 defs carry a `help` string — every one is authoring metadata, not a cutting op.)*
 
@@ -3799,8 +3799,31 @@ above).
 path reads — confirmed by inspecting every touched file's own emit function, then live-calling several blocks'
 `emit()` directly before/after and diffing the G-code (identical). Full suite reported in WORK-LOG (t2431).
 
+### ✅ t2433 — all three flags closed
+
+1. **`probe`'s `level`** ANSWERED — the probe input's trigger polarity (0 = normally-open, contact closes the
+   circuit, the common case; 1 = normally-closed), confirmed 3 independent ways (the ddcs-expert skill's own
+   variable table, the vendor's own config text, the owner's own FINDINGS.md differential-toggle record).
+   Tooltip written with NO register number, per the owner's own caution (settings and macro vars share digits
+   on this controller).
+2. **`holecycle`'s `x`/`y`/`z0` vs `x0`/`y0`** ANSWERED by checking the WIZARD's own bindings
+   (`drillData.js`): `x0`/`y0` are the wizard-visible "Pattern origin X/Y"; `x`/`y`/`z0` are NEVER a wizard
+   field — computed from a separate `originX`/`originY`/`offZ` binding via `absorbsPlacement`, canvas-only.
+   Relabelled to say so plainly.
+3. **`probecheck`'s `dir` colliding with the shared spindle tooltip** — a real code fix: `bridge.js`'s
+   `getDesc` now checks a new per-def `def.fieldHelp` map before the shared `DESCRIPTIONS` fallback (mirrors
+   `def.labels`'s own per-def-beats-shared shape, kept separate since one holds face words and the other full
+   sentences). Storage keys and the shared map itself untouched — `spindle`'s own `dir` still reads it.
+   **Swept for more of the same, found 2**: `radiuscomp`'s own `dir` (compensation sign, same fix) and
+   `holecycle`'s own `cycle` (its shared tooltip named two options — Drill/Dwell — the block doesn't offer).
+
+Verified live both ways: the ACTUAL rendered tooltip read back through Blockly's own field API on a real
+canvas (not just the source object), plus emit re-checked byte-identical for every touched def. Full suite
+reported in WORK-LOG (t2433).
+
 ⭐ **NEXT: the owner's own review pass** (the authoring model this entry itself rules) — correct whatever
-reads wrong for a machinist, and look first at the 3 flagged items above.
+reads wrong for a machinist. BACKLOG #41's own collapsed-block visual polish (a separate, smaller open item —
+no materially different approach found this turn from the one already tried and reverted) is still open too.
 
 ---
 

@@ -594,17 +594,26 @@ export function holeCycleAbsorbsRotation(p = {}) {
 export const holeCycleBlock = {
     type: 'holecycle', label: 'Holes (parametric)', kind: 'leaf', category: 'Toolpaths',
     help: "Drills or bores a whole pattern of holes in one block — pick the layout (single, grid, line, bolt circle, or a rectangle's perimeter) and the cycle (peck drill, or bore by stepping down / by a helix). Depth and the peck/pitch increment can be adjusted from the pendant on a running program without editing the code.",
-    // t2431 (BACKLOG #49) — face labels for what would otherwise be raw JS keys. ⚠ FLAGGED, uncertain rather
-    // than guessed: `x0`/`y0` read as the pattern's own centre/origin (holePatternPoints feeds them straight to
-    // patternPoints' cx/cy) and `x`/`y` as a further shift added on top (`originX = x + x0`, holecycle.js:441) —
-    // most likely a placement/datum offset written by PlaceOnStock rather than something a machinist hand-types,
-    // but that split was not confirmed against a live authoring session, so the two label pairs below are a
-    // best-reading guess, not an observed fact — worth the owner's own look before trusting them.
+    // t2433 (BACKLOG #49) — `x`/`y`/`z0` vs `x0`/`y0` ANSWERED (was flagged t2431 as a guess): confirmed against
+    // the WIZARD's own bindings (drillData.js), not just this file's own math. `x0`/`y0` ARE what the wizard
+    // form shows the operator, already labelled there "Pattern origin X/Y" — this file's own labels now match
+    // that wording so the Blocks-canvas face agrees with the wizard form. `x`/`y`/`z0` are NEVER a wizard field
+    // at all: drillData.js binds the wizard's own "Origin X/Y"/"Z offset" controls to a SEPARATE `placeonstock`
+    // wrapper atom's own offX/offY/offZ, and `absorbsPlacement:true` (below) is what feeds the RESULT into this
+    // block's own x/y/z0 automatically — a machinist never types into them directly. Labelled to say so, rather
+    // than presenting an internal, computed trio as if it were a second set of knobs.
     labels: {
-        z0: 'Start Z', x0: 'Pattern origin X', y0: 'Pattern origin Y', x: 'Placement shift X', y: 'Placement shift Y',
+        z0: '(placement Z — set via the wizard, not typed here)',
+        x0: 'Pattern origin X', y0: 'Pattern origin Y',
+        x: '(placement X — set via the wizard, not typed here)', y: '(placement Y — set via the wizard, not typed here)',
         holeDia: 'Hole Ø', toolDia: 'Tool Ø', clearance: 'Clearance Z', dx: 'Column spacing', dy: 'Row spacing',
         nx: 'Columns (rect)', ny: 'Rows (rect)', dia: 'Bolt circle Ø', startAngle: 'Start angle', skip: 'Skip holes (e.g. 2,5)',
     },
+    // t2433 — `cycle` collides with the shared DESCRIPTIONS entry ("Canned Cycle Type (Drill, Dwell, Peck,
+    // Bore)" — a DIFFERENT vocabulary, drill/dwell/peck/bore, used elsewhere in the registry) — this block's
+    // own cycle field only ever offers peck / bore-step / bore-helix, so "Dwell"/"Drill" in the shared tooltip
+    // would be actively misleading. Found via this turn's own sweep for the same class of collision as `dir`.
+    fieldHelp: { cycle: "How each hole is cut: peck (a normal drill cycle, retracting to clear chips), bore-step (plunge in steps then a full circle at each depth), or bore-helix (one continuous spiral down)." },
     defaults: {
         pattern: 'single', cycle: 'peck',
         x: 0, y: 0, z0: 0, x0: 0, y0: 0,

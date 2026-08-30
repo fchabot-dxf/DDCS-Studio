@@ -36,10 +36,12 @@ export const probeCheckBlock = {
     //      probeSurface. NOTE: a real touch inside the LAST `eps` of travel reads as a miss — inherent to DRO-compare (eps default 0.05mm).
     //  (3) NEITHER (grbl/rs274/centroid) → an HONEST comment, never a guessed register.
     help: "Checks whether the last Probe actually made contact — if it missed (travelled the full commanded distance without tripping), jumps to the given label instead of continuing blind. Put one after every Probe so a broken stylus or a missed part stops the program rather than cutting air.",
-    // t2431 — `dir` here is the PROBE TRAVEL SIGN, not a spindle direction (the shared DESCRIPTIONS tooltip for
-    // "dir" means spindle CW/CCW elsewhere in the registry and can't be overridden per-def) — relabelled on the
-    // face so it doesn't read as the wrong thing even though its tooltip still borrows the spindle wording.
+    // t2433 — `dir` here is the PROBE TRAVEL SIGN, not a spindle direction (t1520's own comment above). Was
+    // relabelled on the face at t2431 but still borrowed the shared DESCRIPTIONS "dir" tooltip (spindle CW/CCW)
+    // since a per-def label couldn't override the shared TOOLTIP, only the face text — `fieldHelp` (bridge.js,
+    // this turn) closes that gap.
     labels: { dir: 'probe direction', seek: 'expected travel distance' },
+    fieldHelp: { dir: "Which way the DRO comparison faces — + if the probe travels toward increasing machine position, - if toward decreasing. Only matters on a controller with no probe status variable (V4.1/DM500); ignored where the controller reports contact directly." },
     defaults: { axis: 'Z', goto: 1, dir: '+', seek: '', eps: 0.05 }, fields: ['axis', 'goto', 'dir', 'seek', 'eps'],
     // t1520 — `dir` is the PROBE TRAVEL SIGN (which way the DRO comparison faces), not a spindle direction. Declared so
     // the canvas keeps a '-'; it used to fall back to the shared cw/ccw list and invert the miss test on the way through.
