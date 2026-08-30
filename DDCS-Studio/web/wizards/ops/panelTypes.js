@@ -215,7 +215,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a
     // synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
     // walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
-    const _writeParam = (name, val) => {
+    const _writeParam = (name, val, opts) => {
         const next = r3(val);
         const f = _field(name);
         if (!f) {   // no bound field → the preview-only side-store, then ask the host to re-render (no 'input' to dispatch)
@@ -224,8 +224,32 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (_onPreviewOnlyWrite) _onPreviewOnlyWrite();
             return;
         }
-        if (String(f.value) === String(next)) return;   // unchanged → no dispatch (breaks the write-back→recompute→write-back chain)
-        f.value = next; f.dispatchEvent(new Event('input', { bubbles: true }));
+        // t2429 (BACKLOG #46) — commit-on-release: a PREVIEW write (opts.preview, a mid-drag frame from
+        // buildCanvasWidgets' own onDrag) still sets the DOM value + dispatches 'input' every frame — that's what
+        // keeps the canvas following the finger live, since update()'s own redraw reads params straight off the
+        // LIVE FORM FIELDS (userOpView.js's own `_readers`), never the model — but it tags the event so
+        // userOpView.js's delegated listener skips the actual model write (onFieldWrite) for it. The eventual
+        // commit (onDragEnd, below) re-sends the SAME final value every preview frame already painted into the
+        // DOM, so it cannot tell "genuinely unchanged" apart from "never actually reached the model" by
+        // comparing against `.value` — `data-ddcs-committed` captures the field's PRE-DRAG value once, on the
+        // FIRST preview frame that touches it (before `.value` is overwritten), specifically so the commit has
+        // something honest to compare against instead of comparing a value to itself.
+        const preview = !!(opts && opts.preview);
+        if (preview) {
+            if (f.dataset.ddcsCommitted === undefined) f.dataset.ddcsCommitted = String(f.value);   // the baseline, captured before this frame overwrites .value
+            if (String(f.value) === String(next)) return;   // t808's own loop-guard, unchanged for a same-value preview frame
+            f.value = next;
+            f.dispatchEvent(new CustomEvent('input', { bubbles: true, detail: { previewOnly: true } }));
+            return;
+        }
+        // A normal (non-preview) write. If a drag left an uncommitted baseline sitting on this field, the loop-
+        // guard must compare against THAT (not `.value`, which a preview frame may have already set to `next`)
+        // — otherwise a drag-end commit re-sending its own final value would look like a no-op and get swallowed.
+        const baseline = f.dataset.ddcsCommitted;
+        if (String(f.value) === String(next) && (baseline === undefined || baseline === String(next))) return;
+        f.value = next;
+        delete f.dataset.ddcsCommitted;   // this value is now the model's own — the next drag starts a fresh baseline
+        f.dispatchEvent(new CustomEvent('input', { bubbles: true }));
     };
     // t1273 — A LATHE OP DRAWS ITSELF. Everything below this line reasons about an XY stock rectangle: a datum corner,
     // a top-down footprint, corner picks. None of that means anything for a bar spinning on centres, so a lathe op
@@ -539,19 +563,43 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
-    const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
+    const setFields = (m, opts) => { for (const k in m) _writeParam(k, m[k], opts); };
     // t1680 — onEdit was destructured away here and never forwarded to any of the 3 returns below, so every twin +
     // lathe op lost buildCanvasWidgets's click-to-edit/value-readout (the 6 legacy per-wizard views never had this
     // gap — each calls buildCanvasWidgets directly and forwards onEdit itself). Found by t1678's census, fixed here
     // at the ONE shared source rather than per-call-site, per the census's own point.
     const { handles, onDrag: _rawOnDrag, onEdit } = buildCanvasWidgets(decls, setFields);
+    // t2429 (BACKLOG #46) — the drag-end commit flush. NOT tracked as a "pending updates" map in a closure (the
+    // first version of this fix tried that inside buildCanvasWidgets itself and it silently never fired — found
+    // live: `_mgr.update()`'s own synchronous re-render calls buildCanvasWidgets FRESH on every drag frame, so
+    // the very closure that computed a frame's pending value is already orphaned by the time FeatureCanvas gets
+    // around to reading `spec.onDragEnd` at release; `this.spec` had moved on to the next frame's fresh closure,
+    // which never had its own onDrag called again). Instead this reads the SOURCE OF TRUTH directly off the live
+    // DOM at release time: any `[data-param]` field in THIS render's own `_host` whose current `.value` still
+    // disagrees with its last-committed marker (data-ddcs-committed, set by _writeParam above) is exactly what
+    // this drag left uncommitted — flush each one as a real (non-preview) write. The DOM field persists across
+    // re-renders (sync-in-place, t1740) even though the closure computing it does not, so this survives the same
+    // hazard that broke the first attempt.
+    const onDragEnd = () => {
+        if (!_host) return;
+        _host.querySelectorAll('[data-param]').forEach((f) => {
+            const committed = f.dataset.ddcsCommitted;
+            if (committed !== undefined && committed !== String(f.value)) _writeParam(f.dataset.param, f.value);
+        });
+    };
     // t718 LAYOUT PLACEMENT PARITY — PLACE the previewGeometry handles: bake the shift into their RENDER position and
     // INVERSE-map their drag world (world − shift → the raw param), keyed by the previewGeometry handle ids. Role/probe
     // handles + the sim Start are untouched (the shift is 0 for probe ops anyway). Size/delta fields pass through — the
     // gesture math reads the un-shifted world, so a pos handle writes world−shift while W/H/Ø/dx/dy are pure translation.
     if (_placed && _pgIds.size) for (const h of handles) if (_pgIds.has(h.id)) { h.x += _pShift.x; h.y += _pShift.y; }
+    // t2429 (BACKLOG #46) — `_pShift` is itself recomputed from `params` on every render (`placeShiftOfStack`,
+    // above), so a PLACED handle's own drag is a FEEDBACK LOOP: the shift and the handle's own raw param
+    // converge together, frame by frame, toward the cursor. Deferred to a single release-time commit (found
+    // live, PROVEN before shipping — not assumed): the loop never gets the intermediate frames it needs to
+    // converge, and the handle lands far short of the drag distance (a 256px drag settled ~35px away). Same
+    // shape as corner's own repoGroups exclusion just below — commit every frame for a placed handle, unchanged.
     const onDrag = (_placed && _pgIds.size)
-        ? (id, world) => _rawOnDrag(id, _pgIds.has(id) ? { x: world.x - _pShift.x, y: world.y - _pShift.y } : world)
+        ? (id, world, commitNow) => _rawOnDrag(id, _pgIds.has(id) ? { x: world.x - _pShift.x, y: world.y - _pShift.y } : world, commitNow || _pgIds.has(id))
         : _rawOnDrag;
     // t120 — Option A independence: wrap the emitting-handle drag. On dragging ANY relTo handle, CAPTURE (freeze) every OTHER
     // relTo group's spot at its CURRENT displayed world (no jump), then SET the dragged group's spot to the drop world — all
@@ -565,7 +613,12 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             next[dragged.gid] = { dx: world.x - cornerXY.x, dy: world.y - cornerXY.y };
             setSpots(next);
         }
-        if (onDrag) onDrag(id, world);
+        // t2429 (BACKLOG #46) — this whole freeze-the-others/re-derive-this-one chain assumes every frame's
+        // write lands in the model synchronously (found live: deferred to preview, the FROZEN marker's own
+        // screen position visibly drifted mid-drag). `dragged` truthy means this handle is one of THIS
+        // mechanism's own repoGroups members — commit it every frame, unchanged; see canvasWidgets.js's own
+        // onDrag comment for the fuller why.
+        if (onDrag) onDrag(id, world, !!dragged);
     } : onDrag;
     // t112 — GUI CORNER-SELECTOR: an op that declares a `corner` enum binding gets clickable stock-corner targets on the
     // canvas (FeatureCanvas._drawCornerPick). Clicking one SETS the corner <select> + dispatches change → update() re-emits
@@ -657,7 +710,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
             else if (spotOnDrag) spotOnDrag(id, world);
         };
-        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, onDragEnd, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
@@ -692,9 +745,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, onDragEnd, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
-    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+    return { stock: stockOut, items, handles, onDrag: spotOnDrag, onDragEnd, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
 }
 
 // A FeatureCanvas per CONTAINER (t1816 — was one shared module-level singleton; two surfaces reparenting the

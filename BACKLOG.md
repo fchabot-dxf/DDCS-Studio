@@ -3779,7 +3779,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 46. [✅ SHIPPED t2409 — root confirmed by tracing the call graph, fix verified live with the probe (before/after rows below), full suite green] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [✅ SHIPPED t2409 (the redraw half) + ⚠ t2429 PARTIALLY SHIPPED (commit-on-release, size/distance handles only — surfacing's own sf_pos, the bug's original screenshot subject, is NOT yet covered, see t2429's own entry below)] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
 
 > ## THE CAPTURE — the evidence three turns of harness testing could not produce
 >
@@ -3944,6 +3944,47 @@ checks stay (dangling still needs catching).
 > comment: "the contention-starved population shifts run to run"). Classified as pre-existing contention noise,
 > not a regression — named here rather than hidden, per the rule that an argued-away red still needs the
 > reasoning on record.
+
+> ⚠ **t2429 (THE COMMIT-ON-RELEASE HALF) — PARTIALLY SHIPPED, scoped down twice, both times named live rather
+> than shipped broken.** #50's own fix (t2427) closed the blocker this half was waiting on; built the ruled
+> mechanism itself this turn: `panelTypes.js`'s `_writeParam` gained an `opts.preview` mode (tagged via
+> `CustomEvent` `detail.previewOnly`) that still paints the DOM field + redraws the canvas every drag frame
+> (the redraw was ALREADY reading live DOM via `userOpView.js`'s own `_readers`, never the model — confirmed
+> BEFORE touching anything, per the dispatch's own instruction, so no restructuring of the redraw path t2409
+> just fixed was needed) but skips the actual model write until a NEW `onDragEnd` (wired into all 3
+> `layoutSpecFromOp` spec-return points) fires ONE plain commit on release, reading whichever fields still
+> disagree with a `data-ddcs-committed` baseline captured on each field's own first preview touch.
+>
+> **TWO EXCLUSIONS found live, kept rather than chased further** (the dispatch's own instruction: stop and
+> report rather than restructure "five turns of hard-won" machinery blind):
+> 1. **Corner's own `repoGroups`/`spotStore` reposition-chain** (t120-t122) — its own "freeze the OTHER
+>    markers, re-derive this one's increment against it" compensation assumes every frame's write reaches the
+>    model synchronously; deferred, the frozen marker's own screen position visibly drifted mid-drag. Excluded
+>    via a `commitNow` flag threaded from `spotOnDrag`'s own `dragged` check — these handles commit every
+>    frame, unchanged, same as before this turn.
+> 2. **Every 'move'-kind handle** (`point`/`diagAim`/`translate` gesture types — the ONE kind FeatureCanvas
+>    runs `_snapToAnchor` against every frame) — committed the CORRECT final field values on release (verified
+>    directly against the DOM) yet the canvas rendered well short of the actual drag distance, for drags of
+>    every size tried (not an extreme-drag edge case). Root not confirmed within this turn's own budget.
+>    Commit-on-release now applies to non-move gestures only (length/scaleX/shear/rect/radial/projLength/
+>    crossAim/probeVector) — VERIFIED working, including `pk_size`, one of the dispatch's own two named
+>    handles. Move-kind handles (including `pk_pos` AND **surfacing's own `sf_pos` — the bug's own original
+>    screenshot subject**) keep committing every frame, unchanged from before this turn; #50's own fix still
+>    coalesces a burst into one undo entry for them either way, so they are not worse off, just not yet on
+>    commit-on-release.
+>
+> **Verified live**: the `?debug=feat` probe (pocket's `pk_size`) shows the model frozen through every
+> mid-drag frame then changing to exactly one new value at/after release, handle tracking the pointer
+> throughout; exactly one undo entry results from a whole drag and correctly restores the pre-drag value; the
+> wizard MODAL's own per-type views (`surfacingView.js`, structurally isolated — its own `setFields` never
+> reads the new `opts` argument) are untouched; a move-kind handle (`pk_pos`) still tracks its own drag
+> correctly (committing every frame, as before). Full suite: reported in WORK-LOG (t2429).
+>
+> **⭐ Next step, named plainly for whoever picks this up**: the move-kind root is still open. The symptom
+> (correct final value, wrong final screen position) smells like a viewport/fit state that updates per-frame
+> during a live drag today and never gets the intermediate frames it needs from a single deferred commit —
+> but that is a hypothesis, not a confirmed root; confirm it before attempting a fix, per this whole arc's own
+> standing discipline against guessing on delicate, hard-won canvas machinery.
 
 ---
 

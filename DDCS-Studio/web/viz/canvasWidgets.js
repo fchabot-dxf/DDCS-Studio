@@ -166,8 +166,15 @@ export const CANVAS_GESTURES = {
     },
 };
 
-/** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map)` writes the op's form fields
- *  (id → value) and triggers the normal update()/redraw loop. Unknown gesture types are skipped (defensive). */
+/** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map, opts)` writes the op's form
+ *  fields (id → value) and triggers the normal update()/redraw loop; `opts.preview` (t2429, BACKLOG #46) marks a
+ *  mid-drag frame — the redraw still runs every frame (setFields still sets the DOM value), but panelTypes.js's
+ *  own `_writeParam` withholds the actual model write for it until its OWN `onDragEnd` (wired directly into
+ *  `layoutSpecFromOp`'s spec objects, not here — see that file's own comment for why: a per-drag "what's pending"
+ *  map tracked in THIS function's own closure cannot survive the gesture, since `_mgr.update()`'s own synchronous
+ *  re-render calls `buildCanvasWidgets` fresh on EVERY frame, discarding whatever closure computed the previous
+ *  frame's pending value before `onDragEnd` could ever see it — found live, the first working version of this
+ *  fix). Unknown gesture types are skipped (defensive). */
 export function buildCanvasWidgets(widgets, setFields) {
     const byId = {};
     const handles = [];
@@ -189,12 +196,36 @@ export function buildCanvasWidgets(widgets, setFields) {
         // colour-string match instead of reading the declared field (the glyph resolver, t1688, needs the real one).
         handles.push({ id, color: d.color, noSnap: d.noSnap, emits: d.emits, manual: d.manual, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
     });
-    const onDrag = (id, world) => {
+    // t2429 (BACKLOG #46) — `commitNow` (3rd arg, optional): panelTypes.js's own `spotOnDrag` wrapper passes
+    // `true` for a handle it recognises as one of corner's own datum-relative reposition-chain markers
+    // (`repoGroups`, backed by `spotStore`/`pinnedStartsFor`) — that mechanism has its own pre-existing,
+    // separately-tested "freeze the OTHER markers' world, then re-derive this one's increment against it"
+    // compensation, proven live to assume every frame's write lands in the model synchronously.
+    //
+    // ⚠ SCOPE, NOT FULLY RESOLVED (found live, reported honestly rather than shipped broken or reverted whole):
+    // a 'move'-kind handle (`point`/`diagAim`/`translate` — the ONLY gesture types FeatureCanvas renders
+    // `kind:'move'` for, and the ONE kind its own pointermove handler runs `_snapToAnchor` against every frame)
+    // committed the CORRECT final field values on release (verified directly against the DOM, both for
+    // pocket's own `pk_pos` AND surfacing's own `sf_pos` — the #46 dispatch's own original named handle) yet
+    // the CANVAS rendered it well short of the actual drag distance, for drags of EVERY size tried (a 256px
+    // drag settling ~35px away; a 64px drag ALSO settling ~35px away — not an extreme-drag edge case, a
+    // general one). Root not confirmed within this turn's own budget (suspected: some viewport/fit state that
+    // updates per-frame during a live drag today, so a single deferred commit never gets the intermediate
+    // frames it needs) — rather than restructure the render/redraw pipeline blind, per the dispatch's own
+    // instruction not to touch "five turns of hard-won" machinery without the root observed, this SCOPES
+    // commit-on-release to non-move gestures only (size/length/radial/scaleX/shear/projLength/crossAim/
+    // probeVector — VERIFIED working, incl. pocket's own pk_size, the dispatch's other named handle).
+    // Move-kind handles keep committing every frame, unchanged — #50's own fix (t2427) still coalesces a
+    // burst into one undo entry for them, so they are not worse than before, just not yet on commit-on-release.
+    const SNAP_ELIGIBLE_TYPES = new Set(['point', 'diagAim', 'translate']);
+    const onDrag = (id, world, commitNow) => {
         const d = byId[id]; if (!d) return;
         const updates = CANVAS_GESTURES[d.type].drag(d, world);
-        if (updates) setFields(updates);
+        const commit = commitNow || SNAP_ELIGIBLE_TYPES.has(d.type);
+        if (updates) setFields(updates, commit ? undefined : { preview: true });
     };
-    const onEdit = (id, value) => {   // click-to-type a dimension's value (FeatureCanvas inline editor)
+    const onEdit = (id, value) => {   // click-to-type a dimension's value (FeatureCanvas inline editor) — a single
+        // discrete action, not a drag stream — commits immediately, unchanged.
         const d = byId[id]; if (!(d && d.field != null && Number.isFinite(value))) return;
         setFields({ [d.field]: d.editMin != null ? Math.max(d.editMin, value) : value });
     };

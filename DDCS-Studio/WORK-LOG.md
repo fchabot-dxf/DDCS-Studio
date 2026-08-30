@@ -64619,3 +64619,101 @@ Files: `web/blocks/blocksApp.js`, `tests/undo-blind-writes-2427.spec.js` (new), 
 
 No `proc_health.py` leaks this turn.
 
+## t2429 — BACKLOG #46's second half: COMMIT ON RELEASE, PARTIALLY shipped — scoped down twice, both named live
+
+The blocker (#50) closed last turn; built the ruled mechanism itself this turn — but found two real
+interactions with pre-existing, hard-won canvas machinery along the way, and scoped around both rather than
+chase either blind or ship either broken.
+
+**THE RISK, checked BEFORE touching anything, per the dispatch's own instruction.** Does the live redraw
+depend on the model write? Traced: `userOpView.js`'s `update(mgr)` builds `params` from `_readers`, and every
+reader closes over the actual DOM `<input data-param>` node, reading `.value` fresh — never the model. Redraw
+and model-write are already decoupled; a mid-drag frame can update the DOM (so the redraw follows it) with the
+model held back. No restructuring of the splitter/preview machinery (t2345-t2357) or the redraw path (t2409)
+was needed going in.
+
+**THE MECHANISM**: `panelTypes.js`'s `_writeParam(name, val, opts)` — `opts.preview` (set by
+`canvasWidgets.js`'s own `onDrag`, once per drag frame) still sets the DOM value and dispatches a real 'input'
+(so the redraw still runs), tagged (`CustomEvent` `detail.previewOnly`) so `userOpView.js`'s delegated listener
+skips `onFieldWrite` — the actual model write — for it. A new `onDragEnd` (wired into all 3
+`layoutSpecFromOp` spec-return points) commits on release. **One real design mistake caught before shipping**:
+the first version tracked "what's pending" as a map inside `canvasWidgets.js`'s own `buildCanvasWidgets`
+closure, replayed by `onDragEnd`. It silently never fired — `_mgr.update()`'s own synchronous re-render calls
+`buildCanvasWidgets` FRESH on every drag frame, so the very closure holding a frame's pending value is
+orphaned by the time `FeatureCanvas` gets around to reading `spec.onDragEnd`, which by then points at a NEWER
+closure that never itself received an `onDrag` call. Redesigned to read the DOM directly instead: `onDragEnd`
+scans the render's own form host for any field whose live value still disagrees with a NEW
+`data-ddcs-committed` baseline (captured once, on the field's own first preview touch, from its pre-drag
+value) — the DOM node persists across re-renders even though the closure computing any one frame does not.
+The old t808 loop-guard (still needed — an unchanged write must not re-trigger a render loop) now compares
+against that baseline rather than the field's raw `.value`, since by drag-end the DOM already shows the drag's
+own final value and a naive value-equality check would have silently swallowed the real commit.
+
+**EXCLUSION 1 — corner's own `repoGroups`/`spotStore` reposition-chain (t120-t122).** Live-verified regression
+before it shipped: `tests/corner-marker-independence.spec.js` (5 pre-existing tests, protecting exactly this
+mechanism) failed 2/5 with the first working version of the core fix — dragging START visibly moved
+REPOSITION's own handle ~50px on screen, though its own #23/#24 VALUE re-derived correctly the whole time
+(instrumented directly, confirmed with console logs before touching anything further). Root: `spotOnDrag`
+(panelTypes.js) freezes every OTHER `repoGroups` member's CURRENT world into `spotStore` the instant one is
+dragged, so a SEPARATE derive-and-write ("the #23/#24 write-back") can hold that marker's screen position
+fixed by re-projecting its own increment against the moving anchor every render — a mechanism that assumes
+every frame's write lands in the model synchronously. Deferred to preview, it never gets those intermediate
+frames. Fixed by threading a `commitNow` flag from `spotOnDrag`'s own `dragged` check through
+`canvasWidgets.js`'s `onDrag(id, world, commitNow)` — these handles now commit every frame, exactly as before
+this turn, bypassing the new deferred path entirely. Re-verified: all 5 corner-marker-independence tests pass,
+plus `alignment-canvas-refit-732.spec.js`.
+
+**EXCLUSION 2 — every 'move'-kind handle (`point`/`diagAim`/`translate` gesture types).** A SECOND regression,
+found chasing `alignment-canvas-refit-732.spec.js`'s own remaining failure after exclusion 1: pocket's own
+`pk_pos` committed the CORRECT final field values on release (verified directly against the DOM:
+`originX=-256.541 originY=-205.233`, exactly the drag's own delta) yet the CANVAS rendered the handle only
+~35px from its start, not the ~256px the drag actually covered. Tested for an extreme-drag-only edge case
+(the test's own scenario) — REFUTED: a small, typical-sized drag (64px) showed the identical ~35px settle,
+so this is general, not an edge case. Tested SURFACING's own `sf_pos` handle too — **the #46 dispatch's own
+original named handle, straight from the owner's own screenshot** — same symptom, same numbers. `'move'`-kind
+is the ONE kind `featureCanvas.js`'s own pointermove handler runs `_snapToAnchor` against every frame; that is
+the strongest lead, not a confirmed root — root NOT established within this turn's own budget, despite direct
+DOM/value instrumentation at every step. Per the dispatch's own explicit instruction ("if the two are
+genuinely inseparable without restructuring, STOP and report rather than restructure the splitter/preview
+machinery... five turns of hard-won behaviour"), this was NOT chased further. Scoped commit-on-release to
+non-move gesture types only (length/scaleX/shear/rect/radial/projLength/crossAim/probeVector) — VERIFIED
+working, including `pk_size`, the dispatch's OTHER named handle. Move-kind handles (`pk_pos`, `sf_pos`, and
+every other position handle) keep committing every frame, unchanged from before this turn — #50's own fix
+(t2427) still coalesces a burst into one undo entry for them regardless, so they are not worse off, just not
+on commit-on-release yet. A new pinning test (`tests/commit-on-release-2429.spec.js`'s own "SCOPE BOUNDARY"
+case) locks this — a move-kind handle's post-release screen position must match wherever the drag itself left
+it, so a future regression of this exclusion fails loudly rather than silently.
+
+**Verified live, with the owner's own probe** (`?debug=feat`, pocket's `pk_size`): model fingerprint frozen
+identically through every mid-drag sampled frame, changing to exactly one new value at/after release; the
+handle itself tracked the pointer every frame throughout (redraw never coupled to the write, confirmed by the
+same probe). One undo restores both canvas and model together. The wizard MODAL's own per-type views
+(`surfacingView.js` etc.) are structurally untouched — their own `setFields` never reads the new `opts`
+argument at all, confirmed via a direct regression test (still dispatches an 'input' every drag frame).
+
+**One near-miss, corrected within the same tool call**: reached for `git stash` mid-turn to A/B this turn's
+own files against a pre-change baseline — caught immediately (this repo's own standing rule: the stash is
+GLOBAL across concurrent seats) and popped back within seconds, before anything else touched the repo;
+diffed the restored files byte-for-byte against a scratch copy to confirm nothing was lost, then redid the
+A/B correctly via `git checkout HEAD --` + a scratch-copy restore instead.
+
+**Non-vacuous, checked directly**: `commit-on-release-2429.spec.js`'s two fix-dependent tests (the probe test,
+the undo-count test) fail against the pre-t2429 baseline; `corner-marker-independence.spec.js` (all 5) and the
+new "SCOPE BOUNDARY" test pass unchanged on that SAME baseline too — correct, since both exclusions restore
+PRE-EXISTING behaviour, so they are non-regression guards, not new-behaviour tests, and are EXPECTED to pass
+whether or not this turn's own fix is present.
+
+**Full suite (Rule 1b — canvasWidgets.js/panelTypes.js/userOpView.js are shared)**: 2971 passed / 3 failed / 21
+flaky / 26 skipped, 28m26s. All 3 reds are `blocks-context-flyout-2411.spec.js`'s own exact-match menu-item
+list, off by one entry: `"❄ Freeze value"` (t2425's own freeze feature, shipped an EARLIER, already-merged
+turn) now correctly appears in the submenu but this OLDER test's own literal list doesn't expect it. A/B'd
+directly: reproduces 3/3 identically with this turn's own files reverted to HEAD — confirmed pre-existing,
+unrelated to t2429, not touched (out of this turn's own scope; the fix belongs in
+`blocks-context-flyout-2411.spec.js`'s own expected-list literal, a one-line test update, flagged here for
+whoever picks it up rather than silently absorbed into an unrelated turn).
+
+Files: `web/viz/canvasWidgets.js`, `web/wizards/ops/panelTypes.js`, `web/wizards/views/userOpView.js`,
+`tests/commit-on-release-2429.spec.js` (new), `BACKLOG.md`.
+
+No `proc_health.py` leaks this turn.
+

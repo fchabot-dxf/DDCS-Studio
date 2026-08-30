@@ -460,7 +460,14 @@ export function createUserOpView(ns, opts) {
                 // t1740 — opt-in write-back: mirrors blocksApp.js's OWN delegated listener exactly (same target
                 // resolution, same field), so the host decides what "write back" means (writeAuthoredValue for
                 // the pane) without this shared file knowing anything about a Blockly workspace.
-                if (onFieldWrite) {
+                // t2429 (BACKLOG #46) — a PREVIEW write (panelTypes.js's own commit-on-release: a mid-drag canvas
+                // frame, tagged via CustomEvent detail) still reaches this listener so the redraw below still
+                // fires every frame — the canvas following the finger live never depended on the model write,
+                // it reads params straight off the LIVE FORM FIELDS (`_readers`, below) — but it must NOT reach
+                // onFieldWrite: that is the actual model write, deferred until the drag's own onDragEnd flush
+                // (panelTypes.js/canvasWidgets.js) fires ONE plain, non-preview dispatch here instead.
+                const isPreview = !!(e && e.detail && e.detail.previewOnly);
+                if (onFieldWrite && !isPreview) {
                     const f = e.target && e.target.closest && e.target.closest('[data-param]');
                     // t2415 (BACKLOG #23) — a checkbox's own `.value` is a static 'on' regardless of checked
                     // state (the DOM's own WYSIWYG default, not a live read) — `.checked` is the real state.
