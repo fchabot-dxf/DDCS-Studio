@@ -4008,6 +4008,11 @@ engine really does.
 > ⇒ ⭐ **It also explains t2411's "already works":** they traced and simulated the FEATURE canvas, where
 > t2371's pinch does work. They answered the question as filed. The Blockly workspace was never examined.
 >
+> ⭐ **CONFIRMED BY THE OWNER, 2026-08-29: "yes feature canvas now works well."** So neither earlier answer
+> was wrong — the feature canvas genuinely works, the Blocks canvas genuinely does not, and the advisor
+> attached a true statement to the wrong surface. ⇒ **This entry is now Blocks-canvas-only; the feature
+> canvas half is CLOSED and needs no further work.**
+>
 > ## THE SYMPTOM
 >
 > On the **Blocks canvas**, two fingers ZOOM but do not PAN. Both must happen from the one gesture — spread
