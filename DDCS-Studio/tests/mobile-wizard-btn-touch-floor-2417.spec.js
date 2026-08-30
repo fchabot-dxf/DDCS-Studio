@@ -16,6 +16,16 @@ import { test, expect } from '@playwright/test';
  * was for the header's own priority-collapse trigger row (the tray has no such collapse ladder; it's a plain
  * vertical list capped by `max-height`/`overflow-y:auto`, styles.css:1645-1646), but the discipline carries
  * over anyway: no padding-left/right in the mobile rule.
+ *
+ * ⭐ t2421 — the tray rows' own line-art icons (`WIZ_ITEM_SVG`, e.g. Drill/Bore/Pocket/Contour), now that the
+ * rows have real room. MEASURED first: the real rendered icon was 14px, not the 16px the dispatch assumed —
+ * so the 20px target is derived by scaling PROPORTIONALLY to the row's own growth (31.6→44px, ×1.39; 14×1.39
+ * ≈ 19.5, rounded to 20), not the dispatch's assumed 16→20 delta (which happens to land on the same number).
+ * Scoped to `.toolbar-dropdown-content button svg` — these icons carry inline `width`/`height` SVG attributes,
+ * not a shared class, and are structurally unrelated to the header bar's own `.btn-ico` (styles.css:2055,
+ * deliberately untouched). Emoji-icon entries (Comm/WCS/Warm-up/…) are plain text, not `<svg>` — this
+ * selector never matches them, so they're unaffected (growing emoji would mean a font-size bump on the same
+ * text run as the label, a different change).
  */
 
 async function measureTriggers(page) {
@@ -101,4 +111,45 @@ test('taller tray rows do not introduce unwanted scrolling at normal group sizes
     const { container } = await openTrayAndMeasureRows(page, i);
     expect(container.scrollHeight, `group ${i}: taller rows still fit without the container's own overflow kicking in`).toBeLessThanOrEqual(container.clientHeight);
   }
+});
+
+async function findSvgIconSize(page) {
+  return page.evaluate(() => {
+    const triggers = Array.from(document.querySelectorAll('.toolbar-dropdown > .wizard-btn'));
+    for (const t of triggers) {
+      t.click();
+      const content = t.closest('.toolbar-dropdown').querySelector('.toolbar-dropdown-content');
+      const svgBtn = Array.from(content.querySelectorAll('button')).find((b) => b.querySelector('svg'));
+      if (svgBtn) {
+        const svg = svgBtn.querySelector('svg');
+        const r = svg.getBoundingClientRect();
+        t.click();
+        return { width: r.width, height: r.height, attrW: svg.getAttribute('width'), attrH: svg.getAttribute('height') };
+      }
+      t.click();
+    }
+    return null;
+  });
+}
+
+test('t2421: at 390px, a tray row\'s line-art icon (SVG) reaches 20px real rendered size', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.ddcsStudio);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(400);
+  const icon = await findSvgIconSize(page);
+  expect(icon, 'at least one tray group has an SVG-icon entry (e.g. Drill/Bore/Pocket)').not.toBeNull();
+  expect(icon.attrW, 'the SVG\'s own inline attribute stays 14 — only the rendered CSS size changes').toBe('14');
+  expect(icon.width, `${JSON.stringify(icon)} reaches the 20px mobile size`).toBe(20);
+  expect(icon.height).toBe(20);
+});
+
+test('t2421: desktop (>600px) tray icons keep their original 14px size', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.ddcsStudio);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.waitForTimeout(300);
+  const icon = await findSvgIconSize(page);
+  expect(icon.width, 'desktop icon size unaffected by the mobile rule').toBe(14);
+  expect(icon.height).toBe(14);
 });

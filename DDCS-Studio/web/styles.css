@@ -1682,6 +1682,18 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
    failure mode. */
 @media (max-width: 600px) {
     .toolbar-dropdown-content button { min-height: 44px; }
+    /* t2421 — the tray's own line-art icons (`WIZ_ITEM_SVG` in ui/wizIcons.js, e.g. Drill/Bore/Pocket/Contour)
+       carry INLINE `width="14" height="14"` attributes, not a shared class — so there is nothing named
+       `.btn-ico` here to touch (that's the SEPARATE header bar's own wrapper, styles.css:2055, deliberately
+       left alone). MEASURED first, not assumed: the real rendered icon was 14px, not the 16px the dispatch
+       guessed — so the 20px target here is derived by scaling PROPORTIONALLY to the row's own growth
+       (31.6px → 44px, a ×1.39 ratio; 14px × 1.39 ≈ 19.5px, rounded to 20px) rather than the dispatch's
+       assumed absolute 16→20 delta, which happens to land on the same number anyway. A CSS `width`/`height`
+       property overrides an SVG's own presentation attributes, same cascade rule as any other HTML attribute
+       vs. CSS. Emoji-icon entries (Comm/WCS/Warm-up/…) are untouched — they're plain text, not `<svg>`, so
+       this selector never matches them; growing emoji would mean a font-size bump that also grows the label
+       text sharing the same text run, a different (and unasked-for) change. */
+    .toolbar-dropdown-content button svg { width: 20px; height: 20px; }
 }
 
 /* t2245 — the group sub-label (commandDeck.js's `wizGroupHtml`, e.g. "ROTARY") is the only plain <div> among

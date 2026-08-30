@@ -64239,3 +64239,41 @@ dispatch's own explicit prohibition — both would trade a real device bug for a
 Flagged for the owner to re-test on the current deployed build with the Blockly-timing finding recorded as
 the lead, rather than guessed at blind.
 
+## t2421 — tray icons grown to match the row floor; #52's touch bug stays parked with the owner (per dispatch)
+
+The owner, seeing the taller tray rows: "is it complicated to increase the icon size too now that there is
+room." Scope (stated twice in the dispatch after t2419's own scoping miss): the line-art icons INSIDE the tray
+rows (Drill/Bore/Pocket/Contour/…), not the trigger pills — those went back to 32px last turn and have no new
+room to justify growing anything.
+
+**Measured first, per the same discipline as every prior turn in this arc**: the real rendered tray icon
+(`WIZ_ITEM_SVG`, `ui/wizIcons.js`) was **14px**, not the dispatch's assumed 16px. Per its own explicit fallback
+("if they are not 16px my lean is wrong and you should scale proportionally... and say what you did"): scaled
+to the row's own growth ratio instead of the assumed absolute delta — 31.6px → 44px is ×1.39; 14px × 1.39 ≈
+19.5px, rounded to 20px. Landed on the SAME number the dispatch's own (wrong-premise) lean guessed, just via
+the correct derivation — worth stating plainly since it could easily read as "did what was asked" when the
+actual reasoning path differed.
+
+**Fix**: `.toolbar-dropdown-content button svg { width: 20px; height: 20px }`, same `@media (max-width: 600px)`
+block as the row floor. These icons carry INLINE `width="14" height="14"` SVG attributes, not a shared class —
+CSS `width`/`height` properties override an SVG's own presentation attributes by the same cascade rule as any
+HTML attribute vs. CSS, so no specificity fight this time (unlike t2417's own `.wizard-btn` vs `.toolbar-btn`
+source-order surprise). Explicitly untouched: `.btn-ico` (styles.css:2055, the SEPARATE header bar's own icon
+wrapper — structurally unrelated, these tray icons have no such wrapper at all) and every emoji-icon entry
+(Comm/WCS/Warm-up/…, plain text, not `<svg>` — the selector never matches them, so growing them would need a
+different mechanism entirely and wasn't asked for).
+
+Screenshotted the Mill group's tray (Drill/Bore/Pocket/Contour) at 390px before finalizing — icons read
+cleanly centered against the label baseline, nothing visually off. `tests/mobile-wizard-btn-touch-floor-2417.
+spec.js` (2 new tests, 7 total in the file now): real rendered icon reaches 20px at 390px (the SVG's own
+`width` ATTRIBUTE stays 14 — only the computed/rendered CSS size changes, confirming the override mechanism
+rather than a JS-side markup edit), desktop keeps 14px. Non-vacuous: reverted via `git stash`, the icon-size
+test fails against the pre-fix CSS with the exact old number.
+
+**BACKLOG #52's touch-mispositioning bug — deliberately NOT investigated further**, per the dispatch's own
+explicit instruction: t2419's own investigation was judged the right kind of work even though nothing shipped
+(tested the advisor's own theory directly, found real new Blockly timing evidence, closed a genuine test gap,
+refused to guess-fix) — the advisor has asked the owner directly for the one discriminator only a real device
+can give (does it fail every time or intermittently, does the parent vanish in the same instant) and it stays
+parked on that answer. No harness time spent on it this turn.
+
