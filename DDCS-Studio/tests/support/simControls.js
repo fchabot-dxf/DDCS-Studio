@@ -8,15 +8,34 @@
  * reset to the start" — clicking it while running does exactly that.
  */
 
-/** Click the panel's own Run/Stop toggle (while running, this stops AND resets to the start) inside `scope`,
- *  if a running one exists. No-op (returns false) if the panel isn't currently playing. */
-export async function stopLiveSim(page, scope) {
-    return page.evaluate((sel) => {
-        const root = document.querySelector(sel);
-        const btn = root && root.querySelector('.pp-run.on');
-        if (btn) { btn.click(); return true; }
-        return false;
-    }, scope);
+/** Click the panel's own Run/Stop toggle (while running, this stops AND resets to the start) inside `scope`.
+ *  Returns true if it stopped a running sim, false if none ever started within `timeout`.
+ *
+ *  t2419 (BACKLOG #56) — WHY THIS POLLS instead of checking once. The original was a single `.pp-run.on`
+ *  lookup, which encodes an assumption that is false under load: that the panel is ALREADY PLAYING by the
+ *  time we look. The panels auto-play ON MOUNT (header above) — so when a contended worker is slow, the
+ *  helper looks a beat too early, finds no `.on`, returns false, and does NOTHING. The sim then starts and
+ *  repaints straight through the caller's next click, which is precisely the actionability flake
+ *  `open-as-modal-1625.spec.js`'s "A REAL OPEN AFTER A PREVIEW…" showed on four consecutive full-suite runs
+ *  while passing 3/3 in isolation every time. Isolation is exactly the condition where the one-shot check
+ *  happens to be right, which is why the bug hid: the test was correct about WHAT to do and wrong about WHEN.
+ *
+ *  ⚠ COST: nil in the common case — the sim IS playing, the first poll clicks it and returns immediately.
+ *  The wait is only paid where no sim ever plays, and it is bounded. Do not raise the default casually:
+ *  every caller pays it in that case, and a long tail here is a slow suite, not a safer one. */
+export async function stopLiveSim(page, scope, { timeout = 2000 } = {}) {
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const stopped = await page.evaluate((sel) => {
+            const root = document.querySelector(sel);
+            const btn = root && root.querySelector('.pp-run.on');
+            if (btn) { btn.click(); return true; }
+            return false;
+        }, scope);
+        if (stopped) return true;
+        if (Date.now() >= deadline) return false;
+        await page.waitForTimeout(100);
+    }
 }
 
 /** t1794 — a real INSERT fires `showRoundTripToastOnce()` (wizardManager.js:72), the shared transient toast
