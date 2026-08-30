@@ -4080,11 +4080,16 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 > ```
 > desktop   hover opens the cascade; CLICK must open THE SAME element, never a second one
 > touch     tap opens THE SAME element — no hover exists, so tap is the only trigger
-> narrow    where a side-by-side flyout does not fit (~340px menu on a 390px screen), the SAME
->           element POSITIONS as a full-width overlay with a visible way BACK to the parent
->           — owner-chosen ("replace, but with a way back"). A POSITIONING MODE, not a
->           second implementation.
+> narrow    ⭐ NOTHING SPECIAL — same cascade, same size, beside its parent row, anchored
+>           to the block. Owner ruled 2026-08-29: "not a problem we can always pan the
+>           canvas to see the menu."
 > ```
+>
+> ⛔ **NO narrow-screen special case.** An earlier draft of this entry proposed a full-width overlay with a
+> back affordance; the owner rejected the premise — the menu hangs off a block ON A PANNABLE CANVAS, so a
+> flyout that lands off-screen is reached by panning, exactly like any other off-screen block. ⇒ One
+> behaviour on every device, no responsive branch, no back affordance to build. The edge-flip that already
+> ships is enough.
 >
 > ⛔ **Impossible-by-construction, not merely fixed:** one element, one open-state — there must be no code
 > path by which two panels can coexist. Prove it: open by hover, then click, and only one panel exists.
