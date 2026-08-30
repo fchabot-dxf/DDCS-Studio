@@ -4051,7 +4051,50 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 
 ---
 
-### 52. [✅ SHIPPED t2411 — hover/click/touch cascade, edge-flip, theme tokens on both the flyout and Blockly's own native menu, verified live incl. screenshots] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+### 52. [⛔ REOPENED 2026-08-29 — TWO LIVE IMPLEMENTATIONS OF ONE MENU ITEM. Owner ruled: **KEEP HOVER/CASCADE, RETIRE THE CLICK-REPLACE PATH**] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+
+> ## THE DEFECT — owner-observed on the deployed site, both screenshots supplied
+>
+> **t2387's click-popup was never retired when t2411 added the hover cascade, so BOTH are wired to the same
+> item and nothing makes them exclusive:**
+>
+> ```
+> CLICK  →  the OLD popup — REPLACES the parent menu (t2387's cursor-anchored panel)
+> HOVER  →  the NEW cascade — attached flyout, parent stays  (t2411)
+> BOTH   →  can be open AT THE SAME TIME       ← the owner's "its weird"
+> ```
+>
+> ⭐⭐ **AND IT EXPLAINS THE PHONE.** A tap IS a click and there is no hover, so mobile has been getting the
+> OLD path the whole time. The "replace" behaviour the owner reported on mobile was never a deliberate
+> adaptation — it is the un-retired t2387 popup. ⇒ ⛔ Do NOT "fix mobile" by keeping a second implementation;
+> that is the bug.
+>
+> ⚠ This is the repo's own two-things-that-must-agree-forever defect, self-inflicted one turn after
+> `blocksApp.js:958-960`'s comment warns against exactly it.
+>
+> ### THE RULING — owner, 2026-08-29: "hover"
+>
+> **ONE element survives: the t2411 cascade. DELETE the t2387 click-replace popup** (do not leave it dormant —
+> a dormant second path is how this happened).
+>
+> ```
+> desktop   hover opens the cascade; CLICK must open THE SAME element, never a second one
+> touch     tap opens THE SAME element — no hover exists, so tap is the only trigger
+> narrow    where a side-by-side flyout does not fit (~340px menu on a 390px screen), the SAME
+>           element POSITIONS as a full-width overlay with a visible way BACK to the parent
+>           — owner-chosen ("replace, but with a way back"). A POSITIONING MODE, not a
+>           second implementation.
+> ```
+>
+> ⛔ **Impossible-by-construction, not merely fixed:** one element, one open-state — there must be no code
+> path by which two panels can coexist. Prove it: open by hover, then click, and only one panel exists.
+>
+> **VERIFY:** desktop hover→click→hover sequences never double; touch tap opens the cascade (not the old
+> popup); at 390px the overlay has a working back affordance; edge-flip and theme tokens still hold.
+
+---
+
+### 52-ORIGINAL. [✅ SHIPPED t2411 — hover/click/touch cascade, edge-flip, theme tokens on both the flyout and Blockly's own native menu, verified live incl. screenshots] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
 
 *(owner, 2026-08-29, with a Windows Explorer screenshot: "right click submenu should be like this." Refines
 #42 piece 4's shipped fallback — the vendored Blockly has no native submenus (established t2389), so t2387
