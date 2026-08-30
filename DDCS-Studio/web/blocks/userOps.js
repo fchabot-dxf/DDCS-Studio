@@ -815,6 +815,13 @@ export function defaultParams(def) {
 // the PRUNED stack every build. A legacy def (no guards, frozen `bindings`) is UNCHANGED: pruneGuards is a no-op with no
 // guard blocks, and without bindingSpecs the frozen `bindings` are used exactly as before → byte-identical for every
 // existing user op (drill/slot/text/…), verified by their emit specs + the guard-prune regression.
+// t2425 (BACKLOG #41) — the metadata-leaf types whose OWN `params.param` names the bound param a "Freeze value"
+// gesture can target. `collapsed` is a native Blockly block property (see stackBridge.js's own KNOWN_LEAF_RECORD_
+// FIELDS) — purely a DERIVED visual this file applies from the declared source of truth (`params.frozenParams`,
+// below), never the other way around: a human collapsing some UNRELATED block via Blockly's own native "Collapse
+// Block" stays exactly that, an ordinary canvas tidy, not a frozen param.
+const FROZEN_MARKER_TYPES = new Set(['formfield', 'param_field', 'field_ref']);
+
 export function instantiate(def, params) {
     // ② B4 step 4b — fill STRUCTURAL binding defaults (guard-driving params with no block socket: bool probeZFirst, enum
     // travelApproach) for any absent param BEFORE prune. A bool guard tolerates undefined (whenOk coerces !!undefined=false),
@@ -833,6 +840,17 @@ export function instantiate(def, params) {
         const blk = flat[b.blockIndex];
         if (blk && blk.params && (b.key in blk.params)) {
             blk.params[b.key] = (p && b.param in p) ? p[b.param] : b.default;
+        }
+    }
+    // t2425 (BACKLOG #41) — FREEZE: mark whichever metadata leaf PLACES a frozen param's row `collapsed`, so a
+    // reload (opFromMarker → this same function) reconstructs the SAME visual a live "Freeze value" gesture set
+    // directly on the canvas, rather than reverting to expanded the moment the page refreshes. `frozenParams` is
+    // read from `p` (the guard-defaulted params), never re-declared per def — this applies uniformly to any
+    // user_* op, no per-twin wiring required, matching the dispatch's own "smaller than it looks" scope.
+    const frozen = (p && Array.isArray(p.frozenParams)) ? new Set(p.frozenParams) : null;
+    if (frozen && frozen.size) {
+        for (const blk of flat) {
+            if (blk && FROZEN_MARKER_TYPES.has(blk.type) && blk.params && frozen.has(blk.params.param)) blk.collapsed = true;
         }
     }
     return clone;

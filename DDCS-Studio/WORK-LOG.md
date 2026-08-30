@@ -64452,3 +64452,89 @@ degrading factor, but also not the clean "same set, stop re-triaging" case eithe
 than picked to fit either box, since the advisor's own point (a repeated excuse is how a real problem gets
 normalised) applies exactly as much to overclaiming "explained" as to under-claiming "concerning."
 
+## t2425 — BACKLOG #41 SHIPPED: FREEZE, the third state between KNOB and DISABLED
+
+Built exactly the owner's own ruling (BACKLOG.md #41, 2026-08-28) — no design decisions of this turn's own,
+only implementation ones. ⛔ DISABLE ≠ FREEZE stayed the one constraint checked at every step: disable means
+"it does not happen"; freeze means "it still happens, you just stop being asked."
+
+**The mechanism, matching #23's own precedent exactly:** `frozenParams: string[]` lives on the op's own
+`params` (`userOps.js`), never on Blockly block state — `opFromMarker` regenerates children from params on
+every reload, so anything living only on the block would be forgotten, which is #23's whole lesson and the
+dispatch's own named hazard. `instantiate(def, params)` reads it and marks whichever `formfield`/`param_field`/
+`field_ref` leaf places that param's row `.collapsed = true`. Verified live, not assumed: `emitMapped()` on a
+frozen vs. unfrozen tree is byte-identical G-code — freeze never touches emit, only which leaf renders
+collapsed.
+
+**Form suppression is a NEW, separate seam, not `_seed` reused.** `userOpView.js` gained `setFrozen(list)` /
+`_frozenExtra`, filtering `formBindings(_def)` before either the tree walk or its own orphan-net fallback (both
+key off the same `byParam`, built from the same filtered `binds` — one filter point covers both paths). Traced
+why NOT `_seed`: the "Customize as blocks" canvas (`window.ddcsEditWizardDef`) is the only place formfield/
+param_field blocks materialize at all — a normally PLACED op's own canvas shows zero of them, confirmed live —
+and that canvas never calls `view.setForm(params)` (it renders straight off the live template, not a seeded
+snapshot). Routing frozen state through `_seed` would have started overriding binding defaults there too, a
+real behavior change this turn never asked for.
+
+**The gesture**: "❄ Freeze value" / "❄ Unfreeze value" in the SAME "Block options…" submenu t2387 built and
+t2423 fixed, gated on the block's own bound `param` field (`boundParamOf`) — not on row-existence, since
+freezing removing the row is the point; gating on the row would make the item vanish the instant it's used with
+no way back. `toggleFreeze` (blocksApp.js) does the light `.data`-patch + `reproject()` (t2413's own precedent
+for a non-structural write — freeze never changes the exec-atom tree, so no heavy `mergeOpBlocks` rebuild is
+needed).
+
+**One reachability finding worth flagging plainly**: the gesture is only reachable via "Customize as blocks"
+today, since that's the only canvas where formfield/param_field blocks exist to right-click at all. That
+matches the dispatch's own hazard example ("freezing depth at 6mm and forking that wizard") — this is
+authoring-time freezing of a wizard TEMPLATE, not per-instance freezing of an already-placed op. Not a gap
+against the ruling (the ruling never asked for the latter), just naming which surface actually got built.
+
+**One test-infrastructure bug found and fixed along the way, not in app code**: the first version of a "live"
+test (patch `.data.params.frozenParams` directly, skip the flaky canvas gesture, verify the form drops the row)
+read the reload input back from `window.ddcsGetBlockProgram()` — which is `programModel.js`'s own CACHED
+stack. A raw `.data` mutation on the live workspace block never updates that cache (only `reproject()`'s own
+explicit `setStack(workspaceToStack(ws), ...)` call does), so reading it back silently reloaded the STALE
+pre-patch stack and erased the patch before the assertion ever ran — the test's own `TimeoutError` was the cache
+staleness, not a mechanism bug. Fixed by reading `workspaceToStack(ws)` (dynamically imported from
+`stackBridge.js`, the same call `reproject()` itself makes) instead — the same fix incidentally exercises the
+real round-trip through `stackToWorkspace`/`deriveLiveWizard`'s own `setFrozen` wiring, which the original
+version never actually reached.
+
+**The right-click→hover→click DOM gesture itself stayed genuinely unreliable in this harness**, confirmed by
+running it 4x with zero retries: 4/4 failures, not a rare flake. Root, read from `blocksApp.js`'s own comment on
+the registry callback: Blockly tears its own context-menu DOM down BEFORE `ddcsBlockOptions`'s `callback` runs,
+so the callback reads a rect CACHED at paint time by a MutationObserver rather than anything live — timing this
+precisely through a real mouse click against Corner's own 16-row chained param_field stack (each row's
+`getSvgRoot()` returning the WHOLE remaining chain's bounding box, not a tight per-row one, established live
+this turn) proved unreliable exactly the way the earlier debugging in this same turn already suspected. Per
+this project's own standing discipline against shipping a flaky test that asserts the wrong thing green, the
+menu-contents test was rewritten to call `Blockly.ContextMenuRegistry.registry.getItem('ddcsBlockOptions').callback(...)`
+directly — same production `itemsFor()` call a real click/tap/keyboard-Enter activates (blocksApp.js's own
+comment: "the ONE activation path"), with a synthetic cached rect standing in for the MutationObserver's own —
+zero DOM right-click, zero hover-timing race. Passed 3/3 clean runs with no retries after the rewrite. The two
+now-unused helper functions (`rightClickBlock`, `openBlockOptionsFlyout`, `clickFlyoutItem`) were deleted along
+with the flaky test they only served, not left as dead code.
+
+**Non-vacuous, checked directly**: all 4 tests in `tests/freeze-value-2425.spec.js` fail 4/4 against the
+pre-change tree (source files reverted to HEAD via `git checkout`, own edits restored from a scratch copy
+afterward — not from HEAD, since the edits were themselves uncommitted this turn).
+
+**Left open, named rather than smoothed over**: Blockly's native collapsed-block rendering is crowded for a
+multi-field block like `param_field` — label, value, and units all fight for the one collapsed summary line. A
+`.toString()` override was tried mid-turn and produced overlapping, less legible text than the native rendering
+it was meant to improve — backed out rather than shipped half-working. The STATE itself (collapsed = "not in
+form") is correct, verified, and round-trips cleanly; only the collapsed block's own visual polish remains a
+known gap, documented in BACKLOG.md #41 rather than silently left for someone to rediscover.
+
+**Full suite (Rule 1b — `userOps.js`/`userOpView.js`/`blocksApp.js` are shared)**: 2967 passed / 4 failed / 16
+flaky / 26 skipped. The 4 reds (`pull-v41-wcs`'s coord1 review, `tooltable-gate-1890`'s grbl gate,
+`wizard-face-1599`'s fork-only-twin render, `workspace-manager-1223`'s quick-menu buttons) all re-ran clean in
+isolation (16/16 passed, 4 parallel workers, zero retries) — none touch freeze/param_field/frozenParams, and two
+of the four (`pull-v41-wcs`, `tooltable-gate-1890`) are named in t2419's own already-documented persisting-flake
+set. Cross-suite contention noise, matching BACKLOG #56's own established characterization of this suite, not a
+regression from this turn's own change.
+
+Files: `web/blocks/userOps.js`, `web/wizards/views/userOpView.js`, `web/blocks/blocksApp.js`,
+`tests/freeze-value-2425.spec.js` (new), `BACKLOG.md`.
+
+No `proc_health.py` leaks this turn — Playwright's own dev server and workers exit cleanly with the test run.
+

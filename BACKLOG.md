@@ -3394,7 +3394,7 @@ there is provably invented. No writes needed to observe it.
 
 ---
 
-### 41. YOU CANNOT REMOVE A FIELD FROM A WIZARD'S FORM — the app silently undoes it
+### 41. [✅ SHIPPED t2425 — `frozenParams` on the op's own params, `collapsed` derived from it in `instantiate()`; reachable today only via "Customize as blocks" (a normally placed op's canvas carries no formfield/param_field blocks at all)] YOU CANNOT REMOVE A FIELD FROM A WIZARD'S FORM — the app silently undoes it
 
 *(owner-reported live 2026-08-28: **"i delete blocks and row of form field dont get removed"**. Diagnosed
 across four dead theories — recorded below so nobody re-walks them.)*
@@ -3495,6 +3495,40 @@ from the start.
 ### STILL REAL IF
 
 Open any wizard in Blocks, delete a `formfield` block, and look at the form. **Row still there = STILL REAL.**
+
+### ✅ SHIPPED t2425 — built exactly the ruling above, one gap left open and named
+
+- **`frozenParams: string[]`** lives on the op's own `params` (`userOps.js`), never on a Blockly block —
+  survives `opFromMarker`'s reconstruction the same way any other param does, verified via a direct round-trip
+  call (freeze → `opFromMarker` → the rebuilt tree still shows the same `collapsed` leaf).
+- `instantiate(def, params)` marks whichever `formfield`/`param_field`/`field_ref` leaf places a frozen param's
+  row `.collapsed = true`. Never touches emit — verified byte-identical G-code frozen vs. unfrozen.
+- `userOpView.js` gained a **separate** `setFrozen(list)` / `_frozenExtra`, not reused from `_seed` — the
+  "Customize as blocks" canvas never calls `setForm(params)` (it renders straight off the live template), so
+  routing frozen state through `_seed` would have started overriding binding defaults there too, a real
+  behavior change outside freeze's own scope.
+- The gesture lives in "Block options…" (t2387/t2423's own submenu) as **❄ Freeze value / ❄ Unfreeze value**,
+  gated on the block's own bound `param` field — not on row-existence (freezing removes the row by design;
+  gating on the row would make the item vanish the instant it's used, with no way back).
+- ⚠ **Reachability, established live, not assumed:** a normally PLACED op's own canvas renders **zero**
+  formfield/param_field blocks — they only materialize in "Customize as blocks"
+  (`window.ddcsEditWizardDef`). So today the gesture is reachable exactly where the ruling's own hazard example
+  lives ("freezing depth at 6mm and forking that wizard") — placing/authoring a wizard, not editing an
+  already-placed op instance.
+- ⚠ **Left open, honestly, not silently:** Blockly's native collapsed-block rendering is crowded for a
+  multi-field block like `param_field` (label + value + units all fight for the one collapsed summary line). A
+  `.toString()` override was tried and produced overlapping text — worse, not better — so it was backed out
+  rather than shipped half-working. The state itself (collapsed = "not in form") is correct and round-trips;
+  only the collapsed block's own visual polish is a known gap.
+- Tests: `tests/freeze-value-2425.spec.js` — two direct unit tests (byte-identical emit + collapse-marking;
+  the full `opFromMarker` round-trip), one "live" test that patches `.data.params.frozenParams` the same way
+  `toggleFreeze` does and reads the live workspace back via `workspaceToStack` (NOT
+  `window.ddcsGetBlockProgram()`, which is a cache a raw `.data` patch never updates — reading it back would
+  silently reload the stale pre-patch value), and one menu-contents check that calls the `ddcsBlockOptions`
+  `ContextMenuRegistry` entry's own `callback` directly rather than driving an actual right-click. The last one
+  replaced a genuinely-unreliable full right-click→hover→click DOM chain against Corner's own 16-row chained
+  param_field stack (failed 4/4 clean runs, no retries — not a rare flake); the registry-level version passed
+  3/3 clean runs. All 4 tests independently proven non-vacuous: fail 4/4 against the pre-change tree.
 
 ---
 

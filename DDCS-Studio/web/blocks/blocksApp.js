@@ -887,7 +887,7 @@ async function buildWorkspace() {
     // Every other branch below (empty / hasTree / mid-edit) is untouched and still targets `formHost`.
     if (blkHost) blkHost.style.display = 'none';
     formHost.style.display = '';
-    const { def, stack, authoredHere, customizing, userRoot, placedOpFallback } = deriveLiveWizard();
+    const { def, stack, authoredHere, customizing, userRoot, placedOpFallback, opBlock } = deriveLiveWizard();
 
     function checkLayoutNodes(nodes) {
       for (const n of childrenOf(nodes)) {
@@ -964,6 +964,12 @@ async function buildWorkspace() {
         formHost.style.display = 'none';
         blkHost.style.display = '';
         blkView.setUserOpDef(liveDef);
+        // t2425 (BACKLOG #41) — FREEZE: this branch never calls `setForm(params)` (see userOpView.js's own
+        // `_frozenExtra` comment), so the form has no other way to learn which params are frozen for THIS live
+        // op. `opBlock.params` is the same store the disable/freeze gesture itself writes to (blocksApp.js's
+        // own `registerBlockOptionsMenu`, `toggleFreeze`) and `deriveLiveWizard`'s own `placedOpFallback`
+        // branch already treats as authoritative for a placed op's current values.
+        blkView.view.setFrozen(opBlock && Array.isArray(opBlock.params && opBlock.params.frozenParams) ? opBlock.params.frozenParams : null);
         if (blkLastOpType === def.opType) {
           blkView.view.refresh(blkMgr());
         } else {
@@ -1238,16 +1244,62 @@ async function buildWorkspace() {
       row.classList.add('ddcs-reveal-glow');
       row.addEventListener('animationend', () => row.classList.remove('ddcs-reveal-glow'), { once: true });
     };
+    // t2425 (BACKLOG #41) — FREEZE. `boundParamOf` deliberately does NOT require a currently-visible row the
+    // way `formRowFor` does: once frozen, the row is gone BY DESIGN, and gating the menu item on "does a row
+    // exist right now" would make the item vanish the instant it's used, with no way back to unfreeze. It only
+    // needs the block's own declared `param` field — real regardless of whether that param's row is currently
+    // rendered, suppressed by freeze, or the tree just hasn't drawn yet.
+    const FROZEN_MARKER_TYPES = new Set(['formfield', 'param_field', 'field_ref']);
+    const boundParamOf = (blk) => {
+      if (!blk || !FROZEN_MARKER_TYPES.has(blk.type)) return null;
+      const param = blk.getFieldValue('PARAM');
+      return param || null;
+    };
+    // The op block this canvas block sits inside — same walk t2415's own disabled-sync change listener already
+    // uses (below, in the ws.addChangeListener block), reused rather than re-derived a second way.
+    const enclosingOp = (blk) => {
+      let opBlk = blk && blk.getSurroundParent && blk.getSurroundParent();
+      while (opBlk && opBlk.type !== 'op') opBlk = opBlk.getSurroundParent && opBlk.getSurroundParent();
+      return opBlk || null;
+    };
+    const opMetaOf = (opBlk) => { try { return JSON.parse(opBlk.data || '{}'); } catch (_) { return {}; } };
+    const frozenSetOf = (opBlk) => new Set(Array.isArray(opMetaOf(opBlk).params && opMetaOf(opBlk).params.frozenParams) ? opMetaOf(opBlk).params.frozenParams : []);
+    const isFrozen = (blk) => {
+      const param = boundParamOf(blk); const opBlk = param && enclosingOp(blk);
+      return !!(opBlk && frozenSetOf(opBlk).has(param));
+    };
+    // t2425 — FREEZE never touches the op's own exec atoms (the metadata leaf that places a row emits nothing
+    // either way, frozen or not — BACKLOG #41's own point: "still emits, you just stop being asked") — so this
+    // stays the LIGHT `.data`-patch + reproject() path (t2413's own precedent for a value-socket write), never
+    // the heavy mergeOpBlocks/replaceOp rebuild t2415's own STRUCTURAL toggle needs (that one changes the op's
+    // shape; this one only changes which row a form shows and one block's own collapsed state). Directly
+    // toggling `.setCollapsed` on the LIVE block gives immediate canvas feedback in the same gesture that
+    // patches `params.frozenParams` — the declared, persisted source of truth `instantiate()` (userOps.js)
+    // reads on a reload, so a fresh reimport reconstructs the identical collapsed visual independently.
+    const toggleFreeze = (blk) => {
+      const param = boundParamOf(blk); const opBlk = enclosingOp(blk);
+      if (!param || !opBlk) return;
+      const meta = opMetaOf(opBlk);
+      const cur = new Set(Array.isArray(meta.params && meta.params.frozenParams) ? meta.params.frozenParams : []);
+      const nowFrozen = !cur.has(param);
+      if (nowFrozen) cur.add(param); else cur.delete(param);
+      meta.params = { ...(meta.params || {}), frozenParams: Array.from(cur) };
+      opBlk.data = JSON.stringify(meta);
+      try { blk.setCollapsed(nowFrozen); } catch (_) { /* older Blockly — the declared param still round-trips, just no same-frame visual */ }
+      reproject();
+      toast(nowFrozen ? 'Frozen — value still emits, no longer in the form.' : 'Unfrozen — back in the form.');
+    };
     const BLOCK_OPTIONS_LABEL = 'Block options…';
     const itemsFor = (blk) => {
       const items = pendingEnablers(blk).map((en) => ({ label: `+ ${en.label}`, fn: () => reveal(blk, en) }));
+      if (boundParamOf(blk)) items.push({ label: isFrozen(blk) ? '❄ Unfreeze value' : '❄ Freeze value', fn: () => toggleFreeze(blk) });
       if (formRowFor(blk)) items.push({ label: 'Show in form', fn: () => showInForm(blk) });
       return items;
     };
     try { CMR.registry.unregister('ddcsBlockOptions'); } catch (_) { /* first run */ }
     CMR.registry.register({
       id: 'ddcsBlockOptions', weight: 200, scopeType: CMR.ScopeType.BLOCK,
-      preconditionFn: (scope) => (pendingEnablers(scope.block).length || formRowFor(scope.block) ? 'enabled' : 'hidden'),
+      preconditionFn: (scope) => (pendingEnablers(scope.block).length || formRowFor(scope.block) || boundParamOf(scope.block) ? 'enabled' : 'hidden'),
       displayText: () => BLOCK_OPTIONS_LABEL,
       // t2417 (BACKLOG #52) — THE ONE ACTIVATION PATH: Blockly invokes this for a real click, a touch tap, AND
       // keyboard arrow+Enter alike (its own native "activate this item" contract, guaranteed for all three —

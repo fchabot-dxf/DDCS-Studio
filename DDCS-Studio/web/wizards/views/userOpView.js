@@ -222,6 +222,15 @@ export function createUserOpView(ns, opts) {
 
     let _def = null;          // the active custom-op def (template + bindings + panel)
     let _seed = null;         // params to seed the widgets with (edit), or null (defaults)
+    // t2425 (BACKLOG #41) — FREEZE's own list of currently-frozen param names, SEPARATE from `_seed`: the
+    // Blocks pane's "Customize as blocks" flow (blocksApp.js's `renderLiveForm`, the `hasTree` branch) never
+    // calls `setForm(params)` at all — it renders straight off the live canvas's own template, so `_seed` stays
+    // null there the whole time. Routing frozen-state through `_seed` too would mean ALSO wiring `setForm` into
+    // that flow, which would additionally start overriding every binding's own default from the op's current
+    // params (line below, in render()) — a real behavior change outside freeze's own scope. A dedicated setter
+    // keeps the two concerns apart: `_seed` still means exactly what it always meant, `_frozenExtra` means only
+    // "these params are frozen right now," and whichever caller has the fact at hand supplies it.
+    let _frozenExtra = null;
     let _readers = [];        // [() → { param: value }] one per rendered widget unit
     let _mgr = null;
     // t120 — CORNER-MARKER INDEPENDENCE (Option A): each corner-datum canvas handle stores a DATUM-RELATIVE spot ({dx,dy} off
@@ -383,7 +392,17 @@ export function createUserOpView(ns, opts) {
         // seed: override each binding's default with the op's param when editing (so the widgets show its values). S5.2 —
         // formBindings supplies the param_field-driven order/presentation when a param_group is present (else the bindings,
         // unchanged); the seed value then wins for the shown default, exactly as before.
-        const binds = formBindings(_def).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
+        // t2425 (BACKLOG #41) — FREEZE: a frozen param is dropped from `binds` BEFORE anything downstream ever sees it —
+        // not hidden after rendering, not filtered inside the tree traversal or the orphan net separately. This one cut
+        // covers both render paths (`renderUiTree`'s tree walk AND its own orphan-net fallback both key off `byParam`,
+        // built from `binds`; the flat/non-tree path renders `binds` directly) without touching either downstream
+        // consumer — `formWidgets.js` never learns "frozen" as a concept at all. `frozenParams` is read from the SAME
+        // `_seed` (the placed instance's own live params) the line above already reads — never Blockly block state,
+        // per the entry's own ruling; that is what lets it round-trip through `opFromMarker` and survive a reload.
+        const frozenParams = new Set(_frozenExtra != null ? _frozenExtra : (Array.isArray(_seed && _seed.frozenParams) ? _seed.frozenParams : []));
+        const binds = formBindings(_def)
+            .filter((b) => !frozenParams.has(b.param))
+            .map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
 
         // t1740 — STRUCTURE-UNCHANGED SYNC-IN-PLACE, opt-in via `onFieldWrite`. The modal (createUserOpView(null),
         // no second arg) never sets it and opens once — render() runs once per open, never again mid-edit (every
@@ -474,6 +493,8 @@ export function createUserOpView(ns, opts) {
         // (Set Output / Wait Input / Dwell) open user_io_step with the matching mode. Only ops that HAVE a `mode` binding; runs
         // before onShow→render so the seeded default shows. A fresh open (no variant) is unaffected; opensAs entries pass none.
         applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
+        // t2425 (BACKLOG #41) — see `_frozenExtra`'s own comment above for why this is separate from `setForm`.
+        setFrozen(list) { _frozenExtra = Array.isArray(list) ? list : null; },
 
         onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; clearPreviewOnlyParams(); _clearThrottle(); applyPanel(); const h = elNS('wiz_user_form'); if (h) h.__sig = null; render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t1648 clear the preview-only side-store too; t808 drop any pending throttled update; t1740 — reset the sync-in-place signature too, so a fresh op never syncs-in-place against a DIFFERENT op's stale structure
         // t1746 ACT 1b-ii-FIX — the LIGHTER entry point a continuously-live host (the Blocks pane) needs for a
