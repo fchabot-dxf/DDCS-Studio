@@ -251,19 +251,37 @@ test('end-to-end (t2417): hover then click — impossible for two panels to coex
 
 test.describe('touch-emulated context (t2417)', () => {
   test.use({ hasTouch: true, viewport: { width: 1400, height: 1000 } });
-  test('end-to-end: a real touch tap on "Block options…" opens the cascade (no hover exists on touch, so tap is the only trigger)', async ({ page }) => {
+  test('end-to-end: a real touch tap on "Block options…" opens the cascade, correctly ANCHORED (no hover exists on touch, so tap is the only trigger)', async ({ page }) => {
     const box = await bootFormfield(page);
     await page.mouse.click(box.x + 20, box.y + 8, { button: 'right' });
     await page.waitForTimeout(250);
     const rowBox = await rowRectFor(page, 'Block options…');
     expect(rowBox).not.toBeNull();
+    // t2419 — the amendment's own suspicion (owner-reported: flyout renders bottom-left on a real phone, the
+    // parent menu already gone). Established live BEFORE writing anything: Blockly's own vendored
+    // `onAction` (blockly_compressed.js) calls `hide()` (synchronous — the row is gone from the DOM
+    // immediately) THEN schedules the registered callback via `requestAnimationFrame(() =>
+    // setTimeout(callback, 0))` — a real, multi-frame deferral, not "basically immediate." This test now
+    // explicitly waits past at least one animation frame before tapping, closer to how a slower/real device's
+    // paint-then-tap timing would actually land, and checks the RESULTING POSITION (t2417's own touch test
+    // never did — it only checked that the cascade opened, not where).
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20))));
     await page.touchscreen.tap(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
     await page.waitForTimeout(400);
     const state = await page.evaluate(() => {
       const flyout = document.querySelector('.op-ctx-menu');
-      return { flyoutOpen: !!flyout && !flyout.hidden, items: flyout ? Array.from(flyout.children).map((c) => c.textContent) : [] };
+      const r = flyout ? flyout.getBoundingClientRect() : null;
+      return {
+        flyoutOpen: !!flyout && !flyout.hidden, rect: r,
+        items: flyout ? Array.from(flyout.children).map((c) => c.textContent) : [],
+      };
     });
     expect(state.flyoutOpen, 'a real tap opens the cascade').toBe(true);
     expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+    // row-ANCHORED, not dumped near the viewport origin (the reported symptom) — its left edge sits at or past
+    // the row's own right edge, and its top is close to the row's own top (clamped into the viewport, so
+    // "close to" rather than exact — the same tolerance the desktop click test's own position check allows).
+    expect(state.rect.left, 'anchored beside the row, not collapsed toward (0,0)/viewport origin').toBeGreaterThan(rowBox.x + rowBox.width - 1);
+    expect(state.rect.top, 'top stays near the row it hangs off, not dumped at the viewport bottom').toBeLessThan(rowBox.y + 100);
   });
 });

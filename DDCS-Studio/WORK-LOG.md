@@ -64139,3 +64139,103 @@ Rule 1b rather than assumed:
 
 Nothing in this suite's own findings changed any of the four fixes above.
 
+## t2419 — corrected the mobile wizard buttons' scope (the advisor's own error, not this turn's) + verified
+## the advisor's unverified BACKLOG #56 stopLiveSim fix
+
+### The scoping correction
+
+t2417's own dispatch (from the advisor) said `.wizard-btn` — the TRIGGER PILL that opens a wizard group's
+dropdown tray ("Setup ▼", "Probe ▼", …). Built and verified exactly that, correctly, per the dispatch. The
+owner's actual ask, though, was for the ROWS INSIDE the tray (Drill/Bore/Pocket/Contour/Slot/Surfacing/…) — the
+advisor scoped the wrong element and said so plainly this turn ("I wrote the wrong element... you built exactly
+what I wrote").
+
+**Reverted** the trigger-pill `min-height:44px` rule outright — back to the base `.toolbar-btn` sizing,
+measured 32px at 390px again, matching the exact pre-t2417 baseline. Per the dispatch's own conditional ("unless
+reverting re-introduces a REAL accessibility problem... STOP and say so"): this DOES reintroduce the same
+sub-floor tap target the earlier measurement found — that's not a new discovery, it's the same known number,
+and the owner's own correction already weighed it against their explicit "i didnt ask" and chose revert anyway.
+Reported plainly rather than silently decided.
+
+**Measured the actual target before touching CSS**, per the same discipline as t2417: the real rendered tray
+row (`.toolbar-dropdown-content button`, no dedicated class of its own — `wizItemHtml` in commandDeck.js emits
+a bare `<button data-optype>`) was **31.6px tall at 390px** — under the floor, essentially the same number the
+trigger pill had, despite the owner's own screenshot making the tray rows LOOK generous (a measurement the
+dispatch itself flagged as possibly showing nothing was needed — it didn't; reported plainly either way, not
+manufactured to justify a change).
+
+**Fix**: `.toolbar-dropdown-content button { min-height: 44px }` inside the same `@media (max-width: 600px)`
+pattern, colocated with the base rule (styles.css:1659) rather than in the header-focused section t2417's rule
+lived in, since this is a different component. Vertical axis only — no padding-left/right in the new rule,
+confirmed measured byte-identical mobile vs desktop. The tray container's own `max-height`/`overflow-y:auto`
+(styles.css:1645-1646, pre-existing) means taller rows just make that scroll trigger sooner with MORE items,
+never a new failure mode — checked live across all 5 wizard groups (4 to 8 items each) at 390px: none overflow
+even at the largest (8 items × 44px = well under an 844px viewport).
+
+`tests/mobile-wizard-btn-touch-floor-2417.spec.js` rewritten in place (same file, corrected scope — kept the
+t2417 name per this project's own precedent of narrowing a spec in place rather than orphaning it, matching
+how `blocks-context-flyout-2411.spec.js` was itself narrowed in t2417): asserts the trigger pill is back to
+exactly 32px (a REGRESSION test, not a range check — a future accidental re-growth of the wrong element fails
+loudly), the tray rows reach ≥44px, desktop is unaffected for both elements, horizontal padding is untouched,
+and no group's tray overflows. Non-vacuous: reverted via `git stash` to the t2417-scoped CSS, both the
+trigger-reverted and tray-floor assertions fail with the exact predicted numbers (32→smaller-than-32 isn't
+right — actually: pre-t2419 the trigger was 44 not 32, and rows were 31.6 not ≥44; both failed as expected).
+
+### Verifying the advisor's own unverified BACKLOG #56 fix
+
+The advisor edited `tests/support/simControls.js`'s `stopLiveSim` directly (commit `dcf8d924`, while my own
+t2417 suite was live and this project serializes Playwright runs) — `.pp-run.on` was a ONE-SHOT lookup that
+silently no-ops when a contended worker hasn't started the auto-playing sim yet; it now POLLS (bounded 2s,
+100ms interval) until a running sim appears or the deadline passes. Committed unverified by the advisor's own
+admission. This turn's full suite is its first real exercise — see the pass-back note for the actual tally
+(`open-as-modal-1625` pass/fail, and whether the overall flaky count moved versus t2417's own 8-flaky
+baseline).
+
+**Result: 0 failed (up from 3 in t2417's own run), 12 flaky (up from 8).** Read the JSON reporter's own
+per-test output (`test-results/summary.json`) rather than the aggregate progress line, since neither names
+individual flaky tests. `open-as-modal-1625.spec.js`'s own target test IS in the flaky list — but that's
+real progress, not a wash: across t2407/t2409/t2411/t2413 it was an OUTRIGHT, un-retried-away failure every
+single time (BACKLOG #56's own words: "the SOLE (or dominant) full-suite failure four turns running"); this
+turn it failed once then PASSED on Playwright's own retry — which is exactly the shape the polling fix
+predicts (a contended worker eventually catches the sim once it starts, instead of never checking again). The
+flaky COUNT going UP (8→12) is the advisor's own predicted mechanism too ("a dozen specs call that helper, so
+several may have been silently no-oping the same way") — several OTHER specs now show up as flaky rather than
+either quietly no-oping with wrong-but-passing state, or (like `open-as-modal-1625` before) failing outright.
+Reported as genuine improvement with an honest caveat, not oversold as "fixed" — the flake isn't eliminated,
+it now recovers.
+
+### The fourth item — a real touch-positioning bug the owner found on the deployed build, NOT reproduced here
+
+Owner, on V2026.08.30.1, two phone screenshots: tapping "Block options…" renders the flyout at the viewport's
+bottom-left, nowhere near the row, with the parent menu already gone. The advisor's own theory: the parent
+closing causes the flyout to compute its anchor against a stale/zero rect.
+
+**Established live before touching anything**: dumped Blockly's own vendored `onAction` handler
+(`blockly_compressed.js`) for how it invokes a registered menu item's callback —
+`h.onAction(function(k,l){hide$$…contextmenu();requestAnimationFrame(()=>{setTimeout(()=>{g.callback(…)},0)})
+})`. Two facts this settles: (1) `hide()` runs SYNCHRONOUSLY the instant any item activates — the parent
+menu closing on click/tap is unconditional Blockly behavior, not something t2417's own code causes or could
+prevent without abandoning the registered-callback path entirely (which is what caused BACKLOG #52's own
+original defect — a real risk, not a free change). (2) the registered callback itself doesn't run until AFTER
+a `requestAnimationFrame` + `setTimeout(0)` — a genuine multi-frame deferral, longer than "immediately after,"
+which is new information worth recording for whoever picks this up next.
+
+**Directly tested the advisor's own theory and could not confirm it**: `window.__ddcsBlockOptionsRowRect`
+(t2417's own paint-time cache, built specifically to route around the row being gone by callback time) reads
+correctly populated, non-stale, non-zero at the moment of tap in every repro attempted — including one that
+explicitly waits past an animation frame + tick before tapping, to approximate the newly-discovered deferral
+more faithfully than the original t2417 touch test did. The resulting flyout position is correctly ANCHORED
+beside the row in every attempt (`tests/blocks-context-flyout-2411.spec.js`'s own touch-emulated test now
+asserts POSITION, not just that something opened — a real verification gap in t2417's own test, closed
+regardless of this bug's outcome).
+
+**Not fixed this turn.** Per the amendment's own explicit permission ("if you cannot drive a genuine two-
+finger gesture convincingly, say so plainly" — the same standing caveat from t2417's own BACKLOG #51 work,
+equally true here): a real touchscreen browser's own chrome (URL bar show/hide, visual-viewport resize on
+scroll) during a long-press-then-tap sequence is the most plausible remaining candidate for a viewport-
+relative rect going stale between paint and use, and it is not something a headless/emulated-touch harness
+can reproduce. Did NOT paper over it with a fixed-corner position or by force-reopening the parent, per the
+dispatch's own explicit prohibition — both would trade a real device bug for a worse, permanently-wrong one.
+Flagged for the owner to re-test on the current deployed build with the Blockly-timing finding recorded as
+the lead, rather than guessed at blind.
+

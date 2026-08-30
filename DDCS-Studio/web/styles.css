@@ -1671,6 +1671,19 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 .toolbar-dropdown-content button:first-child { border-top: none; }
 
+/* t2419 (mobile wizard buttons, CORRECTED SCOPE — the tray ITEM rows, not the trigger pill t2417 wrongly
+   grew) — MEASURED, not guessed, before touching CSS: the real rendered tray button (getBoundingClientRect)
+   was 31.6px tall at a 390px viewport — under the 44-48px touch floor, same as the trigger pill was, despite
+   looking generous in the owner's own screenshot. Owner's standing ruling: GO TO THE FLOOR. VERTICAL AXIS
+   ONLY — `min-height` alone reaches it (no padding-left/right touched; these rows are already `width: 100%`
+   block-level, so there is no horizontal collapse-ladder to disturb the way the header trigger bar has). The
+   tray's own container already caps at `max-height: calc(100vh - 40px)` with `overflow-y: auto`
+   (styles.css:1645-1646) — taller rows simply make that scroll trigger sooner with more items, not a new
+   failure mode. */
+@media (max-width: 600px) {
+    .toolbar-dropdown-content button { min-height: 44px; }
+}
+
 /* t2245 — the group sub-label (commandDeck.js's `wizGroupHtml`, e.g. "ROTARY") is the only plain <div> among
    this flex column's children, so this selector reaches exactly it and nothing else. The container's own
    `gap: 4px` (above) applies uniformly between EVERY child, so without this the label sat EXACTLY as far from
@@ -2082,21 +2095,13 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     .dock-header .header-controls { padding: 6px 6px; gap: 4px; }
 }
 
-/* t2417 (mobile wizard buttons, deferred from t2415, ruled to the touch floor) — MEASURED, not guessed: the
-   real rendered `.wizard-btn` (getBoundingClientRect, not CSS) was 32px tall at a 390px viewport — well under
-   both the Apple 44pt and Google 48dp minimum tap target. `.wizard-btn` ONLY — never `.toolbar-btn` globally,
-   which would also grow the editor-keys row and every other toolbar button this bar shares chrome with.
-   VERTICAL AXIS ONLY, per the ruling: `min-height` alone reaches the floor because `.dock-header .toolbar-btn`
-   is already `display:inline-flex; align-items:center` (styles.css:2067) — the icon/caret/label re-center in
-   the taller box for free, no padding-top/bottom math needed. Horizontal/inline padding is UNTOUCHED here on
-   purpose: it is the one axis the header's own priority-collapse width measurement depends on
-   (HEADER_YIELD, commandDeck.js:15; the measured widths this rule must not perturb live at styles.css:2059). */
-@media (max-width: 600px) {
-    /* `.dock-header .wizard-btn` (not bare `.wizard-btn`) — needs to out-specificity `.toolbar-btn`'s own
-       `min-height: 24px` (styles.css:2314-2329), which sits LATER in this file and would otherwise win the
-       cascade on a same-specificity source-order tie. */
-    .dock-header .wizard-btn { min-height: 44px; }
-}
+/* t2419 — REVERTED. t2417 grew `.wizard-btn` (the TRIGGER pill that OPENS a wizard group's dropdown tray) to
+   the 44px touch floor, but the owner's actual ask was for the rows INSIDE the tray (Drill/Bore/Pocket/…) —
+   the advisor's own dispatch scoped the wrong element ("so you changed the size of the trigger wizard in the
+   bar but i didnt ask"). Reverted to pre-t2417: back to the base `.toolbar-btn` sizing (measured 32px at
+   390px again — see `.toolbar-dropdown-content button` below for the element actually asked for, and the
+   reported pre/post numbers in WORK-LOG.md for the accessibility trade-off this revert reintroduces, which is
+   the owner's own call, not silently made here). */
 
 /* Row 2: Macro Grid */
 .macro-grid-area {

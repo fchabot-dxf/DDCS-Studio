@@ -2163,6 +2163,19 @@ gets built.
 > only, horizontal padding measured byte-identical before/after; the priority-collapse ladder re-checked at
 > 320px and confirmed unaffected. `tests/mobile-wizard-btn-touch-floor-2417.spec.js` (4 tests). Full details in
 > t2417's own WORK-LOG entry.
+>
+> ⛔ **t2419 — WRONG ELEMENT, advisor's own error, corrected.** `.wizard-btn` is the TRIGGER PILL that opens a
+> wizard group's dropdown tray — the owner's actual ask was for the ROWS INSIDE the tray
+> (Drill/Bore/Pocket/Contour/…). Owner, unprompted: "so you changed the size of the trigger wizard in the bar
+> but i didnt ask" / "i asked for the button in dropdown." REVERTED the trigger pill to its pre-t2417 32px
+> (the owner explicitly did not ask for it, weighed against the same accessibility floor and chose revert
+> anyway — reported plainly, not silently decided). Re-measured the ACTUAL target first: the tray's own item
+> row (`.toolbar-dropdown-content button`) was 31.6px, essentially the same sub-floor number — the floor
+> treatment genuinely was needed there too, not manufactured. Fixed: `.toolbar-dropdown-content button {
+> min-height: 44px }`, same mobile media query, vertical axis only. Checked all 5 wizard groups (4-8 items
+> each) at 390px — none overflow the tray's own pre-existing `max-height`/`overflow-y:auto` cap even at the
+> largest. `tests/mobile-wizard-btn-touch-floor-2417.spec.js` rewritten in place (5 tests, non-vacuous both
+> directions).
 
 ### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
@@ -4130,7 +4143,7 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 
 ---
 
-### 52. [⛔ REOPENED 2026-08-29, ✅ SHIPPED t2417 — TWO LIVE IMPLEMENTATIONS OF ONE MENU ITEM, RETIRED FOR REAL. Owner ruled: **KEEP HOVER/CASCADE, RETIRE THE CLICK-REPLACE PATH**] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+### 52. [⛔ REOPENED 2026-08-29, ✅ SHIPPED t2417, ⛔⛔ REOPENED AGAIN t2419 — real device: flyout mispositions on touch, parent already gone. NOT reproduced in the harness; needs an owner device-check] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
 
 > ## THE DEFECT — owner-observed on the deployed site, both screenshots supplied
 >
@@ -4208,6 +4221,35 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 > synthesis pipeline) opens the same cascade too. Non-vacuous: reverted via `git stash`, all 3 new assertions
 > fail against the pre-fix tree with the exact predicted numbers (272 vs 433 — the cursor-vs-anchored gap).
 > Duplicate/hover/positioning regressions stay green.
+
+> ## ⛔⛔ REOPENED AGAIN t2419 — real device, two screenshots: flyout at the viewport's bottom-left, parent gone
+>
+> Owner, V2026.08.30.1: after tapping "Block options…," the flyout renders at the bottom-left of the viewport,
+> nowhere near the row — and in that same frame the parent menu is already gone (desktop hover keeps it open;
+> this is "the whole point of a cascade" per the owner's own words).
+>
+> **Established live, not guessed**: Blockly's own vendored `onAction` (`blockly_compressed.js`) runs
+> `hide()` SYNCHRONOUSLY the instant any item is activated (click, tap, keyboard — no exception), THEN
+> schedules the registered `callback` via `requestAnimationFrame(() => setTimeout(callback, 0))` — a real,
+> multi-frame deferral. Two consequences: the parent closing on click/tap is unconditional Blockly behavior,
+> not something achievable to prevent without abandoning the registered-callback path (which is what caused
+> THIS ENTRY's own original defect); and the callback runs later than "immediately," which matters for
+> anything that could shift between paint and use.
+>
+> **Directly tested the advisor's own "stale/zero rect" theory and could NOT confirm it**: t2417's own
+> `window.__ddcsBlockOptionsRowRect` (cached at PAINT time specifically to avoid needing the row after it's
+> gone) reads correctly populated in every repro attempted, including one that explicitly waits past an
+> animation frame + tick before tapping to approximate the real deferral more closely. The resulting flyout
+> position is correctly row-anchored every time — `tests/blocks-context-flyout-2411.spec.js`'s own touch test
+> now asserts POSITION (a real gap in t2417's own verification, closed regardless of this bug's outcome).
+>
+> ⛔ **NOT FIXED. Per this entry's own explicit prohibition (do not paper over with a fixed-corner position or
+> by force-reopening the parent) and its own stated fallback (if a genuine touch gesture cannot be driven
+> convincingly, say so plainly)**: the most plausible remaining candidate — a real mobile browser's own chrome
+> (URL bar show/hide, visual-viewport resize) shifting the viewport DURING a long-press-then-tap sequence,
+> between when the rect was cached and when the deferred callback uses it — cannot be reproduced in a headless/
+> emulated-touch harness. Flagged for the owner to re-test on the current deployed build; the Blockly-timing
+> finding above is the lead for whoever investigates next, not a guess to build on blind.
 
 ---
 
