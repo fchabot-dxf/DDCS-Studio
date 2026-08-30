@@ -1992,7 +1992,7 @@ failure mode is silent until a controller chokes on a line that was never meant 
 
 ---
 
-### 23. [⭐ RULED 2026-08-26 — author-declared toggles APPROVED; the silent-forget half is separable] NESTED DISABLED STATE IS IN-SESSION ONLY FOR PARAMETRIC OPS
+### 23. [✅ SHIPPED t2415 — drill's pattern is the pilot; author-declared toggles persist end-to-end, verified via the real gesture + a full export/reimport round trip] NESTED DISABLED STATE IS IN-SESSION ONLY FOR PARAMETRIC OPS
 
 *(established at t2277 while making Disable Block real — reported as a scope boundary rather than hidden, and
 NOT a regression: nested disable did nothing at all before that turn.)*
@@ -2077,6 +2077,86 @@ options**, and it is what ships today.
 ⭐ That is a smaller, separable piece of work than the toggles themselves, and it is the one that removes the
 hazard. **The toggles add a capability; the refusal removes the danger.** Do the refusal first if only one
 gets built.
+
+> ⭐⭐ **t2415 — SHIPPED. The toggles built, the refusal now yields to them, verified through a real
+> export→reimport round trip, not just an in-memory assertion.**
+>
+> **THE PILOT — drill's own pattern, exactly the entry's own example.** `array{drill}` (a `holecycle` atom in
+> today's shape) stamps the whole pattern in one child — "disable the third hole" has no stable referent
+> (checked, per the ruling's own "verify representability per op" instruction), but "disable the pattern" does,
+> since there is exactly ONE switchable child. `drillData.js` now wraps `holecycle` in a `guard` (the SAME
+> `wizards/stacks/*.js` `GUARD` idiom every existing structural fork already uses — not a new mechanism),
+> keyed to a new STRUCTURAL binding, `holesEnabled` (no `blockIndex`/`match` — drives the prune, not a value
+> socket, mirroring corner's own `probeZFirst` row-for-row). Default `true` = today's exact shape (the guard
+> unwraps transparently, splicing its child back in place).
+>
+> **GRANULARITY, decided with the code in front of me rather than guessed**: one boolean structural binding
+> PER declared switchable child — the exact shape `probeZFirst` already ships, not a new encoding. A "single
+> declared set" (a bitmask/array covering several children at once) would need its own new read/write
+> machinery for no proven benefit; a plain per-child boolean reuses everything `guard`/`pruneGuards`/
+> `withGuardDefaults` already do. It also generalises cleanly to #41 (freeze) without building it: #41's own
+> entry already calls `frozen` "a declared property of the BINDING" — the exact same shape, just a different
+> binding-level flag than a structural on/off.
+>
+> **HOW THE GESTURE ACTUALLY PERSISTS — traced, not assumed.** Right-clicking Disable Block (the SAME native
+> Blockly gesture t2307's own `disableGuard.js` already listens for) is synced into the structural param by a
+> NEW listener in `blocksApp.js`, on the SAME `element:'disabled'` event. ⚠ **A load-bearing correction found
+> mid-build**: the guard is TRANSPARENT on a PLACED, live canvas — `pruneGuards` already unwrapped it at
+> instantiate time (the default/kept case splices its child in place), so the disabled block's own LIVE PARENT
+> is whatever atom the guard's children sat under (`placeonstock`, for drill), never the guard itself —
+> confirmed live before assuming it (a first attempt walking the live canvas parent found nothing). The
+> correct lookup is against the OP'S OWN REGISTRY DEF (`def.template`, where the guard still exists, matched
+> by the disabled block's TYPE) — `findGuardWhenForBlockType`, now shared between `blocksApp.js` and
+> `disableGuard.js` (`whenGuard.js`) so the two can never independently disagree about which children are
+> declared switchable.
+>
+> **`disableGuard.js` (t2307) NOW YIELDS to a declared toggle** — its own refusal existed specifically because
+> "this state was never going to persist," which is exactly false for a declared-switchable child now. One
+> early-return, gated on the SAME shared lookup; every UNDECLARED child is refused exactly as t2307 shipped it
+> (verified: the existing `disable-guard-2307.spec.js` suite is untouched and still green).
+>
+> **THE SYNC USES THE HEAVY REBUILD PATH (`mergeOpBlocks`/`replaceOp`), not a light patch — found live, not
+> assumed.** A structural toggle changes the op's own SHAPE (a whole child appears/vanishes), which t2413's own
+> lightweight `.data`-only patch (BACKLOG #55, scoped to VALUE sockets) can't reach — the live canvas would
+> keep showing the un-pruned atom while the stored param disagreed. The same rebuild the pre-existing `sc_*`
+> structural-control branch already uses. Practical effect, confirmed live: disabling `holecycle` REMOVES it
+> from the canvas immediately (matching what a fresh reimport with `holesEnabled:false` would build), not
+> "stays visible, greyed" — the params and the canvas never disagree, even mid-session.
+>
+> **A second, independent gap found and closed in the same pass, NOT #23-specific**: the checkbox this turn
+> added to the form (`holesEnabled`, so the toggle is a real, visible field like `probeZFirst`) turned out not
+> to write back at all — `onFieldWrite`'s own caller (`userOpView.js`) always passed a checkbox's `.value`
+> (a static `'on'`, unrelated to checked state) instead of `.checked`, and `onFieldWrite` itself only ever
+> accepted `Number(rawValue)` (t2413's own scope was a numeric drag handle). Both fixed: the delegated listener
+> now reads `.checked` for a checkbox specifically (every other input kind unchanged), and `onFieldWrite`
+> accepts a boolean and — this is the same structural-vs-value split above — routes a structural param through
+> the rebuild path, a value param through t2413's own light patch, unchanged. Left broken, this would have been
+> exactly the hazard the owner's own ruling names as the worst option: a control that LOOKS like it persists
+> and silently doesn't.
+>
+> **VERIFIED, every claim live:**
+> - Emit is BYTE-IDENTICAL to the legacy `drillStack` with `holesEnabled` at its default — the guard's own
+>   kept/unwrapped shape matches the pre-guard baseline exactly (proven both at the node level and via the full
+>   `drill-as-data`/`drill-bindings-identity-1385`/`drill-switch-shots-1385` suites, all green).
+> - Disabling `holecycle` (the real gesture): `disableGuard.js` does NOT revert it; `holesEnabled` reads `false`
+>   in `window.ddcsGetBlockProgram()`; the emitted G-code carries no drilling motion at all (framing only).
+> - THE FULL ROUND TRIP, the entry's own acceptance bar: exported params (with `holesEnabled:false`) fed back
+>   through `opFromMarker('user_drill_data', params)` regenerate the op STILL disabled — not merely "the param
+>   survived in memory," the actual reconstruction path a reimport uses.
+> - Re-enabling via the form checkbox restores both `holesEnabled:true` AND rebuilds `holecycle` back onto the
+>   canvas.
+> - Regression: an undeclared child (`wcs`) is still refused by `disableGuard.js`, byte-for-byte the pre-t2415
+>   behaviour; the shell's own drill form/canvas specs, the whole `drill-*`/`lathe-part-drill` families (53
+>   specs), and t2409's/t2411's/t2413's own permanent specs all stay green after this turn's edits to the same
+>   shared files.
+> - Committed as a permanent spec, `tests/drill-holes-enabled-persist-2415.spec.js` (5 tests).
+>
+> **A tail item ("mobile wizard buttons ~8-10% bigger") arrived as a mid-turn amendment.** Deferred, per the
+> amendment's own stated fallback ("only if #23 lands with room; if not, hand back and say so") — #23 alone
+> surfaced two independent architectural gaps (the transparent-guard lookup, the checkbox write-back) that
+> needed tracing and fixing correctly rather than rushed, and the tail's own measurement requirements
+> (real device floors, a collapse-ladder check at several widths) deserve the same care, not a hurried pass in
+> the remainder of an already-large turn.
 
 ### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
@@ -3630,7 +3710,7 @@ checks stay (dangling still needs catching).
 
 ---
 
-### 49. HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
+### 49. [⭐ AUTHORING MODEL RULED 2026-08-29 — owner: **worker DRAFTS, owner REVIEWS.** Write from the code's own behaviour, then the owner corrects what is wrong for a machinist. ⛔ Do NOT wait for the owner to supply wording — draft it all, and ⭐ flag explicitly any block where you are GUESSING AT INTENT rather than describing observed behaviour, so the review pass knows where to look] HELP AND HUMAN LABELS ARE ABSENT FROM EVERYTHING THAT CUTS METAL
 
 *(same sweep. ~10 of 136 defs carry a `help` string — every one is authoring metadata, not a cutting op.)*
 
@@ -3916,7 +3996,7 @@ engine really does.
 
 ---
 
-### 51. [⚠ INVESTIGATED t2411 — could not reproduce; the described symptom does not hold against the current code, live-tested. See findings below. Becomes an owner re-check, per the dispatch's own fallback] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+### 51. [✅ CLOSED 2026-08-29 — OWNER RE-CHECKED ON DEVICE: "now it works well." t2411 investigated, traced and live-simulated it, changed NO code, and correctly returned it as an owner re-check rather than "fixing" something that was not broken — the right call, vindicated] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
 
 *(owner, 2026-08-29, while testing the t2371 pinch-zoom: "2finger pinch should act as pan.")*
 

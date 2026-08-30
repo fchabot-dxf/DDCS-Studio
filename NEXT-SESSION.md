@@ -24,6 +24,23 @@ completed plans are not kept — *"we can always plan again."*
 
 ---
 
+## ⭐ ORDER RE-SET WITH THE OWNER — 2026-08-29, asked directly. **CORRECTNESS FIRST.**
+
+```
+NOW      #23 persisted disable  →  #41 FREEZE (the owner's own three-state design)
+THEN     ⭐ CORRECTNESS, owner-chosen over polish and over closing the arc:
+           #50  rapid writes invisible to undo
+           #46  its commit-on-release half (unblocked by #50)
+           #56  the open-as-modal flake, 4+ turns running
+LATER    polish: #49 words (worker DRAFTS, owner reviews) · #44 canvas find ·
+         #45 true snippets · #47 tiers 2-4 · #40 the sim reading the output table
+UNSCOPED the arc's last act: delete the six mill shells so each twin is the only form
+CLOSED 2026-08-29 by owner device-check: #51 two-finger pan ("now it works well")
+```
+
+⚠ The block below is the PREVIOUS order (2026-08-28) — kept for its dependency reasoning, which still holds;
+the sequence above supersedes its tail.
+
 ## ⭐⭐ THE RUNNING ORDER — set with the owner, evening 2026-08-28
 
 **Two tracks.** Track A finishes the wizards-as-data arc. Track B is the AUTHORING-UX overhaul born from the
