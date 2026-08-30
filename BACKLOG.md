@@ -4143,7 +4143,7 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 
 ---
 
-### 52. [⛔ REOPENED 2026-08-29, ✅ SHIPPED t2417, ⛔⛔ REOPENED AGAIN t2419 — real device: flyout mispositions on touch, parent already gone. NOT reproduced in the harness; needs an owner device-check] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+### 52. [⛔ REOPENED 2026-08-29, ✅ SHIPPED t2417, ⛔⛔ REOPENED AGAIN t2419, ✅ SHIPPED (for real) t2423 — root was a narrow-viewport double-clamp, not the advisor's own detached-element theory; flyout now stacks below the row when neither side fits] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
 
 > ## THE DEFECT — owner-observed on the deployed site, both screenshots supplied
 >
@@ -4250,6 +4250,42 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 > between when the rect was cached and when the deferred callback uses it — cannot be reproduced in a headless/
 > emulated-touch harness. Flagged for the owner to re-test on the current deployed build; the Blockly-timing
 > finding above is the lead for whoever investigates next, not a guess to build on blind.
+
+> ⭐⭐ **t2423 — SHIPPED, root cause was NEITHER prior theory.** The owner's device confirmed both
+> discriminators: mispositions EVERY time (not a race), parent vanishes the SAME instant. That "same instant"
+> turned out to be a red herring shared by both theories — it's just Blockly's own unconditional `hide()`,
+> unrelated to WHERE the flyout ends up.
+>
+> **Re-verified the advisor's refined theory with total certainty first, not from memory**: re-read
+> `placeAdjacent` and the registered `callback` character-by-character. NEITHER reads `getBoundingClientRect()`
+> on the row anywhere — `anchorRect` (the value already captured at paint time) is used throughout;
+> `m.getBoundingClientRect()` inside `placeAdjacent` is the FLYOUT's own rect (for sizing its own clamp), never
+> the row's. The detached-element-returns-zero mechanism the advisor proposed does not exist in this code —
+> confirmed by code inspection, not just by a failed repro.
+>
+> **The REAL cause, found by computing what the code actually does with the real measured numbers**: this row
+> ("Block options…") is ~156px wide; the flyout itself is ~168px. On ANY ~390px-wide phone screen,
+> `anchorRect.right + gap + flyoutWidth` (400px needed) and `anchorRect.left - gap - flyoutWidth` (-96px) BOTH
+> fail — deterministically, for THIS row's own dimensions, regardless of where on the row sits horizontally.
+> Before the fix, the code still ran the left-side formula anyway, landed deeply negative, and the outer clamp
+> pinned the flyout to the screen's own far-left edge — matching "always" exactly, and matching "-left" in
+> "bottom-left" (the "bottom" part was simply wherever the tapped row's own vertical position happened to be —
+> unrelated to the X-axis bug).
+>
+> **Fix**: when NEITHER side fits, stack the flyout BELOW the row (touching it, left-aligned with it) instead
+> of falling through to a distant screen-edge clamp — still row-anchored, matching this entry's own "beside its
+> parent row" requirement, just switching axis when there's no horizontal room. Not fighting Blockly's `hide()`
+> (unrelated to this bug), not hard-positioning to a fixed corner (still computed from the row's own live-at-
+> paint-time rect).
+>
+> **VERIFIED live with the real measured numbers**: a synthesized narrow-viewport anchor (`placeAdjacent`
+> called directly) now lands exactly at the row's own left edge, exactly at the row's own bottom + the gap —
+> `tests/blocks-context-flyout-2411.spec.js` (2 new tests: a direct unit-level check of the new stack-below
+> branch, and a real end-to-end 390px-viewport touch-emulated test using the actual Blockly row). Non-vacuous:
+> both fail against the pre-fix code with the exact predicted numbers (received x=6 — the far-left screen
+> clamp — vs expected ≈73.6, the row's own position). Desktop's existing right/left-flip behavior (the case
+> where at least one side DOES fit) re-verified unchanged — all 8 pre-existing tests in the same file still
+> pass untouched.
 
 ---
 
@@ -4636,4 +4672,84 @@ the raw `page.waitForTimeout(350)` calls are the one place in this file that doe
 
 **STILL REAL IF:** this specific test fails again — alone, `--workers=1`, no other file failing alongside it —
 on a turn that touches none of `blocksApp.js`/the undo/reproject machinery (`opEdits.js`, the gesture-boundary
+tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`).
+
+---
+
+### 58. [✅ SHIPPED t2423 — container-query gate, same 860px figure, asked of the pane instead of the window] THE WIZARD VIEW PANE SIZES ITSELF FROM THE WINDOW, NOT FROM ITSELF
+
+*(owner, 2026-08-29, with a 2535px-wide screenshot of the Blocks tab: "on very wide screen the wizard preview
+should render as for desktop, it should respect the same screen size rules" — then the decisive clarification:
+**"but from the panel"**. And again, 2026-08-30: "the wizard preview is not using desktop width layout still".)*
+
+```
+WAS    the pane's layout followed the WINDOW width (a plain viewport media query)
+       → window 2535px, but the PANE is ~1230px
+       → it stacked 3D above 2D above form — the phone layout, on a huge screen
+
+NOW    the pane's layout follows THE PANE'S OWN width
+       → a 1230px pane lays out like a 1230px screen would (the desktop wizard:
+         form left, visual right)
+       → drag the pane narrow and it degrades to stacked ON ITS OWN, live
+```
+
+**Two wrong theories died first** (recorded so nobody re-walks them): the advisor blamed the 860px viewport
+query "never firing" at a wide window; the owner reasonably assumed the pane was being measured and had grown
+big enough. Neither was happening — `styles.css`'s `#blk_wiz_user .wiz-2pane` block (and its 11 sibling rules)
+was UNCONDITIONAL, no query of any kind, no measurement of anything. Its own comment explained why: written
+when `#blk-formpane` genuinely never crossed ~380px (it shares the window with the Blockly canvas + palette),
+so the rule "mirrors the ≤860px block's own rules verbatim, unconditionally, since the pane's available width
+never crosses the threshold that layout needs" — correct for the case it was written for; the owner's own pane
+is now routinely well past that, on any reasonably wide monitor, which that author never anticipated.
+
+**Owner ruling: do not make new rules.** Reuse the 860px figure the rest of the app already uses for this
+exact stacked-vs-two-pane decision — only WHAT is measured changes, never the number.
+
+**Fix**: `#blk-formpane { container-type: inline-size; }` (styles.css:~6543) — safe because this element's own
+width is externally set by the splitter (`flex:1`, `.blk-col-resize`'s own drag handler writing `--blk-pv-w`
+on `#blocks-app`), never by its own content, which is the one condition size-containment needs to avoid being
+circular. The 12-rule stacked-layout block moved from unconditional into `@container (max-width: 860px) { … }`
+— the identical rules, byte-for-byte, just gated. `#wiz_user` (the modal) was never inside `#blk-formpane` to
+begin with, so no container query here can ever reach it regardless of pane width — confirmed live, not
+assumed (widened the pane splitter FIRST, the condition that would expose leakage if there were any, then
+opened the modal and checked both a wide and a narrow VIEWPORT: still purely viewport-driven, unchanged).
+
+**VERIFIED, every claim live**: a very wide window with the pane at its default (~380px) width still stacks —
+byte-identical to before (confirmed via the pre-existing `screenshot-baselines-1792.spec.js`'s own baseline
+comparison passing unchanged). The SAME wide window, pane dragged past 860px via the real splitter handle,
+renders the desktop two-pane layout (`flex-direction: row`) — the owner's own reported case. Dragging back
+narrow degrades it to stacked again LIVE, no reload. The modal stays viewport-driven at every width tested.
+64 of the pane's own existing tests (visual host, splitter, screenshot baselines, param groups, render
+equivalence, the modal's own gesture tests) re-run clean, 0 regressions. `tests/wizard-view-pane-container-
+width-2423.spec.js` (4 new tests), non-vacuous — 2 of the 4 correctly fail against the pre-fix CSS with the
+exact predicted behavior (stays "column" even when widened past 860px).
+
+**VERIFY:** the owner's own case — very wide window, Blocks tab, pane at default width → renders as the
+desktop wizard (form left, visual right); drag the splitter narrow → degrades to stacked, live, without a
+reload; wizard modal unchanged at several viewport widths.
+
+---
+
+### 59. [✅ SHIPPED t2423 — one word, `field_ref`'s category corrected] AN "UNCATEGORISED" PALETTE GROUP WAS SHOWING
+
+*(owner, 2026-08-30: spotted a stray "Uncategorised" group in the Blocks palette containing a lone `field_ref`
+block.)*
+
+Traced: `fieldRef.js` declared `category: 'Wizard Form'` — a name absent from `CATEGORIES`
+(`wizards/ops/index.js:141`), so it fell through to `bridge.js`'s own catch-all (t1570), which exists
+specifically to catch this class of mistake (its own comment: "a new block, a typo, a category added to a def
+but not to the list") rather than silently dropping the block from the toolbox. **The catch-all worked exactly
+as designed** — a real typo caught, not a defect in the guard.
+
+**Category chosen deliberately, not mechanically**: `field_ref`'s own docstring is explicit that it does NOT
+declare a bound field the way every `Wizard Inputs` member does (formfield/param_field/the pickers) — it
+RELOCATES an already-declared row's position in the presentation tree, the same "where things sit" concern
+`Wizard Layout`'s own members (grid_container/group_box/layout/split_*) exist for. Filed under `Wizard Layout`
+rather than the owner's own initial lean (`Wizard Inputs`) on that concrete basis, stated in the block's own
+comment. No new `Wizard Form` category added (would leave a category holding exactly one block, and legitimizes
+the typo rather than fixing it).
+
+**VERIFIED**: no "Uncategorised" group renders (`PALETTE`'s own category set now equals a subset of
+`CATEGORIES`); `field_ref` reachable under Wizard Layout; the pre-existing `palette-no-block-vanishes-1570.
+spec.js` (the general reachable-set invariant this exact scenario is drawn from) stays green.
 tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`).

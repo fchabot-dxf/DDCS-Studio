@@ -126,12 +126,36 @@ export function openMenu(items, x, y) {
  * `place()` already does for a cursor-positioned popup (that only shifts the menu to fit, which would leave it
  * overlapping the row it hangs off rather than sitting cleanly beside it). Vertical placement reuses the same
  * top/bottom viewport clamp `place()` already established.
+ *
+ * t2423 (BACKLOG #52 REOPENED — a real device, owner: flyout at the viewport's bottom-left, "nowhere near the
+ * row"). ⚠ Established live, not guessed: this "Block options…" row is ~156px wide and the flyout itself is
+ * ~168px — on ANY ~390px-wide phone screen, `anchorRect.right + gap + r.width` and `anchorRect.left - gap -
+ * r.width` BOTH fail (confirmed with the actual measured numbers: 400px needed vs. 384px available on the
+ * right, -96px on the left) — REGARDLESS of where on the row's own horizontal position the block sits. Before
+ * this fix, the old `else` branch still ran the LEFT-side formula anyway, went deeply negative, and the outer
+ * `Math.max(6, …)` clamp pinned it to the screen's own far-left edge — visually correct in NEITHER direction,
+ * landing wherever the clamp happened to bottom out rather than anywhere related to the row. This is
+ * DETERMINISTIC on a phone-width screen for this row's own dimensions, not a timing race — matches the
+ * owner's own "always, same instant" report exactly (the "same instant" is unrelated: Blockly's own `hide()`
+ * always closes the parent synchronously on activation, independent of this positioning question entirely —
+ * see the registered `callback`'s own comment, blocksApp.js, which was checked and is NOT reading a stale/
+ * detached element here: `anchorRect` is a value already captured before Blockly's hide() ever runs).
+ *
+ * FIX: when NEITHER side has room, stack the flyout BELOW the row instead (a plain dropdown, not a sideways
+ * cascade) — still anchored to and touching the row, never pinned to a distant screen edge unrelated to where
+ * the user tapped.
  */
 function placeAdjacent(m, anchorRect) {
     m.hidden = false;
     const r = m.getBoundingClientRect();
     const gap = 2;   // a hair of separation so the flyout doesn't visually fuse with the row it hangs off
     const fitsRight = anchorRect.right + gap + r.width <= window.innerWidth - 6;
+    const fitsLeft = anchorRect.left - gap - r.width >= 6;
+    if (!fitsRight && !fitsLeft) {
+        m.style.left = Math.round(Math.max(6, Math.min(anchorRect.left, window.innerWidth - r.width - 6))) + 'px';
+        m.style.top = Math.round(Math.max(6, Math.min(anchorRect.bottom + gap, window.innerHeight - r.height - 6))) + 'px';
+        return;
+    }
     const left = fitsRight ? (anchorRect.right + gap) : (anchorRect.left - gap - r.width);
     m.style.left = Math.round(Math.max(6, Math.min(left, window.innerWidth - r.width - 6))) + 'px';
     m.style.top = Math.round(Math.max(6, Math.min(anchorRect.top, window.innerHeight - r.height - 6))) + 'px';

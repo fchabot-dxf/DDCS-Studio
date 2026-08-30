@@ -2693,14 +2693,17 @@ button.primary:hover {
     .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
 }
 
-/* t1760 — THE BLOCKS PANE'S OWN COLUMN IS ALWAYS NARROW, REGARDLESS OF THE WINDOW: the ≤860px block above stacks
+/* t1760 — THE BLOCKS PANE'S OWN COLUMN CAN BE NARROW, REGARDLESS OF THE WINDOW: the ≤860px block above stacks
    `.wiz-2pane` because the desktop side-by-side layout needs `.wiz-controls`'s fixed 360px PLUS real room for
-   `.wiz-visual` (flex:1 1 0) — but `#blk-formpane` (the Wizard View pane's own sidebar column) measures ~380px
-   even at a wide browser window (it shares the window with the Blockly canvas + palette), so the desktop rule
-   squeezed `.wiz-visual` to ~0 width: canvases mounted (confirmed via wizardManager.preview3D, t1760's own fix)
-   but had nowhere to draw. Scoped to `#blk_wiz_user` specifically (never the modal's own `#wiz_user`, which DOES
-   have the wide context the desktop rule assumes) — mirrors the ≤860px block's own rules verbatim, unconditionally,
-   since the pane's available width never crosses the threshold that layout needs. */
+   `.wiz-visual` (flex:1 1 0) — but `#blk-formpane` (the Wizard View pane's own sidebar column) could measure
+   ~380px even at a wide browser window (it shares the window with the Blockly canvas + palette), so the
+   desktop rule squeezed `.wiz-visual` to ~0 width: canvases mounted (confirmed via wizardManager.preview3D,
+   t1760's own fix) but had nowhere to draw. Scoped to `#blk_wiz_user` specifically (never the modal's own
+   `#wiz_user`, which DOES have the wide context the desktop rule assumes) — mirrors the ≤860px block's own
+   rules verbatim. ⚠ t2423 — NO LONGER "unconditionally": a wide window with a wide pane genuinely does have
+   room (a large monitor's default pane routinely measures well past 860px), and this always-on version
+   squeezed it into the phone layout regardless. See the `@container` gate right below, keyed to the SAME
+   860px figure against the pane's own width instead of never firing at all. */
 /* t1766 — THE SURFACE RAN OUT PARTWAY DOWN: t1764 painted #blk_wiz_user's own background, but `.wiz-body`'s base
    rule (below) ALSO sets `max-height: calc(95vh - 120px)` + `overflow-y: auto` on any `.wiz-body` — meant for the
    MODAL, where `.wiz-box` is a fixed-height floating dialog and `.wiz-body` must scroll WITHIN it. #blk_wiz_user
@@ -2713,18 +2716,30 @@ button.primary:hover {
    #blk-formpane becomes the one and only scroll container, and #blk_wiz_user's background then covers everything
    that scrolls, by construction — not a new selector, a removed conflicting cap. */
 #blk_wiz_user { max-height: none; overflow-y: visible; }
-#blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
-#blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
-#blk_wiz_user .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }
-#blk_wiz_user .wiz-2pane > .wiz-splitter { display: none; }
-#blk_wiz_user .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
-#blk_wiz_user .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
-#blk_wiz_user .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
-#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) / 2); }
-#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
-#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
-#blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
-#blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+/* t2423 (BACKLOG #58) — this whole block used to be UNCONDITIONAL: correct back when this pane genuinely
+   never crossed ~380px ("the pane's available width never crosses the threshold that layout needs" — the
+   comment above, now stale), but the owner's own pane is ~1230px wide on a large monitor, and there is no
+   window-width query to widen since nothing here ever asked the WINDOW at all. Gated on the pane's OWN width
+   via `@container` (styles.css:~6543 declares `#blk-formpane` the size-containment root) instead of adding a
+   second layout: same 860px figure the rest of the app already uses for this exact stacked-vs-two-pane
+   decision (owner ruling: reuse it, no new breakpoints), now asked of the CONTAINER. A genuinely narrow pane
+   (the ~380px case these rules were written for) still matches and still stacks — this widens when the rule
+   applies, it does not replace what the rule does. `#wiz_user` (the modal) is untouched — it was never inside
+   `#blk-formpane` to begin with, so no container query here can ever match it regardless of viewport size. */
+@container (max-width: 860px) {
+    #blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
+    #blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
+    #blk_wiz_user .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }
+    #blk_wiz_user .wiz-2pane > .wiz-splitter { display: none; }
+    #blk_wiz_user .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
+    #blk_wiz_user .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
+    #blk_wiz_user .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
+    #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) / 2); }
+    #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
+    #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
+    #blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
+    #blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+}
 
 /* ============================================================================================================
    t752 · t784 — COLLAPSIBLE WIZARD PANES (paneAccordion engine). Each DECLARED viz pane (data-viz-pane: the 2D
@@ -6540,7 +6555,12 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
    the empty/mid-edit state's own plain-text look — only the HEADER bar (below) re-points to the panel family,
    since that is the one piece whose identity actually changed (t1765: it used to be Projected G-code's readout,
    now it titles a wizard). */
-#blocks-app .blk-formpane { flex:1; height:100%; max-height:100%; overflow:auto; background:var(--screen); }
+/* t2423 (BACKLOG #58) — a size-containment root for the `@container` query at styles.css:~2716: this pane's
+   own WIDTH (not the window's) is what the Wizard View's two-pane-vs-stacked layout should key off. `flex:1`
+   above already means the width is externally determined by the flex row's own splitter, never by this
+   element's own content — the one condition `container-type: inline-size` needs to be safe here (containment
+   on an element whose size depends on its CHILDREN would be circular). */
+#blocks-app .blk-formpane { container-type: inline-size; flex:1; height:100%; max-height:100%; overflow:auto; background:var(--screen); }
 #blocks-app .blk-formpane[hidden] { display:none; }
 /* t1734 — the view is ALWAYS present, clicked not guessed (replacing the old single-class auto-switch that
    picked a face FOR the user and — per its own removed comment — had been patched twice for guessing wrong).

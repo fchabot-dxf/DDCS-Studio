@@ -48,6 +48,34 @@ test('openFlyoutAdjacent: opens to the right by default, flips left when it woul
   expect(r.topAligned, 'both cases stay top-aligned with the anchor').toBe(true);
 });
 
+/**
+ * t2423 (BACKLOG #52 REOPENED again — real device, owner: flyout at the viewport's bottom-left, "nowhere near
+ * the row"). Established live that this is DETERMINISTIC on any ~390px-wide screen for THIS row's own
+ * dimensions (~156px row, ~168px flyout — neither fits to either side), not a timing race: before the fix,
+ * the old code still ran the left-side formula, went deeply negative, and the outer clamp pinned the flyout
+ * to the screen's own far-left edge — correct in NEITHER direction, landing wherever the clamp bottomed out
+ * rather than anywhere related to the row.
+ */
+test('openFlyoutAdjacent: when NEITHER side fits (narrow screen), stacks BELOW the row instead of clamping to a distant edge', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.ddcsStudio);
+  const r = await page.evaluate(async () => {
+    const { openFlyoutAdjacent, hideOpMenu } = await import('/ui/opContextMenu.js');
+    const items = [{ label: 'Freeze value', fn: () => {} }, { label: 'Disable', fn: () => {} }];
+    // matches the real measured numbers: a ~156px-wide row roughly centered on a 390px-wide screen, with a
+    // ~168px flyout — neither `right + flyout` nor `left - flyout` fits inside the viewport.
+    const anchor = { left: 74, right: 230, top: 292, bottom: 319, width: 156, height: 27 };
+    Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
+    openFlyoutAdjacent(items, anchor);
+    const m = document.querySelector('.op-ctx-menu');
+    const rect = m.getBoundingClientRect();
+    hideOpMenu();
+    return { left: rect.left, top: rect.top, anchorLeft: anchor.left, anchorBottom: anchor.bottom };
+  });
+  expect(r.left, 'left-aligned WITH the row, not pinned to the screen edge').toBe(r.anchorLeft);
+  expect(r.top, 'stacked directly below the row (touching it), not at some unrelated vertical position').toBeCloseTo(r.anchorBottom + 2, 0);
+});
+
 test('wireFlyoutTrigger: hover-open delay, close-delay tolerance survives re-entry', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio);
@@ -283,5 +311,36 @@ test.describe('touch-emulated context (t2417)', () => {
     // "close to" rather than exact — the same tolerance the desktop click test's own position check allows).
     expect(state.rect.left, 'anchored beside the row, not collapsed toward (0,0)/viewport origin').toBeGreaterThan(rowBox.x + rowBox.width - 1);
     expect(state.rect.top, 'top stays near the row it hangs off, not dumped at the viewport bottom').toBeLessThan(rowBox.y + 100);
+  });
+});
+
+test.describe('narrow phone-width viewport (t2423)', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  test('end-to-end: on a real ~390px screen, tapping "Block options…" lands the flyout TOUCHING the row, not at a distant screen edge', async ({ page }) => {
+    const box = await bootFormfield(page);
+    // the categories flyout opens automatically after boot and can cover the block on this narrow a canvas —
+    // dismiss it first, same as any real user would by tapping elsewhere.
+    await page.mouse.click(300, 400);
+    await page.waitForTimeout(150);
+    await page.mouse.click(box.x + 20, box.y + 8, { button: 'right' });
+    await page.waitForTimeout(250);
+    const rowBox = await rowRectFor(page, 'Block options…');
+    expect(rowBox, 'the row is reachable at this width').not.toBeNull();
+    // established live: this row (~156px) and the flyout (~168px) do not fit on EITHER side of a ~390px
+    // screen — confirming the fixture actually exercises the neither-fits path this test means to cover.
+    expect(rowBox.x + rowBox.width + 2 + 168, 'sanity: does not fit to the right').toBeGreaterThan(390 - 6);
+    expect(rowBox.x - 2 - 168, 'sanity: does not fit to the left either').toBeLessThan(6);
+    await page.touchscreen.tap(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+    await page.waitForTimeout(400);
+    const state = await page.evaluate(() => {
+      const flyout = document.querySelector('.op-ctx-menu');
+      const r = flyout ? flyout.getBoundingClientRect() : null;
+      return { flyoutOpen: !!flyout && !flyout.hidden, rect: r };
+    });
+    expect(state.flyoutOpen, 'a real tap opens the cascade').toBe(true);
+    // TOUCHING the row (left-aligned, stacked just below it) — not the pre-fix behaviour of pinning to the
+    // screen's own far-left edge regardless of where the row actually is.
+    expect(state.rect.left, 'left-aligned with the row').toBeCloseTo(rowBox.x, 0);
+    expect(state.rect.top, 'stacked directly below the row, touching it').toBeCloseTo(rowBox.y + rowBox.height + 2, 0);
   });
 });

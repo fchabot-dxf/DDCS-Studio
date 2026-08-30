@@ -13,8 +13,16 @@
  * Emits NOTHING — metadata only, read by formWidgets.js's `traverse()` at render time to relocate an
  * already-rendered `[data-param]` row; the row's own binding (label/widget/type/default) is unchanged.
  */
+// t2423 — category was 'Wizard Form', a name that exists nowhere in CATEGORIES (wizards/ops/index.js:141) —
+// a typo, caught by bridge.js's own catch-all (t1570) as an "Uncategorised" palette group. Filed under
+// 'Wizard Layout', not 'Wizard Inputs' (the owner's own default lean), on the strength of this file's own
+// header above: field_ref explicitly does NOT declare a bound field the way every 'Wizard Inputs' block does
+// (formfield/param_field/the pickers) — it RELOCATES an already-declared row's position in the tree, the same
+// "where things sit" concern 'Wizard Layout's own members (grid_container/group_box/layout/split_*) exist
+// for. Filing it under Inputs would echo the exact hazard this header already warns about (sharing a name/
+// category with an authoring block silently misreads a placement reference as a declaration).
 export const fieldRefBlock = {
-    type: 'field_ref', label: 'field', category: 'Wizard Form', kind: 'field_ref',
+    type: 'field_ref', label: 'field', category: 'Wizard Layout', kind: 'field_ref',
     help: 'Places an already-bound param\'s already-rendered form row at this position in the tree. `param` must name an existing def binding — this block does not declare one.',
     defaults: {
         param: '',   // which bound param's row to place here — a routing key, not a new declaration

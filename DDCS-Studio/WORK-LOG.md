@@ -64277,3 +64277,178 @@ refused to guess-fix) — the advisor has asked the owner directly for the one d
 can give (does it fail every time or intermittently, does the parent vanish in the same instant) and it stays
 parked on that answer. No harness time spent on it this turn.
 
+## t2423 — BACKLOG #52 fixed for real (the owner's device narrowed it), #58 (container-width pane) shipped,
+## #59 (Uncategorised typo) shipped, #46/#58's own third instance investigated but not reproduced
+
+Five items this turn, three mid-turn amendments. Every fix independently verified live with a non-vacuous
+test (git-stash A/B against pre-fix code, exact predicted numbers).
+
+### BACKLOG #52 — the owner's device narrowed it to "always, same instant"; neither prior theory survived
+
+The owner's own device answered both discriminators the advisor asked for: the flyout mispositions EVERY time
+(not a race) and the parent vanishes the SAME instant. The advisor's refined theory: `getBoundingClientRect()`
+on a detached element returns all zeroes, and the deferred callback might be reading the row's rect live
+rather than from the cache.
+
+**Re-verified the advisor's own theory with total certainty this time — code inspection, not memory.** Read
+`placeAdjacent` and the registered `callback` character-by-character: neither calls `getBoundingClientRect()`
+on the row anywhere. `anchorRect` (the value cached at paint time, t2417's own design) is used throughout for
+`.right`/`.left`/`.top`; `m.getBoundingClientRect()` inside `placeAdjacent` measures the FLYOUT's own box (for
+its own clamp math), never the row. The detached-element mechanism the advisor proposed does not exist in
+this code.
+
+**Also checked CSS animation timing** (a hypothesis of my own, before settling on the real cause): Blockly's
+vendored `.blocklyWidgetDiv`/`.blocklyContextMenu` carry no transition/animation at all — ruled out cleanly by
+reading the vendored stylesheet directly rather than assuming a headless-vs-real-device rendering gap.
+
+**The real cause, found by computing what the code does with the actual measured numbers**: this row
+("Block options…") is ~156px wide, the flyout itself ~168px. On ANY ~390px phone screen,
+`anchorRect.right + gap + flyoutWidth` (400px needed) and `anchorRect.left - gap - flyoutWidth` (-96px) BOTH
+fail to fit — deterministically, for this row's own dimensions, regardless of where it sits horizontally.
+Before the fix, the code still ran the left-side formula anyway, landed deeply negative, and the outer clamp
+pinned the flyout to the screen's own far-left edge — matching "always" exactly, and matching the "-left" in
+"bottom-left" (the "bottom" was simply the tapped row's own vertical position — a separate, unrelated axis).
+Confirmed with the actual numbers (`node -e`) before writing any fix, not guessed.
+
+**Fix**: when NEITHER side fits, stack the flyout BELOW the row (touching it, left-aligned) instead of falling
+through to the distant-edge clamp — still row-anchored, matching the entry's own "beside its parent row"
+requirement, just switching axis when there's no horizontal room. Not fighting Blockly's `hide()` (a different,
+unconditional, unrelated behavior); not hard-positioning to a fixed corner.
+
+**Verified live**: `tests/blocks-context-flyout-2411.spec.js` — a direct unit-level test of the new branch
+(synthetic anchor matching the real measured dimensions) and a real end-to-end 390px-viewport touch-emulated
+test using the actual Blockly row. Non-vacuous: both fail against the pre-fix code with the predicted numbers
+(x=6, the far-edge clamp, vs the row's own ~73.6px position). Desktop's existing flip behavior (where at least
+one side DOES fit) re-verified unchanged — all 8 pre-existing tests in the file stay green.
+
+### BACKLOG #59 — the "Uncategorised" palette group, one typo
+
+`fieldRef.js` declared `category: 'Wizard Form'`, absent from `CATEGORIES` — fell through to `bridge.js`'s own
+catch-all (t1570), which worked exactly as designed (catching a typo rather than silently dropping the block).
+Chose `'Wizard Layout'` over the owner's own initial lean (`'Wizard Inputs'`) on a concrete basis stated in the
+block's own comment: `field_ref` explicitly does NOT declare a bound field (its own docstring says so) — it
+RELOCATES an already-declared row, the same "where things sit" concern `Wizard Layout`'s other members exist
+for; filing it under Inputs would echo the exact hazard the file's own header already warns about. No new
+`'Wizard Form'` category added. Verified: no Uncategorised group renders; the pre-existing
+`palette-no-block-vanishes-1570.spec.js` (the general reachable-set invariant) stays green — no bespoke new
+test needed for a one-word category correction already covered by that generic guard.
+
+### BACKLOG #58 — the Wizard View pane sized itself from the window, not from itself
+
+Root cause (already diagnosed by the advisor before this turn, spec at
+`scratchpad/pending-57-container-width.md`, moved into `BACKLOG.md` as #58 per the advisor's own renumbering
+instruction — #57 stays the `undo-reproject-echo` flake, filed first): `styles.css`'s `#blk_wiz_user .wiz-2pane`
+block (12 rules) was UNCONDITIONAL — no query of any kind, the pane's own width was never consulted. Written
+correctly for the case where `#blk-formpane` genuinely never crossed ~380px; the owner's own pane is now
+routinely well past that on a wide monitor, so widening the panel did nothing — there was no threshold to
+cross in the first place.
+
+**Owner ruling: reuse the 860px figure the app already uses, no new breakpoints.** Fix: `#blk-formpane {
+container-type: inline-size }` (safe because its own width is externally set by the splitter's `flex:1` +
+`--blk-pv-w`, never by its own content — the one condition size-containment needs to avoid being circular) +
+the same 12 rules moved into `@container (max-width: 860px) { … }`, byte-identical otherwise. `#wiz_user` (the
+modal) was never inside `#blk-formpane`, so no container query here can reach it — confirmed live (widened the
+pane splitter FIRST, the condition that would expose leakage if any, then checked the modal at both a wide and
+narrow viewport: still purely viewport-driven).
+
+**Verified live, the owner's own case exactly**: a very wide window (1800px) with the pane at its default
+~380px width still stacks (byte-identical — the pre-existing `screenshot-baselines-1792.spec.js` passed
+unchanged). The SAME window with the pane dragged past 860px via the real `.blk-col-resize` splitter handle
+renders the desktop two-pane layout (`flex-direction: row`). Dragging back narrow degrades it to stacked
+again LIVE, no reload. Ran the pane's own 64 pre-existing tests (visual host, splitter, screenshot baselines,
+param groups, render equivalence, the modal's own gesture tests) — 0 regressions.
+`tests/wizard-view-pane-container-width-2423.spec.js` (4 new tests), non-vacuous.
+
+### A mid-turn amendment: the bottom drag handle (preview sizer) reportedly missing in the pane — NOT REPRODUCED
+
+Owner, two side-by-side screenshots: the sizer grip below the 2D canvas renders in the modal, the same spot is
+empty in the Blocks pane. The advisor had already established the mechanism IS wired (`makePanesCollapsible`
+is called, `addVisualSizer` runs) and offered three testable hypotheses: (a) the selector misses because the
+split doesn't sit under a `.wiz-visual` in the pane, (b) the sizer exists but is zero-size (a direct-child CSS
+rule not matching), (c) a timing race.
+
+**Tested all three live, directly, with the file in hand — none reproduced.** `#blk_wiz_user .viz-split`
+exists and its own `.closest('.wiz-visual')` IS non-null (rules out (a)). The sizer itself
+(`.viz-pane-sizer`) exists with a real, non-zero rect (349×6px narrow, 574×6px wide-pane) and
+`display:flex` computed correctly (rules out (b)) — tested in BOTH the narrow (pre-existing) and wide
+(this turn's own new #58 state) pane layouts, since the amendment flagged these as related. A zoomed
+screenshot of the actual pane shows a visible grip dash, not an empty strip.
+
+**Reported honestly rather than guessed further, matching the same discipline #52's own investigation used**:
+three independent checks (DOM presence, computed size, visual screenshot) across two distinct pane states all
+show the sizer present and working in this harness's own repro path (`ddcsLoadBlockStack` → corner op → open
+the Wizard View pane). Could not reproduce "empty." Per this class of task's own repeated instruction this
+arc (do not guess-fix delicate, hard-won machinery) — flagging for a more specific repro (exact op type,
+window size, or interaction sequence from the owner's own screenshot) rather than continuing to test
+configurations blind.
+
+⭐ **The advisor's own request for a one-sentence read on the pane-vs-modal divergence pattern (#46 → #58 →
+this)**: the three don't obviously share a MECHANISM (a dead update() stub, an unconditional CSS block, and —
+per this turn's own inconclusive finding — apparently NOT a broken sizer selector/timing/visibility) so much
+as a SHAPE: the pane was consistently built as "the modal, but smaller," and each gap surfaced only once the
+pane started being used at sizes/configurations the modal's own authors didn't originally exercise — #58's own
+root cause (a rule written for a pane that "never crosses 380px") is the clearest instance of exactly that
+pattern, but this turn's sizer investigation doesn't yet confirm the SAME shape applies here — that's honest
+uncertainty, not a claimed unifying cause.
+
+### A follow-up amendment: "it used to be there" — a regression, not an unfinished port. Git history searched, no hit found.
+
+The owner's new fact inverted the framing: not "was this ever wired" (already established: yes) but "what
+broke it, and when." Followed the amendment's own instruction precisely: `git log`/`git show` over
+`paneAccordion.js`, `blocksApp.js`, `formWidgets.js`, `bridge.js`, and `styles.css` across every named suspect
+commit (t2385/t2387/t2389 — BACKLOG #42; t2405 — #53; t2409 — #46; t2413 — #55; t2417/t2419/t2421 — #52 +
+mobile CSS).
+
+**`paneAccordion.js` — the sizer's own file — was not touched by ANY of these commits.** Grepped every
+suspect commit's own diff for `viz-`/`wiz-visual`/`wiz-2pane`/`addVisualSizer`/`makePanesCollapsible` in its
+added lines: zero hits, across all six. None of this week's own work touched the sizer's mechanism or its
+structural CSS at all — including the CSS-collision hypothesis the amendment itself flagged as the fastest
+check (checked directly: `.viz-pane-sizer`'s own rule at styles.css:2622 is untouched by any of t2417/t2419/
+t2421's own diffs, all three shown in full).
+
+⚠ **This directly contradicts the owner's "it used to be there," and that contradiction is reported as a
+finding, not resolved by picking a side.** Combined with three independent LIVE checks this same turn (DOM
+presence, computed size, a zoomed screenshot showing a visible grip) all showing the sizer present and working
+in BOTH pane states (narrow/stacked and this turn's own new wide/two-pane state) — the current code and the
+reviewed history both say "not broken here." Two honest possibilities, not resolved by guessing: the
+regression is outside this search window (predates t2385, despite the splitter machinery itself — t2345-
+t2357 — being independently established as working before this week), or the owner's own interaction path
+(exact op type, exact sequence reaching the pane, a theme) differs from this turn's own repro fixture
+(`ddcsLoadBlockStack` → `user_corner_data` → open Wizard View) in a way not yet identified. Not fixed, not
+guessed at further — flagged for a more specific repro from the owner (which op, which theme, whether it
+follows a resize/scroll/re-render) rather than continuing to test configurations blind, per this whole arc's
+own established discipline against guessing on delicate, hard-won machinery.
+
+### The flaky-count trend, established properly this time (names compared, not just counts)
+
+The advisor's own request: has excused the 8→12→16 count rise twice as the predicted surfacing from
+`stopLiveSim`'s own fix; asked to check whether the flaky SET is the same tests recovering each run (holds up
+the explanation) or a widening set (a real problem, outranking everything else). One incident this turn: a
+`git stash` meant to test the sizer against the exact deployed code was run WHILE a full suite was still live
+in the background — caught within the same message before any test finished, popped back immediately. The
+mem-server preloads its files at boot (established fact from an earlier turn), so a brief on-disk stash/pop is
+very unlikely to have touched that run's own served content, but that run's own results were still treated as
+unverified and a second, fully clean, uninterrupted run was made the real evidence — belt and suspenders.
+
+**t2419's own flaky set (12) vs. this turn's clean run (13), compared by name, not just count**: only 6 persist
+across both — `group-gesture`'s increment-3 test, `gui-blocks-reauthor`'s re-author test, `middle-superset`'s
+shard-3 sweep, `open-as-modal-1625`'s own preview test, `pull-v41-wcs`'s coord1 review, `tooltable-gate-1890`'s
+grbl gate. Six from t2419's list did NOT recur this run (`blocks-mmb-pan`, `blocks-rotary-rig`,
+`formfield-block`, `formfield-loud-mismatch-1636`, `probe-port-gate-1880`, `wcs-sync-gate-1906`'s own
+"vacuity trap" test specifically). Seven are NEW this run, several with NOTHING to do with the preview panel
+`stopLiveSim` governs at all — `federated-registry`'s own user-layer test, a `LOSSLESS ROUND-TRIP` bare-ops
+case, a header-390px ellipsis check, a `STATE: a nameless "saved" mark` test.
+
+**Neither of the advisor's own two boxes fits cleanly — reported as the actual shape, not forced into either.**
+This is NOT "the same dozen recovering" (half the set changed). It is also NOT a coherent, growing signature
+tied to `stopLiveSim`/preview-panel behavior — several of the newly-flaky tests are unrelated node/e2e checks
+that never touch a preview panel, which argues AGAINST "stopLiveSim itself is degrading things" and FOR
+ordinary cross-suite contention noise: this exact "population shifts run to run" behavior is BACKLOG #56's own
+pre-existing, already-documented characterization of this 6-worker suite, not something new. The count rising
+(8→12→16→11→13, itself noisy rather than monotonic) is consistent with `stopLiveSim` correctly exposing more
+genuine timing sensitivity where tests used to silently no-op with wrong-but-passing state, layered on top of
+contention noise that was always there. Read together: no evidence found that `stopLiveSim` is itself the
+degrading factor, but also not the clean "same set, stop re-triaging" case either — reported plainly rather
+than picked to fit either box, since the advisor's own point (a repeated excuse is how a real problem gets
+normalised) applies exactly as much to overclaiming "explained" as to under-claiming "concerning."
+
