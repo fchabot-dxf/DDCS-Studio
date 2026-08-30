@@ -155,15 +155,27 @@ const FLYOUT_OPEN_MS = 150;
 const FLYOUT_CLOSE_MS = 450;
 
 /**
- * t2411 (BACKLOG #52) — wire an Explorer-style CASCADE trigger onto an existing DOM row that some OTHER owner
- * (Blockly's own native context menu, here) already rendered and already wired its own click handling on:
- * hover-open (small delay), a generous close-delay with re-entry cancellation (moving from the row into the
- * flyout keeps it open), a click that does NOT reach the row's own native handler (captured + stopped, so
- * whatever menu the row lives in stays open beside the flyout instead of closing itself the way a normal
- * click-to-activate item would), and touch tap-to-toggle (captured + `preventDefault`, so the browser's own
- * synthetic post-touch mouse-event cascade — mouseenter/click ~300ms later — can't double-trigger it).
- * `getItems()` is called FRESH at every open (a hover-delay firing, a click, or a tap), never cached at wiring
- * time, so the flyout always reflects the row's CURRENT state (e.g. which enablers are still pending).
+ * t2411 (BACKLOG #52), narrowed t2417 — wire an Explorer-style CASCADE trigger onto an existing DOM row that
+ * some OTHER owner (Blockly's own native context menu, here) already rendered and already wires its OWN
+ * activation on: hover-open (small delay), a generous close-delay with re-entry cancellation (moving from the
+ * row into the flyout keeps it open).
+ *
+ * ⛔ t2417 — HOVER ONLY, deliberately. This used to also intercept click/touchend on the row (capture +
+ * `stopPropagation`) to route those triggers through the SAME `doOpen()`. Proved live (not assumed) that this
+ * did NOT actually suppress Blockly's own native activation of the row: `stopPropagation()` only blocks the
+ * event from reaching OTHER elements, never a sibling listener already bound to the SAME node — and Blockly
+ * binds its own click/tap handling on the row itself, before this function ever runs (the row doesn't exist
+ * for us to wire until Blockly paints it). The result was BACKLOG #52's own reopened defect: a real click fired
+ * BOTH Blockly's native activation (→ the registered `callback`, then closing Blockly's own menu the way every
+ * other item does) AND this row's own click handler (→ `doOpen()`), landing the shared menu in whichever
+ * position rendered last — "both open at once."
+ *
+ * The fix is not a better interception trick — it's not fighting Blockly's own click/tap activation at all.
+ * Click, tap, and keyboard (arrow keys + Enter) all already funnel through ONE guaranteed path — the
+ * `ContextMenuRegistry` item's own `callback` — so THAT callback is what opens the cascade for all three (see
+ * `registerBlockOptionsMenu` in blocksApp.js). Hover is the only trigger Blockly itself has no opinion on, so
+ * it stays here, wired directly. Two triggers, one shared destination function (`openFlyoutAdjacent`), and no
+ * path where they can race for the same DOM event.
  */
 export function wireFlyoutTrigger(rowEl, getItems) {
     if (!rowEl || rowEl.dataset.flyoutWired === '1') return;
@@ -185,11 +197,6 @@ export function wireFlyoutTrigger(rowEl, getItems) {
 
     rowEl.addEventListener('mouseenter', () => { clearTimers(); openTimer = setTimeout(doOpen, FLYOUT_OPEN_MS); });
     rowEl.addEventListener('mouseleave', () => { if (openTimer) { clearTimeout(openTimer); openTimer = null; } if (openFor === rowEl) scheduleClose(); });
-    rowEl.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); doOpen(); }, { capture: true });
-    rowEl.addEventListener('touchend', (e) => {
-        e.stopPropagation(); e.preventDefault();
-        if (openFor === rowEl && menu && !menu.hidden) { hideOpMenu(); openFor = null; } else { doOpen(); }
-    }, { capture: true });
 }
 
 /** Show the op menu for `op` ({ id, opType, label }) at viewport (x, y). */

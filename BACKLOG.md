@@ -2157,6 +2157,12 @@ gets built.
 > needed tracing and fixing correctly rather than rushed, and the tail's own measurement requirements
 > (real device floors, a collapse-ladder check at several widths) deserve the same care, not a hurried pass in
 > the remainder of an already-large turn.
+> ⭐ **✅ SHIPPED t2417.** Measured the real rendered `.wizard-btn` at 390px (32px — well under the 44-48px
+> platform floor); owner's refined ruling was GO TO THE FLOOR, so `.dock-header .wizard-btn { min-height: 44px }`
+> (a new `@media (max-width: 600px)` rule) rather than the originally-asked 8-10% comfort bump. Vertical axis
+> only, horizontal padding measured byte-identical before/after; the priority-collapse ladder re-checked at
+> 320px and confirmed unaffected. `tests/mobile-wizard-btn-touch-floor-2417.spec.js` (4 tests). Full details in
+> t2417's own WORK-LOG entry.
 
 ### 24. [✅ SHIPPED t2281 — `14fc7ffa`] ⛔⛔ A LOOSE, UNCONNECTED BLOCK ON THE BLOCKS CANVAS SILENTLY EMITS INTO THE REAL PROGRAM
 
@@ -3996,7 +4002,7 @@ engine really does.
 
 ---
 
-### 51. [⛔ REOPENED 2026-08-29 — owner, unambiguous: "panning with 2 fingers doesn't work, it just zooms, it should do BOTH". ⚠ The earlier close was the ADVISOR'S ERROR: an ambiguous multiple-choice answer ("now it works well") was read as a fix confirmation and the entry was closed on it. It was never fixed — t2411 changed no code] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
+### 51. [⛔ REOPENED then RETARGETED 2026-08-29, ✅ SHIPPED t2417 (additive, Blocks canvas) — owner, unambiguous: "panning with 2 fingers doesn't work, it just zooms, it should do BOTH". ⚠ The earlier close was the ADVISOR'S ERROR: an ambiguous multiple-choice answer ("now it works well") was read as a fix confirmation and the entry was closed on it. It was never fixed — t2411 changed no code] TWO-FINGER DRAG ON THE FEATURE CANVAS SHOULD PAN
 
 > ## ⛔⛔ WRONG SURFACE — THE ADVISOR FILED THIS AGAINST THE WRONG CANVAS
 >
@@ -4092,9 +4098,39 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 > If it still fails on-device, the viewport-meta/native-gesture-interception candidate above is where to look
 > next, with real hardware in hand rather than a synthetic repro.
 
+> ⭐⭐ **t2417 — RETARGETED then SHIPPED. The owner's own clarification narrowed this correctly: "in blocks" /
+> "block canvas" meant the BLOCKS TAB'S Blockly workspace, not the feature canvas above — the feature-canvas
+> half stays CLOSED (t2411's own trace was correct for the question as asked).**
+>
+> Checked configuration FIRST, per the dispatch's own instruction, before writing gesture code: `zoom.pinch`
+> defaults to `wheel || controls` in Blockly's own option parsing — already `true` here (`wheel:true`),
+> matching that pinch-zoom already worked. But reading the actual gesture code (not just the option parser)
+> settled the real question: `Gesture.prototype.handlePinch` (vendored `blockly_compressed.js`) computes ONLY a
+> scale ratio from the two touch points' distance and calls `workspace.zoom(x,y,amount)` — no translation call
+> anywhere in it. **A genuine gap in the vendored build, not a missing config flag** — "possibly one line"
+> (this entry's own hope) was not the case.
+>
+> **Fix**: additive `twoFingerPan` (`web/blocks/blocksApp.js`), mirroring the file's own pre-existing
+> `middlePan` (`ws.scroll(origin+delta)`). Tracks the two touches' own midpoint via native `touchstart`/
+> `touchmove`/`touchend`, gated strictly on `touches.length===2` — the same boundary Blockly's own Gesture uses
+> to route into `handlePinch`, so one-finger pan is structurally untouched. Confirmed live (reading the same
+> compressed source) that Blockly's 2-touch branch calls `preventDefault()` only, never `stopPropagation()`, so
+> this listener never fights Blockly's own handling for control.
+>
+> ⛔ **Per this entry's own stated fallback: full simultaneous-gesture proof was not achievable in this
+> harness, and is flagged plainly rather than papered over.** `tests/blocks-two-finger-pan-2417.spec.js` proves
+> OUR OWN mechanism correct to the pixel via synthetic `TouchEvent`s (non-vacuous — fails against the pre-fix
+> tree with the exact predicted before/after numbers). What it cannot prove: Blockly's own pinch firing from
+> the SAME real gesture — established live that Blockly's multi-touch recognition actually runs off POINTER
+> events (`pointerdown`/`pointermove` on `document`, tracked by `pointerId`), not the legacy `TouchEvent` API
+> these tests drive (confirmed: a synthetic pinch-spread via `TouchEvent` left `ws.scale` completely unchanged
+> — Blockly's own listeners never saw it). A real touchscreen dispatches BOTH event families for the same
+> physical touch (standard browser behavior), so the two should compose correctly on real hardware — but that
+> composition is an owner device-check, not a claimed pass.
+
 ---
 
-### 52. [⛔ REOPENED 2026-08-29 — TWO LIVE IMPLEMENTATIONS OF ONE MENU ITEM. Owner ruled: **KEEP HOVER/CASCADE, RETIRE THE CLICK-REPLACE PATH**] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
+### 52. [⛔ REOPENED 2026-08-29, ✅ SHIPPED t2417 — TWO LIVE IMPLEMENTATIONS OF ONE MENU ITEM, RETIRED FOR REAL. Owner ruled: **KEEP HOVER/CASCADE, RETIRE THE CLICK-REPLACE PATH**] "BLOCK ▸" SHOULD OPEN A REAL FLYOUT SUBMENU, EXPLORER-STYLE
 
 > ## THE DEFECT — owner-observed on the deployed site, both screenshots supplied
 >
@@ -4139,6 +4175,39 @@ handle drags unaffected; desktop wheel/drag behaviour unchanged.
 >
 > **VERIFY:** desktop hover→click→hover sequences never double; touch tap opens the cascade (not the old
 > popup); at 390px the overlay has a working back affordance; edge-flip and theme tokens still hold.
+> ⚠ that last clause (a "back affordance") is a leftover from an earlier draft of this entry — the ruling two
+> paragraphs up explicitly rejects a narrow-screen special case, so there is no back affordance to verify;
+> reconciled by t2417's own actual VERIFY below.
+
+> ⭐⭐ **t2417 — SHIPPED, impossible-by-construction as demanded, not merely patched.**
+>
+> **Root cause, established live, not guessed**: `wireFlyoutTrigger`'s own click-interception (a capture-phase
+> `stopPropagation()` on the row) never actually suppressed Blockly's native activation of that same row —
+> `stopPropagation()` only blocks an event from reaching OTHER elements, never a sibling listener already bound
+> to the SAME node, and Blockly binds its own click handling on the row before this code ever gets to touch it
+> (the row doesn't exist to wire until Blockly has just painted it). Proved with an isolated repro: a real
+> click left `nativeMenuOpen:false` (Blockly closed its own menu, as it always does on activation) and the
+> shared `.op-ctx-menu` at the ORIGINAL right-click's cursor position (`openMenu`'s `place()`), not the row-
+> anchored `placeAdjacent()` position — Blockly's own callback fired and its render won the race regardless of
+> the interception.
+>
+> **The fix is not a better interception trick.** Click, touch tap, and keyboard (arrow+Enter) already all
+> funnel through ONE guaranteed path — the `ContextMenuRegistry` item's own `callback` — so THAT callback now
+> opens the SAME row-anchored cascade (`openFlyoutAdjacent`) instead of the old cursor-anchored `openMenu`.
+> `wireFlyoutTrigger` is HOVER-ONLY now; its former click/touchend interception is DELETED, not left dormant,
+> per this entry's own instruction. One wrinkle found live: Blockly tears its own menu DOM down BEFORE
+> invoking the callback, so the row's rect is cached at PAINT time (`window.__ddcsBlockOptionsRowRect`, module-
+> scoped since the paint-observer is wired once ever while the callback re-registers per workspace init) rather
+> than re-queried inside the callback.
+>
+> **VERIFIED, the entry's own "PROVE it" literally**: `tests/blocks-context-flyout-2411.spec.js` (updated in
+> place, narrowed rather than rewritten — same feature evolving) — hover-then-click keeps
+> `document.querySelectorAll('.op-ctx-menu').length` at exactly 1 throughout, and the SAME rect before and
+> after the click (no jump to a second position); a real click opens the cascade at the row-anchored position,
+> never the cursor position; a real Playwright touch-emulated tap (`page.touchscreen.tap`, the genuine
+> synthesis pipeline) opens the same cascade too. Non-vacuous: reverted via `git stash`, all 3 new assertions
+> fail against the pre-fix tree with the exact predicted numbers (272 vs 433 — the cursor-vs-anchored gap).
+> Duplicate/hover/positioning regressions stay green.
 
 ---
 
@@ -4497,3 +4566,32 @@ tolerant window under measured contention.
 **STILL REAL IF:** a full-suite run shows this test (and only unrelated others, never a repeat of THIS one
 tied to a real code change) failing again on a turn that touches none of `blocksApp.js`/`opContextMenu.js`/
 `userOpView.js`/the preview-panel chain.
+
+---
+
+### 57. `undo-reproject-echo.spec.js`'s "a real block-value edit is undoable" flakes standalone — NOT contention, confirmed by A/B revert
+
+*(found t2417, while investigating a 3-failure full-suite run for that turn's own #52/#51/scrollbar/mobile-
+button work)*
+
+Different SHAPE of flake than #56: `open-as-modal-1625` only misbehaves under 6-worker contention (isolated
+single-worker runs are clean); THIS one flakes even alone, `--workers=1`, no contention at all —
+`tests/undo-reproject-echo.spec.js:46:1 › a real block-value edit is undoable (the app-wide path still works
+after the sig change)` failed 2 of 4 solo runs in one sitting, and failed 4 of 6 runs on a completely reverted
+tree (`git stash` of every file t2417 touched: `blocksApp.js`, `opContextMenu.js`, `styles.css`) — **the fail
+rate is the same order of magnitude with or without this turn's own code, which is what rules t2417 out** (not
+a guess: two separate A/B samples, both showing the test fails roughly half the time regardless of which tree
+is checked out).
+
+Not investigated further this turn (out of scope for t2417's own four dispatched items) — a first hypothesis
+for whoever picks it up: the test's own fixed `page.waitForTimeout(350)` after `load()` (`await load(page, 5);
+await page.waitForTimeout(350);`, twice in this test) is explicitly commented as "let the async reproject echo
+fire" — a fixed sleep guessing at an async settle time is a classic source of exactly this shape of
+intermittent failure (sometimes 350ms is enough, sometimes it isn't, under whatever load happens to be on the
+machine at that moment even solo). Worth trying `page.waitForFunction` on the actual reprojected value instead
+of a blind timeout, mirroring how the file's OWN `waitX` helper already does it correctly for the LOAD steps —
+the raw `page.waitForTimeout(350)` calls are the one place in this file that doesn't.
+
+**STILL REAL IF:** this specific test fails again — alone, `--workers=1`, no other file failing alongside it —
+on a turn that touches none of `blocksApp.js`/the undo/reproject machinery (`opEdits.js`, the gesture-boundary
+tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`).

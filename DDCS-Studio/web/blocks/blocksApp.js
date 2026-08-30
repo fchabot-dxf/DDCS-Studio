@@ -28,7 +28,7 @@ import { findGuardWhenForBlockType } from './whenGuard.js';   // t2415 (BACKLOG 
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
-import { openMenu, attachLongPress, wireFlyoutTrigger } from '../ui/opContextMenu.js';   // t2387 (BACKLOG #42 piece 4) — the app's ONE floating popup menu; reused for the "Block options…" fallback rather than a second implementation; t2397 — attachLongPress: "long-press IS right-click, declared once" (BACKLOG #43's own form-row reveal gesture); t2411 (BACKLOG #52) — wireFlyoutTrigger: the Explorer-style cascade trigger for the SAME popup, anchored to the row instead of opened at the cursor
+import { openFlyoutAdjacent, attachLongPress, wireFlyoutTrigger } from '../ui/opContextMenu.js';   // t2397 — attachLongPress: "long-press IS right-click, declared once" (BACKLOG #43's own form-row reveal gesture); t2411/t2417 (BACKLOG #52) — the Explorer-style cascade (openFlyoutAdjacent) + its hover trigger (wireFlyoutTrigger); t2417 retired the t2387 cursor-popup (`openMenu`) entirely — see registerBlockOptionsMenu below
 import { toast } from '../ui/gateway/util.js';   // t2397 (BACKLOG #43) — the app's existing global toast; a param with no single declared source says so through it, never a dead gesture
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
@@ -285,6 +285,46 @@ async function buildWorkspace() {
       window.addEventListener('pointermove', onMove, true);
       window.addEventListener('pointerup', onUp, true);
     }, true);                                              // CAPTURE — beat Blockly's block-level pointerdown
+  })();
+
+  /**
+   * t2417 (BACKLOG #51 REOPENED, retargeted from the feature canvas to THIS Blockly workspace) — two fingers
+   * pinch-zoom but do not pan; both must come from the one gesture. ⚠ Established live, not assumed, before
+   * writing this: the vendored Blockly's own `Gesture.handlePinch` (blockly_compressed.js) computes ONLY a
+   * scale ratio from the two touch points' distance and calls `workspace.zoom(x, y, amount)` — there is no
+   * translation anywhere in it, and no config key changes that (`zoom.pinch` already defaults to `wheel ||
+   * controls`, already true here — pinch-zoom already worked for exactly that reason). This is a genuine gap in
+   * the vendored build, not a missing config flag.
+   *
+   * PURELY ADDITIVE, mirroring `middlePan` above (same `ws.scroll(origin + delta)` idiom): tracks the two
+   * touches' own MIDPOINT and pans by its movement, entirely independent of Blockly's own pinch handling —
+   * confirmed live that `Gesture`'s 2-touch branch (`handlePinch`) calls `preventDefault()` only, never
+   * `stopPropagation()` (its single-touch branch calls both, but that path is not this one), so a passive
+   * listener here on the same `touchmove` stream sees every event Blockly does and never fights it for control.
+   * `{ passive: true }` throughout — this never calls `preventDefault()` itself, leaning on Blockly's own call
+   * to suppress the browser's native page-pinch-zoom.
+   *
+   * ⛔ One-finger pan/drag is UNTOUCHED: every listener here gates strictly on `touches.length === 2`, the same
+   * boundary Blockly's own Gesture uses to route into `handlePinch` in the first place, so a single touch never
+   * reaches this code at all.
+   */
+  (function twoFingerPan() {
+    let active = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    const mid = (touches) => ({ x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 });
+    const rebaseline = (touches) => {
+      const m = mid(touches);
+      sx = m.x; sy = m.y;
+      try { ox = ws.scrollX; oy = ws.scrollY; } catch (_) { ox = 0; oy = 0; }
+      active = true;
+    };
+    host.addEventListener('touchstart', (e) => { if (e.touches.length === 2) rebaseline(e.touches); else active = false; }, { passive: true });
+    host.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 2) { active = false; return; }
+      if (!active) { rebaseline(e.touches); return; }   // e.g. a 3rd finger lifted, landing back at exactly two
+      const m = mid(e.touches);
+      try { ws.scroll(ox + (m.x - sx), oy + (m.y - sy)); } catch (_) { /* pre-render */ }
+    }, { passive: true });
+    host.addEventListener('touchend', (e) => { if (e.touches.length === 2) rebaseline(e.touches); else active = false; }, { passive: true });
   })();
 
   // Authoring is always on (no normal/dev toggle): mountDevMode grows each atom's "expose as knob" affordances + the
@@ -1110,13 +1150,21 @@ async function buildWorkspace() {
   })();
 
   /**
-   * ── t2387 (BACKLOG #42 piece 4) — "Block ▸" / the FALLBACK: ONE "Block options…" entry, a custom popup ────────
+   * ── t2387 (BACKLOG #42 piece 4), redirected t2417 (BACKLOG #52) — "Block ▸": ONE "Block options…" entry ──────
    *
    * ⚠ Established at t2385 already, re-confirmed here rather than re-derived: the vendored Blockly build has no
    * submenu support (grepped `.d.ts`/`blockly.min.js`, zero hits for any nested-menu API) — BACKLOG #42's own
-   * ruled fallback applies: one flat entry opens the same option list as a small popup at the cursor, custom-
-   * rendered. Reuses `openMenu` (ui/opContextMenu.js) — the app's ONE floating menu element — rather than a
-   * second popup implementation to dismiss/clamp/forget.
+   * ruled fallback applies: one flat entry stands in for a real submenu.
+   *
+   * ⛔ t2417 — the entry's OWN `callback` no longer opens `openMenu`'s cursor-anchored popup (t2387's original
+   * shape). That popup and t2411's row-anchored cascade were two independent implementations wired to the SAME
+   * "Block options…" item with nothing making them exclusive — proved live that a real click fires BOTH
+   * (Blockly's own native activation of the row AND the cascade's own click handler), landing the shared menu
+   * wherever rendered last. BACKLOG #52 REOPENED over exactly this ("both open at once"); owner ruling: retire
+   * the cursor popup, keep only the cascade. Blockly's native activation (click, touch tap, and keyboard
+   * arrow+Enter — the registry callback fires for all three, guaranteed) now opens the SAME `openFlyoutAdjacent`
+   * cascade the hover trigger opens, anchored to the SAME row — see the callback below and `wireFlyoutTrigger`'s
+   * own updated header (ui/opContextMenu.js) for the other half.
    *
    * Only PARAM_FIELD/FORMFIELD carry `def.enablers` this turn (piece 5's help/limits/show-when/units) — every
    * other block type's `pendingEnablers` is empty, so `preconditionFn` hides the line entirely for them (and for
@@ -1201,14 +1249,25 @@ async function buildWorkspace() {
       id: 'ddcsBlockOptions', weight: 200, scopeType: CMR.ScopeType.BLOCK,
       preconditionFn: (scope) => (pendingEnablers(scope.block).length || formRowFor(scope.block) ? 'enabled' : 'hidden'),
       displayText: () => BLOCK_OPTIONS_LABEL,
-      // t2411 (BACKLOG #52) — the FALLBACK: reached only when the row's own cascade trigger (below) never fired
-      // — a keyboard activation (arrow keys + Enter), which never hovers or clicks the row at all. Unchanged from
-      // before: a cursor-positioned popup, Blockly's own menu closes (its normal activate-an-item behavior). The
-      // primary, mouse/touch interaction never reaches here — see the MutationObserver below.
-      callback: (scope, menuOpenEvent, menuSelectEvent, location) => { openMenu(itemsFor(scope.block), location.x, location.y); },
+      // t2417 (BACKLOG #52) — THE ONE ACTIVATION PATH: Blockly invokes this for a real click, a touch tap, AND
+      // keyboard arrow+Enter alike (its own native "activate this item" contract, guaranteed for all three —
+      // that is what a registered menu item's `callback` IS). So this is not a fallback for the cases hover
+      // misses; it is the WHOLE non-hover half. Opens the SAME cascade, anchored to the SAME row, that hover
+      // opens. ⚠ Checked live, not assumed: Blockly tears its OWN menu DOM down BEFORE invoking this callback
+      // (confirmed — `.blocklyContextMenu` is already gone by the time this runs), so there is no live row left
+      // to measure here. `window.__ddcsBlockOptionsRowRect` is the row's rect CACHED at paint time by the
+      // MutationObserver below (the menu is a static popup that never reflows between paint and activation, the
+      // same assumption the hover path already relies on) — module-scoped on `window`, not the IIFE closure,
+      // because the observer is wired ONCE ever while this callback is re-registered on every workspace init;
+      // an IIFE-local variable would leave the long-lived observer writing into a stale closure.
+      callback: (scope) => {
+        const r = window.__ddcsBlockOptionsRowRect;
+        if (r) openFlyoutAdjacent(itemsFor(scope.block), r);
+      },
     });
 
-    // t2411 (BACKLOG #52) — THE CASCADE: Blockly repaints its ENTIRE context-menu DOM fresh on every open (a new
+    // t2411 (BACKLOG #52) — THE CASCADE'S HOVER TRIGGER (click/tap/keyboard are the registry callback above, not
+    // this): Blockly repaints its ENTIRE context-menu DOM fresh on every open (a new
     // `.blocklyContextMenu` under a new `.blocklyWidgetDiv`, confirmed live — never patched in place), so the
     // "Block options…" ROW doesn't exist to wire until Blockly has just painted it. A MutationObserver on body
     // catches that paint regardless of what triggered it (right-click, or a synthesized long-press contextmenu —
@@ -1227,6 +1286,10 @@ async function buildWorkspace() {
             if (!menuEl) continue;
             const row = Array.from(menuEl.querySelectorAll('.blocklyMenuItem')).find((r) => r.textContent.trim() === BLOCK_OPTIONS_LABEL);
             if (!row) continue;
+            // t2417 — cache the rect NOW, at paint time, for the registry callback above (see its own comment:
+            // by the time a click/tap/keyboard activation reaches that callback, Blockly has already torn this
+            // row out of the DOM, so there is nothing left there to measure).
+            window.__ddcsBlockOptionsRowRect = row.getBoundingClientRect();
             // t2411 — right-click SELECTS the block first (confirmed live, B.getSelected() reads it back), and
             // Blockly does not change the selection while its own context menu is open — so resolving it fresh
             // at OPEN time (not paint time) is safe and gives the row's own current pending-enabler state.

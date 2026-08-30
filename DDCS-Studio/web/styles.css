@@ -1316,7 +1316,21 @@ html, body { overflow-x: clip; }
    above, so the flyout and the native menu it hangs off read as one family. */
 .blocklyWidgetDiv .blocklyMenu {
     background: var(--panel, #1d2530) !important;
-    border: 1px solid var(--border, rgba(255,255,255,.18)) !important;
+    /* t2417 — OUTLINE, not `border`, and `border: none` to kill Blockly's OWN native one too. Established live:
+       Blockly's vendored stylesheet already puts a 1px border on `.blocklyMenu` independent of anything here —
+       simply not overriding it left it in place. Blockly sizes this menu's WIDGET WRAPPER via an inline pixel
+       `height` it computes itself (confirmed: `.blocklyWidgetDiv` gets `style.height = 170px` for a 6-item
+       menu, exactly items+padding, no border) and this element (`box-sizing: border-box`, Blockly's own) reads
+       `max-height: 100%` of that wrapper — so ANY border here eats border-width's worth of pixels straight out
+       of the content area Blockly already sized to the exact px, tipping a menu that just barely fits into
+       `overflow:auto`'s own "content exceeds by a couple px" phantom scrollbar (measured: `scrollHeight` 170,
+       `clientHeight` 168 — exactly the 2px of a 1px top+bottom border). `outline` paints the same ring WITHOUT
+       occupying box space (`outline-offset: -1px` sits it flush on the inner edge, matching where the border
+       used to sit) — ⛔ do not "fix" this with `overflow` instead: a genuinely tall menu, or one opened near the
+       viewport edge, must still scroll; this removes only the height a border (ours or Blockly's own) adds. */
+    border: none !important;
+    outline: 1px solid var(--border, rgba(255,255,255,.18)) !important;
+    outline-offset: -1px !important;
     border-radius: 8px !important;
     box-shadow: 0 8px 28px rgba(0,0,0,.5) !important;
 }
@@ -2066,6 +2080,22 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 .dock-header .header-controls.is-mini .btn-caret { margin-left: 4px; }
 @media (max-width: 520px) {
     .dock-header .header-controls { padding: 6px 6px; gap: 4px; }
+}
+
+/* t2417 (mobile wizard buttons, deferred from t2415, ruled to the touch floor) — MEASURED, not guessed: the
+   real rendered `.wizard-btn` (getBoundingClientRect, not CSS) was 32px tall at a 390px viewport — well under
+   both the Apple 44pt and Google 48dp minimum tap target. `.wizard-btn` ONLY — never `.toolbar-btn` globally,
+   which would also grow the editor-keys row and every other toolbar button this bar shares chrome with.
+   VERTICAL AXIS ONLY, per the ruling: `min-height` alone reaches the floor because `.dock-header .toolbar-btn`
+   is already `display:inline-flex; align-items:center` (styles.css:2067) — the icon/caret/label re-center in
+   the taller box for free, no padding-top/bottom math needed. Horizontal/inline padding is UNTOUCHED here on
+   purpose: it is the one axis the header's own priority-collapse width measurement depends on
+   (HEADER_YIELD, commandDeck.js:15; the measured widths this rule must not perturb live at styles.css:2059). */
+@media (max-width: 600px) {
+    /* `.dock-header .wizard-btn` (not bare `.wizard-btn`) — needs to out-specificity `.toolbar-btn`'s own
+       `min-height: 24px` (styles.css:2314-2329), which sits LATER in this file and would otherwise win the
+       cascade on a same-specificity source-order tie. */
+    .dock-header .wizard-btn { min-height: 44px; }
 }
 
 /* Row 2: Macro Grid */

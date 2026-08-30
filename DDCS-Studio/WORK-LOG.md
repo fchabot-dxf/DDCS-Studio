@@ -63975,3 +63975,167 @@ registry-wide survey, caught a real authoring slip: `holesEnabled`'s own binding
 verified via a targeted 67-spec re-sweep (drill family, disable-guard, both expose/knob specs, the section
 survey, cam-arm-classify) before re-running the full suite.
 
+## t2417 — BACKLOG #52 REOPENED (fixed for real this time) + a phantom scrollbar + BACKLOG #51 REOPENED/
+## RETARGETED (two-finger pan, additive) + the mobile wizard buttons (deferred from t2415, now built)
+
+Four items, one turn — the first three landed mid-turn as amendments while working the first. Each is
+independently verified live with a non-vacuous test (confirmed failing against the pre-fix code via
+`git stash`, not just asserted).
+
+### #52 REOPENED — "both open at once": t2387's cursor popup was never actually retired, it just lost the race
+
+The owner supplied two screenshots: t2387's click-replace popup and t2411's hover cascade were BOTH wired to
+the same "Block options…" row with nothing making them exclusive — click opened the old popup (replacing the
+parent menu), hover opened the new cascade (parent stays), and on a real click BOTH fired. It also explained
+mobile: a tap IS a click, so mobile had been getting the OLD path the whole time.
+
+**Root cause, established live rather than guessed**: `wireFlyoutTrigger` (t2411, `ui/opContextMenu.js`) tried
+to suppress Blockly's own native click-activation of the row via a capture-phase `stopPropagation()` —
+confirmed live that this DOES NOT WORK against the real Blockly-rendered row: `stopPropagation()` only blocks
+an event from reaching OTHER elements, never a sibling listener already bound to the SAME node, and Blockly
+binds its own activation on the row before this file ever gets a chance to wire it (the row doesn't exist for
+`wireFlyoutTrigger` to touch until Blockly has just painted it). Proved with an isolated repro: a real click on
+the row left `nativeMenuOpen:false` (Blockly's own menu closed, as it always does on activation) and the
+shared `.op-ctx-menu` positioned at the ORIGINAL right-click's cursor coordinates (`openMenu`'s own `place()`),
+not the row-anchored `placeAdjacent()` position — i.e. Blockly's own callback fired and its render won the
+race, regardless of what the capture listener did.
+
+**The fix is not a better interception trick.** Click, touch tap, and keyboard (arrow+Enter) all already
+funnel through ONE guaranteed path — the `ContextMenuRegistry` item's own `callback`, Blockly's contract for
+"this item was activated" — so THAT callback now opens the cascade (`openFlyoutAdjacent`, row-anchored)
+instead of the old `openMenu` (cursor-anchored) popup. `wireFlyoutTrigger` is HOVER-ONLY now — its former
+click/touchend interception is deleted outright, not left dormant, per the owner's own explicit instruction
+("delete it, do not leave it dormant; a dormant second path is exactly how this happened"). One remaining
+wrinkle, found live: Blockly tears its OWN menu DOM down BEFORE invoking the registered callback (confirmed —
+`.blocklyContextMenu` is already gone by the time the callback runs), so the row's rect for `openFlyoutAdjacent`
+has to be CACHED at paint time (`window.__ddcsBlockOptionsRowRect`, set by the same MutationObserver that wires
+hover) rather than re-queried inside the callback — module-scoped on `window` rather than the IIFE closure,
+since the observer is wired once ever while the callback re-registers on every workspace init.
+
+**Verified live** (`tests/blocks-context-flyout-2411.spec.js`, updated in place — narrowed rather than
+rewritten from scratch, since it's the same feature evolving): a real click opens the cascade at the row-
+anchored position, never the old cursor position (asserted via `rect.left` sitting past the row's own right
+edge, not at the click coordinates); hover-then-click keeps `document.querySelectorAll('.op-ctx-menu').length`
+at exactly 1 throughout — the owner's own explicit "PROVE it" ask; a real Playwright touch-emulated tap
+(`page.touchscreen.tap`, the genuine synthesis pipeline, not a hand-rolled `TouchEvent`) opens the same cascade
+too. Non-vacuous: reverted the app-code fix via `git stash` and confirmed all 3 new assertions fail against the
+pre-fix tree with the EXACT predicted numbers (272 vs 433 — the cursor-position vs row-anchored-position gap).
+Regression: Duplicate/hover/openFlyoutAdjacent-positioning tests untouched, still green.
+
+### A mid-turn amendment, owner-observed WHILE working the above: a phantom scrollbar on the same native menu
+
+Blockly's own right-click menu (Duplicate/Add Comment/Collapse/Disable/Delete/Block options…) showed a full-
+height scrollbar with all 7 entries fully visible — content exceeded the box by only a couple pixels, not a
+real overflow. Diagnosed with `scrollHeight`/`clientHeight`/`getComputedStyle`, per the amendment's own
+instruction, rather than guessing: Blockly sizes the menu's WIDGET WRAPPER via an inline pixel `height` it
+computes itself (confirmed: `.blocklyWidgetDiv.style.height = "170px"` for a 6-item menu, exactly items×27+
+padding, no border in the math), and the menu itself (`box-sizing: border-box`, Blockly's own) reads
+`max-height: 100%` of that wrapper. ANY border on `.blocklyMenu` — ours (styles.css's own t2411 theme rider) OR
+Blockly's own vendored default (present independently — simply not overriding it left it in place, confirmed
+live: removing only OUR border rule changed nothing until `border: none` was added explicitly) — eats
+border-width's worth of pixels straight out of the content area Blockly already sized to the exact px, tipping
+a menu that just barely fits into `overflow: auto`'s own phantom scrollbar (measured: `scrollHeight` 170,
+`clientHeight` 168 — exactly a 1px top+bottom border).
+
+**Fix**: `border: none` + `outline: 1px solid … ; outline-offset: -1px` — outline paints the identical ring
+without participating in box sizing at all. Verified: `scrollHeight === clientHeight` now (no phantom
+scrollbar), a GENUINELY capped menu (forced via `widgetDiv.style.height = '100px'` to simulate Blockly's own
+edge-proximity math without fighting this harness for a real one) still has `overflow-y: auto` and actually
+scrolls (`scrollTop` moves on wheel) — the explicit instruction was not to trade a cosmetic bug for a
+functional one. `tests/blockly-menu-scrollbar-2417.spec.js` (2 tests), non-vacuous (fails against pre-fix CSS
+with the exact 170-vs-168 numbers).
+
+### BACKLOG #51 REOPENED and RETARGETED — two-finger pan on the BLOCKS canvas (not the feature canvas)
+
+The advisor's own error, flagged in the amendment: #51 was originally filed against the feature canvas (where
+#32's pinch lived); the owner's actual report was about the Blocks tab's Blockly workspace. Two fingers zoom
+but do not pan; both must come from the one gesture, purely additive — one-finger pan/drag is explicitly
+correct today and out of scope ("pan with one finger is working and fine, i just want also 2 finger").
+
+**Checked configuration before writing any gesture code**, per the dispatch's own explicit instruction:
+`zoom.pinch` (undeclared in `blocksApp.js`'s own inject options) defaults to `wheel || controls` in the
+vendored Blockly's own option-parsing (`b.pinch=a.pinch===void 0?b.wheel||b.controls:!!a.pinch`) — already
+`true` here, matching that pinch-zoom already worked. But reading the actual gesture-handling code (not just
+option parsing) settled it for real: `Gesture.prototype.handlePinch` computes ONLY a scale ratio from the two
+cached touch points' distance and calls `workspace.zoom(x, y, amount)` — there is no translation call anywhere
+in it. **This is a genuine gap in the vendored build, not a missing config flag** — "possibly one line" (the
+dispatch's own stated hope) turned out not to be the case, established by reading the source rather than
+guessing from the docs (which have already surprised this project twice before: no context submenu support, no
+exposed DropdownDiv).
+
+**The fix** (`web/blocks/blocksApp.js`, new `twoFingerPan` IIFE, mirroring the file's own pre-existing
+`middlePan` — same `ws.scroll(origin + delta)` idiom): tracks the two touches' own midpoint via native
+`touchstart`/`touchmove`/`touchend` on the injection host and pans by its movement, entirely additive —
+confirmed live (reading the same compressed source) that Blockly's 2-touch branch
+(`Gesture.prototype.handleTouchMove` → `handlePinch`) calls `preventDefault()` only, never
+`stopPropagation()`, so a passive listener here never fights it for control. Gated strictly on
+`touches.length === 2`, the same boundary Blockly's own Gesture uses to route into `handlePinch` at all, so a
+single touch never reaches this code — one-finger pan is structurally untouched, not just left alone by
+convention.
+
+**What was and wasn't provable in this harness, stated plainly rather than papered over** (the dispatch's own
+instruction: "if you cannot drive a genuine two-finger gesture convincingly, say so plainly and it becomes an
+owner device-check"): `tests/blocks-two-finger-pan-2417.spec.js` (3 tests) drives OUR OWN mechanism directly
+via synthetic `TouchEvent`s and proves it computes and applies the exact correct pan delta (asserted to the
+pixel, non-vacuous — reverted via `git stash`, before=(30,30) after=(30,30) pre-fix vs after=(80,90) post-fix,
+matching the touch delta exactly), never fires for one touch, and re-baselines cleanly when a finger joins or
+leaves mid-gesture. What it CANNOT prove: Blockly's own pinch-zoom firing SIMULTANEOUSLY from the identical
+physical gesture — established by reading the compressed source that Blockly's multi-touch recognition
+actually runs off POINTER events (`pointerdown`/`pointermove` on `document`, tracked by `pointerId` inside its
+own `Gesture` lifecycle: `bindMouseEvents` → `handleMove` → `isMultiTouch() && handleTouchMove(a)`), not the
+legacy `TouchEvent`/`touches[]` API these tests use to drive our own code — a synthetic `TouchEvent` never
+reaches Blockly's own listeners at all (confirmed: dispatching a synthetic pinch-spread via `TouchEvent` left
+`ws.scale` completely unchanged, 0.9→0.9, while our own pan still applied correctly from the SAME event). A
+real touchscreen browser dispatches BOTH event families for the same physical touch (standard, well-
+established behavior), so the two mechanisms should compose correctly on a real device — but that specific
+composition is flagged here as an owner device-check, not a claimed pass.
+
+### The mobile wizard buttons — deferred from t2415, built this turn with the amendment's refined ruling
+
+The owner's ruling (relayed via amendment, refining the original 8-10% ask): GO TO THE FLOOR — measure the
+real rendered tap target at 390px; if under the 44-48px platform minimum, grow to the floor even past the
+originally-asked 8-10% comfort bump (knowingly accepted); if already at/above, apply 8-10% as a comfort bump
+and stop. Vertical axis only, `.wizard-btn` scope only (never `.toolbar-btn` globally — shared with the
+editor-keys row and every other toolbar button).
+
+**Measured first, per the ruling's own discipline** (`getBoundingClientRect`, not CSS): the real rendered
+`.wizard-btn` was **32px tall at 390px** — well under both the Apple 44pt and Google 48dp floors, so this was
+never a comfort-bump case; straight to the floor.
+
+**Fix**: `.dock-header .wizard-btn { min-height: 44px }` inside a new `@media (max-width: 600px)` block. Two
+things established live rather than assumed: (1) a bare `.wizard-btn` selector had ZERO effect at first — same
+specificity as the base `.toolbar-btn { min-height: 24px }` rule, which sits LATER in the file (line 2314) and
+wins same-specificity source-order ties; fixed by scoping to `.dock-header .wizard-btn` (two classes, out-
+specifies the base rule regardless of order). (2) `min-height` alone reaches the floor with NO padding math
+needed, because `.dock-header .toolbar-btn` is already `display: inline-flex; align-items: center`
+(styles.css:2067) — the icon/label/caret re-center in the taller box for free. Horizontal padding is untouched
+BY CONSTRUCTION (the new rule declares no padding property at all), confirmed measured identical (`9px`/`9px`,
+matching the pre-existing `is-compact`/`is-mini` collapse value) before and after.
+
+**Verified live, non-vacuous**: `tests/mobile-wizard-btn-touch-floor-2417.spec.js` (4 tests) — every wizard
+button reaches ≥44px at 390px (fails against pre-fix CSS with the exact 32px number); desktop (1400px) stays
+under 40px, completely unaffected; horizontal padding pinned at 9px, matching the pre-existing mechanism; the
+priority-collapse ladder at 320px re-checked and confirmed BYTE-IDENTICAL (`headerScrollWidth`/`clientWidth`
+368/320 both before and after this fix via `git stash` A/B) — the pre-existing header-internal-scroll fallback
+at that width is unrelated to this change, not a new regression it introduced.
+
+### Full suite — 3 reds, all individually triaged, none tied to this turn's own code
+
+`npm test`: 238/238 node, 2963/2966 e2e. Three failures, none the already-filed #56 flake this time:
+`cam-slot-edit-s3.spec.js`, `middle-superset.spec.js`, `undo-reproject-echo.spec.js`. Named individually per
+Rule 1b rather than assumed:
+
+- `cam-slot-edit-s3.spec.js` and `middle-superset.spec.js` both passed CLEAN (14/14 combined) on an isolated
+  `--workers=1` re-run — matching #56's own documented "contention-starved population shifts run to run"
+  shape. Not this turn's own regression.
+- `undo-reproject-echo.spec.js`'s "a real block-value edit is undoable" test is a DIFFERENT shape: it flaked
+  even ALONE, `--workers=1`, no contention (2 of 4 solo runs failed). ⚠ First reaction was to assume a
+  regression from this turn's `blocksApp.js` edits and start bisecting — an initial 2-sample A/B (git-stash
+  revert vs not) looked like it confirmed that, but expanding to a real sample size caught the mistake before
+  it shipped: 4 of 6 runs failed on the FULLY REVERTED tree too — the same order of magnitude as WITH this
+  turn's code. Two data points is not evidence for a flaky test; filed as BACKLOG #57 with a first hypothesis
+  (the test's own `page.waitForTimeout(350)` calls, unlike its own `waitX` helper, guess at an async settle
+  time rather than polling for it) rather than left as a vague "sometimes fails" note.
+
+Nothing in this suite's own findings changed any of the four fixes above.
+

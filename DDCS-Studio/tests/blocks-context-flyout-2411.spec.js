@@ -2,12 +2,26 @@ import { test, expect } from '@playwright/test';
 
 /**
  * t2411 (BACKLOG #52) — "Block ▸" becomes a real Explorer-style CASCADE: the flyout hangs off the "Block
- * options…" row Blockly's own native context menu renders, opening on hover (small delay) or click, with the
- * parent menu staying open beside it — a positioning + trigger upgrade of the SAME popup t2387 already built
- * (ui/opContextMenu.js), not a rebuild. Covers the shared trigger mechanism directly (opContextMenu.js exports
- * it standalone, so this doesn't need Blockly's own menu machinery to exercise the timing/positioning logic),
- * then one real end-to-end pass through an actual Blockly-rendered row, then a regression check that an
- * ORDINARY row (Duplicate) is completely untouched by the new wiring.
+ * options…" row Blockly's own native context menu renders, opening on hover (small delay), with the parent
+ * menu staying open beside it — a positioning upgrade of the SAME popup t2387 already built (ui/opContextMenu.js),
+ * not a rebuild. Covers the shared trigger mechanism directly (opContextMenu.js exports it standalone, so this
+ * doesn't need Blockly's own menu machinery to exercise the timing/positioning logic), then one real end-to-end
+ * pass through an actual Blockly-rendered row, then a regression check that an ORDINARY row (Duplicate) is
+ * completely untouched by the new wiring.
+ *
+ * ⛔ t2417 (BACKLOG #52 REOPENED) — NARROWED. `wireFlyoutTrigger` used to also intercept click/touchend on the
+ * row itself, trying to make those trigger the SAME cascade while suppressing Blockly's own native activation
+ * of the row. Proved live that this did not work against the REAL Blockly-rendered row (only against a
+ * synthetic stand-in, which is why it read as passing here): `stopPropagation()` cannot stop a sibling listener
+ * already bound to the same DOM node, and Blockly binds its own click/tap handling on the row before this file
+ * ever gets to wire it. A real click fired BOTH paths — Blockly's own native activation (closing its own menu,
+ * the old t2387 cursor popup) AND this file's own click handler (the row-anchored cascade) — landing wherever
+ * rendered last. That was the reopened defect: "both open at once."
+ *
+ * `wireFlyoutTrigger` is HOVER-ONLY now — the two tests that asserted the retired click/touch interception are
+ * replaced below with the real fix: the `ContextMenuRegistry` item's own `callback` (blocksApp.js,
+ * `registerBlockOptionsMenu`) is the ONE path click, touch tap, and keyboard arrow+Enter all guaranteed funnel
+ * through, and it now opens the identical row-anchored cascade instead of the old cursor popup.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
@@ -34,7 +48,7 @@ test('openFlyoutAdjacent: opens to the right by default, flips left when it woul
   expect(r.topAligned, 'both cases stay top-aligned with the anchor').toBe(true);
 });
 
-test('wireFlyoutTrigger: hover-open delay, close-delay tolerance survives re-entry, click is intercepted (native handler never fires, parent stays open)', async ({ page }) => {
+test('wireFlyoutTrigger: hover-open delay, close-delay tolerance survives re-entry', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio);
   await page.evaluate(async () => {
@@ -43,9 +57,7 @@ test('wireFlyoutTrigger: hover-open delay, close-delay tolerance survives re-ent
     row.id = 't2411-row';
     row.textContent = 'Block options…';
     row.style.cssText = 'position:fixed; left:100px; top:100px; width:150px; height:30px; z-index:99999;';
-    row.addEventListener('click', () => { window.__t2411NativeFired = true; });   // stands in for Blockly's own row handler
     document.body.appendChild(row);
-    window.__t2411NativeFired = false;
     wireFlyoutTrigger(row, () => [{ label: 'X', fn: () => {} }]);
   });
   const box = await page.locator('#t2411-row').boundingBox();
@@ -76,42 +88,29 @@ test('wireFlyoutTrigger: hover-open delay, close-delay tolerance survives re-ent
   await page.waitForTimeout(600);
   const staysOpen = await page.evaluate(() => !document.querySelector('.op-ctx-menu').hidden);
   expect(staysOpen, 'moving into the flyout before the close-delay fires keeps it open').toBe(true);
-
-  // click intercept: the row's own native handler never fires, and the flyout opens instead
-  await page.evaluate(() => { document.querySelector('.op-ctx-menu').hidden = true; window.__t2411NativeFired = false; });
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(80);
-  const clickState = await page.evaluate(() => ({ native: window.__t2411NativeFired, open: !document.querySelector('.op-ctx-menu').hidden }));
-  expect(clickState.native, 'the row\'s own native click handler is suppressed — the parent menu never closes itself').toBe(false);
-  expect(clickState.open, 'clicking the row opens the flyout the same as hovering').toBe(true);
 });
 
-test('wireFlyoutTrigger: a touch tap toggles the flyout open then closed', async ({ page }) => {
+/**
+ * t2417 — wireFlyoutTrigger no longer touches click or touch at all (see the file header). A stand-in row with
+ * no Blockly involved cannot exercise "does this suppress Blockly's native activation" — that question can
+ * only be answered against the REAL row, which the end-to-end tests below do.
+ */
+test('wireFlyoutTrigger: a plain click on the row does nothing — click is not this function\'s concern any more', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio);
   await page.evaluate(async () => {
     const { wireFlyoutTrigger } = await import('/ui/opContextMenu.js');
     const row = document.createElement('div');
-    row.id = 't2411-row';
+    row.id = 't2417-row';
     row.style.cssText = 'position:fixed; left:100px; top:100px; width:150px; height:30px; z-index:99999;';
     document.body.appendChild(row);
     wireFlyoutTrigger(row, () => [{ label: 'X', fn: () => {} }]);
   });
-  const box = await page.locator('#t2411-row').boundingBox();
-  const tap = (x, y) => page.evaluate(({ x, y }) => {
-    const row = document.getElementById('t2411-row');
-    row.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [new Touch({ identifier: 1, target: row, clientX: x, clientY: y })] }));
-  }, { x, y });
-
-  await tap(box.x + box.width / 2, box.y + box.height / 2);
+  const box = await page.locator('#t2417-row').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(80);
-  const afterFirstTap = await page.evaluate(() => !document.querySelector('.op-ctx-menu').hidden);
-  expect(afterFirstTap, 'a first tap opens the flyout').toBe(true);
-
-  await tap(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(80);
-  const afterSecondTap = await page.evaluate(() => document.querySelector('.op-ctx-menu').hidden);
-  expect(afterSecondTap, 'a second tap on the same row toggles it closed').toBe(true);
+  const open = await page.evaluate(() => { const m = document.querySelector('.op-ctx-menu'); return !!m && !m.hidden; });
+  expect(open, 'a click alone (no prior hover) never opens the flyout — only mouseenter does').toBe(false);
 });
 
 async function bootFormfield(page) {
@@ -179,4 +178,92 @@ test('regression: an ordinary row (Duplicate) is untouched — still duplicates 
   await page.waitForTimeout(250);
   const after = await page.evaluate(() => window.__blkws.getAllBlocks(false).length);
   expect(after, 'Duplicate still duplicates the block, unaffected by the new cascade wiring').toBeGreaterThan(before);
+});
+
+async function rowRectFor(page, label) {
+  return page.evaluate((label) => {
+    const row = Array.from(document.querySelectorAll('.blocklyMenuItem')).find((r) => r.textContent.trim() === label);
+    if (!row) return null;
+    const r = row.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  }, label);
+}
+
+/**
+ * t2417 (BACKLOG #52 REOPENED) — THE FIX ITSELF: a real CLICK on "Block options…" (no prior hover) opens the
+ * SAME row-anchored cascade the hover trigger opens — never the old cursor-positioned popup. Blockly's own
+ * native menu closes on activation, same as every other item (Duplicate, Delete, …) — that half is unchanged,
+ * standard Blockly behavior, not a regression.
+ */
+test('end-to-end (t2417): a real click on "Block options…" opens the cascade, not the old cursor popup', async ({ page }) => {
+  const box = await bootFormfield(page);
+  await page.mouse.click(box.x + 20, box.y + 8, { button: 'right' });
+  await page.waitForTimeout(250);
+  const rowBox = await rowRectFor(page, 'Block options…');
+  expect(rowBox).not.toBeNull();
+  await page.mouse.click(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+  await page.waitForTimeout(150);
+  const state = await page.evaluate(() => {
+    const flyout = document.querySelector('.op-ctx-menu');
+    const r = flyout ? flyout.getBoundingClientRect() : null;
+    return { flyoutOpen: !!flyout && !flyout.hidden, rect: r, items: flyout ? Array.from(flyout.children).map((c) => c.textContent) : [] };
+  });
+  expect(state.flyoutOpen, 'the click opened the cascade').toBe(true);
+  expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+  // row-ANCHORED, not cursor-positioned: its left edge sits at the row's right edge (+ the flyout's own gap),
+  // never at the click's own (x, y) — that distinction IS the bug this turn fixes.
+  expect(state.rect.left, 'positioned beside the row (the cascade), not at the click point (the old popup)').toBeGreaterThan(rowBox.x + rowBox.width - 1);
+});
+
+/**
+ * t2417 — THE OWNER'S OWN "PROVE IT": open by hover, then click, and only one panel exists throughout — not
+ * two, not a flicker between two different positions, the SAME element the whole time.
+ */
+test('end-to-end (t2417): hover then click — impossible for two panels to coexist, only one .op-ctx-menu ever exists', async ({ page }) => {
+  const box = await bootFormfield(page);
+  await page.mouse.click(box.x + 20, box.y + 8, { button: 'right' });
+  await page.waitForTimeout(250);
+  const rowBox = await rowRectFor(page, 'Block options…');
+  const cx = rowBox.x + rowBox.width / 2, cy = rowBox.y + rowBox.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.waitForTimeout(250);
+  const afterHover = await page.evaluate(() => ({
+    menuCount: document.querySelectorAll('.op-ctx-menu').length,
+    nativeOpen: !!document.querySelector('.blocklyContextMenu'),
+    flyoutOpen: !document.querySelector('.op-ctx-menu').hidden,
+    rect: document.querySelector('.op-ctx-menu').getBoundingClientRect(),
+  }));
+  await page.mouse.click(cx, cy);
+  await page.waitForTimeout(150);
+  const afterClick = await page.evaluate(() => ({
+    menuCount: document.querySelectorAll('.op-ctx-menu').length,
+    flyoutOpen: !document.querySelector('.op-ctx-menu').hidden,
+    rect: document.querySelector('.op-ctx-menu').getBoundingClientRect(),
+  }));
+  expect(afterHover.nativeOpen, 'hover: parent menu stays open').toBe(true);
+  expect(afterHover.flyoutOpen, 'hover: the cascade is open').toBe(true);
+  expect(afterHover.menuCount, 'there is only ever ONE floating menu element, hover or click').toBe(1);
+  expect(afterClick.menuCount, 'still exactly one element after the click').toBe(1);
+  expect(afterClick.flyoutOpen, 'the cascade is still open after the click').toBe(true);
+  expect(afterClick.rect.left, 'the click did not reposition it to a second (cursor) location').toBe(afterHover.rect.left);
+  expect(afterClick.rect.top, 'same top too — the SAME open panel, not a second one').toBe(afterHover.rect.top);
+});
+
+test.describe('touch-emulated context (t2417)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1400, height: 1000 } });
+  test('end-to-end: a real touch tap on "Block options…" opens the cascade (no hover exists on touch, so tap is the only trigger)', async ({ page }) => {
+    const box = await bootFormfield(page);
+    await page.mouse.click(box.x + 20, box.y + 8, { button: 'right' });
+    await page.waitForTimeout(250);
+    const rowBox = await rowRectFor(page, 'Block options…');
+    expect(rowBox).not.toBeNull();
+    await page.touchscreen.tap(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+    await page.waitForTimeout(400);
+    const state = await page.evaluate(() => {
+      const flyout = document.querySelector('.op-ctx-menu');
+      return { flyoutOpen: !!flyout && !flyout.hidden, items: flyout ? Array.from(flyout.children).map((c) => c.textContent) : [] };
+    });
+    expect(state.flyoutOpen, 'a real tap opens the cascade').toBe(true);
+    expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+  });
 });
