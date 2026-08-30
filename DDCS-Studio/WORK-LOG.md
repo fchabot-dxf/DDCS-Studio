@@ -64717,3 +64717,16 @@ Files: `web/viz/canvasWidgets.js`, `web/wizards/ops/panelTypes.js`, `web/wizards
 
 No `proc_health.py` leaks this turn.
 
+## t2431 TAIL (own commit) — the flyout test's stale exact-match list, fixed
+
+Confirmed live (not pattern-matched from the earlier description) via the fixed test itself: `bootFormfield`'s
+own formfield block is `boundParamOf`-eligible, so `itemsFor` (blocksApp.js) now pushes a 5th row after t2425
+(BACKLOG #41, FREEZE) shipped — `pendingEnablers` items, THEN Freeze/Unfreeze, THEN Show-in-form, matching the
+order the fixed assertions now expect. All 3 exact-match assertions in `blocks-context-flyout-2411.spec.js`
+(the hover end-to-end, the t2417 click end-to-end, the touch-tap end-to-end) updated to append `'❄ Freeze
+value'`. Considered loosening to `.toContain()` per the dispatch's own question — kept exact-match: the list
+is short and well-known, so exact-match still catches a genuine future regression/addition, which a fuzzier
+match would quietly stop doing. 10/10 pass in the file.
+
+Files: `tests/blocks-context-flyout-2411.spec.js`.
+

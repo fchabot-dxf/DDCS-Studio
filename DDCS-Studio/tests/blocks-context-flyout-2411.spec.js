@@ -22,6 +22,13 @@ import { test, expect } from '@playwright/test';
  * replaced below with the real fix: the `ContextMenuRegistry` item's own `callback` (blocksApp.js,
  * `registerBlockOptionsMenu`) is the ONE path click, touch tap, and keyboard arrow+Enter all guaranteed funnel
  * through, and it now opens the identical row-anchored cascade instead of the old cursor popup.
+ *
+ * t2431 (BACKLOG #49's own tail) — this file's exact-match flyout-content assertions predated t2425 (BACKLOG
+ * #41, FREEZE), which added a 5th row ("❄ Freeze value"/"❄ Unfreeze value") to every param-bound block's own
+ * flyout — a formfield block (this file's own `bootFormfield` fixture) is bound, so all 3 end-to-end assertions
+ * were stale by one entry, confirmed live via the full suite's own diff. Updated to the real current contents
+ * rather than loosened to a `.toContain()` — the list stays short and well-known, so exact-match keeps catching
+ * a genuine future regression/addition, which a fuzzier match would quietly stop doing.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
@@ -179,7 +186,11 @@ test('end-to-end: right-click a real block, hover "Block options…" — the nat
   });
   expect(state.nativeMenuOpen, 'Blockly\'s own native menu stays open beside the flyout').toBe(true);
   expect(state.flyoutOpen, 'the flyout opened on hover').toBe(true);
-  expect(state.flyoutItems).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+  // t2431 — t2425 (BACKLOG #41, FREEZE) added a 5th row to every param-bound block's own "Block options…"
+  // flyout, AFTER this exact-match assertion was written. A formfield block is bound (`boundParamOf`), so it
+  // now offers Freeze too — `itemsFor`'s own push order (blocksApp.js) is enablers, then Freeze/Unfreeze, then
+  // Show in form, matching the order asserted here.
+  expect(state.flyoutItems).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition', '❄ Freeze value']);
 
   // selecting a flyout item closes BOTH menus together (the whole cascade dismisses, matching the Explorer reference)
   await page.evaluate(() => document.querySelector('.op-ctx-menu').children[0].click());
@@ -237,7 +248,7 @@ test('end-to-end (t2417): a real click on "Block options…" opens the cascade, 
     return { flyoutOpen: !!flyout && !flyout.hidden, rect: r, items: flyout ? Array.from(flyout.children).map((c) => c.textContent) : [] };
   });
   expect(state.flyoutOpen, 'the click opened the cascade').toBe(true);
-  expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+  expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition', '❄ Freeze value']);
   // row-ANCHORED, not cursor-positioned: its left edge sits at the row's right edge (+ the flyout's own gap),
   // never at the click's own (x, y) — that distinction IS the bug this turn fixes.
   expect(state.rect.left, 'positioned beside the row (the cascade), not at the click point (the old popup)').toBeGreaterThan(rowBox.x + rowBox.width - 1);
@@ -305,7 +316,7 @@ test.describe('touch-emulated context (t2417)', () => {
       };
     });
     expect(state.flyoutOpen, 'a real tap opens the cascade').toBe(true);
-    expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition']);
+    expect(state.items).toEqual(['+ help text', '+ limits (min/max/step)', '+ units', '+ show-when condition', '❄ Freeze value']);
     // row-ANCHORED, not dumped near the viewport origin (the reported symptom) — its left edge sits at or past
     // the row's own right edge, and its top is close to the row's own top (clamped into the viewport, so
     // "close to" rather than exact — the same tolerance the desktop click test's own position check allows).
