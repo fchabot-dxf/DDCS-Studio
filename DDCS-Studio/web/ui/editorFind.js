@@ -10,6 +10,7 @@
  * SEARCH ONLY, per the dispatch — no replace (a separate feature with its own overwrite hazards). Case-
  * insensitive by default (no toggle this turn — nothing else asked for).
  */
+import { cycleIndex, formatCount } from './findBarCore.js';   // t2435 — the match-cycling shape shared with the Blocks-canvas find bar
 
 const editorEl = () => document.getElementById('editor');
 
@@ -48,7 +49,7 @@ export function installEditorFind() {
     let current = -1;
 
     function renderCount() {
-        countEl.textContent = matches.length ? `${current + 1}/${matches.length}` : '0/0';
+        countEl.textContent = formatCount(current, matches.length);
     }
 
     function refresh() {
@@ -73,7 +74,7 @@ export function installEditorFind() {
 
     function goTo(idx) {
         if (!matches.length) return;
-        current = ((idx % matches.length) + matches.length) % matches.length;
+        current = cycleIndex(0, idx, matches.length);   // idx already carries the target index (not a delta) at every call site — cycleIndex(0, idx, n) wraps it the same way the old modulo did
         const m = matches[current];
         ed.focus();   // #editor carries inputmode="none" (suppresses the OS keyboard) — focusing it is safe/expected here, the same as editorAutocomplete.js's own insert-then-focus
         ed.setSelectionRange(m.start, m.end);
@@ -86,7 +87,13 @@ export function installEditorFind() {
         if (btnOpen) btnOpen.classList.add('active');
         const selected = ed.value.slice(ed.selectionStart, ed.selectionEnd);
         if (selected && !selected.includes('\n')) input.value = selected;   // seed from a real selection, not a multi-line one
-        input.focus();
+        // t2435 amendment (owner-corrected, real device + screenshots): the LEAD wasn't the keyboard's own
+        // resize, it's the browser's own default "scroll the newly-focused element into view" behaviour —
+        // the owner's own two screenshots show the WHOLE PAGE shifted (the bar moved from below the wizard-
+        // button row to above it) the moment the input took focus, not just a shrunk viewport. `preventScroll`
+        // stops the browser from doing that scroll itself; OUR OWN reveal logic (scrollToOffset below) is
+        // what should be moving the view, not an uncontrolled browser default fighting it.
+        input.focus({ preventScroll: true });
         input.select();
         refresh();
         if (matches.length) goTo(current < 0 ? 0 : current);

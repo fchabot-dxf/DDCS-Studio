@@ -64833,3 +64833,164 @@ in isolation (0 failed, 0 flaky, 1-2 runs each) before trusting this.
 
 Files: `web/blocks/blockly/bridge.js`, `web/wizards/ops/{holecycle,measure,probe,radiuscomp}.js`, `BACKLOG.md`.
 
+## t2435 — BACKLOG #44 SHIPPED: CANVAS FIND — a find bar for blocks already on the Blocks canvas
+
+Owner-approved ("4 yes"). The palette search (`.blk-search`, blocksApp.js) only filters what you can ADD from
+the toolbox; nothing searched the blocks a real op already has on the canvas (~155 for a corner stack). Same
+request as t2383's editor find bar, one tab over.
+
+**Read the editor's own find bar in full before designing anything (t2383, `ui/editorFind.js`).** It is text-
+offset based — `computeMatches` over `textarea.value`, `setSelectionRange`, line-height-based scroll — none of
+that transfers to a Blockly canvas where a "match" is a block, not a character range. What genuinely DOES
+transfer: the index-cycling-with-wraparound math and the "n/m" count formatting. Extracted those into a new
+`ui/findBarCore.js` (`cycleIndex`, `formatCount`) — and proved it's actually shared, not just declared shared,
+by refactoring `editorFind.js` itself onto the extracted functions (replacing its own inline modulo/ternary)
+and confirming its existing behavior didn't change.
+
+**New module for the canvas side: `blocks/blockCanvasFind.js`.** `computeBlockMatches(ws, query)` walks
+`ws.getAllBlocks(false)` and, per block, checks the block's own `type` plus every field's own
+`Field.prototype.getText()` — Blockly's own public method, uniform across every field kind (a caption, a typed
+value, a dropdown's own DISPLAYED option, not its raw stored code) — against the query, case-insensitive.
+Deliberately generous per the dispatch's own instruction: a param name (`radius`), a variable (`#100`), a
+literal (`18000`) must all hit, because that's what a machinist is actually looking for, and matching on
+`getText()` guarantees whatever's found is the same text actually painted on screen.
+
+**Reveal reuses t2397's own glow mechanism verbatim, not rediscovered.** Extracted `blocksApp.js`'s existing
+inline glow tail (previously living only inside `revealInBlocks`, the FORM → BLOCK jump) into a standalone
+`panAndGlow(blk)`: `ws.centerOnBlock(blk.id)` to pan, then a DIRECT `style.filter` drop-shadow + `setTimeout`
+clear for the glow — NOT CSS `@keyframes`, which this Blockly build silently ignores on an SVG block root
+(t2397's own live-caught finding, confirmed again this turn via `getComputedStyle` coming back empty for a
+keyframe attempt before I found the existing workaround and just reused it). Both `revealInBlocks` and the new
+find bar now call this one function — same reveal, one source, not two copies.
+
+**Edge cases, decided with the file in hand rather than guessed, per the dispatch's own instruction:**
+- A match inside a COLLAPSED block, or inside a collapsed ANCESTOR (a container/mouth block): `expandForReveal`
+  walks up `getSurroundParent()` and calls `setCollapsed(false)` on every collapsed block in the chain before
+  panning — a glow on a hidden collapsed summary would show the user nothing. `getAllBlocks(false)` already
+  finds blocks regardless of an ancestor's own collapsed state (confirmed live — Blockly's own tree walk
+  doesn't prune on collapse), so the search itself needed no change, only the reveal.
+- Off-canvas at high zoom: pan-only via `ws.centerOnBlock`, no zoom-to-fit added. Reasoning: this is exactly
+  what the existing, already-shipped t2397 reveal relies on, and nothing in verification showed centering
+  alone to be insufficient — adding zoom-to-fit would be machinery for a problem not actually observed.
+- Zero matches: the count reads "0/0" (the editor's own convention) and the input gets a visible `.no-match`
+  CSS class — never a silent no-op, per the dispatch's own explicit instruction.
+
+**Placement — distinct from the palette search on purpose.** An overlay chip + bar in the canvas's own
+top-right corner (`#blocks-app .blk-find-chip`/`.blk-findbar`, styles.css), the SAME corner-overlay convention
+`.editor-findbar` already uses over the editor's own code area (t2383) — not a second input sitting beside the
+always-visible `.blk-search` palette box at the top, so the two never read as the same control doing different
+things. `.blk-search` filters the TOOLBOX; this chip searches the CANVAS.
+
+**Wiring**: `installBlockCanvasFind(ws, host, panAndGlow)` called in `blocksApp.js` right after the existing
+palette-search setup, passing the newly-extracted `panAndGlow` in rather than reimplementing it.
+
+**Verification — caught and fixed a wrong-canvas boot bug while writing the test.** First attempt booted via
+`window.ddcsEditWizardDef('user_corner_data')`, which opens a DIFFERENT, much larger "Customize as blocks"
+AUTHORING canvas (1787 blocks) — caused a spurious "the model changed after typing" failure unrelated to the
+find bar itself. Fixed by switching to the correct pattern this session already established for a REAL PLACED
+op: `_framed`/`makeOp` from `blocks/opBuilders.js` + `window.ddcsLoadBlockStack([progstart, op, progend])` —
+155 blocks, matching the dispatch's own "a corner stack is ~98 blocks" framing.
+
+Promoted the scratch verification script into a permanent file, `tests/block-canvas-find-2435.spec.js`, with a
+top-of-file header (what BACKLOG #44 is, what's shared vs. built fresh, what each test verifies) and a single
+shared `bootCornerPlaced(page)` helper (previously duplicated identically in both test bodies — refactored out
+before finalizing, matching this session's own `bootPocket`/`bootFormfield`-style helper convention). Two
+tests, both passing (2/2, `npx playwright test tests/block-canvas-find-2435.spec.js`):
+- **End-to-end**: chip mounts on the canvas; opening the bar and typing "radius" finds matches (count != "0/0");
+  the model (`ddcsGetBlockProgram()`) is BYTE-IDENTICAL before and after typing — the direct proof the dispatch
+  asked for that the find input never edits a block; Enter-cycling to a match leaves a block with a
+  `style.filter` containing `drop-shadow` (glow confirmed both via inspection and a viewed screenshot);
+  typing a nonexistent query shows "0/0" plus the `.no-match` class; Esc closes the bar. Screenshot saved to
+  `DDCS-Studio/verification/t2435-canvas-find.png` (test itself writes to the gitignored `scratchpad/`, per
+  this session's own test convention — copied the actual captured result into `verification/` for the record,
+  matching how other turns' screenshots ended up there).
+- **Collapsed-block edge case**: collapsed a block carrying a distinctive matched caption ("Probe stylus
+  radius"), searched "stylus radius" (2 legitimate matches — a field caption can repeat), then cycled through
+  matches with Enter (up to 3 times) checking after each whether the specifically-collapsed target had been
+  expanded — rather than assuming, as a first, WRONG attempt did, that `matches[0]` would be the collapsed one.
+  Confirmed the target block is un-collapsed once the cycle actually reaches it.
+
+**Full suite (Rule 1b — `blocksApp.js` is shared)**: 2972 passed / 2 failed / 23 flaky (recovered) / 26 skipped,
+27m28s. Both reds named individually, neither touches this turn's files: `blocks-context-flyout-2411.spec.js`
+("wireFlyoutTrigger: a plain click on the row does nothing") and `open-as-modal-1625.spec.js` ("A REAL OPEN
+AFTER A PREVIEW gets its INSERT back") — the latter is the SAME test t2409's/t2433's own WORK-LOG entries
+already name as a documented suite-contention flake. Grepped `blocks-context-flyout-2411.spec.js` for any
+reference to the new find-bar DOM (`blk-find`/`findWired`) — none — confirming no interaction. Both re-ran
+clean in isolation (`npx playwright test tests/blocks-context-flyout-2411.spec.js tests/open-as-modal-1625.spec.js`
+— 13 passed, 0 failed, 0 flaky) before trusting this.
+
+## t2435 MID-TASK AMENDMENT — "when the keyboard opens the code disappears" — one real bug found and fixed
+chasing the wrong theory first, one focused fix landed on the corrected theory, one existing mechanism
+correctly left alone once found
+
+Owner-reported, real device, two screenshots: with the editor's own find bar (t2383, already shipped) focused
+and the on-screen keyboard up, the code area goes blank — a find bar whose results you can't see while typing
+is just a text box. The advisor's FIRST framing named the keyboard's own viewport shrink as the cause and
+asked it be fixed once for both find bars (the editor's, already shipped, and this turn's new canvas one).
+
+**First theory (viewport shrink) — investigated, partly built, then CORRECTED by the advisor before shipping.**
+Built `ui/viewportKeyboard.js` (a `visualViewport`-driven `--vvh` CSS custom property) plus an
+`interactive-widget=resizes-content` viewport-meta opt-in, on the theory that `.app-shell`'s `calc(100dvh -
+54px)` wasn't shrinking for the keyboard the way it does for a mobile URL bar. **While verifying this against
+a REAL corner op**, found a genuine, unrelated bug in code I wrote earlier this same turn: `panAndGlow`
+(blocksApp.js, shared by the canvas find bar AND the pre-existing t2397 FORM→BLOCK reveal) called
+`ws.centerOnBlock(id)` with no second argument — Blockly then centers on `block.getHeightWidth()`, which
+INCLUDES everything still connected below the block via its "next" chain (confirmed live: a mid-stack block's
+own real row height is ~34px, but `getHeightWidth()` reported 334–1153px for the SAME blocks, the height of
+their entire remaining trailing chain). Centering on that inflated height could put the actually-matched block
+hundreds of px off-screen — reproduced live across all 6 matches of a "radius" search on a real corner stack,
+fixed by passing Blockly's own `useCoordinates=true` flag (`ws.centerOnBlock(blk.id, true)`), which centers on
+the block's own `.height`/`.width` instead. Re-verified clean across all 6 matches, properly spaced past the
+1800ms glow-clear timer so no stale glow could be mistaken for the current one (a real trap: cycling matches
+faster than the glow timer clears leaves MULTIPLE blocks simultaneously "glowing," and a naive "find any
+glowing block" check can grab the wrong one — hit this in my own test scripts before realizing it was a
+detection artifact, not a product bug).
+
+**Then the advisor corrected the theory entirely**, having re-read the owner's own two screenshots more
+carefully: the code area doesn't merely shrink, the WHOLE PAGE SCROLLS — the find bar sits below the
+wizard-button row unfocused, above it once focused. The lead is the browser's own default "scroll the
+newly-focused element into view" behaviour, not the keyboard's viewport resize. The advisor explicitly said
+not to chase the viewport theory further and offered amnesty for time already spent on it — taken, logged
+here rather than hidden.
+
+**Investigating the corrected theory surfaced an EXISTING, already-built mechanism I hadn't checked for
+first** (a real miss — should have searched before building `viewportKeyboard.js`): `app.js` already has a
+`visualViewport`-driven keyboard detector (t2229/BACKLOG F3a) toggling `body.keyboard-active`, and
+`styles.css` already pins `.editor-container` to a fixed 60px strip under that class specifically so the
+editor stays visible above the keyboard, with `editorManager.js`'s own `insert()` already re-centering the
+cursor line within that strip. **My `--vvh`/`interactive-widget=resizes-content` additions would have BROKEN
+this outright**: the existing detector's own heuristic is `vv.height < window.innerHeight * 0.8` — if
+`interactive-widget=resizes-content` makes the LAYOUT viewport (and so `window.innerHeight`) shrink to match
+the keyboard too, that ratio never drops below 0.8 and `keyboard-active` would stop firing at all. Caught this
+before shipping — reverted all three viewport-theory pieces (`ui/viewportKeyboard.js` deleted, the
+`interactive-widget` meta reverted, `.app-shell`'s `--vvh` fallback reverted) rather than leave a live risk to
+an already-working system sitting in the diff.
+
+**What actually shipped for the corrected theory**: `input.focus({ preventScroll: true })` in both find bars'
+own `open()` (`ui/editorFind.js`, `web/blocks/blockCanvasFind.js`) — stops the browser's own default
+scroll-into-view from fighting each bar's OWN reveal logic (`scrollToOffset`/`centerOnBlock`), which is what
+should be controlling the view, not an uncontrolled browser default. Grepped the rest of the app for any other
+`scrollIntoView`/bare `.focus()` pattern that might also be contributing — none found in either find bar or
+anything they call.
+
+**⚠ NOT verifiable in this harness, named plainly rather than claimed as tested** (per the amendment's own
+anticipation): headless Chromium has no real OS on-screen keyboard and doesn't reproduce a mobile browser's
+native focus-scroll heuristic, so nothing here can prove `preventScroll` resolves what the owner is actually
+seeing. This needs the owner's own device re-check.
+
+**⚠ A separate, NOT-fixed-today finding, worth the owner's/advisor's attention**: the existing 60px
+`keyboard-active` editor pin (`styles.css`) squeezes the WHOLE `.editor-container` — toolbar strip AND the
+code area the find bar lives in — into 60px total. That budget was sized for `editorManager.js`'s own
+snippet-button-insert use case (one centered line, deliberately avoiding real focus to keep the OS keyboard
+suppressed). A find bar legitimately needs real focus (a real query needs a real keyboard), so `keyboard-active`
+correctly engages for it — but 60px total may not be enough room to show both a code line AND a usable find
+bar. Not touched this turn: redesigning that budget is a real decision (how much room, what gets clipped) that
+deserves its own dispatch rather than a guess bolted onto an already-large amendment.
+
+Files (amendment): `web/ui/editorFind.js`, `web/blocks/blockCanvasFind.js`, `web/blocks/blocksApp.js`
+(`panAndGlow`'s `useCoordinates` fix — kept; the viewport-theory files were created and then deleted/reverted
+in the same turn, so they never reach the diff).
+
+Files: `web/ui/editorFind.js`, `web/ui/findBarCore.js` (new), `web/blocks/blockCanvasFind.js` (new),
+`web/blocks/blocksApp.js`, `web/styles.css`, `tests/block-canvas-find-2435.spec.js` (new), `BACKLOG.md`.
+

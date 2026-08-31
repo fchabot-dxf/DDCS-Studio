@@ -36,6 +36,7 @@ import { applyProgramIntent, opSimContext } from '../viz/opSimContext.js';      
 import { opSimStarts } from '../viz/opSimStarts.js';                  // t756 — the DECLARED per-op start source (retires the legacy inferStart)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { installBlockCanvasFind } from './blockCanvasFind.js';   // t2435 (BACKLOG #44) — find a block already ON the canvas (the palette search above only filters what you can ADD)
 // t756 (R-C) — the legacy WIZARDS[type].inferStart start-source is retired: the Blocks preview now reads the DECLARED
 // opSimStarts (blkStartHints below), the same source as the editor + wizard previews. The CornerWizard/… imports that
 // only fed inferStart are gone with it.
@@ -351,6 +352,13 @@ async function buildWorkspace() {
   search.addEventListener('input', runSearch);
   search.addEventListener('search', runSearch);   // the ✕ clear button fires 'search'
   window.__blkWs = ws;   // debug/test accessor
+
+  // t2435 (BACKLOG #44) — find a block ALREADY ON the canvas, distinct from the palette search just above
+  // (which only filters what you can ADD from the toolbox) — a chip + overlay bar on `host` (the canvas
+  // itself), not a second input beside `.blk-search`, so the two don't read as the same control doing
+  // different things. `panAndGlow` (defined below, hoisted) is the SAME pan+glow t2397's own FORM → BLOCK
+  // reveal already uses — passed in rather than reimplemented.
+  installBlockCanvasFind(ws, host, panAndGlow);
 
   // t2287 — the undo redesign's ONE seam into Blockly: registered ONCE, the moment the workspace exists (never
   // before — saveStates.js stays free of any Blockly import either way). `hasWorkspace` is the single
@@ -834,6 +842,35 @@ async function buildWorkspace() {
   // which never own a param this way). Absent either shape — a genuinely un-owned param (the older pill/
   // socket mechanism, no named declaring block at all) — says so plainly via toast rather than a silent
   // no-op ("hides or explains, never a dead click": the gesture always fires, there's just nothing to reveal).
+  // t2397 — LIVE-CAUGHT: the CSS `@keyframes` route (`.ddcs-block-glow`, styles.css) that works cleanly on
+  // the FORM ROW's own `.ddcs-reveal-glow` (confirmed: `getComputedStyle` reports the animation running,
+  // exactly 2× the theme's own `--edit-glow-speed`) does NOT reliably run on a Blockly block's SVG `<g>` root
+  // in this build — confirmed live: `getComputedStyle(root).animationName` came back EMPTY on the SAME class
+  // applied to the SAME rule, and the class was gone well before one theme-paced iteration could have
+  // finished. Rather than chase an SVG `animation`-shorthand quirk further, this is a DIRECT, timer-driven
+  // highlight instead — same colour tokens (`--accent`/`--edit-glow-rgb`), no dependency on CSS keyframe
+  // timing on an element type this build doesn't animate that way reliably.
+  // t2435 (BACKLOG #44) — extracted from what was `revealInBlocks`'s own inline pan+glow tail so the NEW
+  // canvas-find bar (blockCanvasFind.js) reuses the identical, already-proven reveal instead of rediscovering
+  // it — the dispatch's own explicit instruction.
+  function panAndGlow(blk) {
+    // t2435 amendment verification, live-caught: plain `centerOnBlock(id)` centers Blockly's own
+    // `getHeightWidth()` — which, for a block anchoring a long "next"-connected chain (any op block in a real
+    // stack), reports the height of EVERYTHING still connected below it, not just this block's own row
+    // (confirmed live: a corner op's own `radiuscomp` block measured `getHeightWidth().height` at 1153px
+    // against its own real single-row `.height` of 34px). Centering on that inflated height can put the block
+    // that actually matched hundreds of px off-screen. `centerOnBlock(id, true)` — Blockly's own
+    // `useCoordinates` flag — centers on the block's own `.height`/`.width` instead, which is what a reveal
+    // actually wants: THIS block's own row visible, not the middle of everything under it.
+    try { ws.centerOnBlock(blk.id, true); } catch (_) { /* best-effort pan */ }
+    const root = blk.getSvgRoot && blk.getSvgRoot();
+    if (root) {
+      clearTimeout(root._ddcsGlowTimer);
+      root.style.filter = 'drop-shadow(0 0 3px var(--accent, #0ea5e9)) drop-shadow(0 0 10px rgba(var(--edit-glow-rgb, 14,165,233), .9))';
+      root._ddcsGlowTimer = setTimeout(() => { root.style.filter = ''; root._ddcsGlowTimer = null; }, 1800);
+    }
+  }
+
   function revealInBlocks(param) {
     let blk = ws.getAllBlocks(false).find((b) => (b.type === 'param_field' || b.type === 'formfield') && b.getFieldValue('PARAM') === param);
     if (!blk) {
@@ -844,21 +881,7 @@ async function buildWorkspace() {
       }) || null;
     }
     if (!blk) { toast(`"${param}" isn't declared by a single block on this canvas (bound another way — nothing to jump to).`, true); return; }
-    try { ws.centerOnBlock(blk.id); } catch (_) { /* best-effort pan */ }
-    // t2397 — LIVE-CAUGHT: the CSS `@keyframes` route (`.ddcs-block-glow`, styles.css) that works cleanly on
-    // the FORM ROW's own `.ddcs-reveal-glow` (confirmed: `getComputedStyle` reports the animation running,
-    // exactly 2× the theme's own `--edit-glow-speed`) does NOT reliably run on a Blockly block's SVG `<g>` root
-    // in this build — confirmed live: `getComputedStyle(root).animationName` came back EMPTY on the SAME class
-    // applied to the SAME rule, and the class was gone well before one theme-paced iteration could have
-    // finished. Rather than chase an SVG `animation`-shorthand quirk further, this is a DIRECT, timer-driven
-    // highlight instead — same colour tokens (`--accent`/`--edit-glow-rgb`), no dependency on CSS keyframe
-    // timing on an element type this build doesn't animate that way reliably.
-    const root = blk.getSvgRoot && blk.getSvgRoot();
-    if (root) {
-      clearTimeout(root._ddcsGlowTimer);
-      root.style.filter = 'drop-shadow(0 0 3px var(--accent, #0ea5e9)) drop-shadow(0 0 10px rgba(var(--edit-glow-rgb, 14,165,233), .9))';
-      root._ddcsGlowTimer = setTimeout(() => { root.style.filter = ''; root._ddcsGlowTimer = null; }, 1800);
-    }
+    panAndGlow(blk);
   }
 
   function renderLiveForm() {

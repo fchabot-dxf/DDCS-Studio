@@ -6387,6 +6387,35 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     font-family:inherit; font-size:12px; line-height:1.2;
 }
 #blocks-app .blk-search:focus { border-color:var(--accent, #0ea5e9); }
+/* t2435 (BACKLOG #44) — find a block ALREADY on the canvas, distinct from `.blk-search` just above (which only
+   filters the toolbox). The chip sits in `.blk-bk-host`'s own top-right corner, an overlay ON the canvas — the
+   SAME placement `.editor-findbar` uses over the editor's own code area (styles.css, t2383) — not a second
+   input beside `.blk-search`, so the two never read as the same control. */
+#blocks-app .blk-find-chip {
+    position:absolute; top:6px; right:6px; z-index:11;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    padding:5px 9px; border-radius:999px; line-height:1;
+    background:color-mix(in srgb, var(--panel, #161b22) 90%, transparent); color:var(--text-dim, #8b949e);
+    border:1px solid var(--border, #30363d); box-shadow:0 2px 8px rgba(0,0,0,.35);
+    font-family:inherit;
+}
+#blocks-app .blk-find-chip:hover { filter:brightness(1.15); color:var(--text, #e6edf3); }
+#blocks-app .blk-find-chip.active { background:var(--accent, #2d7ff9); color:#fff; border-color:var(--accent, #2d7ff9); }
+#blocks-app .blk-findbar {
+    position:absolute; top:6px; right:6px; z-index:11;
+    display:flex; align-items:center; gap:4px; padding:4px 6px;
+    background:var(--panel-bg, #1e1e1e); border:1px solid var(--btn-edge, rgba(255,255,255,.2));
+    border-radius:var(--btn-radius, 6px); box-shadow:0 2px 8px rgba(0,0,0,.35);
+}
+#blocks-app .blk-findbar.hidden { display:none; }
+#blocks-app .blk-findbar .blk-find-input {
+    width:140px; font-size:12px; font-family:var(--font-code, monospace); padding:4px 6px;
+    background:#111; color:#eee; border:1px solid var(--btn-edge, rgba(255,255,255,.2)); border-radius:4px;
+}
+#blocks-app .blk-findbar .blk-find-input.no-match { border-color:#ef4444; }
+#blocks-app .blk-find-count { font-size:11px; color:var(--text-dim, #999); min-width:42px; text-align:center; font-family:var(--font-code, monospace); }
+#blocks-app .blk-findbar .blk-find-nav,
+#blocks-app .blk-findbar .blk-find-close { min-height:22px; padding:4px 6px; display:inline-flex; align-items:center; justify-content:center; }
 /* Suggested-next strip: a scrollable row of BLOCK-SHAPED chips (Blockly statement silhouette — top notch + bottom
    bump, category-coloured); click a chip to append that block. The strip's vertical padding shows the notch/bump. */
 #blocks-app .blk-suggest { display:flex; gap:6px; align-items:center; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding:6px 2px; }
