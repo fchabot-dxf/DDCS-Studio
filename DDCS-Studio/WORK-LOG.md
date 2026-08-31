@@ -65240,3 +65240,52 @@ run this session has shown (t2435: 2, t2437: 2). Treated as potentially serious,
 
 Files: `web/index.html`, `web/styles.css`, `tests/editor-find-chip-discoverability-2441.spec.js` (new).
 
+## t2443 — THE 46 RUN DOWN: worker oversubscription, confirmed decisively, not just plausibly
+
+Top item, ahead of the queue, per the dispatch's own framing: nothing else ships on a baseline nobody trusts.
+The advisor had already ruled out my own t2441 change, a second concurrent suite, other agents (owner
+confirmed directly), and the progress reporter's write volume (disproved by arithmetic, a hygiene throttle
+landed anyway at `913a61ba`, explicitly labelled NOT the fix). Prime hypothesis handed to me: worker
+oversubscription — `playwright.config.js`'s own `workers:6` was measured at t1593 (2026-08-06), 3.5 weeks and
+~600 tests of suite growth ago, on a quieter machine than this one's current ordinary baseline.
+
+**Found `retries:2` already configured in the SAME file before running anything** — every test gets up to 2
+retries. This re-sharpened what "46 failed, identically, twice" actually means: those 46 failed ALL THREE
+attempts, both times, not a single unlucky pass. `retries:2` already absorbs an ordinary one-off contention
+stall; surviving it twice, on the exact same set, is a systematic ceiling, not noise — which is exactly the
+detail the advisor named as what made "ordinary contention" unconvincing on its own.
+
+**The decisive experiment, run exactly as specified.** Full suite, `--workers=4` (CLI override, config file
+left untouched until the result was in), nothing else running concurrently (learned that lesson at t2441 —
+caught my own two-suites-at-once mistake there via the ETA ballooning, didn't repeat it). Sampled Chrome/node
+memory every 20s via a lightweight PowerShell loop alongside (not itself a Playwright/Chrome process, no
+meaningful added contention) for the "peak memory" ask.
+
+**Result: 2994 passed, 0 FAILED, 11 flaky, 26 skipped, 31m47s.** Not a partial improvement toward the usual
+0-2 baseline — a complete collapse to zero. This is as decisive as the experiment could have come back.
+Peak measured during the run: ~5.3GB across up to 33 Chrome processes, ~3.1GB across up to 24 node processes.
+(Did not additionally capture whether the ORIGINAL w6 failures clustered late-run vs spread evenly — the w6
+runs' own `summary.json` had already been overwritten by the w4 run's own output before I thought to check;
+noting the gap honestly rather than guessing. Given the w4 result is already a complete, clean confirmation,
+re-running w6 a third time (another ~30min) purely to recover that secondary data point wasn't worth the
+cost — the main question the experiment was built to answer is answered.)
+
+**Shipped, not left as a one-off override, per the dispatch's own instruction to draw the conclusion the
+evidence supports rather than the convenient one.** `playwright.config.js`'s `workers:` changed 6→4, with the
+comment extended (not replaced) in the SAME format t1593's own entry established — both measurements now
+recorded, this turn's own reasoning for why the old number went stale (the machine's ordinary baseline grew:
+owner-confirmed no other agent, yet ~28 Chrome + ~17 node processes + VS Code + two Claude Code seats as the
+baseline BEFORE Playwright starts a single worker). Also wrote the finding into `context/VERIFICATION.md` as
+a new, generalizable section — how to recognize this failure signature again (large, cross-domain, A/B-
+confirmed-unrelated-to-any-turn's-own-change) and the cheap decisive test to run, rather than leaving this
+turn's own specific numbers as the only record of the method.
+
+**Not re-verified via a third full run at the new config default** — the CLI `--workers=4` override I already
+ran is functionally identical to what the config's new default produces (same mechanism, same effective
+value); a config-only change doesn't need its own separate 30-minute full-suite proof when the exact setting
+it produces was just directly measured. Rule 1b — `playwright.config.js` is the single shared file every test
+run reads — but the relevant verification here IS the decisive experiment itself, already run and reported
+in full above, not a fourth suite invocation for the same information.
+
+Files: `playwright.config.js`, `context/VERIFICATION.md`.
+

@@ -72,6 +72,31 @@ Playwright and reports nothing.
 2. ⛔ **Never run two Playwright suites at once.** Parallel runs produce mass timeout reds that look like
    real failures. Serialize them — if one seat has a suite live, the other waits.
 
+## ⭐⭐ THE FULL SUITE NEEDS A QUIET-ENOUGH MACHINE — worker count is re-measured, not permanent
+
+`playwright.config.js`'s own `workers:` number is a measurement of THIS machine at a point in time, not a
+constant. t2443 (2026-08-31) found `workers:6` (set at t1593, 2026-08-06, on a then-quieter machine) now
+comes back **46 FAILED** — spanning totally unrelated domains (alignment, ATC, add-operation, Blocks), the
+signature of resource starvation rather than a logic defect, reproduced identically across two clean runs.
+`workers:4` on the same machine, same moment: **0 failed**. Not a fluke — the owner confirmed directly no
+other agent was running; a progress-reporter write-volume theory was disproved by arithmetic first.
+
+**Why the number goes stale:** the config's own worker count assumes a baseline load for the machine it was
+measured on. This machine's ordinary baseline (VS Code, two concurrent Claude Code seats, ~28 Chrome + ~17
+node processes even before Playwright starts) had grown enough in 3.5 weeks / ~600 tests of suite growth
+that 6 workers — each driving its own Chromium — oversubscribed it. `retries:2` (the same config file)
+already absorbs ordinary one-off contention; failing all 3 attempts, on the SAME 46 tests twice, is what
+made "ordinary noise" unconvincing and pointed at a systematic ceiling instead.
+
+**How to apply:** if a full-suite run comes back with a LARGE (double-digit+), CROSS-DOMAIN failure set that
+doesn't match any single turn's own change (confirm via the A/B pattern: same failures reproduce at HEAD
+before that turn's change existed), don't chase it as a code regression first — suspect the worker count
+against the machine's CURRENT ordinary load. The decisive, cheap test: re-run with a lower `--workers`
+override; if the failure set collapses toward the usual near-zero baseline, the fix is a config number plus
+a dated comment recording the new measurement (`playwright.config.js`'s own comment on `workers:` is the
+log of every past measurement — extend it, don't replace it). If the failures do NOT collapse, stop and
+treat it as a real regression instead — bisect the day's own commits.
+
 ## ⚠ AND THE COST THAT IS NOT WALL-CLOCK
 
 The reporter also keeps the worker's captured stdout at **~2.8 KB instead of ~530 KB** (the old per-test

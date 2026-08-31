@@ -22,12 +22,25 @@ export default defineConfig({
   // (CI already has `dot`+`html`; doubling that up was never this entry's complaint). See the reporter's own
   // header for the full surface/stdout-shape reasoning.
   reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : []), ['./tests/support/progressReporter.mjs'], ['json', { outputFile: 'test-results/summary.json' }]],
-  workers: 6,  // t1593 (2026-08-06) — re-measured on the i7-13700F (16c/24t/32GB): w4=1158s/73fail, w6=975s/73fail (same set, ±2 within
-               // the existing flake class), w8=897s/82fail (+10 NEW beyond baseline, only 1 healed — a real contention ceiling; backed
-               // off per the "new failures → back off one step" rule, so w12 was not run). The t836 baseline this replaces was itself
-               // contaminated by the (now-fixed) formBindings bug's deterministic failures being misread as load sensitivity.
-               // NOTE: the 73-count baseline itself is NOT zero — it's a separate, pre-existing mouse/hover-event class (drag/canvas
-               // tests) confirmed present on main HEAD too (0 flaky across retries); unrelated to worker count, not investigated here.
+  workers: 4,  // t2443 (2026-08-31) — RE-MEASURED, replacing t1593's own w6 pick: on THIS SAME i7-13700F (16c/24t/32GB), w6 now
+               // comes back 46 FAILED (spanning totally unrelated domains — alignment drag physics, ATC rendering, Blocks find,
+               // add-operation G-code identity — the signature of resource starvation, not a logic defect), reproduced IDENTICALLY
+               // across two separate clean runs (retries:2 below already absorbs ordinary one-off contention, so 46 tests failing
+               // ALL THREE attempts, twice, is a systematic ceiling, not noise). w4 on the SAME machine, same moment: 0 FAILED
+               // (2994 passed, 11 flaky, 26 skipped) — a complete collapse, not just an improvement. Confirmed via A/B (the 46 also
+               // reproduce at HEAD before that turn's own unrelated change existed) and isolated spot-checks (25 of the 46 ran 100%
+               // clean alone) before trusting the worker-count theory over "just flaky code." Peak measured during the w4 run: ~5.3GB
+               // across 33 Chrome processes + ~3.1GB across 24 node processes.
+               // WHY THE OLD NUMBER WENT STALE: t1593's own w6=975s/73fail measurement is 3.5 weeks and ~600 tests of suite growth
+               // old, taken on a QUIETER machine. This box's own ORDINARY baseline (owner-confirmed no other agent running) now
+               // carries ~28 Chrome + ~17 node processes, VS Code, and two concurrent Claude Code seats even before Playwright starts
+               // a single worker — six Chromium-driving workers on top of that oversubscribes it. See context/VERIFICATION.md for the
+               // standing note: this full suite needs re-measuring again if the machine's own ordinary baseline shifts meaningfully,
+               // the same way this measurement replaced t1593's.
+               // t1593 (2026-08-06, superseded): w4=1158s/73fail, w6=975s/73fail, w8=897s/82fail (+10 new, only 1 healed — a real
+               // ceiling, backed off). The t836 baseline t1593 itself replaced was contaminated by a since-fixed formBindings bug.
+               // NOTE (unrelated to worker count, not re-investigated here): a separate, pre-existing mouse/hover-event flake class
+               // (drag/canvas tests) was already present on main HEAD independent of this number — see t1593's own original note.
   // t1724 — retries live HERE, not on individual specs. t1718 declared `test.describe.configure({retries:2})` on
   // 5 specs measured flaky under this SAME worker=6 contention; t1719's next gate run showed 3 DIFFERENT specs
   // starved instead (names that hadn't failed the run before) — the contention-starved population shifts run to
