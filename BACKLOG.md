@@ -4205,8 +4205,23 @@ verifying it would have broken an EXISTING, already-shipped mobile-keyboard mech
 block chain, not just the target block's own row — fixed via `useCoordinates=true` in the shared `panAndGlow`
 (also benefits the pre-existing t2397 FORM→BLOCK reveal, not just this turn's find bar).
 
+**t2437 — the REAL root, found on the third pass (full story in WORK-LOG t2437).** `preventScroll` changed
+nothing on the owner's real device; the owner then spotted it themselves from their own screenshots — `.main`
+(the editor's own parent) sits empty. `styles.css`'s `body.keyboard-active .editor-container` rule DETACHES
+the editor (`position:fixed; height:60px !important`) the instant the keyboard opens — correct and deliberate
+for `editorManager.js`'s own snippet-insert buttons (one centered line is enough there), wrong for a find bar
+that needs to READ several lines. Fix: a new `.ddcs-find-open` class (set by both find bars' `open()`/`close()`)
+steps the detach rule aside while a find bar is open (`:not(.ddcs-find-open)`), so the editor stays in normal
+flow — plus `app.js`'s own existing `keyboard-active` detector (t2229/F3a, extended not duplicated) now also
+publishes `--vv-height`, handed to `.app-shell` itself so the in-flow editor's own ancestor has the REAL
+visible height (established directly: `100dvh` does NOT track the keyboard without an opt-in that would break
+the detector's own `innerHeight` comparison — deliberately not added). `#blocks-app` already carries the
+literal `.app-shell` class, so ONE rule fixes both the editor and the canvas, no second pin needed.
+`preventScroll` (t2435) stays — confirmed inert for this specific bug, not harmful, not removed.
+
 Files: `web/ui/editorFind.js`, `web/ui/findBarCore.js` (new), `web/blocks/blockCanvasFind.js` (new),
-`web/blocks/blocksApp.js`, `web/styles.css`, `tests/block-canvas-find-2435.spec.js` (new).
+`web/blocks/blocksApp.js`, `web/styles.css`, `web/app.js`, `tests/block-canvas-find-2435.spec.js` (new),
+`tests/keyboard-find-height-2437.spec.js` (new).
 
 ---
 

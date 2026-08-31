@@ -125,15 +125,20 @@ export function installBlockCanvasFind(ws, container, panAndGlow) {
     function open() {
         bar.classList.remove('hidden');
         chip.classList.add('active');
-        // t2435 amendment — same fix as editorFind.js's own `open()`: `preventScroll` stops the browser's own
-        // default "scroll the newly-focused input into view" from fighting our OWN pan+glow reveal below.
+        // t2435 amendment — kept as a harmless, strictly-safer default; per t2437 it was NOT the real bug
+        // (the editor's own equivalent case turned out to be the 60px keyboard pin, not a scroll fight).
         input.focus({ preventScroll: true }); input.select();
+        // t2437 — the SAME "give the canvas real room while a find bar needs to be read" signal as
+        // editorFind.js's own `open()`; styles.css pins `.blk-bk-host` under this class + `keyboard-active`
+        // the same way it already pins `.editor-container` for the editor.
+        document.body.classList.add('ddcs-find-open');
         refresh();
         if (matches.length) goTo(current < 0 ? 0 : current);
     }
 
     function close() {
         bar.classList.add('hidden');
+        document.body.classList.remove('ddcs-find-open');
         chip.classList.remove('active');
         current = -1; matches = [];
     }

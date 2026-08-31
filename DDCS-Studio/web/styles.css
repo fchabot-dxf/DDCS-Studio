@@ -3254,8 +3254,15 @@ button.primary:hover {
     }
 
     /* When mobile keyboard is active, pin the editor to a thin strip so
-       the rest of the UI (command deck) remains usable beneath it. */
-    body.keyboard-active .editor-container {
+       the rest of the UI (command deck) remains usable beneath it.
+       t2437 — `:not(.ddcs-find-open)`: this pin DETACHES the editor from normal flow (`position:fixed`) and
+       parks it as a strip at the very top — correct and deliberate for INSERTING a snippet (one centered line
+       is enough, `editorManager.js`'s own `insert()` already centers it there). A FIND bar needs the OPPOSITE:
+       you have to READ several lines while typing, and detaching the editor leaves its own parent (`.main`,
+       confirmed live by the owner: an empty region, same theme background, sitting where the editor used to
+       be) with nothing in it. So while a find bar is open, this rule steps aside entirely — the editor STAYS
+       IN NORMAL FLOW and just inherits whatever height `.app-shell` gives it, no separate pin needed. */
+    body.keyboard-active:not(.ddcs-find-open) .editor-container {
         position: fixed;
         top: 0;
         left: 0;
@@ -3266,10 +3273,27 @@ button.primary:hover {
         border-bottom: 2px solid #00ff00;
     }
 
-    /* Ensure the controller dock / deck panel starts below the pinned editor */
-    body.keyboard-active #controller-dock,
-    body.keyboard-active .deck-panel {
+    /* Ensure the controller dock / deck panel starts below the pinned editor — same find-open exclusion */
+    body.keyboard-active:not(.ddcs-find-open) #controller-dock,
+    body.keyboard-active:not(.ddcs-find-open) .deck-panel {
         padding-top: 60px;
+    }
+
+    /* t2437 — an in-flow editor is only actually correct if its OWN ancestor (`.app-shell`) has the REAL
+       visible height. Established directly: `.app-shell`'s `calc(100dvh - 54px)` does NOT track the on-screen
+       keyboard on Chrome/Android without an `interactive-widget=resizes-content` opt-in — deliberately not set
+       (it would defeat app.js's own `keyboard-active` detector, whose `vv.height < innerHeight * 0.8` check
+       needs `innerHeight` to stay the PRE-keyboard value). So `.main` staying "tall" while the keyboard is up
+       is the layout viewport never having shrunk, not a genuinely-correct available height — an in-flow editor
+       alone would still extend behind the keyboard. `--vv-height` (app.js's own detector, t2229/F3a — extended
+       this turn, not duplicated) IS the real measured height; this rule hands it to `.app-shell` itself,
+       scoped tightly to keyboard+find-open so nothing else is affected. `#blocks-app` (the Blocks tab) already
+       carries the `.app-shell` class itself (index.html), so ONE declaration here is the single source both
+       the in-flow editor AND the Blocks-tab canvas inherit through the existing flex/grid chain — no second,
+       duplicated pin for the canvas needed (`.blk-bk-host`'s own `ResizeObserver` → `Blockly.svgResize`,
+       already wired in blocksApp.js, picks the change up on its own). */
+    body.keyboard-active.ddcs-find-open .app-shell {
+        height: calc(var(--vv-height, 100dvh) - 54px) !important;
     }
 }
 /* Main Sidebar Containers */

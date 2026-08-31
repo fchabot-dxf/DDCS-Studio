@@ -87,20 +87,25 @@ export function installEditorFind() {
         if (btnOpen) btnOpen.classList.add('active');
         const selected = ed.value.slice(ed.selectionStart, ed.selectionEnd);
         if (selected && !selected.includes('\n')) input.value = selected;   // seed from a real selection, not a multi-line one
-        // t2435 amendment (owner-corrected, real device + screenshots): the LEAD wasn't the keyboard's own
-        // resize, it's the browser's own default "scroll the newly-focused element into view" behaviour —
-        // the owner's own two screenshots show the WHOLE PAGE shifted (the bar moved from below the wizard-
-        // button row to above it) the moment the input took focus, not just a shrunk viewport. `preventScroll`
-        // stops the browser from doing that scroll itself; OUR OWN reveal logic (scrollToOffset below) is
-        // what should be moving the view, not an uncontrolled browser default fighting it.
+        // t2435 amendment: `preventScroll` — kept as a harmless, strictly-safer default (never lets the
+        // browser's own focus-scroll fight our own reveal below), but per t2437 it was NOT the real bug here:
+        // the owner re-checked on their device and the code was still hidden. See the t2437 body-class toggle
+        // below for the actual fix (styles.css's own 60px keyboard pin, sized for a different use case).
         input.focus({ preventScroll: true });
         input.select();
+        // t2437 — the 60px `body.keyboard-active .editor-container` pin (styles.css) is deliberately sized for
+        // INSERTING a snippet with the keyboard up (one centered line is enough there). FIND is the opposite
+        // need — you have to READ several lines while typing. This class tells styles.css "also give the
+        // editor whatever visible room `--vv-height` (app.js's own keyboard detector) actually has", without
+        // touching the plain snippet-insert case at all (a stacked class, not a change to the existing rule).
+        document.body.classList.add('ddcs-find-open');
         refresh();
         if (matches.length) goTo(current < 0 ? 0 : current);
     }
 
     function close() {
         bar.classList.add('hidden');
+        document.body.classList.remove('ddcs-find-open');
         if (btnOpen) btnOpen.classList.remove('active');
         current = -1;
         matches = [];

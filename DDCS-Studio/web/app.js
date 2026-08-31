@@ -192,6 +192,12 @@ class DDCSStudio {
 
                     if (newActive) {
                         document.body.classList.add('keyboard-active');
+                        // t2437 — the actual visible height, published for anything that needs MORE than the
+                        // plain 60px snippet-insert pin (styles.css's own `body.keyboard-active .editor-container`)
+                        // while the keyboard is up — e.g. a find bar, which needs to READ several lines, not just
+                        // see the one it's typing into. Same live signal the class itself is built from, just not
+                        // thrown away.
+                        document.body.style.setProperty('--vv-height', `${vv.height}px`);
                     } else {
                         document.body.classList.remove('keyboard-active');
                     }

@@ -64994,3 +64994,90 @@ in the same turn, so they never reach the diff).
 Files: `web/ui/editorFind.js`, `web/ui/findBarCore.js` (new), `web/blocks/blockCanvasFind.js` (new),
 `web/blocks/blocksApp.js`, `web/styles.css`, `tests/block-canvas-find-2435.spec.js` (new), `BACKLOG.md`.
 
+## t2437 — the REAL root of "keyboard hides the code," found on the third pass: not a scroll, not a shrink, a
+DELIBERATE detach-and-pin rule fighting the wrong use case
+
+Owner re-checked t2435's `preventScroll` fix on a real device: still broken. Two more screenshots later, the
+owner spotted the actual tell themselves: `main.main` (the editor's own PARENT) sits empty — same background
+as the active theme, not a failed render, not a panel. `styles.css:3258`'s `body.keyboard-active
+.editor-container { position:fixed; top:0; height:60px !important; ... }` lifts the editor OUT of normal flow
+the instant the keyboard opens, parking it as a 60px strip pinned to the very top — `.main` is left holding
+its own full box with nothing inside it. That rule is CORRECT and DELIBERATE for `editorManager.js`'s own
+snippet-insert buttons (spacebar, symbol taps): one centered line, keyboard deliberately kept hidden. A find
+bar is the opposite need — real focus, real keyboard, and you have to READ several lines while typing, not
+just the one you're on.
+
+**The fix, established rather than assumed** (the dispatch's own explicit ask: does `.main` actually have the
+correct height with the keyboard up, or is it only "tall" because the layout viewport never shrank?). Checked
+directly: `.app-shell`'s `calc(100dvh - 54px)` does NOT track the on-screen keyboard on Chrome/Android without
+an `interactive-widget=resizes-content` opt-in — the SAME fact t2435's own (reverted) amendment work already
+established, and the SAME reason that opt-in stays unset (it would defeat `app.js`'s own `keyboard-active`
+detector, whose `vv.height < innerHeight * 0.8` check needs `innerHeight` to stay the pre-keyboard value).
+So the answer is: `.main` staying tall is the STALE case, not a genuinely-correct available height — an
+in-flow editor alone would still extend behind the keyboard. Two pieces, both needed:
+
+1. **Stay in flow.** `body.keyboard-active .editor-container`'s detach rule now reads
+   `body.keyboard-active:not(.ddcs-find-open) .editor-container` — a NEW `.ddcs-find-open` class (set/cleared
+   by both find bars' own `open()`/`close()`, `ui/editorFind.js` and `blocks/blockCanvasFind.js`) steps the
+   whole rule aside while a find bar is open, rather than overriding its height with a second, competing
+   value. The plain snippet-insert case (no find bar open) is completely untouched — same selector, same
+   values, just one more exclusion clause.
+2. **Give `.app-shell` the REAL height while that's true.** `app.js`'s existing `_checkKeyboard` (t2229/
+   BACKLOG F3a — extended, not duplicated; t2435's own reverted mistake was building a SECOND
+   `visualViewport` listener instead of reusing this one) now also publishes `--vv-height` (the measured
+   `visualViewport.height`) as a CSS custom property on `body` whenever the keyboard is active. A new rule,
+   `body.keyboard-active.ddcs-find-open .app-shell { height: calc(var(--vv-height, 100dvh) - 54px) !important;
+   }`, hands that real height to `.app-shell` — scoped tightly so nothing else is affected.
+
+**One rule, two consumers, for free.** `#blocks-app` (the Blocks tab) already carries the literal class
+`.app-shell` itself (`index.html`) — so the SAME single CSS rule above sizes BOTH the in-flow editor pane
+(inherits via `.main`'s existing `flex:1`/`.editor-container`'s existing `flex:1; height:100%` chain, no
+change needed there) AND the Blocks canvas (`.blk-bk-host`'s own pre-existing `ResizeObserver` →
+`Blockly.svgResize`, blocksApp.js, picks the resize up on its own) — no second, hand-rolled pin for the canvas
+was needed at all. Confirmed the DRY outcome is real, not assumed, by checking `#blocks-app`'s DOM class
+attribute directly before relying on it.
+
+**preventScroll (t2435) — kept, confirmed inert for THIS bug, not dead code.** No scroll was ever actually
+involved (the advisor's own two prior read of the owner's screenshots were both corrected in sequence — first
+"keyboard shrink," then "focus scroll," now the real "detach-and-pin"). `input.focus({preventScroll:true})`
+remains in both find bars' `open()` as a strictly-safer default (never lets a browser's own focus-scroll fight
+whatever reveal logic runs after it) — recorded here per the dispatch's own ask, rather than leaving it
+silently in the diff without saying whether it still does anything for the reported bug. It doesn't, for this
+one; it's not harmful, so it stays.
+
+**Verified live**, extending the REAL `app.js` code path (overriding `visualViewport.height` + dispatching a
+real `resize` event, so `_checkKeyboard` itself runs — not a reimplementation): the plain 60px pin is
+UNCHANGED when no find bar is open (measured exactly 60px). With the editor find bar open under a simulated
+300px keyboard-shrunk viewport, `.editor-container` grows to 149px (in flow, NOT position:fixed) — confirmed
+this is the CORRECT remaining room, not a bug: `.app-shell` itself correctly measures 246px (300-54), and
+`.main`'s own siblings within the shell (`.dock-header` 54px, `#controller-dock` 43px) legitimately take the
+rest, leaving `.main`/`.editor-container` 149px — still roughly double-plus the old 60px pin's usable lines
+(~7 lines vs ~2-3). Typed a query matching two lines 5 apart; both stayed within the visible band while
+cycling with Enter (byte-position math against the now-larger `ed.clientHeight`), where the OLD 60px pin would
+have failed outright. Closing the find bar reverted `.editor-container` back to exactly 60px, confirming the
+override is scoped to find-open only. For the canvas: `#blocks-app` measured 246px unpinned-until-find-opens
+(same `.app-shell` height as any other keyboard-inactive-for-blocks state, since there was NO prior
+keyboard-active handling there at all), then correctly shrank once the canvas find bar opened, and the
+panned+glowed matched block's own top landed within the shrunk, now-actually-correct `.blk-bk-host` bounds.
+
+**⚠ NOT verifiable end-to-end in this harness** (named plainly per the dispatch's own instruction): headless
+Chromium has no real OS on-screen keyboard. `visualViewport.height` is overridden and a REAL `resize` event
+dispatched so the actual `app.js` code path runs (not a mock), which is as close as this harness gets — but
+whether a real Android/iOS keyboard fires those events the way assumed, and whether `0.8` is the right
+threshold on the owner's own device, both still need their own recheck. Goes back to the owner, as the
+dispatch anticipated.
+
+**Full suite (Rule 1b — `styles.css` and `app.js` are both shared, dispatch's own explicit call-out)**: 2978
+passed / 2 failed / 20 flaky (recovered) / 26 skipped, 29m9s. Both reds named individually, neither touches
+this turn's files: `blocks-context-flyout-2411.spec.js` (the same pre-existing flake seen at t2435's own full
+run) and `pane-visual-host-programmatic-1762.spec.js` ("...draws the real 3D scene + 2D path at 393px") — a
+DIFFERENT test than either of t2435's two reds, consistent with these being suite-contention flakes rather
+than anything caused by this turn (a genuine regression would fail the SAME test every run, not a different
+one each time). Grepped `pane-visual-host-programmatic-1762.spec.js` for any reference to `keyboard-active`/
+`ddcs-find-open`/`app-shell`/`vv-height` — none. Both re-ran clean in isolation (`npx playwright test
+tests/blocks-context-flyout-2411.spec.js tests/pane-visual-host-programmatic-1762.spec.js` — 12 passed, 0
+failed, 0 flaky) before trusting this.
+
+Files: `web/app.js`, `web/styles.css`, `web/ui/editorFind.js`, `web/blocks/blockCanvasFind.js`,
+`tests/keyboard-find-height-2437.spec.js` (new).
+
