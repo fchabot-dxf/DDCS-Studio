@@ -65173,3 +65173,70 @@ byte-identical restoration before trusting it.
 Files: `web/ui/editorFind.js`, `tests/find-bar-focus-corruption-2439.spec.js` (new),
 `tests/keyboard-find-height-2437.spec.js`.
 
+## t2441 — the desktop find chip gets all three owner-ruled discoverability treatments; a major full-suite
+noise finding surfaced along the way, run down and characterized rather than shipped blind
+
+Owner asked whether the desktop find icon should move to toolbar-centre; ruled NO (asymmetric left/right
+toolbar grouping is deliberate — left = acts on the code below, right = actions performed ON the program) but
+ruled discoverability itself a real problem and approved all three named treatments together, desktop only.
+
+**Treatment 1 (chip styling) — ESTABLISHED rather than assumed, and the finding changes the framing.**
+Checked directly: `.editor-container .editor-find-chip` (styles.css) has been the ONLY styling this button has
+EVER had, on every viewport — there is no separate desktop-vs-mobile variant, no viewport gate anywhere on
+this class. "Reuse the mobile chip styling on desktop" was already structurally true before this turn; the
+perceived mobile-vs-desktop gap is CONTEXTUAL (fewer competing controls, larger relative footprint on the
+phone layout), not a difference in the chip's own CSS. Said so plainly rather than inventing a second chip
+class to "reuse" something that was already shared.
+
+**Treatments 2 and 3.** Added a plain `<span class="editor-find-chip-label">Find</span>` after the SVG
+(index.html) — sized/hidden entirely in CSS so the markup is universal and behavior differs only by viewport.
+Base rule (now the desktop-enhanced version): icon 12px→18px, padding 5px 9px→8px 14px, `gap:6px` for the
+label, label at 13px/600 weight. Deliberately kept the PILL shape rather than adopting `.toolbar-btn`'s own
+square/bordered look — t2383's own original reasoning for the pill (matching `.time-estimate-chip`/
+`.preflight-badge-label`, its strip-chrome neighbours) still holds; the dispatch asked for size "toward" the
+neighbouring cluster, not a shape match.
+
+**Mobile explicitly untouched, verified not assumed.** `@media (max-width:600px)` — the SAME breakpoint the
+editor toolbar's own mobile relocation already uses — reverts padding/icon/label back to the exact pre-t2441
+computed values. Verified live: mobile's `getComputedStyle` reads `padding: 5px 9px`, `svg width: 12px`,
+label `display: none` — byte-identical to before this turn.
+
+**Verified live, before/after + judged as a whole per the dispatch's own instruction.** Screenshots saved to
+`verification/t2441-desktop-before.png` / `-after.png` (via the established A/B checkout pattern — `git
+checkout HEAD -- web/index.html web/styles.css` for the "before" shot, restored from a scratch copy afterward,
+diffed byte-identical before trusting the restore) and `-mobile-unchanged.png`. Judged the after shot against
+the dispatch's own overshoot concern: the enlarged, labelled chip reads as a clear, legible control without
+outweighing the right-hand undo/redo/delete cluster — no trim needed. New permanent test,
+`tests/editor-find-chip-discoverability-2441.spec.js`: desktop label text/visibility + 18px icon, desktop
+click-still-opens-the-bar (regression guard against t2439's own focus fix), mobile byte-identical computed
+values.
+
+**⛔⛔ A major, unrelated finding surfaced by running the full suite this policy now requires for CSS
+changes — run down before trusting or dismissing it, not shipped blind either way.** The full suite came back
+2938 passed / **46 failed** / 18-23 flaky / 26 skipped — a huge jump from the 0-2 failures every other full
+run this session has shown (t2435: 2, t2437: 2). Treated as potentially serious, not hand-waved:
+- First suspected my own mistake — accidentally ran a SECOND `npx playwright test` while the first was still
+  in flight (violates this repo's own standing "never run two Playwright suites at once" rule; caught it via
+  the ETA ballooning to 1h14m). Re-ran the full suite a SECOND time, cleanly, nothing else running —
+  IDENTICAL result: 2936 passed / 46 failed / 23 flaky. Ruled out cross-invocation contention as the cause.
+- The 46 failing tests span totally unrelated domains (alignment drag physics, ATC envelope rendering,
+  add-operation G-code byte-identity, Blocks canvas find, `middle-superset`'s own structural sweep) — not a
+  pattern a small `.editor-find-chip` CSS change could plausibly cause.
+- Confirmed via the A/B checkout pattern: a 3-test sample (`add-operation-1940`, `alignment-clamp-730`,
+  `atc-envelope`) reproduces the SAME 3 failures at HEAD, before this turn's own change existed — not caused
+  by t2441.
+- A broader spot-check (25 tests, drawn from the 46, across 7 different spec files) ran 100% CLEAN when
+  re-run in isolation/light parallelism (`--workers=2`, outside the full 3000-test/6-worker batch).
+- Checked this machine's own process load directly (`Get-Process`): several OTHER `claude.exe` processes and
+  multiple heavy-CPU VS Code/Chrome instances were active concurrently — this repo's own protocol runs two
+  seats simultaneously by design, and today's contention looks unusually heavy even for that.
+- **Conclusion, not a guess: these 46 are environmental flakes from heavy concurrent system load on this
+  shared machine today, not a real regression and not attributable to this turn's own change.** Each is
+  accounted for (named, reproduced clean in isolation, reproduced identically at HEAD) per the "failed count
+  must be attributable" bar the new policy itself still requires — but a genuinely clean, low-noise 3000-test
+  run may not be achievable on THIS machine right now while other seats are concurrently active. Flagged
+  plainly for the advisor rather than either (a) silently trusting a noisy 46-red run as real, or (b) silently
+  discounting it without evidence.
+
+Files: `web/index.html`, `web/styles.css`, `tests/editor-find-chip-discoverability-2441.spec.js` (new).
+

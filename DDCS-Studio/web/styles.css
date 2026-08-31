@@ -1231,16 +1231,27 @@ html, body { overflow-x: clip; }
 .editor-container .time-estimate-chip[hidden] { display: none; }
 /* t2383 AMENDMENT 2 — the find-bar TOGGLE chip, same pill shape/size as its strip-chrome neighbours
    (.time-estimate-chip/.preflight-badge-label) rather than the bordered .toolbar-btn square this used to be
-   (amendment 1's now-superseded placement). order:2 — see index.html's own comment on this button. */
+   (amendment 1's now-superseded placement). order:2 — see index.html's own comment on this button.
+   t2441 — owner ruled ALL THREE discoverability treatments in for DESKTOP only (mobile stays the model,
+   untouched): (1) chip treatment — already true, ESTABLISHED not assumed: this class is the ONLY styling this
+   button has ever had, on every viewport (no separate mobile-vs-desktop variant existed to "reuse" — the chip
+   IS the shared styling, so treatment 1 was already satisfied by the pre-existing rule below); the base sizing
+   here is now the DESKTOP-enhanced version, (2) the "Find" label (index.html's own new `.editor-find-chip-label`
+   span), (3) a bigger icon (18px, up from 12px — toward the neighbouring `.toolbar-btn` cluster's own 14px
+   icons + 24px min-height, without fully matching its square shape/border — this stays a pill, deliberately,
+   per t2383's own reasoning above). Mobile (`max-width:600px` below, the SAME breakpoint the editor toolbar's
+   own relocation already uses) reverts every one of these back to the exact pre-t2441 values. */
 .editor-container .editor-find-chip {
     order: 2;
     cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 5px 9px; border-radius: 999px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 14px; border-radius: 999px; line-height: 1;
     background: color-mix(in srgb, var(--panel, #161b22) 90%, transparent); color: var(--text-dim, #8b949e);
     border: 1px solid var(--border, #30363d); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
     font-family: inherit;
 }
+.editor-container .editor-find-chip svg { width: 18px; height: 18px; }
+.editor-container .editor-find-chip-label { font-size: 13px; font-weight: 600; white-space: nowrap; }
 .editor-container .editor-find-chip:hover { filter: brightness(1.15); color: var(--text, #e6edf3); }
 .editor-container .editor-find-chip.active { background: var(--accent, #2d7ff9); color: #fff; border-color: var(--accent, #2d7ff9); }
 /* t738 — the PREVIEW VISIBILITY modal rows: a visible toggle + label on the left, an opacity slider on the right. */
@@ -6257,6 +6268,13 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .editor-strip-chrome { order: 1; flex: 0 0 auto; }
     .editor-code { order: 2; }
     .editor-toolbar { order: 3; }
+
+    /* t2441 — mobile is the model the owner ruled desktop should move TOWARD, not the other way round: revert
+       the desktop-enhanced find chip (bigger padding/icon, the "Find" label) back to exactly its pre-t2441
+       values here, so the phone presentation is byte-for-byte unchanged. */
+    .editor-container .editor-find-chip { padding: 5px 9px; gap: 0; }
+    .editor-container .editor-find-chip svg { width: 12px; height: 12px; }
+    .editor-container .editor-find-chip-label { display: none; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
