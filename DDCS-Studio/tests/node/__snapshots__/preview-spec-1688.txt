@@ -2,161 +2,177 @@
 # fixture: stock 200×150 pin=g55 · machine 800×600×-120 · partZeroShift → {"x":300,"y":200}
 # encoding: keys sorted recursively · numbers rounded to 1e-4 (-0→0) · present-but-undefined → "<undefined>" (NEVER dropped) · function → "<fn/arity>"
 #
-user_alignment_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_alignment_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_alignment_data @defaults .handles <2 entries>
 user_alignment_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":60,"y":-4,"yieldCoincident":false}
 user_alignment_data @defaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":110,"y":-4,"yieldCoincident":false}
 user_alignment_data @defaults .items <0 entries>
 user_alignment_data @defaults .onDrag "<fn/2>"
+user_alignment_data @defaults .onDragEnd "<fn/0>"
 user_alignment_data @defaults .onEdit "<fn/2>"
 user_alignment_data @defaults .origin {"x":0,"y":0}
 user_alignment_data @defaults .paths null
 user_alignment_data @defaults .placement {"x":300,"y":200}
 user_alignment_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_alignment_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_alignment_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_alignment_data @offdefaults .handles <2 entries>
 user_alignment_data @offdefaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":211,"y":45,"yieldCoincident":false}
 user_alignment_data @offdefaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":211,"y":102,"yieldCoincident":false}
 user_alignment_data @offdefaults .items <0 entries>
 user_alignment_data @offdefaults .onDrag "<fn/2>"
+user_alignment_data @offdefaults .onDragEnd "<fn/0>"
 user_alignment_data @offdefaults .onEdit "<fn/2>"
 user_alignment_data @offdefaults .origin {"x":0,"y":0}
 user_alignment_data @offdefaults .paths null
 user_alignment_data @offdefaults .placement {"x":300,"y":200}
 user_alignment_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_change_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_change_data @defaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_change_data @defaults .handles <0 entries>
 user_atc_change_data @defaults .items <0 entries>
 user_atc_change_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_change_data @defaults .onDrag "<fn/2>"
+user_atc_change_data @defaults .onDrag "<fn/3>"
+user_atc_change_data @defaults .onDragEnd "<fn/0>"
 user_atc_change_data @defaults .onEdit "<fn/2>"
 user_atc_change_data @defaults .origin {"x":0,"y":0}
 user_atc_change_data @defaults .paths null
 user_atc_change_data @defaults .placement {"x":300,"y":200}
 user_atc_change_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_change_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_change_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_change_data @offdefaults .handles <0 entries>
 user_atc_change_data @offdefaults .items <0 entries>
 user_atc_change_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_change_data @offdefaults .onDrag "<fn/2>"
+user_atc_change_data @offdefaults .onDrag "<fn/3>"
+user_atc_change_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_change_data @offdefaults .onEdit "<fn/2>"
 user_atc_change_data @offdefaults .origin {"x":0,"y":0}
 user_atc_change_data @offdefaults .paths null
 user_atc_change_data @offdefaults .placement {"x":300,"y":200}
 user_atc_change_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_check_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_check_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_check_data @defaults .handles <0 entries>
 user_atc_check_data @defaults .items <0 entries>
-user_atc_check_data @defaults .onDrag "<fn/2>"
+user_atc_check_data @defaults .onDrag "<fn/3>"
+user_atc_check_data @defaults .onDragEnd "<fn/0>"
 user_atc_check_data @defaults .onEdit "<fn/2>"
 user_atc_check_data @defaults .origin {"x":0,"y":0}
 user_atc_check_data @defaults .paths null
 user_atc_check_data @defaults .placement {"x":300,"y":200}
 user_atc_check_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_check_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_check_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_check_data @offdefaults .handles <0 entries>
 user_atc_check_data @offdefaults .items <0 entries>
-user_atc_check_data @offdefaults .onDrag "<fn/2>"
+user_atc_check_data @offdefaults .onDrag "<fn/3>"
+user_atc_check_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_check_data @offdefaults .onEdit "<fn/2>"
 user_atc_check_data @offdefaults .origin {"x":0,"y":0}
 user_atc_check_data @offdefaults .paths null
 user_atc_check_data @offdefaults .placement {"x":300,"y":200}
 user_atc_check_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_length_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_length_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_length_data @defaults .handles <0 entries>
 user_atc_length_data @defaults .items <0 entries>
-user_atc_length_data @defaults .onDrag "<fn/2>"
+user_atc_length_data @defaults .onDrag "<fn/3>"
+user_atc_length_data @defaults .onDragEnd "<fn/0>"
 user_atc_length_data @defaults .onEdit "<fn/2>"
 user_atc_length_data @defaults .origin {"x":0,"y":0}
 user_atc_length_data @defaults .paths null
 user_atc_length_data @defaults .placement {"x":300,"y":200}
 user_atc_length_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_length_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_length_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_length_data @offdefaults .handles <0 entries>
 user_atc_length_data @offdefaults .items <0 entries>
-user_atc_length_data @offdefaults .onDrag "<fn/2>"
+user_atc_length_data @offdefaults .onDrag "<fn/3>"
+user_atc_length_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_length_data @offdefaults .onEdit "<fn/2>"
 user_atc_length_data @offdefaults .origin {"x":0,"y":0}
 user_atc_length_data @offdefaults .paths null
 user_atc_length_data @offdefaults .placement {"x":300,"y":200}
 user_atc_length_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_table_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_table_data @defaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_table_data @defaults .handles <0 entries>
 user_atc_table_data @defaults .items <0 entries>
 user_atc_table_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_table_data @defaults .onDrag "<fn/2>"
+user_atc_table_data @defaults .onDrag "<fn/3>"
+user_atc_table_data @defaults .onDragEnd "<fn/0>"
 user_atc_table_data @defaults .onEdit "<fn/2>"
 user_atc_table_data @defaults .origin {"x":0,"y":0}
 user_atc_table_data @defaults .paths null
 user_atc_table_data @defaults .placement {"x":300,"y":200}
 user_atc_table_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_table_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_table_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_table_data @offdefaults .handles <0 entries>
 user_atc_table_data @offdefaults .items <0 entries>
 user_atc_table_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_table_data @offdefaults .onDrag "<fn/2>"
+user_atc_table_data @offdefaults .onDrag "<fn/3>"
+user_atc_table_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_table_data @offdefaults .onEdit "<fn/2>"
 user_atc_table_data @offdefaults .origin {"x":0,"y":0}
 user_atc_table_data @offdefaults .paths null
 user_atc_table_data @offdefaults .placement {"x":300,"y":200}
 user_atc_table_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_test_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_test_data @defaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_test_data @defaults .handles <0 entries>
 user_atc_test_data @defaults .items <0 entries>
 user_atc_test_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_test_data @defaults .onDrag "<fn/2>"
+user_atc_test_data @defaults .onDrag "<fn/3>"
+user_atc_test_data @defaults .onDragEnd "<fn/0>"
 user_atc_test_data @defaults .onEdit "<fn/2>"
 user_atc_test_data @defaults .origin {"x":0,"y":0}
 user_atc_test_data @defaults .paths null
 user_atc_test_data @defaults .placement {"x":300,"y":200}
 user_atc_test_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_test_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_test_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_test_data @offdefaults .handles <0 entries>
 user_atc_test_data @offdefaults .items <0 entries>
 user_atc_test_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_atc_test_data @offdefaults .onDrag "<fn/2>"
+user_atc_test_data @offdefaults .onDrag "<fn/3>"
+user_atc_test_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_test_data @offdefaults .onEdit "<fn/2>"
 user_atc_test_data @offdefaults .origin {"x":0,"y":0}
 user_atc_test_data @offdefaults .paths null
 user_atc_test_data @offdefaults .placement {"x":300,"y":200}
 user_atc_test_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_warmup_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_warmup_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_warmup_data @defaults .handles <0 entries>
 user_atc_warmup_data @defaults .items <0 entries>
-user_atc_warmup_data @defaults .onDrag "<fn/2>"
+user_atc_warmup_data @defaults .onDrag "<fn/3>"
+user_atc_warmup_data @defaults .onDragEnd "<fn/0>"
 user_atc_warmup_data @defaults .onEdit "<fn/2>"
 user_atc_warmup_data @defaults .origin {"x":0,"y":0}
 user_atc_warmup_data @defaults .paths null
 user_atc_warmup_data @defaults .placement {"x":300,"y":200}
 user_atc_warmup_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_atc_warmup_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_warmup_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
 user_atc_warmup_data @offdefaults .handles <0 entries>
 user_atc_warmup_data @offdefaults .items <0 entries>
-user_atc_warmup_data @offdefaults .onDrag "<fn/2>"
+user_atc_warmup_data @offdefaults .onDrag "<fn/3>"
+user_atc_warmup_data @offdefaults .onDragEnd "<fn/0>"
 user_atc_warmup_data @offdefaults .onEdit "<fn/2>"
 user_atc_warmup_data @offdefaults .origin {"x":0,"y":0}
 user_atc_warmup_data @offdefaults .paths null
 user_atc_warmup_data @offdefaults .placement {"x":300,"y":200}
 user_atc_warmup_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_bore_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_bore_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_bore_data @defaults .handles <2 entries>
 user_bore_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_bore_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":6,"y":0}
 user_bore_data @defaults .items <0 entries>
-user_bore_data @defaults .onDrag "<fn/2>"
+user_bore_data @defaults .onDrag "<fn/3>"
+user_bore_data @defaults .onDragEnd "<fn/0>"
 user_bore_data @defaults .onEdit "<fn/2>"
 user_bore_data @defaults .origin {"x":0,"y":0}
 user_bore_data @defaults .paths <1 entries>
 user_bore_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":6,"y":0},{"x":5.1962,"y":3},{"x":3,"y":5.1962},{"x":0,"y":6},{"x":-3,"y":5.1962},{"x":-5.1962,"y":3},{"x":-6,"y":0},{"x":-5.1962,"y":-3},{"x":-3,"y":-5.1962},{"x":0,"y":-6},{"x":3,"y":-5.1962},{"x":5.1962,"y":-3},{"x":6,"y":0}]}
 user_bore_data @defaults .placement {"x":300,"y":200}
 user_bore_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_bore_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_bore_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_bore_data @offdefaults .handles <3 entries>
 user_bore_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
 user_bore_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
 user_bore_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":13,"y":7}
 user_bore_data @offdefaults .items <0 entries>
-user_bore_data @offdefaults .onDrag "<fn/2>"
+user_bore_data @offdefaults .onDrag "<fn/3>"
+user_bore_data @offdefaults .onDragEnd "<fn/0>"
 user_bore_data @offdefaults .onEdit "<fn/2>"
 user_bore_data @offdefaults .origin {"x":0,"y":0}
 user_bore_data @offdefaults .paths <90 entries>
@@ -252,30 +268,33 @@ user_bore_data @offdefaults .paths[88] {"cls":"fc-guide","pts":[{"x":229,"y":223
 user_bore_data @offdefaults .paths[89] {"cls":"fc-guide","pts":[{"x":256,"y":223},{"x":254.7272,"y":227.75},{"x":251.25,"y":231.2272},{"x":246.5,"y":232.5},{"x":241.75,"y":231.2272},{"x":238.2728,"y":227.75},{"x":237,"y":223},{"x":238.2728,"y":218.25},{"x":241.75,"y":214.7728},{"x":246.5,"y":213.5},{"x":251.25,"y":214.7728},{"x":254.7272,"y":218.25},{"x":256,"y":223}]}
 user_bore_data @offdefaults .placement {"x":300,"y":200}
 user_bore_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_comm_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
+user_comm_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
 user_comm_data @defaults .handles <0 entries>
 user_comm_data @defaults .items <0 entries>
-user_comm_data @defaults .onDrag "<fn/2>"
+user_comm_data @defaults .onDrag "<fn/3>"
+user_comm_data @defaults .onDragEnd "<fn/0>"
 user_comm_data @defaults .onEdit "<fn/2>"
 user_comm_data @defaults .origin {"x":0,"y":0}
 user_comm_data @defaults .paths null
 user_comm_data @defaults .placement {"x":300,"y":200}
 user_comm_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_comm_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
+user_comm_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
 user_comm_data @offdefaults .handles <0 entries>
 user_comm_data @offdefaults .items <0 entries>
-user_comm_data @offdefaults .onDrag "<fn/2>"
+user_comm_data @offdefaults .onDrag "<fn/3>"
+user_comm_data @offdefaults .onDragEnd "<fn/0>"
 user_comm_data @offdefaults .onEdit "<fn/2>"
 user_comm_data @offdefaults .origin {"x":0,"y":0}
 user_comm_data @offdefaults .paths null
 user_comm_data @offdefaults .placement {"x":300,"y":200}
 user_comm_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_contour_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_contour_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_contour_data @defaults .handles <2 entries>
 user_contour_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3,"y":3}
 user_contour_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"ct_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":83,"y":63}
 user_contour_data @defaults .items <0 entries>
-user_contour_data @defaults .onDrag "<fn/2>"
+user_contour_data @defaults .onDrag "<fn/3>"
+user_contour_data @defaults .onDragEnd "<fn/0>"
 user_contour_data @defaults .onEdit "<fn/2>"
 user_contour_data @defaults .origin {"x":0,"y":0}
 user_contour_data @defaults .paths <2 entries>
@@ -283,12 +302,13 @@ user_contour_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":3},{"x
 user_contour_data @defaults .paths[1] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":86,"y":0},{"x":86,"y":66},{"x":0,"y":66},{"x":0,"y":0}]}
 user_contour_data @defaults .placement {"x":300,"y":200}
 user_contour_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_contour_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_contour_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_contour_data @offdefaults .handles <2 entries>
 user_contour_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":25.5,"y":29}
 user_contour_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"ct_size","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":54,"y":29}
 user_contour_data @offdefaults .items <0 entries>
-user_contour_data @offdefaults .onDrag "<fn/2>"
+user_contour_data @offdefaults .onDrag "<fn/3>"
+user_contour_data @offdefaults .onDragEnd "<fn/0>"
 user_contour_data @offdefaults .onEdit "<fn/2>"
 user_contour_data @offdefaults .origin {"x":0,"y":0}
 user_contour_data @offdefaults .paths <2 entries>
@@ -296,7 +316,7 @@ user_contour_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":54,"y":29
 user_contour_data @offdefaults .paths[1] {"cls":"fc-path","pts":[{"x":47.5,"y":29},{"x":47.4529,"y":30.4389},{"x":47.3118,"y":31.8716},{"x":47.0773,"y":33.292},{"x":46.7504,"y":34.694},{"x":46.3325,"y":36.0717},{"x":45.8253,"y":37.419},{"x":45.2312,"y":38.7304},{"x":44.5526,"y":40},{"x":43.7923,"y":41.2225},{"x":42.9538,"y":42.3928},{"x":42.0405,"y":43.5056},{"x":41.0563,"y":44.5563},{"x":40.0056,"y":45.5405},{"x":38.8928,"y":46.4538},{"x":37.7225,"y":47.2923},{"x":36.5,"y":48.0526},{"x":35.2304,"y":48.7312},{"x":33.919,"y":49.3253},{"x":32.5717,"y":49.8325},{"x":31.194,"y":50.2504},{"x":29.792,"y":50.5773},{"x":28.3716,"y":50.8118},{"x":26.9389,"y":50.9529},{"x":25.5,"y":51},{"x":24.0611,"y":50.9529},{"x":22.6284,"y":50.8118},{"x":21.208,"y":50.5773},{"x":19.806,"y":50.2504},{"x":18.4283,"y":49.8325},{"x":17.081,"y":49.3253},{"x":15.7696,"y":48.7312},{"x":14.5,"y":48.0526},{"x":13.2775,"y":47.2923},{"x":12.1072,"y":46.4538},{"x":10.9944,"y":45.5405},{"x":9.9437,"y":44.5563},{"x":8.9595,"y":43.5056},{"x":8.0462,"y":42.3928},{"x":7.2077,"y":41.2225},{"x":6.4474,"y":40},{"x":5.7688,"y":38.7304},{"x":5.1747,"y":37.419},{"x":4.6675,"y":36.0717},{"x":4.2496,"y":34.694},{"x":3.9227,"y":33.292},{"x":3.6882,"y":31.8716},{"x":3.5471,"y":30.4389},{"x":3.5,"y":29},{"x":3.5471,"y":27.5611},{"x":3.6882,"y":26.1284},{"x":3.9227,"y":24.708},{"x":4.2496,"y":23.306},{"x":4.6675,"y":21.9283},{"x":5.1747,"y":20.581},{"x":5.7688,"y":19.2696},{"x":6.4474,"y":18},{"x":7.2077,"y":16.7775},{"x":8.0462,"y":15.6072},{"x":8.9595,"y":14.4944},{"x":9.9437,"y":13.4437},{"x":10.9944,"y":12.4595},{"x":12.1072,"y":11.5462},{"x":13.2775,"y":10.7077},{"x":14.5,"y":9.9474},{"x":15.7696,"y":9.2688},{"x":17.081,"y":8.6747},{"x":18.4283,"y":8.1675},{"x":19.806,"y":7.7496},{"x":21.208,"y":7.4227},{"x":22.6284,"y":7.1882},{"x":24.0611,"y":7.0471},{"x":25.5,"y":7},{"x":26.9389,"y":7.0471},{"x":28.3716,"y":7.1882},{"x":29.792,"y":7.4227},{"x":31.194,"y":7.7496},{"x":32.5717,"y":8.1675},{"x":33.919,"y":8.6747},{"x":35.2304,"y":9.2688},{"x":36.5,"y":9.9474},{"x":37.7225,"y":10.7077},{"x":38.8928,"y":11.5462},{"x":40.0056,"y":12.4595},{"x":41.0563,"y":13.4437},{"x":42.0405,"y":14.4944},{"x":42.9538,"y":15.6072},{"x":43.7923,"y":16.7775},{"x":44.5526,"y":18},{"x":45.2312,"y":19.2696},{"x":45.8253,"y":20.581},{"x":46.3325,"y":21.9283},{"x":46.7504,"y":23.306},{"x":47.0773,"y":24.708},{"x":47.3118,"y":26.1284},{"x":47.4529,"y":27.5611},{"x":47.5,"y":29}]}
 user_contour_data @offdefaults .placement {"x":300,"y":200}
 user_contour_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_corner_data @defaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_corner_data @defaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @defaults .corner "FL"
 user_corner_data @defaults .handles <2 entries>
 user_corner_data @defaults .handles[0] {"color":"#22d3ee","emits":true,"id":"reposition_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":-36,"y":13.125}
@@ -304,13 +324,14 @@ user_corner_data @defaults .handles[1] {"color":"#ffb300","emits":false,"id":"__
 user_corner_data @defaults .items <1 entries>
 user_corner_data @defaults .items[0] {"kind":"hole","r":2.4,"x":-36,"y":13.125}
 user_corner_data @defaults .onCornerPick "<fn/1>"
-user_corner_data @defaults .onDrag "<fn/2>"
+user_corner_data @defaults .onDrag "<fn/3>"
+user_corner_data @defaults .onDragEnd "<fn/0>"
 user_corner_data @defaults .onEdit "<fn/2>"
 user_corner_data @defaults .origin {"x":0,"y":0}
 user_corner_data @defaults .paths null
 user_corner_data @defaults .placement {"x":300,"y":200}
 user_corner_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_corner_data @offdefaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_corner_data @offdefaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @offdefaults .corner "FR"
 user_corner_data @offdefaults .handles <3 entries>
 user_corner_data @offdefaults .handles[0] {"color":"#ffb300","emits":true,"id":"reposition_pos","kind":"move","label":"2","labelDir":"<undefined>","manual":true,"noSnap":"<undefined>","x":136,"y":-43.875}
@@ -320,29 +341,32 @@ user_corner_data @offdefaults .items <2 entries>
 user_corner_data @offdefaults .items[0] {"kind":"hole","r":2.4,"x":136,"y":-43.875}
 user_corner_data @offdefaults .items[1] {"kind":"hole","r":2.4,"x":193,"y":13.125}
 user_corner_data @offdefaults .onCornerPick "<fn/1>"
-user_corner_data @offdefaults .onDrag "<fn/2>"
+user_corner_data @offdefaults .onDrag "<fn/3>"
+user_corner_data @offdefaults .onDragEnd "<fn/0>"
 user_corner_data @offdefaults .onEdit "<fn/2>"
 user_corner_data @offdefaults .origin {"x":0,"y":0}
 user_corner_data @offdefaults .paths null
 user_corner_data @offdefaults .placement {"x":300,"y":200}
 user_corner_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_drill_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_drill_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_drill_data @defaults .handles <1 entries>
 user_drill_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_drill_data @defaults .items <0 entries>
-user_drill_data @defaults .onDrag "<fn/2>"
+user_drill_data @defaults .onDrag "<fn/3>"
+user_drill_data @defaults .onDragEnd "<fn/0>"
 user_drill_data @defaults .onEdit "<fn/2>"
 user_drill_data @defaults .origin {"x":0,"y":0}
 user_drill_data @defaults .paths <1 entries>
 user_drill_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":0},{"x":2.5981,"y":1.5},{"x":1.5,"y":2.5981},{"x":0,"y":3},{"x":-1.5,"y":2.5981},{"x":-2.5981,"y":1.5},{"x":-3,"y":0},{"x":-2.5981,"y":-1.5},{"x":-1.5,"y":-2.5981},{"x":0,"y":-3},{"x":1.5,"y":-2.5981},{"x":2.5981,"y":-1.5},{"x":3,"y":0}]}
 user_drill_data @defaults .placement {"x":300,"y":200}
 user_drill_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_drill_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_drill_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_drill_data @offdefaults .handles <2 entries>
 user_drill_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
 user_drill_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
 user_drill_data @offdefaults .items <0 entries>
-user_drill_data @offdefaults .onDrag "<fn/2>"
+user_drill_data @offdefaults .onDrag "<fn/3>"
+user_drill_data @offdefaults .onDragEnd "<fn/0>"
 user_drill_data @offdefaults .onEdit "<fn/2>"
 user_drill_data @offdefaults .origin {"x":0,"y":0}
 user_drill_data @offdefaults .paths <90 entries>
@@ -438,69 +462,75 @@ user_drill_data @offdefaults .paths[88] {"cls":"fc-guide","pts":[{"x":222.5,"y":
 user_drill_data @offdefaults .paths[89] {"cls":"fc-guide","pts":[{"x":249.5,"y":223},{"x":249.0981,"y":224.5},{"x":248,"y":225.5981},{"x":246.5,"y":226},{"x":245,"y":225.5981},{"x":243.9019,"y":224.5},{"x":243.5,"y":223},{"x":243.9019,"y":221.5},{"x":245,"y":220.4019},{"x":246.5,"y":220},{"x":248,"y":220.4019},{"x":249.0981,"y":221.5},{"x":249.5,"y":223}]}
 user_drill_data @offdefaults .placement {"x":300,"y":200}
 user_drill_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_edge_data @defaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_edge_data @defaults .panel {"keys":["edgeSel","handles","items","onDrag","onDragEnd","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_edge_data @defaults .edgeSel {"axis":"X","dir":"pos"}
 user_edge_data @defaults .handles <1 entries>
 user_edge_data @defaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":-9,"y":75}
 user_edge_data @defaults .items <2 entries>
 user_edge_data @defaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":0,"y1":0,"y2":150}
 user_edge_data @defaults .items[1] {"cls":"fc-edge-approach","kind":"line","x1":-9,"x2":0,"y1":75,"y2":75}
-user_edge_data @defaults .onDrag "<fn/2>"
+user_edge_data @defaults .onDrag "<fn/3>"
+user_edge_data @defaults .onDragEnd "<fn/0>"
 user_edge_data @defaults .onEdgePick "<fn/2>"
 user_edge_data @defaults .onEdit "<fn/2>"
 user_edge_data @defaults .origin {"x":0,"y":0}
 user_edge_data @defaults .paths null
 user_edge_data @defaults .placement {"x":300,"y":200}
 user_edge_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_edge_data @offdefaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_edge_data @offdefaults .panel {"keys":["edgeSel","handles","items","onDrag","onDragEnd","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_edge_data @offdefaults .edgeSel {"axis":"Y","dir":"neg"}
 user_edge_data @offdefaults .handles <1 entries>
 user_edge_data @offdefaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":163.2}
 user_edge_data @offdefaults .items <2 entries>
 user_edge_data @offdefaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":200,"y1":150,"y2":150}
 user_edge_data @offdefaults .items[1] {"cls":"fc-edge-approach","kind":"line","x1":100,"x2":100,"y1":163.2,"y2":150}
-user_edge_data @offdefaults .onDrag "<fn/2>"
+user_edge_data @offdefaults .onDrag "<fn/3>"
+user_edge_data @offdefaults .onDragEnd "<fn/0>"
 user_edge_data @offdefaults .onEdgePick "<fn/2>"
 user_edge_data @offdefaults .onEdit "<fn/2>"
 user_edge_data @offdefaults .origin {"x":0,"y":0}
 user_edge_data @offdefaults .paths null
 user_edge_data @offdefaults .placement {"x":300,"y":200}
 user_edge_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_homing_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_homing_data @defaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_homing_data @defaults .handles <1 entries>
 user_homing_data @defaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":400,"y":300}
 user_homing_data @defaults .items <0 entries>
 user_homing_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_homing_data @defaults .onDrag "<fn/2>"
+user_homing_data @defaults .onDrag "<fn/3>"
+user_homing_data @defaults .onDragEnd "<fn/0>"
 user_homing_data @defaults .onEdit "<fn/2>"
 user_homing_data @defaults .origin {"x":0,"y":0}
 user_homing_data @defaults .paths null
 user_homing_data @defaults .placement {"x":300,"y":200}
 user_homing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_homing_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_homing_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_homing_data @offdefaults .handles <1 entries>
 user_homing_data @offdefaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":400,"y":300}
 user_homing_data @offdefaults .items <0 entries>
 user_homing_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
-user_homing_data @offdefaults .onDrag "<fn/2>"
+user_homing_data @offdefaults .onDrag "<fn/3>"
+user_homing_data @offdefaults .onDragEnd "<fn/0>"
 user_homing_data @offdefaults .onEdit "<fn/2>"
 user_homing_data @offdefaults .origin {"x":0,"y":0}
 user_homing_data @offdefaults .paths null
 user_homing_data @offdefaults .placement {"x":300,"y":200}
 user_homing_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_io_step @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_io_step @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_io_step @defaults .handles <0 entries>
 user_io_step @defaults .items <0 entries>
-user_io_step @defaults .onDrag "<fn/2>"
+user_io_step @defaults .onDrag "<fn/3>"
+user_io_step @defaults .onDragEnd "<fn/0>"
 user_io_step @defaults .onEdit "<fn/2>"
 user_io_step @defaults .origin {"x":0,"y":0}
 user_io_step @defaults .paths null
 user_io_step @defaults .placement {"x":300,"y":200}
 user_io_step @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_io_step @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_io_step @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_io_step @offdefaults .handles <0 entries>
 user_io_step @offdefaults .items <0 entries>
-user_io_step @offdefaults .onDrag "<fn/2>"
+user_io_step @offdefaults .onDrag "<fn/3>"
+user_io_step @offdefaults .onDragEnd "<fn/0>"
 user_io_step @offdefaults .onEdit "<fn/2>"
 user_io_step @offdefaults .origin {"x":0,"y":0}
 user_io_step @offdefaults .paths null
@@ -671,51 +701,56 @@ user_lathe_polygon @offdefaults .onEdit "<fn/2>"
 user_lathe_polygon @offdefaults .paths <1 entries>
 user_lathe_polygon @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":33.971,"y":10},{"x":32.7324,"y":11.2382},{"x":31.6504,"y":12.3204},{"x":30.6851,"y":13.2855},{"x":29.8088,"y":14.1618},{"x":29.0003,"y":14.9707},{"x":28.2427,"y":15.7285},{"x":27.5224,"y":16.4482},{"x":26.8296,"y":17.1416},{"x":26.153,"y":17.8174},{"x":25.4853,"y":18.4853},{"x":24.8174,"y":19.153},{"x":24.1416,"y":19.8296},{"x":23.4482,"y":20.5224},{"x":22.7285,"y":21.2427},{"x":21.9707,"y":22.0003},{"x":21.1618,"y":22.8088},{"x":20.2855,"y":23.6851},{"x":19.3204,"y":24.6504},{"x":18.2382,"y":25.7324},{"x":17,"y":26.971},{"x":15.7618,"y":25.7324},{"x":14.6796,"y":24.6504},{"x":13.7145,"y":23.6851},{"x":12.8382,"y":22.8088},{"x":12.0293,"y":22.0003},{"x":11.2715,"y":21.2427},{"x":10.5518,"y":20.5224},{"x":9.8584,"y":19.8296},{"x":9.1826,"y":19.153},{"x":8.5147,"y":18.4853},{"x":7.847,"y":17.8174},{"x":7.1704,"y":17.1416},{"x":6.4776,"y":16.4482},{"x":5.7573,"y":15.7285},{"x":4.9997,"y":14.9707},{"x":4.1912,"y":14.1618},{"x":3.3149,"y":13.2855},{"x":2.3496,"y":12.3204},{"x":1.2676,"y":11.2382},{"x":0.029,"y":10},{"x":1.2676,"y":8.7618},{"x":2.3496,"y":7.6796},{"x":3.3149,"y":6.7145},{"x":4.1912,"y":5.8382},{"x":4.9997,"y":5.0293},{"x":5.7573,"y":4.2715},{"x":6.4776,"y":3.5518},{"x":7.1704,"y":2.8584},{"x":7.847,"y":2.1826},{"x":8.5147,"y":1.5147},{"x":9.1826,"y":0.847},{"x":9.8584,"y":0.1704},{"x":10.5518,"y":-0.5224},{"x":11.2715,"y":-1.2427},{"x":12.0293,"y":-2.0003},{"x":12.8382,"y":-2.8088},{"x":13.7145,"y":-3.6851},{"x":14.6796,"y":-4.6504},{"x":15.7618,"y":-5.7324},{"x":17,"y":-6.971},{"x":18.2382,"y":-5.7324},{"x":19.3204,"y":-4.6504},{"x":20.2855,"y":-3.6851},{"x":21.1618,"y":-2.8088},{"x":21.9707,"y":-2.0003},{"x":22.7285,"y":-1.2427},{"x":23.4482,"y":-0.5224},{"x":24.1416,"y":0.1704},{"x":24.8174,"y":0.847},{"x":25.4853,"y":1.5147},{"x":26.153,"y":2.1826},{"x":26.8296,"y":2.8584},{"x":27.5224,"y":3.5518},{"x":28.2427,"y":4.2715},{"x":29.0003,"y":5.0293},{"x":29.8088,"y":5.8382},{"x":30.6851,"y":6.7145},{"x":31.6504,"y":7.6796},{"x":32.7324,"y":8.7618},{"x":33.971,"y":10}]}
 user_lathe_polygon @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
-user_middle_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_middle_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_middle_data @defaults .handles <2 entries>
 user_middle_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"crossAimP","kind":"size","label":"X↔","manual":"<undefined>","noSnap":"<undefined>","value":80,"x":80,"y":75}
 user_middle_data @defaults .handles[1] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":-15,"y":75}
 user_middle_data @defaults .items <0 entries>
-user_middle_data @defaults .onDrag "<fn/2>"
+user_middle_data @defaults .onDrag "<fn/3>"
+user_middle_data @defaults .onDragEnd "<fn/0>"
 user_middle_data @defaults .onEdit "<fn/2>"
 user_middle_data @defaults .origin {"x":0,"y":0}
 user_middle_data @defaults .paths null
 user_middle_data @defaults .placement {"x":300,"y":200}
 user_middle_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_middle_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_middle_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_middle_data @offdefaults .handles <1 entries>
 user_middle_data @offdefaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_middle_data @offdefaults .items <0 entries>
-user_middle_data @offdefaults .onDrag "<fn/2>"
+user_middle_data @offdefaults .onDrag "<fn/3>"
+user_middle_data @offdefaults .onDragEnd "<fn/0>"
 user_middle_data @offdefaults .onEdit "<fn/2>"
 user_middle_data @offdefaults .origin {"x":0,"y":0}
 user_middle_data @offdefaults .paths null
 user_middle_data @offdefaults .placement {"x":300,"y":200}
 user_middle_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_pause_confirm @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_pause_confirm @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_pause_confirm @defaults .handles <0 entries>
 user_pause_confirm @defaults .items <0 entries>
-user_pause_confirm @defaults .onDrag "<fn/2>"
+user_pause_confirm @defaults .onDrag "<fn/3>"
+user_pause_confirm @defaults .onDragEnd "<fn/0>"
 user_pause_confirm @defaults .onEdit "<fn/2>"
 user_pause_confirm @defaults .origin {"x":0,"y":0}
 user_pause_confirm @defaults .paths null
 user_pause_confirm @defaults .placement {"x":300,"y":200}
 user_pause_confirm @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_pause_confirm @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_pause_confirm @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_pause_confirm @offdefaults .handles <0 entries>
 user_pause_confirm @offdefaults .items <0 entries>
-user_pause_confirm @offdefaults .onDrag "<fn/2>"
+user_pause_confirm @offdefaults .onDrag "<fn/3>"
+user_pause_confirm @offdefaults .onDragEnd "<fn/0>"
 user_pause_confirm @offdefaults .onEdit "<fn/2>"
 user_pause_confirm @offdefaults .origin {"x":0,"y":0}
 user_pause_confirm @offdefaults .paths null
 user_pause_confirm @offdefaults .placement {"x":300,"y":200}
 user_pause_confirm @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_pocket_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_pocket_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_pocket_data @defaults .handles <2 entries>
 user_pocket_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_pocket_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"pk_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":80,"y":60}
 user_pocket_data @defaults .items <0 entries>
-user_pocket_data @defaults .onDrag "<fn/2>"
+user_pocket_data @defaults .onDrag "<fn/3>"
+user_pocket_data @defaults .onDragEnd "<fn/0>"
 user_pocket_data @defaults .onEdit "<fn/2>"
 user_pocket_data @defaults .origin {"x":0,"y":0}
 user_pocket_data @defaults .paths <13 entries>
@@ -734,43 +769,46 @@ user_pocket_data @defaults .paths[11] {"cls":"fc-guide","pts":[{"x":27,"y":27},{
 user_pocket_data @defaults .paths[12] {"cls":"fc-guide","pts":[{"x":29.4,"y":29.4},{"x":50.6,"y":29.4},{"x":50.6,"y":30.6},{"x":29.4,"y":30.6},{"x":29.4,"y":29.4}]}
 user_pocket_data @defaults .placement {"x":300,"y":200}
 user_pocket_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_pocket_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_pocket_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_pocket_data @offdefaults .handles <2 entries>
 user_pocket_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":32,"y":35.5}
 user_pocket_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"pk_size","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":60.5,"y":35.5}
 user_pocket_data @offdefaults .items <0 entries>
-user_pocket_data @offdefaults .onDrag "<fn/2>"
+user_pocket_data @offdefaults .onDrag "<fn/3>"
+user_pocket_data @offdefaults .onDragEnd "<fn/0>"
 user_pocket_data @offdefaults .onEdit "<fn/2>"
 user_pocket_data @offdefaults .origin {"x":0,"y":0}
 user_pocket_data @offdefaults .paths <1 entries>
 user_pocket_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":60.5,"y":35.5},{"x":60.439,"y":37.364},{"x":60.2562,"y":39.22},{"x":59.9524,"y":41.0601},{"x":59.5289,"y":42.8763},{"x":58.9875,"y":44.661},{"x":58.3306,"y":46.4065},{"x":57.5609,"y":48.1052},{"x":56.6817,"y":49.75},{"x":55.6969,"y":51.3338},{"x":54.6106,"y":52.8497},{"x":53.4274,"y":54.2914},{"x":52.1525,"y":55.6525},{"x":50.7914,"y":56.9274},{"x":49.3497,"y":58.1106},{"x":47.8338,"y":59.1969},{"x":46.25,"y":60.1817},{"x":44.6052,"y":61.0609},{"x":42.9065,"y":61.8306},{"x":41.161,"y":62.4875},{"x":39.3763,"y":63.0289},{"x":37.5601,"y":63.4524},{"x":35.72,"y":63.7562},{"x":33.864,"y":63.939},{"x":32,"y":64},{"x":30.136,"y":63.939},{"x":28.28,"y":63.7562},{"x":26.4399,"y":63.4524},{"x":24.6237,"y":63.0289},{"x":22.839,"y":62.4875},{"x":21.0935,"y":61.8306},{"x":19.3948,"y":61.0609},{"x":17.75,"y":60.1817},{"x":16.1662,"y":59.1969},{"x":14.6503,"y":58.1106},{"x":13.2086,"y":56.9274},{"x":11.8475,"y":55.6525},{"x":10.5726,"y":54.2914},{"x":9.3894,"y":52.8497},{"x":8.3031,"y":51.3338},{"x":7.3183,"y":49.75},{"x":6.4391,"y":48.1052},{"x":5.6694,"y":46.4065},{"x":5.0125,"y":44.661},{"x":4.4711,"y":42.8763},{"x":4.0476,"y":41.0601},{"x":3.7438,"y":39.22},{"x":3.561,"y":37.364},{"x":3.5,"y":35.5},{"x":3.561,"y":33.636},{"x":3.7438,"y":31.78},{"x":4.0476,"y":29.9399},{"x":4.4711,"y":28.1237},{"x":5.0125,"y":26.339},{"x":5.6694,"y":24.5935},{"x":6.4391,"y":22.8948},{"x":7.3183,"y":21.25},{"x":8.3031,"y":19.6662},{"x":9.3894,"y":18.1503},{"x":10.5726,"y":16.7086},{"x":11.8475,"y":15.3475},{"x":13.2086,"y":14.0726},{"x":14.6503,"y":12.8894},{"x":16.1662,"y":11.8031},{"x":17.75,"y":10.8183},{"x":19.3948,"y":9.9391},{"x":21.0935,"y":9.1694},{"x":22.839,"y":8.5125},{"x":24.6237,"y":7.9711},{"x":26.4399,"y":7.5476},{"x":28.28,"y":7.2438},{"x":30.136,"y":7.061},{"x":32,"y":7},{"x":33.864,"y":7.061},{"x":35.72,"y":7.2438},{"x":37.5601,"y":7.5476},{"x":39.3763,"y":7.9711},{"x":41.161,"y":8.5125},{"x":42.9065,"y":9.1694},{"x":44.6052,"y":9.9391},{"x":46.25,"y":10.8183},{"x":47.8338,"y":11.8031},{"x":49.3497,"y":12.8894},{"x":50.7914,"y":14.0726},{"x":52.1525,"y":15.3475},{"x":53.4274,"y":16.7086},{"x":54.6106,"y":18.1503},{"x":55.6969,"y":19.6662},{"x":56.6817,"y":21.25},{"x":57.5609,"y":22.8948},{"x":58.3306,"y":24.5935},{"x":58.9875,"y":26.339},{"x":59.5289,"y":28.1237},{"x":59.9524,"y":29.9399},{"x":60.2562,"y":31.78},{"x":60.439,"y":33.636},{"x":60.5,"y":35.5}]}
 user_pocket_data @offdefaults .placement {"x":300,"y":200}
 user_pocket_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_rotary_center_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_center_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_rotary_center_data @defaults .handles <1 entries>
 user_rotary_center_data @defaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_rotary_center_data @defaults .items <2 entries>
 user_rotary_center_data @defaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
 user_rotary_center_data @defaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
-user_rotary_center_data @defaults .onDrag "<fn/2>"
+user_rotary_center_data @defaults .onDrag "<fn/3>"
+user_rotary_center_data @defaults .onDragEnd "<fn/0>"
 user_rotary_center_data @defaults .onEdit "<fn/2>"
 user_rotary_center_data @defaults .origin {"x":0,"y":0}
 user_rotary_center_data @defaults .paths null
 user_rotary_center_data @defaults .placement {"x":300,"y":200}
 user_rotary_center_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_rotary_center_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_center_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_rotary_center_data @offdefaults .handles <1 entries>
 user_rotary_center_data @offdefaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_rotary_center_data @offdefaults .items <2 entries>
 user_rotary_center_data @offdefaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
 user_rotary_center_data @offdefaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
-user_rotary_center_data @offdefaults .onDrag "<fn/2>"
+user_rotary_center_data @offdefaults .onDrag "<fn/3>"
+user_rotary_center_data @offdefaults .onDragEnd "<fn/0>"
 user_rotary_center_data @offdefaults .onEdit "<fn/2>"
 user_rotary_center_data @offdefaults .origin {"x":0,"y":0}
 user_rotary_center_data @offdefaults .paths null
 user_rotary_center_data @offdefaults .placement {"x":300,"y":200}
 user_rotary_center_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_rotary_clock_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_clock_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_rotary_clock_data @defaults .handles <2 entries>
 user_rotary_clock_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":75,"yieldCoincident":false}
 user_rotary_clock_data @defaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":95,"yieldCoincident":false}
@@ -779,12 +817,13 @@ user_rotary_clock_data @defaults .items[0] {"cls":"fc-rotary-span","kind":"line"
 user_rotary_clock_data @defaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":65,"kind":"circle","r":3}
 user_rotary_clock_data @defaults .items[2] {"cls":"fc-rotary-touch","cx":100,"cy":85,"kind":"circle","r":3}
 user_rotary_clock_data @defaults .onDrag "<fn/2>"
+user_rotary_clock_data @defaults .onDragEnd "<fn/0>"
 user_rotary_clock_data @defaults .onEdit "<fn/2>"
 user_rotary_clock_data @defaults .origin {"x":0,"y":0}
 user_rotary_clock_data @defaults .paths null
 user_rotary_clock_data @defaults .placement {"x":300,"y":200}
 user_rotary_clock_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_rotary_clock_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_clock_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_rotary_clock_data @offdefaults .handles <2 entries>
 user_rotary_clock_data @offdefaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":75,"yieldCoincident":false}
 user_rotary_clock_data @offdefaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":102,"yieldCoincident":false}
@@ -793,19 +832,21 @@ user_rotary_clock_data @offdefaults .items[0] {"cls":"fc-rotary-span","kind":"li
 user_rotary_clock_data @offdefaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":61.5,"kind":"circle","r":3}
 user_rotary_clock_data @offdefaults .items[2] {"cls":"fc-rotary-touch","cx":100,"cy":88.5,"kind":"circle","r":3}
 user_rotary_clock_data @offdefaults .onDrag "<fn/2>"
+user_rotary_clock_data @offdefaults .onDragEnd "<fn/0>"
 user_rotary_clock_data @offdefaults .onEdit "<fn/2>"
 user_rotary_clock_data @offdefaults .origin {"x":0,"y":0}
 user_rotary_clock_data @offdefaults .paths null
 user_rotary_clock_data @offdefaults .placement {"x":300,"y":200}
 user_rotary_clock_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_slot_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_slot_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_slot_data @defaults .handles <4 entries>
 user_slot_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","manual":"<undefined>","noSnap":"<undefined>","x":30,"y":0}
 user_slot_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_slot_data @defaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":60,"y":0}
 user_slot_data @defaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":30,"y":3}
 user_slot_data @defaults .items <0 entries>
-user_slot_data @defaults .onDrag "<fn/2>"
+user_slot_data @defaults .onDrag "<fn/3>"
+user_slot_data @defaults .onDragEnd "<fn/0>"
 user_slot_data @defaults .onEdit "<fn/2>"
 user_slot_data @defaults .origin {"x":0,"y":0}
 user_slot_data @defaults .paths <3 entries>
@@ -814,14 +855,15 @@ user_slot_data @defaults .paths[1] {"cls":"fc-guide","pts":[{"x":0,"y":3},{"x":6
 user_slot_data @defaults .paths[2] {"cls":"fc-guide","pts":[{"x":0,"y":-3},{"x":60,"y":-3}]}
 user_slot_data @defaults .placement {"x":300,"y":200}
 user_slot_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_slot_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_slot_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_slot_data @offdefaults .handles <4 entries>
 user_slot_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","manual":"<undefined>","noSnap":"<undefined>","x":33.5,"y":13.5}
 user_slot_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":13.5}
 user_slot_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":63.5,"y":13.5}
 user_slot_data @offdefaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":33.5,"y":20}
 user_slot_data @offdefaults .items <0 entries>
-user_slot_data @offdefaults .onDrag "<fn/2>"
+user_slot_data @offdefaults .onDrag "<fn/3>"
+user_slot_data @offdefaults .onDragEnd "<fn/0>"
 user_slot_data @offdefaults .onEdit "<fn/2>"
 user_slot_data @offdefaults .origin {"x":0,"y":0}
 user_slot_data @offdefaults .paths <3 entries>
@@ -830,58 +872,63 @@ user_slot_data @offdefaults .paths[1] {"cls":"fc-guide","pts":[{"x":3.5,"y":20},
 user_slot_data @offdefaults .paths[2] {"cls":"fc-guide","pts":[{"x":3.5,"y":7},{"x":63.5,"y":7}]}
 user_slot_data @offdefaults .placement {"x":300,"y":200}
 user_slot_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_surfacing_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_surfacing_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_surfacing_data @defaults .handles <2 entries>
 user_surfacing_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":false,"x":0,"y":0}
 user_surfacing_data @defaults .handles[1] {"color":"<undefined>","displayVals":[100,80],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":100,"y":80}
 user_surfacing_data @defaults .items <0 entries>
-user_surfacing_data @defaults .onDrag "<fn/2>"
+user_surfacing_data @defaults .onDrag "<fn/3>"
+user_surfacing_data @defaults .onDragEnd "<fn/0>"
 user_surfacing_data @defaults .onEdit "<fn/2>"
 user_surfacing_data @defaults .origin {"x":0,"y":0}
 user_surfacing_data @defaults .paths <1 entries>
 user_surfacing_data @defaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":100,"y":0},{"x":100,"y":80},{"x":0,"y":80},{"x":0,"y":0}]}
 user_surfacing_data @defaults .placement {"x":300,"y":200}
 user_surfacing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_surfacing_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_surfacing_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_surfacing_data @offdefaults .handles <2 entries>
 user_surfacing_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":true,"x":0,"y":0}
 user_surfacing_data @offdefaults .handles[1] {"color":"<undefined>","displayVals":[107,87],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":114,"y":94}
 user_surfacing_data @offdefaults .items <0 entries>
-user_surfacing_data @offdefaults .onDrag "<fn/2>"
+user_surfacing_data @offdefaults .onDrag "<fn/3>"
+user_surfacing_data @offdefaults .onDragEnd "<fn/0>"
 user_surfacing_data @offdefaults .onEdit "<fn/2>"
 user_surfacing_data @offdefaults .origin {"x":0,"y":0}
 user_surfacing_data @offdefaults .paths <1 entries>
 user_surfacing_data @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":107,"y":0},{"x":107,"y":87},{"x":0,"y":87},{"x":0,"y":0}]}
 user_surfacing_data @offdefaults .placement {"x":300,"y":200}
 user_surfacing_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_tap_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_tap_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_tap_data @defaults .handles <1 entries>
 user_tap_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_tap_data @defaults .items <0 entries>
-user_tap_data @defaults .onDrag "<fn/2>"
+user_tap_data @defaults .onDrag "<fn/3>"
+user_tap_data @defaults .onDragEnd "<fn/0>"
 user_tap_data @defaults .onEdit "<fn/2>"
 user_tap_data @defaults .origin {"x":0,"y":0}
 user_tap_data @defaults .paths <1 entries>
 user_tap_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":0},{"x":2.7716,"y":1.1481},{"x":2.1213,"y":2.1213},{"x":1.1481,"y":2.7716},{"x":0,"y":3},{"x":-1.1481,"y":2.7716},{"x":-2.1213,"y":2.1213},{"x":-2.7716,"y":1.1481},{"x":-3,"y":0},{"x":-2.7716,"y":-1.1481},{"x":-2.1213,"y":-2.1213},{"x":-1.1481,"y":-2.7716},{"x":0,"y":-3},{"x":1.1481,"y":-2.7716},{"x":2.1213,"y":-2.1213},{"x":2.7716,"y":-1.1481},{"x":3,"y":0}]}
 user_tap_data @defaults .placement {"x":300,"y":200}
 user_tap_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_tap_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_tap_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_tap_data @offdefaults .handles <1 entries>
 user_tap_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
 user_tap_data @offdefaults .items <0 entries>
-user_tap_data @offdefaults .onDrag "<fn/2>"
+user_tap_data @offdefaults .onDrag "<fn/3>"
+user_tap_data @offdefaults .onDragEnd "<fn/0>"
 user_tap_data @offdefaults .onEdit "<fn/2>"
 user_tap_data @offdefaults .origin {"x":0,"y":0}
 user_tap_data @offdefaults .paths <1 entries>
 user_tap_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":27.5,"y":7},{"x":25.6731,"y":16.1844},{"x":20.4706,"y":23.9706},{"x":12.6844,"y":29.1731},{"x":3.5,"y":31},{"x":-5.6844,"y":29.1731},{"x":-13.4706,"y":23.9706},{"x":-18.6731,"y":16.1844},{"x":-20.5,"y":7},{"x":-18.6731,"y":-2.1844},{"x":-13.4706,"y":-9.9706},{"x":-5.6844,"y":-15.1731},{"x":3.5,"y":-17},{"x":12.6844,"y":-15.1731},{"x":20.4706,"y":-9.9706},{"x":25.6731,"y":-2.1844},{"x":27.5,"y":7}]}
 user_tap_data @offdefaults .placement {"x":300,"y":200}
 user_tap_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_text_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_text_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_text_data @defaults .handles <2 entries>
 user_text_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_text_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":42.5143,"y":0}
 user_text_data @defaults .items <0 entries>
-user_text_data @defaults .onDrag "<fn/2>"
+user_text_data @defaults .onDrag "<fn/3>"
+user_text_data @defaults .onDragEnd "<fn/0>"
 user_text_data @defaults .onEdit "<fn/2>"
 user_text_data @defaults .origin {"x":0,"y":0}
 user_text_data @defaults .paths <8 entries>
@@ -895,12 +942,13 @@ user_text_data @defaults .paths[6] {"cls":"fc-path","pts":[{"x":32.9143,"y":12},
 user_text_data @defaults .paths[7] {"cls":"fc-path","pts":[{"x":37.3714,"y":12},{"x":37.3714,"y":0}]}
 user_text_data @defaults .placement {"x":300,"y":200}
 user_text_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_text_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_text_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_text_data @offdefaults .handles <2 entries>
 user_text_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":1489.4621,"y":186.4224}
 user_text_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":4452.6094,"y":550.2511}
 user_text_data @offdefaults .items <0 entries>
-user_text_data @offdefaults .onDrag "<fn/2>"
+user_text_data @offdefaults .onDrag "<fn/3>"
+user_text_data @offdefaults .onDragEnd "<fn/0>"
 user_text_data @offdefaults .onEdit "<fn/2>"
 user_text_data @offdefaults .origin {"x":0,"y":0}
 user_text_data @offdefaults .paths <35 entries>
@@ -941,19 +989,21 @@ user_text_data @offdefaults .paths[33] {"cls":"fc-path","pts":[{"x":2755.9935,"y
 user_text_data @offdefaults .paths[34] {"cls":"fc-path","pts":[{"x":2812.0298,"y":367.956},{"x":2812.0298,"y":348.8133}]}
 user_text_data @offdefaults .placement {"x":300,"y":200}
 user_text_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_wcs_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_wcs_data @defaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_wcs_data @defaults .handles <0 entries>
 user_wcs_data @defaults .items <0 entries>
-user_wcs_data @defaults .onDrag "<fn/2>"
+user_wcs_data @defaults .onDrag "<fn/3>"
+user_wcs_data @defaults .onDragEnd "<fn/0>"
 user_wcs_data @defaults .onEdit "<fn/2>"
 user_wcs_data @defaults .origin {"x":0,"y":0}
 user_wcs_data @defaults .paths null
 user_wcs_data @defaults .placement {"x":300,"y":200}
 user_wcs_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-user_wcs_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_wcs_data @offdefaults .panel {"keys":["handles","items","onDrag","onDragEnd","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
 user_wcs_data @offdefaults .handles <0 entries>
 user_wcs_data @offdefaults .items <0 entries>
-user_wcs_data @offdefaults .onDrag "<fn/2>"
+user_wcs_data @offdefaults .onDrag "<fn/3>"
+user_wcs_data @offdefaults .onDragEnd "<fn/0>"
 user_wcs_data @offdefaults .onEdit "<fn/2>"
 user_wcs_data @offdefaults .origin {"x":0,"y":0}
 user_wcs_data @offdefaults .paths null

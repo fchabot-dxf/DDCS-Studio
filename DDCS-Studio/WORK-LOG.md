@@ -65563,3 +65563,31 @@ gate is currently RED on `wizards-as-data-blocks` independent of anything in thi
 
 Files: `web/data/learnerLibrary.js`, `tests/learner-library.spec.js`.
 
+## t2451a (TAIL, own commit) — the pre-existing `preview-spec-gate-1688.test.mjs` red, RESOLVED (regenerated, not
+hand-edited), and its root correctly re-attributed
+
+Flagged twice now (t2439, t2449) as a pre-existing `test:node` failure unrelated to whatever that turn's own
+change was — each time re-triaged from scratch, exactly the cost the dispatch named. Traced properly this time:
+`git log -S"onDragEnd" -- web/wizards/ops/panelTypes.js` shows the field was introduced by **t2429** (commit
+`406fb116`, BACKLOG #46's partial ship), not t2447 as my own t2449 WORK-LOG entry guessed — t2447 only changed
+HOW `onDragEnd` gets populated (the scan/write split), it did not introduce the field. Correcting that
+attribution here since it's now on the record twice.
+
+The gate has a DECLARED regeneration mechanism (`preview-spec-gate-1688.test.mjs`'s own header comment):
+`UPDATE_PREVIEW_SNAPSHOT=1 npm run test:node` rewrites the fixture and deliberately FAILS the run, forcing a
+`git diff` read before trusting it — never hand-edit the `.txt`. Ran it, then read the full diff line by line per
+the test's own warning ("a KEY that disappeared is a declaration a renderer stopped receiving... a NUMBER that
+moved is geometry"). The diff was clean and exactly two categories, uniformly: every panel gained `onDragEnd`
+in its `.keys` list and its own `.onDragEnd "<fn/0>"` line, and every panel's `.onDrag` arity read `<fn/3>`
+instead of `<fn/2>` (a parameter t2429/t2447's own shared handler generator added at the same time) — no key
+disappeared, no number/geometry line moved. Re-ran `test:node` clean: **238/238.**
+
+Verified this doesn't paper over anything real: `git status` after regenerating shows ONLY the snapshot `.txt`
+changed — no source file. This is a golden-file catching up to already-shipped, already-tested behavior from
+two turns ago, not a live code change.
+
+Tier: this file is a test fixture, not source — `test:node` alone is the correct and sufficient tier (no `web/`
+file changed, so `test:changed`'s import graph has nothing new to pick up).
+
+Files: `tests/node/__snapshots__/preview-spec-1688.txt`.
+
