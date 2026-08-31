@@ -3675,7 +3675,7 @@ and culling/renaming Blockly's native context-menu entries. The canvas keeps its
 
 ---
 
-### 47. [⚠ TIER 1 SHIPPED t2395 — goto/ifgoto/probecheck/confirm target pickers + the `assign.var` pilot with the live per-dialect traffic light. TIERS 2-4 STILL OPEN: the other var fields, tool/pin numbers, `flip.setup`] EXACT-NAME REFERENCES ON THE EMIT-SIDE BLOCKS ARE FREE TEXT — extend #42's picker principle to them
+### 47. [⚠ TIER 1 SHIPPED t2395 — goto/ifgoto/probecheck/confirm target pickers + the `assign.var` pilot with the live per-dialect traffic light. ✅ TIER 2/3 SHIPPED t2453 — tool.n/toolsel.toolNum (REFERENCE, forward-authorable) + outpin.pin/waitinput.pin/probe.port (same) + flip.setup (CLOSED, must-match — established, not assumed, see t2453's own reasoning). STILL OPEN: the other 13+ var-name fields (item 2's remainder), `tooloffset.tool/value` (miscategorized into this tier by a dispatch, corrected — see t2453 WORK-LOG, needs its OWN decision, not a reflex reuse)] EXACT-NAME REFERENCES ON THE EMIT-SIDE BLOCKS ARE FREE TEXT — extend #42's picker principle to them
 
 *(from the 2026-08-28 block-def sweep, all 136 defs audited with file:line. The principle is ALREADY
 owner-ruled in #42 — "wherever we need an exact variable name don't allow typing"; this entry is its
@@ -3692,10 +3692,12 @@ field below defaults to a string, so typos are invisible until the machine runs 
    `tooloffset.tool/value`, `wcswrite.addrVar`, `radiuscomp.*`, `safehop/clearlift.saveVar/workClear`, …)
    type `#nnn` free. The registries EXIST (`data/varMap.js` RANGES/RESERVED, `universalScratch.opBands()`,
    per-dialect vars) and never reach the canvas. A typo emits a legal write to a register nobody owns.
-3. **Tool / pin numbers** — `tool.n`, `toolsel.toolNum`, `probe.port`, `outpin.pin`, `waitinput.pin`: bare
+3. ✅ SHIPPED t2453. **Tool / pin numbers** — `tool.n`, `toolsel.toolNum`, `probe.port`, `outpin.pin`, `waitinput.pin`: bare
    number sockets while the form side already has `tool_library_picker` / `declared_io_picker`
-   (`specializedPickers.js:22,36`). Same data, two affordances, split by surface.
-4. `flip.setup` → picker of the stack's `setup` indices (a typo today = the flip silently never applies).
+   (`specializedPickers.js:22,36`). Same data, two affordances, split by surface. Note: this list never named
+   `tooloffset.tool` (that's item 2's own `#nnn` shape, above) — a later dispatch mis-sorted it into this tier;
+   corrected back, see t2453 WORK-LOG.
+4. ✅ SHIPPED t2453 — `flip.setup` → picker of the stack's `setup` indices (a typo today = the flip silently never applies). Built as the CLOSED (must-match) rung, not goto's forward-authorable one — established with the file in hand, reasoning in bridge.js's own `SETUP_TARGET_FIELDS` header comment.
 
 ### ✅ SCOPE RULED — owner, 2026-08-28: *"we don't need to verify everything, but a var block should at
 least use the match search result gui, go to as well."*

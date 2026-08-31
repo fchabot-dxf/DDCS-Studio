@@ -27,6 +27,8 @@
  * actual ask ("a search with dropdown option") once a stack's own var/atom/param list runs past a handful.
  */
 import { openFieldPopup } from './dropdownPopup.js';
+import { getToolLibrary } from '../../wizards/toolPicker.js';   // t2453 (BACKLOG #47 tier 2) — settings.atc.tools[], the SAME source formWidgets.js's own tool-library picker reads
+import { getOutputs, getInputs } from '../../ui/settingsPanel.js';   // t2453 (BACKLOG #47 tier 2) — settings.outputs/inputs[], the SAME source formWidgets.js's own declared-I/O picker reads
 
 const META_TYPES = new Set([
     'formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group',
@@ -43,12 +45,26 @@ export function installPickerField(Blockly) {
             this.SERIALIZABLE = true;
             this.pickKind = (config && config.pickKind) || '';
             this.allowNew = !!(config && config.allowNew);
+            this.pinKind = (config && config.pinKind) || 'output';   // t2453 — which of settings.inputs/outputs a 'pin' picker reads
             this.size_ = new Size(120, 24);
         }
-        static fromJson(options) { return new FieldPicker(options.value, undefined, { ...options, pickKind: options.pickKind, allowNew: options.allowNew }); }
+        static fromJson(options) { return new FieldPicker(options.value, undefined, { ...options, pickKind: options.pickKind, allowNew: options.allowNew, pinKind: options.pinKind }); }
 
         doClassValidation_(v) { return v == null ? '' : String(v); }
-        getText() { return this.getValue() || (this.allowNew ? '(pick or type…)' : '(pick…)'); }
+        // t2453 (BACKLOG #47 tier 2) — TOOL/PIN get the same visible TRAFFIC-LIGHT suffix comboField.js's own
+        // 'var' kind already established (never a gate — the value commits regardless, this only decorates the
+        // face): a value not found among the LIVE candidates (settings.atc.tools[] / settings.inputs|outputs[])
+        // reads as legitimately uncatalogued machine config, not a typo, so the wording says "not in your
+        // table"/"not a declared pin", never "invalid".
+        getText() {
+            const v = this.getValue();
+            if (!v) return this.allowNew ? '(pick or type…)' : '(pick…)';
+            if (this.pickKind === 'tool' || this.pickKind === 'pin') {
+                const known = this._candidates().some((c) => String((c && typeof c === 'object') ? c.value : c) === String(v));
+                if (!known) return `${v}  ⚠ ${this.pickKind === 'tool' ? 'not in your tool table' : 'not a declared I/O pin'}`;
+            }
+            return v;
+        }
         isClickable() { return true; }
 
         /** Every candidate this picker's `pickKind` offers, read live from the SOURCE BLOCK's own workspace —
@@ -85,12 +101,42 @@ export function installPickerField(Blockly) {
                 }).filter((v) => v != null && v !== '');
                 return [...new Set(labels)];
             }
+            // t2453 (BACKLOG #47 tier 2) — MACHINE-DECLARED sources (not stack-derived, unlike every kind
+            // above): candidates are {value,label} objects here — showEditor_() below normalizes both shapes,
+            // so the existing plain-string kinds above are untouched.
+            if (this.pickKind === 'tool') {
+                let lib = [];
+                try { lib = getToolLibrary(); } catch (_) { /* no settings yet */ }
+                return (lib || []).map((t) => ({ value: String(t.num), label: t.label }));
+            }
+            if (this.pickKind === 'pin') {
+                let rows = [];
+                try { rows = this.pinKind === 'input' ? getInputs() : getOutputs(); } catch (_) { /* no settings yet */ }
+                return (rows || []).filter((r) => r && r.pin !== '' && r.pin != null)
+                    .map((r) => ({ value: String(r.pin), label: `${r.label || r.type} (pin ${r.pin})` }));
+            }
+            // t2453 (BACKLOG #47 tier 3) — flip.setup: CLOSED (this.allowNew stays false — no config passes it
+            // true), same live-stack-derived shape as 'label' above: every `setup` block's own `index`, read off
+            // its value-socket shadow (setup.index defaults to a NUMBER, so fieldKind() classifies it 'value' —
+            // the same value-socket shape label.n has, not a plain Field).
+            if (this.pickKind === 'setup') {
+                const setups = all.filter((b) => b.type === 'setup').map((b) => {
+                    const inp = b.getInput('INDEX');
+                    const tgt = inp && inp.connection && inp.connection.targetBlock();
+                    return tgt ? tgt.getFieldValue('NUM') : null;
+                }).filter((v) => v != null && v !== '');
+                return [...new Set(setups)];
+            }
             return [];
         }
 
         showEditor_() {
             openFieldPopup(this, (content, close) => {
-                const candidates = this._candidates();
+                // t2453 (BACKLOG #47 tier 2) — MACHINE-DECLARED kinds (tool/pin) return {value,label} objects
+                // (the label reads "T3 · 6mm endmill" / "Coolant (pin 8)"; the committed value is the bare
+                // number the emit expects) — normalized here so every kind below stays byte-identical for the
+                // plain-string ones (matchvar/atomtype/whenparam/label/setup), which never had this shape.
+                const candidates = this._candidates().map((c) => (c && typeof c === 'object') ? c : { value: c, label: c });
                 const filterBox = document.createElement('input');
                 filterBox.type = 'text'; filterBox.placeholder = this.allowNew ? 'filter, or type a new number…' : 'filter…';
                 filterBox.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:6px;padding:4px 6px;font:inherit;';
@@ -99,27 +145,30 @@ export function installPickerField(Blockly) {
                 const commit = (v) => { this.setValue(v); close(); };
                 const renderList = (q) => {
                     list.innerHTML = '';
-                    const shown = candidates.filter((c) => !q || String(c).toLowerCase().includes(String(q).toLowerCase()));
+                    const shown = candidates.filter((c) => !q || String(c.label).toLowerCase().includes(String(q).toLowerCase()));
                     if (!shown.length) {
                         const empty = document.createElement('div');
-                        empty.textContent = candidates.length ? 'no match' : '(nothing in this stack yet)';
+                        const emptyStackMsg = (this.pickKind === 'tool') ? '(no tools in your library yet)'
+                            : (this.pickKind === 'pin') ? '(no pins declared yet — see Settings)'
+                            : '(nothing in this stack yet)';
+                        empty.textContent = candidates.length ? 'no match' : emptyStackMsg;
                         empty.style.cssText = 'opacity:.6;padding:4px 6px;'; list.appendChild(empty);
                     }
                     for (const c of shown) {
                         const row = document.createElement('div');
                         row.className = 'ddcs-picker-row';
-                        row.textContent = c;
+                        row.textContent = c.label;
                         row.style.cssText = 'padding:5px 6px;cursor:pointer;border-radius:3px;';
                         row.addEventListener('mouseenter', () => { row.style.background = 'rgba(0,0,0,.08)'; });
                         row.addEventListener('mouseleave', () => { row.style.background = ''; });
                         row.addEventListener('mousedown', (e) => e.preventDefault());   // don't steal focus before the click lands
-                        row.addEventListener('click', () => commit(c));
+                        row.addEventListener('click', () => commit(c.value));
                         list.appendChild(row);
                     }
                     // t2395 (BACKLOG #47) — FORWARD-AUTHORABLE: a typed value with no exact candidate match still
                     // commits, via its own explicit row (never silently, and never by falling through the "no
                     // match" empty state above — that stays a plain status line for the closed/must-match mode).
-                    if (this.allowNew && q && !candidates.some((c) => String(c) === String(q))) {
+                    if (this.allowNew && q && !candidates.some((c) => String(c.value) === String(q))) {
                         const newRow = document.createElement('div');
                         newRow.className = 'ddcs-picker-row ddcs-picker-newrow';
                         newRow.textContent = `+ use "${q}"`;

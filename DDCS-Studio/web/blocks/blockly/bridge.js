@@ -38,6 +38,47 @@ const CORNER_COLOUR = { stockAttach: '#4ab3ff', pathDatum: '#ffcf3a' };
 // the stack's own labels but a typed NEW number still commits (`allowNew`, pickerField.js) — "people place the
 // jump before the label."
 const LABEL_TARGET_FIELDS = { goto: 'n', ifgoto: 'goto', probecheck: 'goto', confirm: 'cancel', hmiconfirm: 'cancel' };
+// t2453 (BACKLOG #47 tier 2) — TOOL NUMBERS, the same REFERENCE/forward-authorable shape as the goto family
+// above (a `(def.type, field)` table for the same name-collision reason): `tool.n` / `toolsel.toolNum` name a
+// tool-library entry (settings.atc.tools[]) that lives OUTSIDE the stack entirely (declared in Settings, not
+// by any block on this canvas) — so unlike matchvar/atomType (a reference to a thing that must ALREADY exist
+// IN THIS STACK), referencing a tool number nobody has catalogued yet is legitimate authoring, not a mistake
+// (the owner's own standing rule: machine configuration is theirs). `allowNew: true`, same as goto — the
+// TRAFFIC LIGHT (pickerField.js's own getText()) says "not in your tool table" instead of refusing it.
+// ⛔ `tooloffset.tool` was NOT added here despite BACKLOG #47's own dispatch naming it under this tier: its
+// default (`measure.js`, `tool: '#1300'`) is a REGISTER REFERENCE (the currently-loaded tool, dialect vars.
+// toolTable-relative), not a catalogued tool NUMBER — BACKLOG #47 itself originally listed `tooloffset.tool/
+// value` under item 2 (macro-var names), not item 3 (tool/pin numbers); the dispatch's own tier grouping
+// mis-sorted it. ⚠ Tried the OTHER obvious fix too (routing it to assign.var's own combo/traffic-light
+// mechanism, since its shape genuinely matches) and REVERTED it: `classify(1300)` (data/varMap.js) resolves to
+// `camsetting`, not `scratch`/`uservar`, so the traffic light would show "⚠ camsetting register — not free
+// scratch/user space" on the field's OWN correct, unedited default — every freshly-dropped `tooloffset` block
+// would open already warning, which is exactly the noise the traffic light was built to avoid on a clean case
+// (comboField.js's own header: "a plain scratch/uservar value stays exactly as typed, no decoration"). Left
+// untouched (plain text, unchanged) — a real follow-up exists (`tooloffset.value`, default `'#102'`, has the
+// identical tension) but deciding it needs the file in hand at that time, not a reflexive reuse here.
+const TOOL_TARGET_FIELDS = { tool: 'n', toolsel: 'toolNum' };
+// t2453 (BACKLOG #47 tier 2) — I/O PIN NUMBERS: `outpin.pin` / `waitinput.pin` share a bare field NAME across
+// OPPOSITE meanings (output vs input — the exact `LABEL_TARGET_FIELDS`-style collision), and `probe.port`
+// names a THIRD field for the same input concept (`ui/ioTable.js`'s own INPUT_TYPES already catalogues a
+// `type:'probe'` row for this exact pin). `settings.inputs`/`settings.outputs`' own `.pin` field IS the same
+// raw numbering space these blocks emit (`ui/ioTable.js`'s own header: "Pin ranges: inputs 1-24, outputs
+// 1-20" — matching outpin.js's own "DDCS raw outputs are pins 0-20" comment) — one source, not re-derived.
+// Same REFERENCE/forward-authorable ladder rung as tool numbers: an uncatalogued pin is legitimate (the
+// owner's machine, not yet fully catalogued in Settings), never a closed gate.
+const IO_TARGET_FIELDS = { outpin: { field: 'pin', kind: 'output' }, waitinput: { field: 'pin', kind: 'input' }, probe: { field: 'port', kind: 'input' } };
+// t2453 (BACKLOG #47 tier 3) — `flip.setup`: established WITH THE FILE IN HAND (transform.js) that this is the
+// CLOSED rung, not goto's forward-authorable one, despite superficially looking like the same "reference a
+// sibling block's own number" shape label targets are. Two reasons, not just "the dispatch's own hunch":
+// (1) a `setup` block is a whole SECTION boundary a user builds (title + its own child ops) BEFORE it means
+// anything to flip — unlike a `label`, a lightweight one-field marker commonly dropped inline ahead of the
+// jump that targets it, there is no ordinary authoring flow where you'd type "flip setup 3" before setup 3's
+// own boundary exists to flip; (2) setups are FEW (a two-sided job has exactly 2, rarely 3+), so closing this
+// picker costs no real workflow flexibility the way closing goto would (forward jumps in a long linear
+// program are routine; referencing a not-yet-built setup section is not). A typo here is the entry's own
+// "worst failure mode" (the flip silently never applies, wrong side gets cut) — closing the picker removes
+// that whole class rather than merely warning about it.
+const SETUP_TARGET_FIELDS = { flip: 'setup' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],
@@ -307,6 +348,9 @@ export function fieldKind(def, field) {
     }
     if (def.kind === 'formfield' && (field === 'matchvar' || field === 'atomType' || field === 'whenparam')) return 'picker';
     if (LABEL_TARGET_FIELDS[def.type] === field) return 'picker';   // t2395 (BACKLOG #47 item 1) — the goto family, see LABEL_TARGET_FIELDS' own header
+    if (TOOL_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — tool numbers, see TOOL_TARGET_FIELDS' own header
+    if (IO_TARGET_FIELDS[def.type] && IO_TARGET_FIELDS[def.type].field === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — I/O pin numbers, see IO_TARGET_FIELDS' own header
+    if (SETUP_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 3) — flip.setup, CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
     // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
     // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
     // scope" — a signal genuinely unique to this pattern (an ordinary numeric Z field defaults to a NUMBER,
@@ -412,6 +456,17 @@ function jsonDef(def) {
         // field name the way matchvar/atomType/whenparam's already is; routed to the shared 'label' enumeration
         // instead, with `allowNew` (forward-authorable: a typed number with no matching label still commits).
         else if (k === 'picker' && LABEL_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'label', allowNew: true, tooltip: desc });
+        // t2453 (BACKLOG #47 tier 2) — same fixed-pickKind shape as the goto branch just above (the field's own
+        // NAME varies per block — n/toolNum — so pickKind can't be derived from it the way the generic fallback
+        // below does); REFERENCE, forward-authorable (allowNew), see TOOL_TARGET_FIELDS' own header.
+        else if (k === 'picker' && TOOL_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'tool', allowNew: true, tooltip: desc });
+        // t2453 (BACKLOG #47 tier 2) — I/O pins: `pinKind` carries input-vs-output PER BLOCK TYPE (outpin.pin
+        // and waitinput.pin share the bare field name 'pin' but mean opposite things — see IO_TARGET_FIELDS'
+        // own header); also REFERENCE, forward-authorable.
+        else if (k === 'picker' && IO_TARGET_FIELDS[def.type] && IO_TARGET_FIELDS[def.type].field === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'pin', pinKind: IO_TARGET_FIELDS[def.type].kind, allowNew: true, tooltip: desc });
+        // t2453 (BACKLOG #47 tier 3) — flip.setup: CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
+        // for why this is the must-match rung, not the forward-authorable one tool/pin/goto all use.
+        else if (k === 'picker' && SETUP_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'setup', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });

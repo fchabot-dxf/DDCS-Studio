@@ -65632,3 +65632,108 @@ Tier: doc-only for #25 (`BACKLOG.md`) — nothing to gate.
 
 Files: `BACKLOG.md`.
 
+## t2453 — BACKLOG #47 TIERS 2-3: tool/pin-number pickers (REFERENCE, forward-authorable) + `flip.setup`
+(CLOSED, must-match) — one mis-sort corrected, one field left deliberately untouched
+
+Reused t2395's own field machinery, per the dispatch's own instruction, rather than inventing a third field
+class: `pickerField.js`'s `allowNew` REFERENCE mode (goto's own shape) for tool/pin, extended with a NEW
+traffic-light `getText()` decoration borrowed from `comboField.js`'s own 'var' kind (neither field alone had
+BOTH "offer a picker + accept a typed miss" AND "warn visibly on the miss" — the dispatch explicitly asked for
+both, so this turn combines them rather than picking one).
+
+### Tier 2 — tool numbers: `tool.n` / `toolsel.toolNum`
+
+New `TOOL_TARGET_FIELDS` table (bridge.js, same `(def.type, field)` shape as `LABEL_TARGET_FIELDS` — the field
+NAME differs per block, same collision risk). Routed to `field_picker`, `pickKind:'tool'`, `allowNew:true`.
+`pickerField.js`'s `_candidates()` gained a `'tool'` branch reading `getToolLibrary()` (`wizards/toolPicker.js`
+— the SAME source `formWidgets.js`'s own tool-library picker already reads, confirmed via that file's own
+import line, not re-derived) — candidates are `{value,label}` objects now (`T3 · 6mm Ball Nose (Ø6) · ⌐`,
+value=the bare T#), a new shape `showEditor_()` normalizes so the four PRE-EXISTING plain-string kinds
+(matchvar/atomtype/whenparam/label) stay byte-identical (confirmed: `(c && typeof c==='object') ? c : {value:c,
+label:c}`).
+
+**`tooloffset.tool` was explicitly NOT added here**, despite the dispatch naming it under this tier. Read the
+file first (`measure.js`): its default is `'#1300'`, a REGISTER reference (the currently-loaded tool, read via
+`dialect.vars.toolTable`-relative addressing), not a catalogued tool NUMBER — BACKLOG #47's own ORIGINAL item
+list (not this turn's dispatch) already had it correctly under item 2 (macro-var names), never item 3. **Tried
+the var-combo fix too and reverted it**: `classify(1300)` (`data/varMap.js`) resolves to `camsetting`, so
+reusing `assign.var`'s own mechanism would show "⚠ camsetting register — not free scratch/user space" on the
+field's own correct, UNEDITED default — every freshly-dropped `tooloffset` block would open already warning,
+which is exactly the noise the traffic light was built to avoid on a clean case (comboField.js's own header:
+"a plain scratch/uservar value stays exactly as typed, no decoration"). Left untouched, plain text, unchanged
+behavior — named as a real follow-up (`.value` has the identical shape/tension) but not decided reflexively.
+
+### Tier 2 — I/O pin numbers: `outpin.pin` / `waitinput.pin` / `probe.port`
+
+New `IO_TARGET_FIELDS` table, this time carrying a per-block `kind` ('input'/'output') alongside the field name
+— `outpin.pin` and `waitinput.pin` share the bare name 'pin' for OPPOSITE meanings (the exact
+`LABEL_TARGET_FIELDS` collision, one level deeper). `pickKind:'pin'` reads `getOutputs()`/`getInputs()`
+(`ui/settingsPanel.js` — same source `formWidgets.js`'s own declared-I/O picker reads) filtered to rows with a
+real `.pin` (unset rows excluded — nothing useful to offer). **Confirmed the numbering space actually matches**
+before wiring anything: `ui/ioTable.js`'s own header comment ("Pin ranges: inputs 1-24, outputs 1-20") lines up
+exactly with `outpin.js`'s own comment ("DDCS raw outputs are pins 0-20") — same declared space, not
+independently-numbered lists that happen to share a field name. `probe.port` maps to the `input` kind —
+`ui/ioTable.js`'s own `INPUT_TYPES` already catalogues a `type:'probe'` row for exactly this pin, and the
+DEFAULT SETTINGS seed one (`{id:'probe', label:'3D Probe', pin:3}`) that matches `probe.port`'s own default
+(`3`) exactly — confirmed live, a fresh `probe` block shows CLEAN (no warning) out of the box, not a
+false-positive on the common case.
+
+`probe.port`'s own comment ("accept literals OR #var/[expr] refs") was checked before converting it from a
+value-socket to a field: `allowNew`'s free-typing already covers typing `#5` or `[expr]` as a string (same
+capability a `math_number` shadow's own literal-entry gave); the only thing lost is PLUGGING IN a separate
+value-producing block into the socket, which nothing in this codebase currently wires for `probe.port` (a plain
+shadow, like every other numeric field here) — behavior-equivalent for its documented use, not a regression.
+
+### Tier 3 — `flip.setup`: established CLOSED, not goto's forward-authorable rung — with the file in hand
+
+The dispatch explicitly asked this be decided, not assumed. Read `transform.js` before ruling: a `setup` block
+is a whole SECTION boundary (title + its own child ops) a user builds BEFORE it means anything to a flip —
+unlike a `label` (a lightweight one-field marker routinely dropped inline AHEAD of the jump that targets it,
+making forward-authoring completely ordinary for goto), there's no realistic authoring order where someone
+types "flip setup 3" before setup 3's own boundary exists to flip. Setups are also FEW (a two-sided job has
+exactly 2, rarely 3+) — closing this picker costs no real workflow flexibility the way closing goto would
+(routine forward jumps in a long linear program vs. referencing a section that doesn't exist yet). New
+`SETUP_TARGET_FIELDS` table, routed WITHOUT `allowNew` — `_candidates()`'s `'setup'` branch reads every `setup`
+block's own `index` off its value-socket shadow (`setup.index` defaults to a number, so `fieldKind()` classifies
+it 'value' the same as `label.n` — read via `b.getInput('INDEX').connection.targetBlock().getFieldValue('NUM')`,
+the identical shape t2395 already established for labels). No traffic light on this one — a closed picker's
+value can only ever BE a live candidate, so there's nothing to warn about.
+
+### VERIFIED
+
+Live, via `stackToWorkspace` (the app's own real deserialization path, not a hand-built Blockly harness):
+`tool.n=1` (matches T1 in the seeded library) shows CLEAN, `tool.n=99` shows "99 ⚠ not in your tool table" on
+the block FACE (not just a tooltip); `outpin.pin=0` (uncatalogued in default settings) shows "⚠ not a declared
+I/O pin"; `probe.port=3` shows CLEAN (matches the seeded 3D Probe input); `flip.setup`'s picker lists real
+`setup` indices from the stack with NO "type a new number" affordance (screenshot-confirmed: `filter…`, not
+`filter, or type a new number…`). Screenshots: `t2453-1-traffic-light-face.png` (both warnings visible
+in-canvas), `t2453-2-tool-picker-popup.png` (the real 4-tool library, rich labels + tip glyphs, "filter, or type
+a new number…" placeholder confirming forward-authoring stayed live), `t2453-3-flip-setup-closed-picker.png`
+(two real setup indices 1/2, plain "filter…" placeholder). Round-trip proven: `stackToWorkspace` →
+`workspaceToStack` on a stack touching all 6 new/changed fields came back byte-identical (params re-stringified,
+values unchanged — `tool.n`/`outpin.pin`/`probe.port`/`flip.setup` moved from number-stored to string-stored,
+confirmed inert everywhere actually consumed: `num()`/`getTool()`/`flipForSetup()` all `Number(...)`-coerce
+already, grepped no other consumer of `tool.n` exists). Emit byte-identical for an untouched, fully-catalogued
+canvas (T1/pin 5/port 3/setup 1 all emit their exact same G-code lines as before — `fieldKind()` changes affect
+CANVAS RENDERING only, never the `{type,params}` stack shape emit reads). `test:node` reran 238/238 (the Blockly
+canvas field routing this turn touched is unrelated to that gate's own wizard-panel snapshot).
+
+### Tier — broadened manually, per the dispatch's own explicit warning
+
+`npm run test:changed` caught **0 tests** — confirms the dispatch's own warning a third time over (t2439,
+t2445, t2447 already showed this exact blind spot): `bridge.js`/`pickerField.js` are reached only via
+browser-side dynamic `import()` inside `page.evaluate()`, invisible to `--only-changed`'s Node-side static
+graph. Grepped for the actual blast radius rather than guessing a subset: 148 of 896 spec files touch the
+Blocks canvas broadly (`showApp('blocks')` / `__blkws` / `stackToWorkspace` / `bridge.js` itself). Given
+`bridge.js`+`pickerField.js` are exactly t2395's own "Rule 1b" shared-file set (that turn's own WORK-LOG:
+"Full suite (Rule 1b — bridge.js/pickerField.js/comboField.js/userOps.js/devMode.js all shared)"), and this
+turn touches the SAME two files again, followed the SAME established rule rather than deciding a narrower scope
+fresh: **full suite**, not the 148-file subset.
+
+**Result: 3000 passed, 0 failed, 13 flaky (all recovered on retry), 26 skipped — 31m25s.**
+
+Files: `web/blocks/blockly/bridge.js` (`TOOL_TARGET_FIELDS`, `IO_TARGET_FIELDS`, `SETUP_TARGET_FIELDS`, their
+`fieldKind()`/`jsonDef()` routing), `web/blocks/blockly/pickerField.js` (`pinKind` config, the `'tool'`/`'pin'`/
+`'setup'` `_candidates()` branches, the traffic-light `getText()`, `showEditor_()`'s `{value,label}`
+normalization).
+
