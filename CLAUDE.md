@@ -24,6 +24,7 @@ delivery mechanism. **Open it now.**
 | ⭐ [`context/SEATS.md`](context/SEATS.md) | **who reaches which controller, from where** — and the VS Code setup |
 | [`context/SETUP.md`](context/SETUP.md) | the studio, and home. what is wired to what. ⛔ the safety rules |
 | [`context/CHANNELS.md`](context/CHANNELS.md) | the vendor and the community — what is pending with each |
+| [`context/VERIFICATION.md`](context/VERIFICATION.md) | **which suite to run and what it costs** — the tier policy, where to watch progress, and the two traps that silently disable the tooling |
 
 ⛔ **These are NOT project documentation.** They are the *operating context* — where the work happens, on what
 hardware, with whom. The project itself is documented in `ROADMAP.md`, `ARCHITECTURE.md`, `BACKLOG.md`, and
