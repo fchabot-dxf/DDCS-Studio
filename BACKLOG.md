@@ -2637,7 +2637,25 @@ shipped placeholders (or feed the controller's eng into the allocator, which is 
 
 ---
 
-### 30. THE WIZARDS-AS-DATA EQUIVALENCE PROOFS ARE EXPERT-ONLY — V4.1 and V3/DM500 are never compared
+### 30. [✅ SHIPPED t2303, 2026-08-27, commit `135c83b5` — ⚠ this doc entry was never updated to say so, causing a
+wasted t2455 dispatch; re-verified far MORE thoroughly than the original ship, still zero divergences, 2026-08-31]
+THE WIZARDS-AS-DATA EQUIVALENCE PROOFS ARE EXPERT-ONLY — V4.1 and V3/DM500 are never compared
+
+⚠ **t2455 dispatched this as "turn 1" of a new arc**, unaware t2303 already shipped it — this doc entry simply
+never got its SHIPPED header. All 5 `*-as-data` specs (drill/bore/slot/text/atc-warmup) already carry
+cross-dialect coverage across all 7 registered dialects (t2303's own WORK-LOG: "clean everywhere, no divergence
+found, one file [slot] already covered"). Re-verified at t2455, going well beyond a re-run:
+- The 5 existing cross-dialect tests still pass, unchanged, 4 days later (10/10 green).
+- **Skeptically verified the mechanism itself isn't a silent no-op** (the dispatch's own explicit ask): emitted
+  the SAME stack under all 7 dialects directly — 6 of 7 produced genuinely DIFFERENT text (dwell syntax, M-code
+  casing, comment gating), proving `{profileId}` really threads through `emitMapped` rather than silently
+  falling back to one dialect for every comparison.
+- **Directly confirmed the DM500 `ifgoto` ground truth** this entry itself cites (vendor: space before GOTO, no
+  space around the operator) against a LIVE emit, not just the source: `IF #4LT#3 GOTO5`, exact match.
+- **Went past t2303's own representative-slice checks to the FULL sweep × all 7 dialects** for every op (441
+  total combos: drill 140, bore 70, slot 35, text 140, atc-warmup 56) — zero divergences found anywhere.
+
+No divergences found, at any depth checked. See WORK-LOG t2455 for the full account.
 
 *(raised by the owner 2026-08-26, twice; measured by the advisor the same day)*
 

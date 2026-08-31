@@ -65737,3 +65737,81 @@ Files: `web/blocks/blockly/bridge.js` (`TOOL_TARGET_FIELDS`, `IO_TARGET_FIELDS`,
 `'setup'` `_candidates()` branches, the traffic-light `getText()`, `showEditor_()`'s `{value,label}`
 normalization).
 
+## t2455 — BACKLOG #30's "turn 1" was ALREADY SHIPPED (t2303, 2026-08-27) — dispatch was working from a stale
+BACKLOG.md entry AGAIN (third time this session: #25 at t2451, #47's own tier-1 heading before t2453); re-
+verified far more thoroughly than the original ship rather than repeating it, corrected the doc
+
+Dispatched as "NEW ARC, turn 1 is BACKLOG #30" with a detailed plan to add V4.1/DM500 to each `*-as-data`
+spec's cross-dialect sweep. **All 5 already have it** — `grep -l "cross-dialect\|listPosts" tests/*as-data*.spec.js`
+returns all 5 files; `git log` on `drill-as-data.spec.js` shows `135c83b5 "t2303 Part 1 (BACKLOG #30): V4.1/DM500
+dialects in the *-as-data equivalence sweeps"`, already an ancestor of this branch's HEAD. t2303's own WORK-LOG:
+checked each of the 5 named files individually rather than assuming the dispatch's "every spec is ZERO" claim
+held uniformly, found `slot-as-data.spec.js` already fully covered (a correction against that turn's own
+dispatch too), added cross-dialect tests to the other 4, and reported **zero divergences found anywhere**.
+
+**The dispatch's own "STILL REAL IF" check has a real blind spot, worth naming**: `grep -l "ddcs-v41\|dm500"
+tests/*as-data*.spec.js` (the literal check BACKLOG #30 itself specifies) returns only `bore-as-data.spec.js` —
+because the other 4 files' cross-dialect tests call `listPosts()` and iterate generically, never naming
+`ddcs-v41`/`dm500` as literal strings. The check is a false negative for exactly the fix it's meant to detect;
+noting this so a future re-check of this entry doesn't repeat the same false "still open" read the dispatch
+itself likely made.
+
+**Did not just re-run t2303's own tests and declare done — the CURRENT dispatch's own framing is more
+demanding than "confirm coverage exists"**: *"finding DIVERGENCES is the point... a clean first pass would be
+a SUSPICIOUS result... if everything matches immediately, verify the sweep genuinely exercises the other
+dialects rather than silently falling back to Expert, and say how you proved it."* Took that literally, three
+ways:
+
+1. **Confirmed the 5 existing cross-dialect tests are still green**, unchanged, 4 days after t2303 shipped them
+   (`drill/bore/slot/text/atc-warmup-as-data.spec.js`, 10/10 passed).
+2. **Proved `{profileId}` genuinely threads through `emitMapped`**, rather than the sweep comparing two sides
+   that both silently fell back to one dialect (which would make "0 diffs across 7 dialects" worthless — both
+   sides could be wrong the SAME way): emitted the identical drill stack under all 7 registered dialects
+   directly — **6 of 7 produced genuinely different text** (DM500's `G04 P3000` vs the others' `G04 P3`/`G4 P3`
+   dwell syntax; grbl's own comment-gating wraps the depth-register line differently). Real, visible per-dialect
+   branching, not a coincidence of identical output.
+3. **Directly checked the DM500 `ifgoto` ground truth BACKLOG #30 itself cites** (vendor evidence: a space
+   before `GOTO`, no space around the operator) against a LIVE emit rather than trusting the source read alone:
+   `emitMapped([{type:'ifgoto', params:{lhs:'#4', op:'<', rhs:'#3', goto:5}}], {profileId:'ddcs-v3-dm500'})` →
+   `"IF #4LT#3 GOTO5"`, an exact match. (First attempt used the wrong internal op key — `'lt'` instead of `'<'`
+   — and got the DIALECT's own literal op-string fallback, `"IF #4lt#3 GOTO5"`; traced to `ifGotoBlock`'s own
+   default `op: '!='` in `flow.js` before re-testing with the correct key — a test bug on my own first pass, not
+   a Studio defect, caught before trusting it.)
+
+**Went past t2303's own coverage, not just past its claim**: t2303's cross-dialect tests each use a SMALL
+REPRESENTATIVE SLICE of their own file's full sweep (drill: 3 of ~20 entries; bore: 2 combos × 4 dialects;
+slot: 2 of its own full set; text/atc-warmup: 3 of their own full sets) — reasonable for a first pass, but not
+exhaustive. Ran the FULL sweep from each file's own main equivalence test × ALL 7 dialects instead:
+
+```
+drill        20 sweep entries × 7 dialects = 140 combos — 0 diffs
+bore         10 combos        × 7 dialects =  70 combos — 0 diffs
+slot          5 combos        × 7 dialects =  35 combos — 0 diffs (broadened past the file's own 2-entry rep set)
+text         20 sweep entries × 7 dialects = 140 combos — 0 diffs
+atc-warmup    8 sweep entries × 7 dialects =  56 combos — 0 diffs
+──────────────────────────────────────────────────────────────
+TOTAL                                        441 combos — 0 diffs
+```
+
+**Report: zero divergences found, at every depth checked** — the existing coverage, a direct proof the
+mechanism isn't a silent no-op, a live ground-truth spot-check, and an exhaustive full-sweep run 21x larger
+than t2303's own combined cross-dialect combo count (441 vs t2303's original ~21+8+14+21+24). Per the dispatch's
+own instruction ("do NOT fix divergences... find them, hand back the list"), there is no list — an honest
+report, not a manufactured one.
+
+**Corrected `BACKLOG.md`'s #30 entry** to `[✅ SHIPPED t2303 / re-verified far more thoroughly t2455]`, and named
+the "STILL REAL IF" grep's own blind spot in the doc so a future re-check doesn't repeat it.
+
+**A pattern worth flagging plainly, not just fixing quietly a third time**: this is the THIRD stale-BACKLOG-
+header dispatch this session (#25 at t2451, #47's silent-on-tier-1 heading caught by the advisor's own sweep
+before t2453, now #30) — all three were the SAME shape: real work shipped in a prior turn, the entry's own
+`###` header never updated to say so. Worth the advisor's own attention as a doc-hygiene gap in the SHIPPED-
+marking step itself, not just three isolated misses.
+
+No code changes — doc-only (`BACKLOG.md`) plus a scratch verification file, deleted before commit, not part of
+this turn's diff. `git status` confirms zero `tests/`/`web/` files changed by this turn.
+
+Tier: doc-only — nothing to gate.
+
+Files: `BACKLOG.md`.
+
