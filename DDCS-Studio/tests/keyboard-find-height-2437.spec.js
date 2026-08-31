@@ -53,6 +53,10 @@ test('opening the editor find bar under an active keyboard gives the editor real
 
   const lines = Array.from({ length: 80 }, (_, i) => (i === 60 ? 'FIND_ME_TARGET' : i === 65 ? 'FIND_ME_SECOND' : `N${i} G1 X${i} Y${i}`));
   await page.evaluate((text) => { const ed = document.getElementById('editor'); ed.value = text; ed.dispatchEvent(new Event('input', { bubbles: true })); }, lines.join('\n'));
+  // t2439 — a settle wait for the editor's own pre-existing background content pass (unrelated to find; it
+  // runs after any content load) BEFORE interacting, so it can't race the cursor/selection this test reads —
+  // see tests/find-bar-focus-corruption-2439.spec.js's own header for the full story.
+  await page.waitForTimeout(1500);
 
   await simulateKeyboard(page, 300);
 

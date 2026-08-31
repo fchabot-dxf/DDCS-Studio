@@ -76,7 +76,16 @@ export function installEditorFind() {
         if (!matches.length) return;
         current = cycleIndex(0, idx, matches.length);   // idx already carries the target index (not a delta) at every call site — cycleIndex(0, idx, n) wraps it the same way the old modulo did
         const m = matches[current];
-        ed.focus();   // #editor carries inputmode="none" (suppresses the OS keyboard) — focusing it is safe/expected here, the same as editorAutocomplete.js's own insert-then-focus
+        // t2439 ⛔⛔ URGENT REGRESSION FIX (data-corrupting, owner-reported): `goTo` runs on EVERY keystroke —
+        // the `input` listener below calls it after every character typed, not just on an explicit Enter/
+        // arrow cycle. The `ed.focus()` this line used to carry (t2383's own original code, present since the
+        // very first version of this file, never actually exercised char-by-char before now — see WORK-LOG
+        // t2439) moved DOM focus from THIS input to the editor textarea after the FIRST match was found — so
+        // every keystroke after that landed in the user's G-code program instead of the search box. A
+        // textarea's selection range and scroll position are plain DOM properties, independent of focus —
+        // `setSelectionRange`/`scrollTop` below still visibly highlight the match in a BLURRED textarea
+        // (confirmed live), so dropping the focus() call keeps the exact same visual "match highlighted in
+        // the code" behavior while the find input — and every subsequent keystroke — never moves.
         ed.setSelectionRange(m.start, m.end);
         scrollToOffset(m.start);
         renderCount();

@@ -65081,3 +65081,95 @@ failed, 0 flaky) before trusting this.
 Files: `web/app.js`, `web/styles.css`, `web/ui/editorFind.js`, `web/blocks/blockCanvasFind.js`,
 `tests/keyboard-find-height-2437.spec.js` (new).
 
+## t2439 ⛔⛔ URGENT REGRESSION, DATA-CORRUPTING — SHIPPED FIX: the editor find bar was typing search
+queries into the user's own G-code program
+
+Owner, deployed V2026.08.30.11, desktop: "the search bar doesnt let me write a whole word, after first
+letter the carret jumps to editor and writes in the code." A follow-up screenshot showed the actual damage:
+line 12 of a real open program read `Iffff#44` instead of `IF #44` — three stray characters landed IN THE
+PROGRAM from typing a search query. Treated as the top item ahead of anything else queued, per the dispatch's
+own framing: this is not a usability bug, it is silent corruption of the thing the app exists to protect.
+
+**Root cause, confirmed by direct code reading before touching anything.** `ui/editorFind.js`'s `goTo()` runs
+on EVERY keystroke — the `input` listener calls `refresh(); if (matches.length) goTo(...)` after each
+character typed, not just on an explicit Enter/arrow cycle — and `goTo()` carried `ed.focus()`: t2383's own
+original code, present since the very first version of this file, apparently never actually exercised
+character-by-character before this. The moment the FIRST match was found (almost any non-trivial query
+matches something in a real program), DOM focus moved from the find input to the editor textarea. Every
+keystroke after that was then routed by the BROWSER ITSELF to wherever focus currently sat — the textarea —
+and inserted directly into the G-code. `#editor`'s own `inputmode="none"` only suppresses the on-screen
+mobile keyboard; it has no effect on a desktop hardware keyboard, so this was ALWAYS a live hazard on desktop,
+just never triggered by any of this session's own prior verification (see below for why).
+
+**A mid-task amendment (owner's own second screenshot) independently narrowed the mechanism before I'd
+finished writing it up, and it matched exactly**: the find input SURVIVED and kept its value (still showed
+`f`, count still read `1/20`) while stray characters landed in the editor — ruling out a DOM-node replacement
+and confirming focus moved away from a still-live input. The amendment also noted Chrome's own spellcheck
+popup appeared over the code, corroborating the editor genuinely received real keystrokes, not just a moved
+caret. This is independent confirmation of the exact `ed.focus()` mechanism already found and fixed by the
+time the amendment landed.
+
+**Why NOTHING caught this across three turns of this session's own find-bar verification (t2383/t2435/t2437,
+and my own first draft of THIS turn's test).** Every prior test set the find input's `.value` directly and
+dispatched ONE synthetic `input` event — `inp.value = 'query'; inp.dispatchEvent(new Event('input'))`. This
+fires the listener once with the complete query already in place, and crucially does NOT route through the
+browser's own focus-dependent keystroke delivery the way real typing does — there is no "second keystroke" to
+misroute when the whole string lands in one synthetic event. `page.keyboard.type()` (Playwright's own
+real-keystroke API — sequential keydown/keyup delivered to whatever element currently holds DOM focus) is the
+only way this class of bug reproduces at all, and nothing in this session used it for a find bar until now.
+Logged as a real gap in this session's own testing methodology, not just this one bug's own cause.
+
+**The fix is structural, not a re-focus patch** (the dispatch's own explicit instruction: re-focusing after
+every keystroke would paper over a re-render that should not be stealing focus, and would still drop
+characters in the race). `goTo()` no longer calls `ed.focus()` at all. A textarea's selection range and scroll
+position are plain DOM properties, independent of focus — confirmed directly (`ed.setSelectionRange()` on an
+unfocused textarea persists exactly as set, verified via a live probe before trusting it) — so
+`setSelectionRange`/`scrollTop` still move the visible match in the editor exactly as before, with the find
+input keeping focus for the entire interaction: typing AND cycling matches with Enter/arrows.
+
+**Canvas find bar checked too, per the dispatch's own explicit instruction — not assumed clean from reading
+the code.** `blocks/blockCanvasFind.js`'s own `goTo()` never called `.focus()` on anything besides its own
+input inside `open()` (a one-time call when the bar opens, not per-keystroke), so it was never exposed to this
+mechanism — verified with the same real-keystroke methodology (`page.keyboard.type('radius')`,
+`page.keyboard.press('Enter')` ×2), model stayed byte-identical, focus never left `.blk-find-input`.
+
+**Verified live — the acceptance test the dispatch named as what was missing.** New file
+`tests/find-bar-focus-corruption-2439.spec.js`: typed `FINDME`/`radius` character-by-character via
+`page.keyboard.type()` into both bars, confirmed `document.activeElement` never left the find input at any
+point, confirmed the full query landed correctly in the find box, and — the real acceptance test — confirmed
+the program (editor `.value`) / block model (`ddcsGetBlockProgram()`) is BYTE-IDENTICAL to its state before
+typing, both after typing the full query and after cycling matches with two real Enter presses.
+
+**A test-timing race exposed (not caused) by this fix, run down before trusting the result.** Removing
+`ed.focus()` from `goTo()` broke an EXISTING test (`keyboard-find-height-2437.spec.js`'s own "editor find bar"
+test) that had been passing reliably — it started reading the WRONG matched line (79, the last line, instead
+of 60). Traced directly: the editor has a pre-existing background content-sync pass (`editorManager.js`'s
+`syncText`, wired to the SAME `input` event) that appears to interact with a debounced reformatter elsewhere
+in the app (unrelated to find — observed independently: loading raw seed content and reading it back shortly
+after showed `N0 `-prefix stripping and a default feed rate injected, a normalization pass, not find-related).
+That test's OWN timing left too little margin between seeding content and reading the selection; focusing
+`ed` inside the OLD `goTo()` had been *incidentally* eating enough time to dodge the race, not by any
+deliberate "skip while focused" design (confirmed: `setSelectionRange` itself is unaffected by focus, ruling
+out that path directly). Fixed by adding the same settle-wait margin `find-bar-focus-corruption-2439.spec.js`
+already uses after seeding content — a TEST-side timing fix, not a product change, verified 3× clean after
+the fix (once serialized to rule out cross-file worker contention as a separate factor).
+
+**Tier — per the new `context/VERIFICATION.md` policy** (this session's own first turn under it): this fix
+touches only `web/ui/editorFind.js` (JS), so `test:changed` + `test:node` per the policy's own JS/test-changes
+row, not the full suite. `test:changed` selected only the 2 files I directly touched (`--only-changed`'s
+import-graph tracking doesn't see `editorFind.js`'s browser-side dynamic `import()` — a real, noted gap for
+this app's architecture: Playwright's own static graph can't see which OTHER spec files exercise a
+browser-loaded module they never `import` at the Node level). Manually broadened the run to the other 3
+find-bar-adjacent spec files (`editor-find-2383`, `block-canvas-find-2435`, `keyboard-find-height-2437`) to
+cover what the bare tier missed, given this is a data-corruption fix where thoroughness matters most — 13/13
+clean serialized, and clean in 2 of 3 parallel-batch runs (the one batch failure was a documented worker-
+contention flake, not a repro of anything real: an immediate re-run came back 13/13 clean again).
+`test:node` surfaced ONE pre-existing red, `preview-spec-gate-1688.test.mjs` (an `onDrag`/`onDragEnd` panel
+golden-snapshot mismatch, unrelated to find bars entirely) — confirmed pre-existing by A/B: `git checkout HEAD
+-- web/ui/editorFind.js tests/keyboard-find-height-2437.spec.js`, re-ran, IDENTICAL failure at HEAD before
+this turn's own change existed; restored my actual files from a scratch backup afterward and confirmed
+byte-identical restoration before trusting it.
+
+Files: `web/ui/editorFind.js`, `tests/find-bar-focus-corruption-2439.spec.js` (new),
+`tests/keyboard-find-height-2437.spec.js`.
+
