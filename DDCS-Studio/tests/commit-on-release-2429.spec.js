@@ -25,8 +25,7 @@ import { test, expect } from '@playwright/test';
  * EVERY drag frame, orphaning whichever closure computed the previous frame's pending value before `onDragEnd`
  * ever got called on it.
  *
- * ⚠ SCOPE — narrower than originally intended, two exclusions found live and kept rather than chased blind
- * (the dispatch's own instruction: stop and report rather than restructure "five turns of hard-won" machinery):
+ * ⚠ SCOPE, t2429 — ONE exclusion remains deliberately untouched, ONE was resolved two turns later (t2447):
  *
  * 1. Corner's own `repoGroups`/`spotStore` reposition-chain (t120-t122): dragging one datum-relative marker
  *    freezes every OTHER marker's world into `spotStore`, which a separate derive-and-write (the "#23/#24
@@ -34,21 +33,23 @@ import { test, expect } from '@playwright/test';
  *    mechanism assumes every frame's write lands in the model synchronously; deferred to a single release-time
  *    commit, the frozen marker's own screen position visibly drifted mid-drag (confirmed live, then fixed by
  *    excluding it — `spotOnDrag`'s own `dragged` check now forces an immediate, every-frame commit for exactly
- *    these handles, unchanged from before this turn).
+ *    these handles). STILL EXCLUDED, deliberately not revisited at t2447 either — see
+ *    `corner-marker-independence.spec.js`'s own 5 tests, which protect exactly this.
  *
- * 2. 'move'-kind handles generally (`point`/`diagAim`/`translate` gesture types — the only ones FeatureCanvas
- *    renders `kind:'move'` for, and the ONE kind its own pointermove handler runs `_snapToAnchor` against every
- *    frame): committed the CORRECT final field values on release (verified directly against the DOM, for BOTH
- *    pocket's own `pk_pos` and surfacing's own `sf_pos` — the #46 dispatch's own original named handle) yet the
- *    CANVAS rendered the handle well short of the actual drag distance — for drags of every size tried, not an
- *    extreme edge case. Root not confirmed within this turn's own budget. Scoped out rather than shipped
- *    broken or the whole fix reverted: commit-on-release now applies to non-move gestures only
- *    (length/scaleX/shear/rect/radial/projLength/crossAim/probeVector — VERIFIED working, including pocket's
- *    OTHER named handle, `pk_size`). Move-kind handles keep committing every frame, unchanged from before this
- *    turn — #50's own fix (t2427) still coalesces a burst into one undo entry for them, so they are not worse
- *    off, just not yet on commit-on-release. Surfacing's own `sf_pos` — the bug's own original screenshot
- *    subject — is therefore STILL on the old every-frame-write behavior; named here rather than left to be
- *    silently rediscovered.
+ * 2. ⭐ 'move'-kind handles (`point`/`diagAim`/`translate`) — EXCLUDED at t2429, RESOLVED at t2447. At t2429,
+ *    a move-kind handle committed the CORRECT final value on release yet the CANVAS rendered it well short of
+ *    the actual drag distance (a 256px drag settling ~35px away) — root not confirmed within that turn's own
+ *    budget, so it was scoped OUT (kept on every-frame-commit, unchanged) rather than shipped broken. t2447
+ *    found the actual root, by MEASUREMENT (`?debug=feat`) per the dispatch's own hard-won instruction (this
+ *    bug had already outlived four advisor theories and one of t2429's own): NOT `_snapToAnchor`, NOT a
+ *    feedback loop — `featureCanvas.js`'s own auto-refit-when-idle (`render()`, `!_userAdjusted && !active`)
+ *    fires on the ONE render a deferred drag's `onDragEnd` causes (exactly when `active` has just gone null),
+ *    against a geometry that jumped in one step instead of drifting gradually across frames — landing the
+ *    fitted transform somewhere the frozen mid-drag one never anticipated. Fixed at the source
+ *    (`featureCanvas.js`'s own `_suppressFitOnCommit`, set only around a drag's own release-time commit) —
+ *    move-kind handles are now on commit-on-release like everything else; `canvasWidgets.js` no longer
+ *    special-cases them at all. Surfacing's own `sf_pos` — the #46 dispatch's own original screenshot subject
+ *    — is included (same generic mechanism, no per-op special-casing).
  *
  * Separately, the classic per-type wizard MODAL views (e.g. `surfacingView.js`'s own hand-rolled `setFields`)
  * are structurally untouched — they never read the new `opts` argument at all, so they're byte-identical
@@ -162,29 +163,89 @@ test('exactly ONE undo entry results from the whole drag, and it restores the pr
   expect(afterUndo, 'one undo restores the pre-drag value').toBe(80);
 });
 
-test('SCOPE BOUNDARY: a move-kind position handle (pk_pos) is NOT deferred — it still tracks the drag correctly by committing every frame, unchanged', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
-  await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = { show: true, x: 200, y: 150, z: 25, datum: 'nnp' }; s.preview = s.preview || {}; s.preview.default3D = false; });
-  await page.evaluate(() => window.openWiz('user_pocket_data'));
-  await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-  await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.setView) p.setView('2d'); });
-  await page.waitForSelector('#wiz_user svg [data-hid="pk_pos"]', { timeout: 8000 });
-  await page.waitForTimeout(200);
-  const posScreen = () => page.evaluate(() => { const el = document.querySelector('#wiz_user svg [data-hid="pk_pos"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+test('t2447: a move-kind position handle (pk_pos) is NOW ALSO deferred to commit-on-release — model frozen through the drag, canvas tracks every frame, no post-release snap-back', async ({ page }) => {
+  const featLines = [];
+  page.on('console', (msg) => { const t = msg.text(); if (t.startsWith('[featProbe]')) featLines.push(t); });
+
+  await bootPocket(page, true);
+
+  const modelOriginX = () => page.evaluate(() => window.ddcsGetBlockProgram().find((b) => b.type === 'op').params.originX);
+  const posScreen = () => page.evaluate(() => { const el = document.querySelector('.fc-handle[data-hid="pk_pos"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+
+  const beforeValue = await modelOriginX();
   const before = await posScreen();
-  await page.mouse.move(before.x, before.y); await page.mouse.down();
-  await page.mouse.move(before.x - 200, before.y + 160, { steps: 12 });
+
+  await page.mouse.move(before.x, before.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(before.x - i * 20, before.y + i * 15, { steps: 2 });
+    await page.waitForTimeout(20);
+    if (i === 6) {
+      // ⭐ THE ROOT this turn's own fix addresses: mid-drag, the MODEL (not the DOM field — the preview path
+      // deliberately UPDATES the DOM field every frame, that's what makes the canvas track the pointer live;
+      // see panelTypes.js's own _writeParam comment) must still be frozen at its pre-drag value.
+      expect(await modelOriginX(), 'mid-drag: the MODEL is still frozen at its pre-drag value').toBe(beforeValue);
+    }
+  }
   const mid = await posScreen();
   await page.mouse.up();
   await page.waitForTimeout(400);
   const after = await posScreen();
+  const afterValue = await modelOriginX();
+
+  console.log('=== featProbe rows (pk_pos, t2447) ===');
+  for (const l of featLines) console.log(l);
+
+  expect(afterValue, 'release: the model now holds the NEW, committed value').not.toBe(beforeValue);
+
   const movedMid = Math.hypot(mid.x - before.x, mid.y - before.y);
   const movedAfter = Math.hypot(after.x - before.x, after.y - before.y);
-  // this is the scope boundary this turn's own header comment names: a 'move'-kind handle keeps committing
-  // every frame (unchanged from before this turn), so its post-release screen position must match its own
-  // mid-drag position — a "landed short" gap here would mean the move-kind exclusion silently regressed.
-  expect(movedAfter, 'the handle\'s post-release position matches where the drag actually left it').toBeGreaterThan(movedMid - 5);
+  // t2447 — THE BUG t2429 excluded move-kind FOR: a deferred commit used to make the canvas visibly SNAP BACK
+  // toward its start on release (root: featureCanvas.js's own auto-refit-when-idle firing on the one render a
+  // deferred commit causes, against a geometry that just jumped in one step — see canvasWidgets.js's own
+  // comment for the full mechanism). This is the actual regression guard: post-release position must match
+  // where the live drag already correctly had it, not just "somewhere further than a small tolerance."
+  expect(movedAfter, "the handle's post-release position matches where the drag actually left it — no snap-back").toBeGreaterThan(movedMid - 5);
+  expect(movedMid, 'the canvas tracked the pointer substantially during the drag itself (not frozen)').toBeGreaterThan(100);
+});
+
+test('t2447: one undo restores BOTH the canvas and the value together for a move-kind handle drag (pk_pos)', async ({ page }) => {
+  await bootPocket(page, false);
+
+  const beforeValue = await page.evaluate(() => window.ddcsGetBlockProgram().find((b) => b.type === 'op').params.originX);
+  expect(beforeValue).toBe(0);
+
+  await page.evaluate(async () => {
+    const { onChange } = await import('/blocks/saveStates.js');
+    window.__t2447SnapCount = 0;
+    window.__t2447Unwatch = onChange(() => { window.__t2447SnapCount++; });
+  });
+
+  const posScreen = () => page.evaluate(() => { const el = document.querySelector('.fc-handle[data-hid="pk_pos"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const before = await posScreen();
+
+  await page.mouse.move(before.x, before.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) {
+    await page.mouse.move(before.x - i * 15, before.y + i * 12, { steps: 2 });
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(600);   // past GESTURE_QUIET_MS — the drag's own single deferred undo entry
+
+  const afterValue = await page.evaluate(() => window.ddcsGetBlockProgram().find((b) => b.type === 'op').params.originX);
+  expect(afterValue, 'the drag landed a new value').not.toBe(beforeValue);
+  const snapCount = await page.evaluate(() => window.__t2447SnapCount);
+  expect(snapCount, 'the whole drag becomes exactly one undo entry, not a per-frame flood').toBe(1);
+
+  await page.evaluate(async () => (await import('/blocks/saveStates.js')).undo());
+  await page.waitForTimeout(300);
+
+  const restoredValue = await page.evaluate(() => window.ddcsGetBlockProgram().find((b) => b.type === 'op').params.originX);
+  expect(restoredValue, 'one undo restores the pre-drag VALUE').toBe(beforeValue);
+  const restoredPos = await posScreen();
+  const driftFromStart = Math.hypot(restoredPos.x - before.x, restoredPos.y - before.y);
+  expect(driftFromStart, 'one undo also restores the CANVAS position, together with the value').toBeLessThan(10);
 });
 
 test('REGRESSION: the wizard MODAL\'s own drag (surfacingView.js, a separate setFields) is untouched — still writes every frame', async ({ page }) => {

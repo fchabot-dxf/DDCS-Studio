@@ -3843,7 +3843,7 @@ no materially different approach found this turn from the one already tried and 
 
 ---
 
-### 46. [✅ SHIPPED t2409 (the redraw half) + ⚠ t2429 PARTIALLY SHIPPED (commit-on-release, size/distance handles only — surfacing's own sf_pos, the bug's original screenshot subject, is NOT yet covered, see t2429's own entry below)] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
+### 46. [✅ SHIPPED t2409 (the redraw half) + t2429 (commit-on-release, size/distance handles) + ✅ t2447 (move-kind handles finished, root cause confirmed by measurement — TWO bugs found: featureCanvas.js's own auto-refit firing on a deferred commit's one render, and onDragEnd's own multi-field scan-then-write ordering bug)] THE WIZARD-VIEW CANVAS DRAG IS HALF-WIRED — value moves, GUI doesn't. RULED: complete the loop
 
 > ## THE CAPTURE — the evidence three turns of harness testing could not produce
 >
@@ -4049,6 +4049,25 @@ no materially different approach found this turn from the one already tried and 
 > during a live drag today and never gets the intermediate frames it needs from a single deferred commit —
 > but that is a hypothesis, not a confirmed root; confirm it before attempting a fix, per this whole arc's own
 > standing discipline against guessing on delicate, hard-won canvas machinery.
+>
+> **✅ t2447 — RESOLVED, root confirmed by measurement, not the hypothesis above.** `?debug=feat` on a real
+> temporarily-deferred move drag showed the handle tracking the pointer PERFECTLY through every mid-drag frame
+> (not a gradual undershoot as the hypothesis above suspected), then snapping backward on the exact render
+> right after release. **Root 1**: `featureCanvas.js`'s own `render()` has a pre-existing, legitimate
+> auto-refit-when-idle (`!_userAdjusted && !active`). For every-frame-commit (working), `onDragEnd`'s flush
+> finds nothing left to write at release, so no extra render happens, so that condition never fires — `_tf`
+> stays byte-identical. For a deferred drag, `onDragEnd`'s flush is the FIRST change the model ever sees, and
+> it lands exactly when `active` has just gone null — firing the refit against a geometry that jumped in one
+> step, landing the transform somewhere the frozen mid-drag one never anticipated. Not `_snapToAnchor`. Fixed
+> via `_suppressFitOnCommit`, set only around `end()`'s own synchronous `onDragEnd()` call. **Root 2**, found
+> chasing a smaller residual AFTER root 1 shipped, on the Blocks-canvas surface specifically (the wizard-modal
+> surface had zero residual): `onDragEnd`'s own multi-field loop scanned-and-wrote interleaved — a first
+> field's own write can trigger a synchronous rebuild (confirmed: the Blocks-canvas host rebuilds its form's
+> DOM wholesale on a model write, unlike the wizard modal) that orphans a LATER field's own value-read within
+> the SAME loop, silently reverting it to its pre-drag value. Fixed by splitting scan from write. Both
+> move-kind handles (`pk_pos` AND `sf_pos`, the bug's own original screenshot subject) are now on
+> commit-on-release. Verified: 198 tests across the full canvas/drag blast radius, 0 failed, 0 flaky. Full
+> story: WORK-LOG t2447.
 
 ---
 

@@ -200,28 +200,31 @@ export function buildCanvasWidgets(widgets, setFields) {
     // `true` for a handle it recognises as one of corner's own datum-relative reposition-chain markers
     // (`repoGroups`, backed by `spotStore`/`pinnedStartsFor`) — that mechanism has its own pre-existing,
     // separately-tested "freeze the OTHER markers' world, then re-derive this one's increment against it"
-    // compensation, proven live to assume every frame's write lands in the model synchronously.
+    // compensation, proven live to assume every frame's write lands in the model synchronously. Still excluded
+    // — deliberately not revisited this turn (`corner-marker-independence.spec.js`'s 5 tests protect exactly
+    // this, unrelated to the fix below).
     //
-    // ⚠ SCOPE, NOT FULLY RESOLVED (found live, reported honestly rather than shipped broken or reverted whole):
-    // a 'move'-kind handle (`point`/`diagAim`/`translate` — the ONLY gesture types FeatureCanvas renders
-    // `kind:'move'` for, and the ONE kind its own pointermove handler runs `_snapToAnchor` against every frame)
-    // committed the CORRECT final field values on release (verified directly against the DOM, both for
-    // pocket's own `pk_pos` AND surfacing's own `sf_pos` — the #46 dispatch's own original named handle) yet
-    // the CANVAS rendered it well short of the actual drag distance, for drags of EVERY size tried (a 256px
-    // drag settling ~35px away; a 64px drag ALSO settling ~35px away — not an extreme-drag edge case, a
-    // general one). Root not confirmed within this turn's own budget (suspected: some viewport/fit state that
-    // updates per-frame during a live drag today, so a single deferred commit never gets the intermediate
-    // frames it needs) — rather than restructure the render/redraw pipeline blind, per the dispatch's own
-    // instruction not to touch "five turns of hard-won" machinery without the root observed, this SCOPES
-    // commit-on-release to non-move gestures only (size/length/radial/scaleX/shear/projLength/crossAim/
-    // probeVector — VERIFIED working, incl. pocket's own pk_size, the dispatch's other named handle).
-    // Move-kind handles keep committing every frame, unchanged — #50's own fix (t2427) still coalesces a
-    // burst into one undo entry for them, so they are not worse than before, just not yet on commit-on-release.
-    const SNAP_ELIGIBLE_TYPES = new Set(['point', 'diagAim', 'translate']);
+    // ⭐ t2447 — 'move'-kind handles (`point`/`diagAim`/`translate`) ARE NOW ON commit-on-release too. t2429's
+    // own exclusion (a 'move' handle committed the CORRECT final value on release, yet the CANVAS rendered it
+    // well short of the actual drag distance — a 256px drag settling ~35px away, general not an edge case) is
+    // RESOLVED: root CONFIRMED by measurement (`?debug=feat`, per the dispatch's own hard-won instruction —
+    // this bug had already outlived four advisor theories and one of t2429's own), not reasoned to. It was
+    // never about 'move'/`_snapToAnchor` specifically — `featureCanvas.js`'s own `render()` auto-refits the
+    // viewport whenever nothing is being dragged and the user hasn't manually panned/zoomed
+    // (`!_userAdjusted && !this.active`). For an EVERY-FRAME-COMMIT drag (the old default here), by the time
+    // `this.active` goes null on release, `onDragEnd`'s own flush finds NOTHING left to write (already
+    // committed continuously) — no extra render happens, so that auto-refit condition never gets a chance to
+    // fire, confirmed directly: the transform is byte-identical before/after release. For a DEFERRED drag, the
+    // model has been frozen the WHOLE gesture — `onDragEnd`'s flush is the FIRST change it ever sees, and that
+    // one render lands EXACTLY when `this.active` has just gone null, firing the auto-refit against a geometry
+    // that just jumped in one step instead of drifting gradually — landing the fitted transform somewhere the
+    // FROZEN mid-drag one never anticipated. Fixed at the actual source, `featureCanvas.js`'s own `end()` +
+    // `render()` (`_suppressFitOnCommit` — see `end()`'s own comment for the full mechanism), not here; this
+    // file needed no change beyond removing the exclusion below, once that render-path fix was confirmed live.
     const onDrag = (id, world, commitNow) => {
         const d = byId[id]; if (!d) return;
         const updates = CANVAS_GESTURES[d.type].drag(d, world);
-        const commit = commitNow || SNAP_ELIGIBLE_TYPES.has(d.type);
+        const commit = commitNow;
         if (updates) setFields(updates, commit ? undefined : { preview: true });
     };
     const onEdit = (id, value) => {   // click-to-type a dimension's value (FeatureCanvas inline editor) — a single

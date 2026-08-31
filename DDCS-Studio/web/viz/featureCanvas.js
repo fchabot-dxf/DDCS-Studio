@@ -251,7 +251,21 @@ export class FeatureCanvas {
             this.svg.style.cursor = 'default';
             const hadSnap = !!this._snap; this._snap = null;
             // (pointer capture already released above, before the pinch check)
+            // t2447 (BACKLOG #46, the move-kind handle bug — ROOT CONFIRMED by measurement, ?debug=feat) —
+            // `this.active` just went null above, so `render()`'s own auto-refit-when-idle condition (below,
+            // `!this._userAdjusted && !this.active`) is now eligible to fire on the VERY NEXT render — which,
+            // for a DEFERRED (preview/commit-on-release) drag, is exactly the render `onDragEnd` is about to
+            // cause. That render carries the WHOLE drag's change in one jump (nothing committed gradually), so
+            // a fit computed against it lands somewhere the FROZEN mid-drag transform never anticipated — a
+            // visible snap. Measured directly: for an EVERY-FRAME-COMMIT handle (already working), `onDragEnd`
+            // finds nothing left to flush (already committed continuously), so no extra render happens here at
+            // all and the refit condition never gets a chance to fire — `_tf` stays byte-identical before/after
+            // release. `_suppressFitOnCommit` recreates that same "no refit here" outcome for a DEFERRED drag's
+            // own commit specifically — scoped to this exact synchronous call, so a genuinely unrelated render
+            // later (typing a value, opening a different field) still refits normally, unchanged.
+            this._suppressFitOnCommit = true;
             if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
+            this._suppressFitOnCommit = false;
             // t732 — REFIT-ON-DROP so the canvas ACCOMMODATES a marker dragged to the edge. A free (noSnap) sim-start marker
             // is held at the 80px gutter by _followHandle during the drag; with the frozen viewBox and no refit it would PIN
             // there — the next drag can't leave the fitted view, so it goes nowhere (the user's felt symptom). If it landed in
@@ -311,7 +325,11 @@ export class FeatureCanvas {
         this.svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
         // Auto-fit until the user pans/zooms (then they own the view; dbl-click re-fits). Also freeze
         // the fit while a handle is being dragged so the view doesn't "swim" under the cursor.
-        if (!this._tf || (!this._userAdjusted && !this.active)) this._tf = this._fit(spec, VW, VH);
+        // t2447 — `_suppressFitOnCommit` (set only around a drag's own release-time commit, see `end()`'s own
+        // comment for the measured root cause) additionally holds the freeze through the ONE render a
+        // DEFERRED-commit drag's `onDragEnd` causes, so it doesn't refit against a geometry that just jumped
+        // in one step and snap away from wherever the frozen transform already correctly had it.
+        if (!this._tf || (!this._userAdjusted && !this.active && !this._suppressFitOnCommit)) this._tf = this._fit(spec, VW, VH);
         else if (this._refitPending && !this.active) { this._refitPending = false; this._tf = this._fit(spec, VW, VH, true); }   // the drop's refit, now that the spec has caught up
         else { this._tf.cx = VW / 2; this._tf.cy = VH / 2; }
         this._draw(spec, VW, VH);

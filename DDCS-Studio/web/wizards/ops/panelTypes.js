@@ -580,12 +580,32 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // this drag left uncommitted — flush each one as a real (non-preview) write. The DOM field persists across
     // re-renders (sync-in-place, t1740) even though the closure computing it does not, so this survives the same
     // hazard that broke the first attempt.
+    //
+    // t2447 (BACKLOG #46, the move-kind handle bug's OWN second half — found chasing a residual, SMALLER
+    // discrepancy after the main root-cause fix, confirmed live before shipping) — a MULTI-FIELD handle
+    // (`pk_pos` writes BOTH originX and originY) used to SCAN-AND-WRITE in one interleaved pass: reading the
+    // NEXT field's value, then immediately calling `_writeParam` on it, THEN moving to the field after. But
+    // `_writeParam`'s own (non-preview) dispatch triggers a SYNCHRONOUS re-render (some hosts — confirmed live
+    // on the Blocks-canvas one, not the wizard modal — REBUILD their own form's DOM wholesale on a model
+    // write) that completes BEFORE the loop's own next iteration runs. The second field's own `.value`, read
+    // from THAT SAME iteration, could then be reading a FRESH, model-derived element that never had this
+    // drag's own preview touch — landing back at its PRE-drag value (confirmed live: originY silently
+    // committed as 0, its own pre-drag value, while originX committed correctly in the SAME drag). Fixed by
+    // splitting scan from write: read every (name, value) pair to flush FIRST, while every field is still the
+    // live, drag-touched one — THEN write them, one call per pair. Each individual `_writeParam(name, value)`
+    // call still correctly re-resolves `_field(name)` itself (by NAME within `_host`, which stays valid across
+    // an internal re-render — only the FIELD ELEMENTS get replaced, not the host container itself, so a
+    // by-name lookup made AFTER an earlier field's own rebuild still finds the right element) — what was wrong
+    // was reading a LATER field's VALUE only after an EARLIER field had already possibly triggered that
+    // rebuild, not the re-resolution itself.
     const onDragEnd = () => {
         if (!_host) return;
+        const toFlush = [];
         _host.querySelectorAll('[data-param]').forEach((f) => {
             const committed = f.dataset.ddcsCommitted;
-            if (committed !== undefined && committed !== String(f.value)) _writeParam(f.dataset.param, f.value);
+            if (committed !== undefined && committed !== String(f.value)) toFlush.push([f.dataset.param, f.value]);
         });
+        for (const [name, val] of toFlush) _writeParam(name, val);
     };
     // t718 LAYOUT PLACEMENT PARITY — PLACE the previewGeometry handles: bake the shift into their RENDER position and
     // INVERSE-map their drag world (world − shift → the raw param), keyed by the previewGeometry handle ids. Role/probe

@@ -65386,3 +65386,111 @@ Files: `web/engine/GcodeExecutionEngine.js`, `web/engine/virtualIO.js`, `web/ui/
 `web/viz/createPreviewPanel.js`, `tests/declared-output-type-gates-atc-handshake-2445.spec.js` (new),
 `BACKLOG.md`.
 
+## t2447 — BACKLOG #46 FINISHED: the move-kind handle bug, root confirmed by measurement after resisting four
+advisor theories and one of t2429's own — TWO real bugs found and fixed, not one
+
+The last unfinished piece of a drag thread the owner opened five days ago. t2429 shipped commit-on-release for
+every handle EXCEPT move-kind (`point`/`diagAim`/`translate`) — a move handle committed the CORRECT final
+value on release, yet the CANVAS rendered it well short of the actual drag distance (a 256px drag settling
+~35px away), root not confirmed within that turn's own budget. The dispatch's own explicit instruction: this
+bug has already outlived four advisor theories and one of t2429's own; every time it has yielded, it was to a
+MEASUREMENT, never to reasoning — confirm via `?debug=feat` before touching anything, do not restructure
+`featureCanvas.js`'s render path or the splitter/preview machinery blind.
+
+**Followed the instruction literally.** Temporarily emptied `canvasWidgets.js`'s own `SNAP_ELIGIBLE_TYPES`
+exclusion (a scratch-backed, reverted-before-commit experiment) to force a move-kind handle through the
+DEFERRED path, then drove a real `pk_pos` drag under `?debug=feat`, capturing every probe row via
+`page.on('console')`. **The measurement was immediately decisive**: the handle tracked the pointer PERFECTLY
+through every single mid-drag frame (contradicting my own first assumption of a gradual "undershoot") — then
+SNAPPED BACKWARD on the exact frame right after release, and stayed there permanently (not a settle-timing
+artifact — held identical across a 100ms→2000ms sweep). `writes` stayed flat but `redraws` incremented once
+more — a render happened with no new field write.
+
+**Root 1 — CONFIRMED, not the lead t2429 itself suspected.** Added three targeted, temporary `console.log`s
+(featureCanvas.js's own `end()`, `panelTypes.js`'s `onDragEnd`, `layoutSpecFromOp`'s own entry) — all removed
+before shipping. `hadSnap` was FALSE (ruling out `_snapToAnchor`'s own snap-ring redraw branch — the "strongest
+lead" t2429 itself named turned out to be a correlated red herring, not causal). `onDragEnd` flushed the
+CORRECT final values. `layoutSpecFromOp` received the CORRECT params on every post-commit render. Yet the
+RENDERED SCREEN POSITION was wrong — so the bug had to be in the TRANSFORM, not the data. Logged `this._tf` on
+every `_draw()` call for BOTH the deferred (broken) and the ORIGINAL every-frame-commit (working) path, same
+drag, back to back: **for the working path, `_tf` was byte-identical across the ENTIRE gesture including
+release — because `onDragEnd`'s own flush found NOTHING left to commit (already committed every frame), so NO
+extra render happened at release, so `render()`'s own auto-refit-when-idle condition
+(`!_userAdjusted && !this.active`) never got a chance to fire.** For the deferred path, the model had been
+frozen the WHOLE drag — `onDragEnd`'s flush is the FIRST change it ever sees, and that one render lands EXACTLY
+when `this.active` has just gone null, firing the auto-refit against a geometry that jumped in one step
+instead of drifting gradually across frames — landing the fitted transform somewhere the FROZEN mid-drag one
+never anticipated. Not `_snapToAnchor`. Not a feedback loop. `render()`'s own pre-existing, LEGITIMATE
+auto-refit-on-idle-change behavior, firing at exactly the wrong moment for a deferred commit specifically.
+
+**Fix 1, surgical**: `_suppressFitOnCommit` — set `true` only around `end()`'s own synchronous call to
+`this.spec.onDragEnd(id)`, checked as an added clause in `render()`'s existing refit condition. Recreates the
+SAME "no refit here" outcome the working path gets for free, scoped to exactly the render(s) that one commit
+causes — a genuinely unrelated later render (typing a value, opening a different field) still refits
+normally, unchanged. No touch to `_fit()`'s own algorithm, the render pipeline's own structure, or the
+splitter/preview machinery — exactly the dispatch's own boundary.
+
+**Verified live**: re-emptied `SNAP_ELIGIBLE_TYPES` with the fix in place — the SAME drag that previously
+snapped from 559,978 to 748,839 now holds 559,978 through release and 15+ seconds past it. Made permanent:
+`canvasWidgets.js`'s own move-kind exclusion removed entirely (`const commit = commitNow;` — the
+`SNAP_ELIGIBLE_TYPES` set and its `.has()` check deleted, not just emptied), so move-kind handles are now on
+commit-on-release like everything else, no special-casing.
+
+**Root 2, found chasing a SMALLER residual after shipping fix 1 — NOT the same bug wearing a different
+symptom.** The wizard-modal surface (`sf_pos`-style, `openWiz`) showed ZERO residual after fix 1 — a complete,
+clean resolution. The Blocks-canvas surface (`pk_pos` via `ddcsLoadBlockStack`) still showed the handle
+landing at ~80% of the drag distance (240px of a 300px drag), not 100%. Traced `_tf` again for THIS surface
+specifically: byte-identical throughout, including post-release — fix 1's own mechanism was working correctly
+here too. So the remaining gap had to be in the VALUE, not the transform. Logged the handle's own WORLD
+coordinate on every `_draw()` (via `spec.handles.find(h => h.id === 'pk_pos')`) — found it directly: `y`
+correctly progressed through every live-drag frame, then SILENTLY RESET TO 0 (its pre-drag value) on the exact
+same post-release render `x` correctly committed on. **`onDragEnd`'s own multi-field loop scans-and-writes
+interleaved** — `pk_pos` binds BOTH `originX` and `originY`, and the loop calls `_writeParam` on the FIRST
+field (originX) immediately upon finding it, THEN moves to check the second (originY). But `_writeParam`'s
+own non-preview dispatch triggers a SYNCHRONOUS re-render, and — confirmed live, NOT true of the wizard-modal
+surface — the Blocks-canvas host REBUILDS ITS OWN FORM'S DOM WHOLESALE on a model write (the wizard modal
+mutates in place). By the time the loop's OWN iteration reaches originY, the field it's about to read `.value`
+from may already be a FRESH, model-derived element that never had this drag's own preview touch — landing
+back at 0, its pre-drag value, silently.
+
+**Fix 2, equally surgical**: split `onDragEnd`'s own scan from its write — read every `(name, value)` pair to
+flush into an array FIRST (while every field is still the live, drag-touched one, before ANY write could
+trigger a rebuild), THEN write them one call per pair in a separate loop. Each `_writeParam(name, value)` call
+still correctly re-resolves the CURRENT field by name via `_field(name)` — the fix isn't about avoiding that
+re-resolution (which is fine, since `_host` itself — the outer container — stays valid across an internal
+rebuild that only replaces its own children, per the file's own existing t1806 design), it's about not
+reading a LATER field's value only AFTER an earlier field's own write may have already triggered that
+rebuild.
+
+**Verified live**: same drag, Blocks-canvas surface, post-fix-2 — `pk_pos` world Y now correctly holds its
+drag-final value (not 0) on the SAME render X commits on; screen distance from start now matches the live-drag
+distance exactly, same as the wizard-modal surface.
+
+**Scope boundary respected, not revisited**: corner's own `repoGroups`/`spotStore` reposition-chain exclusion
+(t2429's OTHER exclusion) — untouched, per the dispatch's own explicit instruction; `corner-marker-independence
+.spec.js`'s 5 tests confirm it's still exactly as it was. The `_pgIds`/PLACED-handle feedback-loop exclusion
+(panelTypes.js, a THIRD, separate mechanism neither t2429 nor this turn's own dispatch named) is also
+untouched — genuinely a different mechanism (a converging feedback loop, not a fit/refit snap), out of this
+turn's own scope, named here rather than silently assumed also-fixed.
+
+**Test suite rewritten, not just re-verified**: `commit-on-release-2429.spec.js`'s own "SCOPE BOUNDARY" test
+(which asserted move-kind STAYS every-frame-commit, now factually false) replaced with two real tests proving
+the NEW behavior for `pk_pos` specifically — a `?debug=feat`-probed test confirming the MODEL (not the DOM
+field, which correctly updates every preview frame — checked the wrong thing in an early draft of this test
+and caught it before trusting a false pass) stays frozen through the whole drag then commits exactly once, no
+post-release snap-back; and an undo test confirming one undo restores BOTH the model value AND the canvas
+position together. Both use `bootPocket` (the Blocks-canvas boot, matching `pk_size`'s own established
+pattern) rather than `openWiz`, since that surface is where fix 2's own bug lived — confirmed `pk_pos` renders
+on that boot path too before switching. File's own header comment rewritten to record BOTH exclusions'
+current status (one resolved, one still deliberately excluded) rather than leaving stale t2429-era framing.
+
+**Full suite NOT run** — per the dispatch's own tier guidance (`context/VERIFICATION.md`) this is a JS-only
+change, and given `--only-changed`'s own dynamic-import blind spot (t2439, t2445), manually broadened instead:
+grepped every spec file referencing `.fc-handle`/`featureCanvas`/`onDragEnd`/move-kind/position-handle
+patterns — 68 files, 198 tests — and ran them as one batch. **198 passed, 0 failed, 0 flaky.** Also separately
+re-ran `commit-on-release-2429.spec.js` alone twice more (5/5, 5/5) and the narrower corner/alignment
+regression set (8/8) before trusting the broader run.
+
+Files: `web/viz/featureCanvas.js`, `web/viz/canvasWidgets.js`, `web/wizards/ops/panelTypes.js`,
+`tests/commit-on-release-2429.spec.js`.
+
