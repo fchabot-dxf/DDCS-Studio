@@ -3328,7 +3328,7 @@ all-32 `CUSTOMIZE` path, which is unaffected — so the blast radius is *guarded
 
 ---
 
-### 40. THE SIM IGNORES THE OUTPUT TABLE THE USER ALREADY FILLED IN — "stage 3", declared and never finished
+### 40. [✅ SHIPPED t2445 — `ATC_DIALECT` entries carry `expectedType`; the engine reads `settings.outputs[]` via a new `outputs` constructor option before asserting a handshake sensor; a `group:'atc'` carve-out protects existing ATC-picker-created rows from a false "repurposed" read; `_noAutoAnswer` also exempts the sensor from the separate hands-free auto-answer safety net, or the fix would've been silently undone ~350ms later] THE SIM IGNORES THE OUTPUT TABLE THE USER ALREADY FILLED IN — "stage 3", declared and never finished
 
 *(surfaced 2026-08-28 from a community post — an M350 V2 owner running a two-head machine who drives his DUST
 COLLECTOR from `M151`. We are not solving his problem; his post made ours visible. ⭐ Third "gap" that
@@ -3385,12 +3385,28 @@ choice for a dust collector, and that is entirely the machine owner's call.
 
 ### STILL REAL IF
 
-`grep -n "getOutputs" DDCS-Studio/web/engine/*.js` → no hits means the engine still ignores the user's table.
+~~`grep -n "getOutputs" DDCS-Studio/web/engine/*.js` → no hits means the engine still ignores the user's
+table.~~ SUPERSEDED — the shipped fix doesn't call `getOutputs()` from inside `web/engine/` at all (it's
+INJECTED as a constructor option from `web/viz/createPreviewPanel.js`, matching the existing `stock`/
+`wcsOffset` pattern), so this check would now read "still broken" even though it's fixed. The CURRENT
+check: `grep -n "expectedType" DDCS-Studio/web/engine/GcodeExecutionEngine.js` → no hits means the fix
+regressed (ATC_DIALECT's handshake entries lost their declared-type guard).
 
 ### ⭐ TESTABLE ON THE BENCH V4.1, READ-ONLY
 
 The bench at `10.0.0.50` has **no ATC at all**, so anything the sim claims about gripper or drawbar sensors
-there is provably invented. No writes needed to observe it.
+there is provably invented. No writes needed to observe it. ⚠ Not reachable from the worker's own environment
+(no network path to `10.0.0.50`) — still open, noted rather than silently skipped.
+
+**⭐ A real regression risk found and fixed before shipping, not after**: `ioTable.js`'s own ATC pin-picker
+was the ONLY thing that ever created a gripper row before this turn, and it stored those as `type:'custom'`
+(no dedicated type existed yet) — the SAME representation a repurposed row would have. Comparing raw `type`
+alone would have broken every EXISTING correctly-wired gripper. Resolved via `group:'atc'` (set only by that
+picker, for that specific catalogued M-code) — trusted regardless of stored type; only a GENERAL-table row
+(no ATC-specific meaning attached) is actually checked. Full story + all 6 tests: WORK-LOG t2445.
+
+Files: `web/engine/GcodeExecutionEngine.js`, `web/engine/virtualIO.js`, `web/ui/ioTable.js`,
+`web/viz/createPreviewPanel.js`, `tests/declared-output-type-gates-atc-handshake-2445.spec.js` (new).
 
 ---
 

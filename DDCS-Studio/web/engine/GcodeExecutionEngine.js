@@ -7,7 +7,7 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState, setLimitSwitches } from './virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState, setLimitSwitches, handshakeTargetInput } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition, stripWrappingBrackets } from './core/condition.js';
@@ -34,18 +34,29 @@ const DRO_BASES = [880, 1500, 864, 5420];
 // which had NO M301 (a silent no-op), mislabelled M303/304 as tool-open/closed, and drove M305/306 as a dust-cover
 // OUTPUT (they are gripper WAITS). Drawbar out reuses the spindle-clamp pins (OUT_SPINDLE_UNCLAMP→IN_DRAWBAR_OPEN etc.).
 export const ATC_DIALECT = {
-    // OUTPUTS — drive a solenoid/valve; the virtualIO handshake confirms the paired sensor
-    154: { kind: 'output', pin: 'OUT_SPINDLE_UNCLAMP', state: true, label: 'drawbar release' },   // → IN_DRAWBAR_OPEN (M301)
-    155: { kind: 'output', pin: 'OUT_SPINDLE_CLAMP', state: true, label: 'drawbar lock' },         // → IN_DRAWBAR_CLOSED (M302)
-    162: { kind: 'output', pin: 'OUT_DUST_COVER', state: true, label: 'dust cover open' },         // → IN_DUST_COVER_OPEN
-    163: { kind: 'output', pin: 'OUT_DUST_COVER', state: false, label: 'dust cover close' },        // → IN_DUST_COVER_OPEN clears
-    150: { kind: 'output', pin: 'OUT_GRIPPER_OPEN', state: true, label: 'gripper open' },          // → IN_GRIPPER_OPEN (M305)
-    151: { kind: 'output', pin: 'OUT_GRIPPER_CLOSE', state: true, label: 'gripper close' },        // → IN_GRIPPER_CLOSED (M306)
+    // OUTPUTS — drive a solenoid/valve; the virtualIO handshake confirms the paired sensor.
+    // t2445 (BACKLOG #40) — `expectedType` is the ONLY new field: it names which `settings.outputs[]` TYPE
+    // (ioTable.js's OUTPUT_TYPES) this M-code assumes is wired to it. "M151 fires an output" is a fact about
+    // the DDCS dialect (right to hardcode); "…and 450ms later a gripper-closed sensor asserts" is a claim
+    // about THAT MACHINE'S WIRING — which the user may have told us is something else entirely (a community
+    // M350 V2 owner drives a DUST COLLECTOR from M151). See `_declaredOutputType`/the ATC_DIALECT branch below
+    // for where this is actually checked — declared-elsewhere ⇒ decline to assert, never infer/correct/overwrite.
+    154: { kind: 'output', pin: 'OUT_SPINDLE_UNCLAMP', state: true, label: 'drawbar release', expectedType: 'drawbar' },   // → IN_DRAWBAR_OPEN (M301)
+    155: { kind: 'output', pin: 'OUT_SPINDLE_CLAMP', state: true, label: 'drawbar lock', expectedType: 'drawbar' },         // → IN_DRAWBAR_CLOSED (M302)
+    162: { kind: 'output', pin: 'OUT_DUST_COVER', state: true, label: 'dust cover open', expectedType: 'dustcover' },         // → IN_DUST_COVER_OPEN
+    163: { kind: 'output', pin: 'OUT_DUST_COVER', state: false, label: 'dust cover close', expectedType: 'dustcover' },        // → IN_DUST_COVER_OPEN clears
+    150: { kind: 'output', pin: 'OUT_GRIPPER_OPEN', state: true, label: 'gripper open', expectedType: 'gripper' },          // → IN_GRIPPER_OPEN (M305)
+    151: { kind: 'output', pin: 'OUT_GRIPPER_CLOSE', state: true, label: 'gripper close', expectedType: 'gripper' },        // → IN_GRIPPER_CLOSED (M306)
     // FIXED-STATION PNEUMATICS (M350 firmware push, slib-m.nc O10102 + firmwareStack) — OPEN-LOOP outputs: the push is
     // timed by G04 dwells, NOT sensor waits, so these have NO paired sensor handshake (they set the output + fire
     // io_change, was a no-op). M19 spindle-orient is recognized here (was a no-op) so P-C.2b can animate the orient on
     // its io_change; not otherwise modelled. M158 (vacuum on) is M159's pair-half — grounded in the WORKFLOW doc but NOT
     // emitted by the current firmwareStack (completeness).
+    // t2445 (BACKLOG #40 part 3) — CHECKED, not assumed: none of M19/156-161's own pins (OUT_SPINDLE_ORIENT/
+    // OUT_LOCATING_PIN/OUT_VACUUM/OUT_PUSHER) has an entry in virtualIO.js's M3K_TRUTH_TABLE — no handshake rule
+    // exists for them at all, so `triggerVirtualHandshake` already no-ops for every one of these (looks the pin
+    // up, finds nothing, returns). There is no sensor to wrongly assert here — genuinely a no-op already,
+    // confirmed by reading the table rather than inferred from "open-loop" alone. No `expectedType` needed.
     19: { kind: 'output', pin: 'OUT_SPINDLE_ORIENT', state: true, label: 'spindle orient' },
     156: { kind: 'output', pin: 'OUT_LOCATING_PIN', state: true, label: 'locating pin open' },
     157: { kind: 'output', pin: 'OUT_LOCATING_PIN', state: false, label: 'locating pin close' },
@@ -64,8 +75,17 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onPlayState = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, g53ApproxZ = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onPlayState = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, g53ApproxZ = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5, outputs = null } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
+        // t2445 (BACKLOG #40) — the machine owner's OWN declared `settings.outputs[]` (ioTable.js), injected by
+        // the caller exactly like `stock`/`wcsOffset` below (the engine stays settings-agnostic itself — a test
+        // harness or a bare `new GcodeExecutionEngine()` gets `[]`, so behaviour is BYTE-IDENTICAL to before
+        // this turn when nothing is declared — see `_declaredOutputType`).
+        this._outputs = Array.isArray(outputs) ? outputs : [];
+        // Sensors this run has decided NOT to fabricate (a declared-elsewhere output means the paired sensor's
+        // own claim is false) — `_scheduleAutoAnswer` checks this so the hands-free safety net can't silently
+        // paper back over a decline (see the ATC_DIALECT branch in `_execLine`).
+        this._noAutoAnswer = new Set();
         // t644 — probe-datum tracking (for the datum-correctness check): _datumOrigin[axis] = the MACHINE coord where work-0
         // lands after a WCS write. Set by G92 (any post) and by a write to the WCS-table register range (wcsBase/wcsStride,
         // the register-write posts like Expert). The touched face reads work-0 ⟺ _datumOrigin[axis] == the face's machine coord.
@@ -713,7 +733,14 @@ export class GcodeExecutionEngine {
 
     // Virtual sensor: answer a waited input after autoAnswerMs unless something else
     // (the truth table, or a manual click) already satisfied it. One timer per pin.
+    // t2445 (BACKLOG #40) — `_noAutoAnswer` is the SAME "declining to assert, not asserting harder" rule
+    // extended to this hands-free safety net: skipping just the specific ATC handshake would still let this
+    // BLANKET mechanism fabricate the sensor ~350ms later regardless (the truth-table delay vs autoAnswerMs
+    // race), silently undoing the whole fix for the default autoAnswer:true case. A pin only lands here when
+    // an M-code's own expected output type was contradicted by the machine owner's OWN declared config — never
+    // for an un-declared pin (that path is untouched, byte-identical to before this turn).
     _scheduleAutoAnswer(pinName, targetState) {
+        if (this._noAutoAnswer && this._noAutoAnswer.has(pinName)) return;
         if (this._autoTimers.has(pinName)) return;
         const id = setTimeout(() => {
             this._autoTimers.delete(pinName);
@@ -729,6 +756,31 @@ export class GcodeExecutionEngine {
         if (!this._autoTimers) return;
         for (const id of this._autoTimers.values()) clearTimeout(id);
         this._autoTimers.clear();
+        if (this._noAutoAnswer) this._noAutoAnswer.clear();
+    }
+
+    // t2445 (BACKLOG #40) — does the machine owner's OWN `settings.outputs[]` say pin M<mcode> is something
+    // OTHER than what `ATC_DIALECT[mcode].expectedType` assumes? Matched via onCode/offCode, the SAME join key
+    // `ioTable.js`'s own `_findAtcRow`/labeling already use (relabel-proof, one source). Returns the declared
+    // `type` string, or null when there is nothing to contradict the vendor default — either no row at all
+    // (the regression-risk case: behaviour UNCHANGED from before this turn), OR a row with `group:'atc'`.
+    //
+    // ⚠ THE group:'atc' CARVE-OUT IS LOAD-BEARING, not a stray exemption — caught while verifying, not
+    // assumed. `ioTable.js`'s own ATC pin-picker (`_makeAtcRow`) is the ONLY thing that ever created a row FOR
+    // this specific catalogued function BEFORE this turn added a dedicated `gripper` OUTPUT_TYPES entry — it
+    // stored those rows as `type:'custom'` (the historical fallback). Comparing raw `type` against
+    // `expectedType` would treat EVERY EXISTING, correctly-wired gripper (assigned through that picker,
+    // predating this fix) as "declared elsewhere" and silently break its own real handshake — the opposite of
+    // this turn's own goal. `group:'atc'` is set ONLY by that picker, for that specific catalogued M-code, so
+    // it is trustworthy regardless of the stored type string. The community dust-collector case is NOT
+    // affected: that row was assigned through the GENERAL output table (no ATC-specific meaning attached), so
+    // it never carries `group:'atc'` — its own declared type is genuinely checked, as designed.
+    _declaredOutputType(mcode) {
+        if (!this._outputs.length) return null;
+        const code = (x) => parseInt(String(x || '').replace(/[^0-9]/g, ''), 10);
+        const row = this._outputs.find((r) => code(r.onCode) === mcode || code(r.offCode) === mcode);
+        if (!row || row.group === 'atc') return null;
+        return row.type || null;
     }
 
     /**
@@ -989,8 +1041,25 @@ export class GcodeExecutionEngine {
                 if (d.kind === 'wait') {
                     if (waitForInput(m, null, d.pin, d.state)) waiting = true;
                 } else {
-                    setVirtualOutput(d.pin, d.state);
-                    this._setStatus(`M${m} → ${d.label} (${d.pin} ${d.state ? 'ON' : 'OFF'})`, true);
+                    // t2445 (BACKLOG #40) — before asserting the paired sensor, check what the MACHINE OWNER
+                    // actually told us this pin is (settings.outputs[], via _declaredOutputType). No row at
+                    // all ⇒ null ⇒ unchanged, vendor-default behaviour (layer 1, right to hardcode). A row
+                    // that AGREES with `d.expectedType` ⇒ unchanged too. Only a row that DISAGREES — the
+                    // owner explicitly repurposed this output (a dust collector on the gripper pin) — means
+                    // the sensor claim is now KNOWN false: still fire the output itself (M151 really does
+                    // drive SOMETHING), but decline the handshake, and exempt the paired input from the
+                    // hands-free auto-answer safety net too (else it fabricates the sensor moments later
+                    // regardless — see _scheduleAutoAnswer's own comment).
+                    const declaredType = d.expectedType ? this._declaredOutputType(m) : null;
+                    if (declaredType && declaredType !== d.expectedType) {
+                        const target = handshakeTargetInput(d.pin, d.state);
+                        if (target) this._noAutoAnswer.add(target);
+                        setVirtualOutput(d.pin, d.state, { skipHandshake: true });
+                        this._setStatus(`M${m} → ${d.label} (${d.pin} ${d.state ? 'ON' : 'OFF'}) — output is declared "${declaredType}", not ${d.expectedType}: the ${d.label} sensor is NOT asserted`, true);
+                    } else {
+                        setVirtualOutput(d.pin, d.state);
+                        this._setStatus(`M${m} → ${d.label} (${d.pin} ${d.state ? 'ON' : 'OFF'})`, true);
+                    }
                 }
             } else if (m === 10 || m === 11) {
                 // Generic output control by port (NOTE: on real DDCS Expert, M10/M11 is the

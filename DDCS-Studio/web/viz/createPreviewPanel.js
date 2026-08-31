@@ -70,6 +70,11 @@ const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetS
 // table lookup. Preserves the null-when-no-machine contract (callers `|| {0,0,0}`); wcsOffsetAt never returns null when m exists.
 const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return m ? wcsOffsetAt(m, (m.wcs && m.wcs.active) || 1) : null; };
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
+// t2445 (BACKLOG #40) — the machine owner's OWN settings.outputs[] (ioTable.js), fed to the engine so it can
+// tell "M151 fires an output" (the dialect, right to hardcode) apart from "…and a gripper-closed sensor
+// asserts" (a claim about THIS machine's wiring the owner may have told us is false). Same access pattern as
+// wcsForViz/machineForViz just above — one source, no separate import of settingsPanel.js's own getOutputs().
+const outputsForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().outputs) || [];
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 // Z-fraction of the stock datum (0=bottom, 0.5=centre, 1=top) — the datum's height above the stock bottom, as a
 // fraction of the stock height. Migrates the legacy XY-only codes (all top-Z). Used to place part-zero in the frame.
@@ -635,6 +640,7 @@ export function createPreviewPanel(container, opts = {}) {
         engine = new GcodeExecutionEngine({
             autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
             stock: previewStock(),
+            outputs: outputsForViz(),   // t2445 (BACKLOG #40) — see outputsForViz's own comment
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             rapidRate: (machineForViz() || {}).rapidRate,   // t844 — time-true playback uses the DECLARED G0 rate, so it matches the time estimate

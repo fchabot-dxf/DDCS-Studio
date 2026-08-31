@@ -24,6 +24,10 @@ export const OUTPUT_TYPES = [
     { type: 'coolant',   label: 'Coolant',              onCode: 'M8',   offCode: 'M9',   help: 'Flood coolant — the ON code turns it on, the OFF code off (typically M8 / M9).' },
     { type: 'drawbar',   label: 'Drawbar (ATC)',        onCode: 'M154', offCode: 'M155', help: 'The spindle drawbar solenoid — its ON code RELEASES (unclamps) the tool, its OFF code CLAMPS it. The ATC change pulses this to swap tools.' },
     { type: 'dustcover', label: 'Dust cover (ATC)',     onCode: 'M162', offCode: 'M163', help: 'The dust-cover / chip-shield actuator — opened (ON) before a tool change, closed (OFF) after.' },
+    // t2445 (BACKLOG #40) — drawbar/dustcover/carousel were already catalogued; M150/M151 (the pick/place
+    // gripper on a two-head or robot-style ATC) simply weren't, which is why a repurposed use of that pin (a
+    // community M350 V2 owner drives a DUST COLLECTOR from M151) had no honest home in this table before now.
+    { type: 'gripper',   label: 'Gripper (ATC)',        onCode: 'M150', offCode: 'M151', help: 'The pick/place gripper solenoid — its ON code OPENS the jaws, OFF code CLOSES them around the tool.' },
     { type: 'rotate',    label: 'Carousel rotate (ATC)', onCode: '',    offCode: '',     help: 'Carousel-rotate output for a disk magazine — indexes the target pocket to the fixed pickup station.' },
     { type: 'mist',      label: 'Mist',                 onCode: 'M7',   offCode: 'M9' },
     { type: 'custom',    label: 'Custom',               onCode: '',     offCode: '' },
@@ -437,7 +441,7 @@ const ATC_IO_FUNCTIONS = {
         { key: 'pusher', label: 'Pusher cylinder', onCode: 'M160', offCode: 'M161', type: 'custom' },
         { key: 'pin', label: 'Locating pin', onCode: 'M156', offCode: 'M157', type: 'custom' },
         { key: 'vacuum', label: 'Vacuum pump', onCode: 'M158', offCode: 'M159', type: 'custom' },
-        { key: 'gripper', label: 'Gripper (open / close)', onCode: 'M150', offCode: 'M151', type: 'custom' },
+        { key: 'gripper', label: 'Gripper (open / close)', onCode: 'M150', offCode: 'M151', type: 'gripper' },   // t2445 (BACKLOG #40) — was 'custom' (no dedicated OUTPUT_TYPES row existed); now matches the sim's own ATC_DIALECT[150/151].expectedType, so a pin assigned here is correctly typed from creation
         { key: 'rotate', label: 'Carousel rotate', onCode: '', offCode: '', type: 'rotate' },
     ],
     input: [

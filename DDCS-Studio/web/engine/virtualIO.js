@@ -304,8 +304,12 @@ export function resetVirtualIO() {
  *
  * @param {string}  pin   - Output pin name (must match an M3K_TRUTH_TABLE key to trigger simulation)
  * @param {boolean} value - New state for the output
+ * @param {{skipHandshake?: boolean}} [opts] - t2445 (BACKLOG #40): skipHandshake=true still records the
+ *   output's own state (M151 really does fire SOMETHING) but declines the paired-sensor assertion — for when
+ *   the caller has determined the machine owner's own declared config contradicts what the dialect assumes is
+ *   wired to this pin. See GcodeExecutionEngine.js's ATC_DIALECT branch, the only caller that sets this.
  */
-export function setVirtualOutput(pin, value) {
+export function setVirtualOutput(pin, value, { skipHandshake = false } = {}) {
     const prev = ioState.outputs.get(pin);
     ioState.outputs.set(pin, value);
 
@@ -318,7 +322,20 @@ export function setVirtualOutput(pin, value) {
         _dispatchIoChange(pin, value);
     }
 
-    triggerVirtualHandshake(pin, value);
+    if (!skipHandshake) triggerVirtualHandshake(pin, value);
+}
+
+/**
+ * t2445 (BACKLOG #40) — read-only peek at what `triggerVirtualHandshake` WOULD assert for `outputPin`/`state`,
+ * without actually scheduling it. Uses the exact same rule-resolution as the real handshake (one source), so a
+ * caller that needs to know "which sensor is this pin's claim about" (to exempt it from the auto-answer safety
+ * net when declining the handshake) can never drift out of sync with M3K_TRUTH_TABLE itself.
+ * @returns {string|null} the target input pin name, or null if this output/state has no handshake rule at all.
+ */
+export function handshakeTargetInput(outputPin, state = true) {
+    const stateRuleKey = `${outputPin}_${state ? 'ON' : 'OFF'}`;
+    const rule = M3K_TRUTH_TABLE[stateRuleKey] || (state === true ? M3K_TRUTH_TABLE[outputPin] : null);
+    return rule ? rule.targetInput : null;
 }
 
 /**

@@ -65289,3 +65289,100 @@ in full above, not a fourth suite invocation for the same information.
 
 Files: `playwright.config.js`, `context/VERIFICATION.md`.
 
+## t2445 — BACKLOG #40 SHIPPED: the sim now reads the machine owner's OWN declared output table before
+inventing a sensor from the M-code alone
+
+Surfaced by a community post: an M350 V2 owner with a two-head machine drives his DUST COLLECTOR from `M151`
+— which the sim insisted was a gripper-close output, confidently asserting an `IN_GRIPPER_CLOSED` sensor his
+machine never has. A program doing `M151` then `M306` (wait: gripper closed) sim-proceeds cleanly while the
+real machine parks forever — a FALSE GREEN in a safety-adjacent surface. The user could already declare their
+real output config (`settings.outputs[]`, ioTable.js) — `getOutputs()` had zero callers under `web/engine/`;
+a declared seam (`settingsPanel.js`'s own "stage 3" comment) left unfinished, per the dispatch's own framing.
+
+**The three layers, confirmed by reading the code before touching anything.** Layer 1 (M-code → intent,
+`ATC_DIALECT`, GcodeExecutionEngine.js) is the vendor dialect, right to hardcode. Layer 3 (pin → physical
+port) is the user's, correctly untouched. Layer 2 — "…and 450ms later a gripper-closed sensor asserts" — is a
+claim about THAT machine's wiring made from the M-code alone; `virtualIO.js`'s `M3K_TRUTH_TABLE` is where that
+claim actually lives (`triggerVirtualHandshake`, called unconditionally from `setVirtualOutput`).
+
+**The fix — three parts, as scoped:**
+
+1. **The sim reads `settings.outputs[]` before asserting the paired sensor.** `ATC_DIALECT`'s handshake-
+   bearing entries (150/151/154/155/162/163) now carry `expectedType` (`gripper`/`drawbar`/`dustcover`). A new
+   engine constructor option, `outputs` (injected by `createPreviewPanel.js`'s own `outputsForViz()`, matching
+   the existing `wcsForViz`/`machineForViz` pattern — one source, no new settings-access route invented), lets
+   `_declaredOutputType(mcode)` look up a matching `settings.outputs[]` row by onCode/offCode (the SAME join
+   key `ioTable.js`'s own `_findAtcRow` already uses). No row at all ⇒ null ⇒ unchanged vendor-default
+   behaviour — the regression-risk case the dispatch named explicitly, verified directly (test 1 below). A row
+   that AGREES ⇒ also unchanged. Only a row that DISAGREES declines the handshake:
+   `virtualIO.js`'s `setVirtualOutput(pin, state, {skipHandshake:true})` (new, backward-compatible 3rd param;
+   still records the output's own state — M151 really does drive SOMETHING — only the SENSOR claim is
+   withheld, verified separately, test 4).
+2. **A `gripper` row added to `OUTPUT_TYPES`** (ioTable.js) — drawbar/dustcover/carousel were already
+   catalogued, M150/M151 weren't, confirmed by reading the array before adding anything. Also fixed
+   `ATC_IO_FUNCTIONS.output`'s own gripper entry, which was silently falling back to `type:'custom'` (no
+   dedicated type existed until now) — now correctly `'gripper'`, so a NEWLY-assigned pin is typed correctly
+   from creation.
+3. **CHECKED, not assumed, whether the open-loop family (M156-161, M19) needs the same fix.** Read
+   `virtualIO.js`'s `M3K_TRUTH_TABLE` directly: none of `OUT_LOCATING_PIN`/`OUT_VACUUM`/`OUT_PUSHER`/
+   `OUT_SPINDLE_ORIENT` has ANY entry there — `triggerVirtualHandshake` already no-ops for all of them (looks
+   the pin up, finds nothing, returns). No sensor to wrongly assert; genuinely already safe. No `expectedType`
+   added — nothing to guard.
+
+**⭐⭐ The part that made this a real fix, not a cosmetic one — found while verifying, not assumed correct.**
+Declining just the specific handshake was NOT enough on its own: `_scheduleAutoAnswer` is a SEPARATE, blanket
+"a virtual sensor satisfies any wait after `autoAnswerMs`" safety net (the hands-free default for running a
+whole program without manual sensor clicks), unconditional on which M-code is involved — it would fabricate
+the EXACT SAME sensor ~350ms later regardless (450ms handshake delay vs 800ms default `autoAnswerMs` — close
+enough that a shallow fix testing only "does the handshake fire" would look correct and STILL ship the false
+green). Fixed by adding `_noAutoAnswer` (a Set the engine populates via a new `virtualIO.js` export,
+`handshakeTargetInput(pin, state)` — a READ-ONLY peek at what the real handshake WOULD assert, so this new
+exemption path can never drift out of sync with `M3K_TRUTH_TABLE` itself, one source) — `_scheduleAutoAnswer`
+now checks it before scheduling. Cleared alongside `_autoTimers` in `_clearAutoTimers` (the same existing
+reset lifecycle, no new one invented).
+
+**⚠ A real regression risk found and fixed BEFORE it could ship, not after.** Comparing raw `row.type` against
+`d.expectedType` would have broken every EXISTING, correctly-wired gripper: `ioTable.js`'s own ATC pin-picker
+(`_makeAtcRow`) was the ONLY thing that ever created a row for the gripper function before this turn, and it
+stored those as `type:'custom'` (the historical fallback, since no dedicated type existed) — the SAME stored
+representation the community owner's OWN repurposed dust-collector row would also have (no honest catalog
+entry existed for either case). Resolved via `group:'atc'` — set ONLY by that dedicated picker, for that
+specific catalogued M-code — trusted regardless of its stored `type` string; ONLY a row from the GENERAL
+output table (no `group:'atc'`, the owner picked freely from the shared catalog with no ATC-specific meaning
+attached) is checked against `expectedType`. Verified directly (test 5): an ATC-picker-style row with the old
+`type:'custom'` still fires the handshake normally — no regression for a machine that already worked.
+
+**Verified live, all via the browser's own dynamic import** (matching this repo's own `atc-dialect.spec.js`
+convention, not a reimplementation): new file `tests/declared-output-type-gates-atc-handshake-2445.spec.js`,
+6 tests — (1) nothing declared: handshake fires, program finishes normally (the regression-risk case); (2)
+declared as the matching `gripper` type: same, unchanged; (3) declared as `custom`/repurposed (the actual
+community case): the sensor is NEVER asserted, `eng.running` stays `true` (the sim GENUINELY parks — verified
+past BOTH the handshake's 450ms AND a shortened 400ms `autoAnswerMs`, not just past one), `_waitPin` confirms
+it's parked specifically on `IN_GRIPPER_CLOSED`; (4) the OUTPUT itself still fires even when declared
+elsewhere (`ioState.outputs['OUT_GRIPPER_CLOSE']` still `true` via `trace()` mode) — declining the sensor
+claim is not declining the output; (5) the `group:'atc'` regression-prevention case above; (6) `OUTPUT_TYPES`
+carries the new dedicated gripper row. First pass used 700ms wait margins for the "handshake fires" cases —
+flaked twice under a heavy 232-test/4-worker parallel run (not a logic bug: `retries:2` recovered both, and
+the SAME contention pattern hit two pre-existing, unrelated ATC tests in the same run) — widened to 1500ms
+rather than leaving it to retries alone; 0 flaky across 2 follow-up runs at full parallelism after.
+
+**Tier — broadened manually, per the dispatch's own explicit warning.** `test:changed` (`--only-changed`)
+selected only the 6 NEW tests in my own file — confirmed via a direct run, and exactly the t2439-identified
+blind spot: every consumer of `GcodeExecutionEngine.js`/`virtualIO.js`/`ioTable.js`/`createPreviewPanel.js`
+reaches them via a browser-side `page.evaluate(() => import(...))`, invisible to Playwright's Node-side static
+graph. Grepped for every spec file referencing those four filenames (48 files) and ran them as one batch:
+226→227 passed (the +1 is my own new test file growing by one test between runs) / 0 failed / 4 flaky both
+runs (2 pre-existing — `atc-collet.spec.js`, `atc-io-labeling.spec.js`, both matching this session's
+documented parallel-worker contention pattern — plus, before the margin widening, 1-2 of my own now-fixed
+timing-tight tests). Not the full suite (this is a JS-only change, no CSS/asset touch, so the new
+`context/VERIFICATION.md` policy doesn't call for it) — the 48-file manual broadening IS the "attributable"
+tier for this specific blind spot.
+
+**⭐ Bench V4.1 read-only sanity check (dispatch's own suggestion, since it has no ATC at all) — NOT
+reachable from this environment.** No network path to `10.0.0.50` from here; noted honestly rather than
+skipped silently. The owner/advisor's own seat may be better positioned to run this check.
+
+Files: `web/engine/GcodeExecutionEngine.js`, `web/engine/virtualIO.js`, `web/ui/ioTable.js`,
+`web/viz/createPreviewPanel.js`, `tests/declared-output-type-gates-atc-handshake-2445.spec.js` (new),
+`BACKLOG.md`.
+
