@@ -65494,3 +65494,72 @@ regression set (8/8) before trusting the broader run.
 Files: `web/viz/featureCanvas.js`, `web/viz/canvasWidgets.js`, `web/wizards/ops/panelTypes.js`,
 `tests/commit-on-release-2429.spec.js`.
 
+## t2449 — BACKLOG #45 SHIPPED: the learner library's facing snippet rebuilt on the REAL surfaceraster atom, a new
+bare Milling snippet added, trace-square deliberately kept as a hand-listed facsimile
+
+The owner's own ruling on `face-pass` (Complete Programs > Milling): *"milling atom, needs to be true."* The old
+entry hand-listed one straight G1 across 100mm and called it "facing" — no stepover, no raster, no boundary, a
+description of facing rather than facing itself, free to drift from what the surfacing wizard's own
+`surfaceraster` op (`wizards/ops/surfaceraster.js`) actually emits the moment either one changes.
+
+**Rebuilt `face-pass` on the real atom.** New stack: `progstart` → a comment → `{type:'surfaceraster', params:
+{w:100,h:10,depth:0.5,feed:800}}` → `progend`. Params kept MINIMAL on purpose — only `w/h/depth/feed` are named;
+everything else (`toolDia`, `stepoverPct`, `entry`, `wcs`, `zMode`, …) falls back to `SURFACING_DEFAULTS`
+(`blocks/dataOps/surfacingData.js`), the SAME defaults a freshly-dropped wizard op would use. **Established
+live, not assumed**: a minimal 3-4-field params object still emits complete, valid G-code — confirmed via
+`traceToolpath()` on the raw emitted text (`engine/trace.js`), not just "it didn't throw."
+
+**Kept `trace-square` hand-listed — a deliberate keep, not an oversight.** Its own point is reading raw
+G0/G1 syntax as a first program (its own `desc` says "a first cut to read"); it never claimed to BE a named
+operation the way the old `face-pass` did. There is no real atom for "trace this exact square outline" to hold
+it to — `pocket`/`contour` BUILD a boundary from a shape+size, they don't retrace four literal corners — so
+nothing here can drift from an atom's own behavior the way the old `face-pass` could. Left a comment in the file
+naming this reasoning explicitly and flagging it as PER-ENTRY, not a blanket rule: if a future turn adds a real
+"outline a rectangle" atom, re-decide against THAT atom specifically rather than assuming this holds.
+
+**New: a bare `raster-area` snippet**, `Snippets > Milling` (new sub-category, `learnerLibrary.js`'s `SNIPPETS`
+array, inserted between Motion and Probing) — the owner's own separate ask: *"does surfacing have a block
+snippet"* — it didn't; the closest thing was the old fake `face-pass`. `raster-area` is `surfaceraster` alone
+(no `progstart`/`progend` framing), params `{w:30,h:20,depth:0.3}`. **Established live**: a bare
+`surfaceraster` atom with no program framing still traces a real, non-degenerate toolpath on its own (confirmed
+via `traceToolpath` — real segment count, real non-zero-area bounds) — so it correctly belongs in Snippets (bare
+compositions), not Complete Programs; the atom needs no framing declared to preview meaningfully.
+
+**Test**: new `tests/learner-library.spec.js` case checks both entries use the real `surfaceraster` type (not
+hand-listed moves), that the emit is self-documenting (named `#4x` vars with inline comments — confirmed the
+atom's own emit carries these, same as any wizard op's would), that both trace a real toolpath with
+non-degenerate bounds via `traceToolpath`, and that both drag in as one connected flyout stack via
+`stackToFlyoutBlock`. **Proved non-vacuous**: fails against pre-change HEAD (old `face-pass` had no
+`surfaceraster` block at all; `raster-area` didn't exist). Full file (3 tests) stable across 3 runs.
+
+**Live UI verification — went further than a screenshot.** First attempt at automated click-through hit a real
+Playwright actionability snag: `.blocklyToolboxCategoryLabel` (the row's text span) is visible but its own
+parent `.blocklyToolboxCategory` div intercepts pointer events, so a direct `.click()` on the label times out.
+This is NOT the intermittent DOM quirk it first looked like — clicking the ANCESTOR `.blocklyToolboxCategory`
+div instead (found via `xpath=ancestor::div[contains(@class,"blocklyToolboxCategory")][1]`) resolved it
+cleanly and reproducibly. With the correct target: clicked `Snippets > Milling`, confirmed the flyout opens
+showing the `raster-area` stack (head block `comment`, `surfaceraster` connected via `.next`), **dragged the
+flyout block onto the workspace via real `page.mouse` down/move/up**, and confirmed via
+`ws.getTopBlocks(false)` that a real, connected block landed. Separately clicked `Complete Programs > Milling`
+and confirmed its flyout shows 2 entries (`trace-square` + `face-pass`, both `progstart`-headed). No prior test
+in this codebase had automated this specific toolbox-row interaction against the real app — this turn
+establishes a working pattern (ancestor-div click, not the label) for any future one that needs it. Scratch
+file (`tests/_live-check.spec.js`) and its screenshot were deleted before commit — neither is part of this
+turn's intended diff.
+
+**Tier**: JS/data-only change → `test:changed` (3/3, exactly `learner-library.spec.js` — correctly scoped, no
+manual broadening needed: grepped for other files reaching `learnerLibrary.js`, found only `blocksApp.js`
+(already in the import graph `--only-changed` used) and one unrelated comment mentioning the word in
+`probeSurface.js`, not an import) + `npm run test:node`.
+
+**Flagging, not fixing — a PRE-EXISTING, unrelated `test:node` failure.** `tests/node/preview-spec-gate-1688.test.mjs`
+fails on a frozen panel-shape snapshot: `onDragEnd` now appears as a field on every panel (`user_alignment_data`,
+`user_atc_*_data`, …) where the recorded snapshot doesn't have it. Confirmed via `git stash` that this is
+IDENTICAL on clean HEAD before any of this turn's own changes — traces to t2447's `panelTypes.js` scan/write
+split (which legitimately added `onDragEnd` as a real field), shipped and passed in a prior turn without this
+node-tier gate having been run against it. Not touched here: `panelTypes.js` isn't part of this turn's diff, and
+regenerating a frozen gate snapshot is its own decision, not mine to make inside a #45 dispatch. Advisor: this
+gate is currently RED on `wizards-as-data-blocks` independent of anything in this turn.
+
+Files: `web/data/learnerLibrary.js`, `tests/learner-library.spec.js`.
+

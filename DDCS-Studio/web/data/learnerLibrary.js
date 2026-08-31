@@ -53,6 +53,24 @@ export const SNIPPETS = [
         ],
     },
     {
+        // t2449 (BACKLOG #45 part 2) — the owner's own ask: "does surfacing have a block snippet" — it
+        // didn't, and the near-misses (the old face-pass) were fakes. This is the REAL atom, bare, no
+        // program frame — the point is to show surfaceraster doing its own job without the wizard's own
+        // 30-field apparatus around it. ESTABLISHED live, not assumed, per the dispatch's own instruction:
+        // a bare surfaceraster atom (no progstart/progend) emits clean G-code AND traces a real, non-empty
+        // toolpath on its own (confirmed directly — 50 lines, 5 segments, a real bounding box) — so this
+        // correctly belongs in Snippets (bare compositions), not Complete Programs; the atom needs no
+        // framing declared to preview meaningfully.
+        category: 'Milling',
+        entries: [
+            { id: 'raster-area', label: 'Raster an area', desc: 'The real surfacing atom, bare — one small area, rastered at a shallow depth. No spindle/program framing: just the atom doing its own job.',
+              stack: [
+                  cmt('This block rasters an area — the atom the surfacing wizard actually emits'),
+                  { type: 'surfaceraster', params: { w: 30, h: 20, depth: 0.3 } },   // everything else (tool Ø, stepover%, feed, entry, …) falls back to the atom's own sensible defaults
+              ] },
+        ],
+    },
+    {
         category: 'Probing',
         entries: [
             { id: 'z-touch', label: 'Z touch-off', desc: 'Probe straight down (G31) until the probe triggers, then store the touch Z in #50.',
@@ -89,6 +107,14 @@ export const PROGRAMS = [
     {
         category: 'Milling',
         entries: [
+            // t2449 (BACKLOG #45) — KEPT hand-listed moves DELIBERATELY, decided with the file in hand: this
+            // entry's own POINT is reading raw G0/G1 syntax as a first program ("a first cut to read," its own
+            // desc says so) — it never claims to BE a named operation the way face-pass used to. There is no
+            // real atom for "trace this exact square outline" to hold it to (pocket/contour BUILD a boundary
+            // from a shape+size, they don't retrace four literal corners) — so nothing here can drift from an
+            // atom's own behavior the way the old face-pass could from surfaceraster's. If a future turn ever
+            // adds a real "outline a rectangle" atom, RE-DECIDE against that atom specifically — don't assume
+            // this reasoning still holds just because it held here.
             { id: 'trace-square', label: 'Trace a square', desc: 'A first program to read: spin up, plunge, cut a 50 mm square at Z-1, then retract & end.',
               stack: [
                   { type: 'progstart', params: { rpm: 10000, dir: 'cw', spinUp: 0, clearance: 5 } },
@@ -101,13 +127,22 @@ export const PROGRAMS = [
                   { type: 'move', params: { mode: 'cut', x: 0, y: 0, z: -1, feed: 600 } },       // ↓ back to start
                   { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
               ] },
-            { id: 'face-pass', label: 'Single facing pass', desc: 'Spin up, plunge to a shallow Z, then cut one straight pass across 100 mm.',
+            // t2449 (BACKLOG #45) — REBUILT on the real atom (owner's own ruling: "milling atom, needs to be
+            // true"). The old version hand-listed one straight G1 across 100mm and called it "facing" — no
+            // stepover, no raster, no boundary, free to drift from what the app's own surfacing wizard
+            // actually emits. `surfaceraster` (wizards/ops/surfaceraster.js) IS what the wizard emits — a
+            // small area (100×10mm, one stepover-ish wide) reads as simply as the old fake did, but it is the
+            // thing itself: change the area or tool and the raster genuinely re-derives, because it's the real
+            // math, not a description of it. Params kept MINIMAL (w/h/depth/feed only) — everything else
+            // (toolDia, stepoverPct, entry, wcs, …) falls back to surfaceraster's own sensible defaults, same
+            // as a freshly-dropped wizard op would. Read as a learner: the atom's OWN emitted G-code carries
+            // named #vars with inline comments explaining the raster math (confirmed live) — MORE
+            // self-documenting than the old hand-listed moves were, not less; no legibility tension found.
+            { id: 'face-pass', label: 'Single facing pass', desc: 'Spin up, then face a shallow strip with the REAL facing atom (surfaceraster) — a small area, built from the same math the wizard uses, so it can never drift from what facing actually does.',
               stack: [
                   { type: 'progstart', params: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5 } },
-                  cmt('A single facing pass across 100 mm at Z-0.5'),
-                  { type: 'move', params: { mode: 'rapid', x: 0, y: 0, z: 5, feed: 200 } },       // above the start
-                  { type: 'move', params: { mode: 'cut', x: 0, y: 0, z: -0.5, feed: 200 } },       // plunge to depth
-                  { type: 'move', params: { mode: 'cut', x: 100, y: 0, z: -0.5, feed: 800 } },     // face across
+                  cmt('A facing pass on the real surfaceraster atom — small area, same math the wizard uses'),
+                  { type: 'surfaceraster', params: { w: 100, h: 10, depth: 0.5, feed: 800 } },
                   { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 10, park: false, parkX: 0, parkY: 0, end: 'M30' } },
               ] },
         ],

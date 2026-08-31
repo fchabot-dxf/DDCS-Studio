@@ -4260,7 +4260,7 @@ Files: `web/ui/editorFind.js`, `web/ui/findBarCore.js` (new), `web/blocks/blockC
 
 ---
 
-### 45. THE MILLING SNIPPETS HAND-ROLL WHAT THE ENGINE DECLARES — rebuild on real atoms, add surfacing
+### 45. [✅ SHIPPED t2449] THE MILLING SNIPPETS HAND-ROLL WHAT THE ENGINE DECLARES — rebuild on real atoms, add surfacing
 
 *(owner-asked 2026-08-28: "does surfacing have a block snippet" — answer: NO, and the near-misses are fakes.
 ⭐ Owner-approved the same day, with the principle in their own words: **"milling atom, needs to be true."**
@@ -4279,6 +4279,30 @@ engine really does.
   file in hand and say which.
 
 **VERIFY:** snippets still drag in and run in the sim; the learner-library spec stays green.
+
+**✅ SHIPPED t2449.** `face-pass` rebuilt on the real `surfaceraster` atom (minimal params `{w,h,depth,feed}` —
+everything else falls back to the atom's own defaults, confirmed live). New bare `raster-area` snippet added
+under a new `Snippets > Milling` sub-category — confirmed live that a bare `surfaceraster` atom (no
+progstart/progend framing) still traces a real, non-degenerate toolpath on its own. `trace-square` KEPT
+hand-listed, deliberately: no real atom exists for "retrace this exact outline" (pocket/contour BUILD a
+boundary from a shape, they don't retrace four literal corners), so nothing there can drift the way the old
+`face-pass` could — reasoning left in a file comment, scoped per-entry, not a blanket rule.
+
+Verified two ways: (1) data-level — `traceToolpath()` on both entries' raw emit shows real segment counts and
+non-zero-area bounds, plus a non-vacuous new test (fails 3/3 against pre-change HEAD, since `raster-area` didn't
+exist and old `face-pass` had no `surfaceraster` block). (2) live UI — clicked `Snippets > Milling` and
+`Complete Programs > Milling` in the real Blocks tab, opened both flyouts, and dragged `raster-area` onto the
+workspace via real `page.mouse` events, confirming a connected block actually lands (no prior test in the repo
+had automated this toolbox-row interaction against the real app; the working click target turned out to be the
+row's ancestor `.blocklyToolboxCategory` div, not the `.blocklyToolboxCategoryLabel` span — the label alone
+doesn't receive pointer events).
+
+Separately flagged, not fixed (out of scope for this entry): `tests/node/preview-spec-gate-1688.test.mjs` is
+currently RED on this branch independent of this change — a frozen panel-snapshot gate that never got
+regenerated after t2447 legitimately added `onDragEnd` as a real panel field. Confirmed via `git stash` that the
+failure is identical on clean HEAD. See WORK-LOG t2449.
+
+Files: `web/data/learnerLibrary.js`, `tests/learner-library.spec.js`.
 
 ---
 

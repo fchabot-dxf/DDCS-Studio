@@ -88,3 +88,66 @@ test('Probing snippets: the canonical "probe surface" primitive (single + two-pa
   expect((r.two.g31), 'probe-surface-2pass emits G31 probes').toBe(true);
   expect(r.two.stackLen, 'probe-surface-2pass drags in as one connected 8-block stack').toBe(8);
 });
+
+/**
+ * t2449 (BACKLOG #45) — "milling atom, needs to be true." The old face-pass hand-listed one straight G1 move
+ * and called it "facing" (no stepover, no raster — a facsimile, free to drift from what surfacing.js's own
+ * surfaceraster atom actually does). Rebuilt on the real atom; a NEW bare snippet added ("this block rasters
+ * an area") since the wizard-level surfacing op never had one. Both drag in and RUN IN THE SIM producing a
+ * real toolpath — verified via traceToolpath, not just "emits some text" (that's the OTHER test's own job).
+ */
+test('BACKLOG #45: face-pass and the new raster-area snippet are the REAL surfaceraster atom — both trace a real toolpath in the sim', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => !!window.ddcsStudio);
+
+  const r = await page.evaluate(async () => {
+    const { SNIPPETS, PROGRAMS, learnerToolboxCategories } = await import('/data/learnerLibrary.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const { stackToFlyoutBlock } = await import('/blocks/blockly/stackBridge.js');
+    const { buildToolbox } = await import('/blocks/blockly/bridge.js');
+
+    const milling = SNIPPETS.find((g) => g.category === 'Milling');
+    const raster = milling && milling.entries.find((e) => e.id === 'raster-area');
+    const facePass = PROGRAMS.find((g) => g.category === 'Milling').entries.find((e) => e.id === 'face-pass');
+
+    const check = (entry) => {
+      const g = (emitMapped(entry.stack).text || '').trim();
+      const usesRealAtom = entry.stack.some((b) => b && b.type === 'surfaceraster');
+      const trace = traceToolpath(g);
+      const fb = stackToFlyoutBlock(entry.stack);
+      let n = 0; for (let b = fb; b; b = b.next && b.next.block) n += 1;
+      return {
+        usesRealAtom,
+        // the atom's own emit is self-documenting (named #vars + inline comments explaining the raster math)
+        selfDocumenting: /#4\d=.*\(/.test(g),
+        segCount: trace && trace.segments ? trace.segments.length : 0,
+        hasRealBounds: !!(trace && trace.bounds && (trace.bounds.maxX - trace.bounds.minX) > 0 && (trace.bounds.maxY - trace.bounds.minY) > 0),
+        stackLen: n, stackHead: !!(fb && fb.type),
+      };
+    };
+
+    const snipHasMilling = buildToolbox(learnerToolboxCategories())
+      .contents.find((c) => /Snippets/.test(c.name)).contents.some((c) => c.name === 'Milling');
+
+    return {
+      raster: raster ? check(raster) : null,
+      facePass: facePass ? check(facePass) : null,
+      snipHasMilling,
+    };
+  });
+
+  expect(r.raster, 'the new raster-area snippet exists under Snippets > Milling').not.toBeNull();
+  expect(r.snipHasMilling, 'Milling sub-category shows under 📚 Snippets').toBe(true);
+  expect(r.raster.usesRealAtom, 'raster-area is built on the REAL surfaceraster atom, not hand-listed moves').toBe(true);
+  expect(r.raster.selfDocumenting, "the atom's own emit carries named #vars with explanatory comments").toBe(true);
+  expect(r.raster.segCount, 'the bare snippet (no progstart/progend) traces a real, non-trivial toolpath on its own').toBeGreaterThan(3);
+  expect(r.raster.hasRealBounds, 'the bare snippet traces a real 2D area, not a degenerate zero-size path').toBe(true);
+  expect(r.raster.stackHead, 'raster-area drags in as one connected stack').toBe(true);
+
+  expect(r.facePass, 'face-pass exists under Complete Programs > Milling').not.toBeNull();
+  expect(r.facePass.usesRealAtom, 'face-pass is REBUILT on the real surfaceraster atom, not the old hand-listed facsimile').toBe(true);
+  expect(r.facePass.selfDocumenting, "face-pass's own emit is self-documenting like a real wizard op's would be").toBe(true);
+  expect(r.facePass.segCount, 'face-pass traces a real toolpath').toBeGreaterThan(3);
+  expect(r.facePass.hasRealBounds, "face-pass traces a real area, not a single degenerate line").toBe(true);
+});
