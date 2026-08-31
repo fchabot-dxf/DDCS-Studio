@@ -45,6 +45,7 @@ const HTML_PATH = path.join(OUT_DIR, 'progress.html');
 const JSON_PATH = path.join(OUT_DIR, 'progress.json');
 const HEARTBEAT_STDOUT_MS = 120_000;   // 2 minutes — cheap enough to answer "still alive?", rare enough to stay near-silent
 const STALE_AFTER_SEC = 120;           // documented in the rendered surfaces — a heartbeat older than this means the run died
+const WRITE_THROTTLE_MS = 400;         // t2443 — mid-run tick floor; see _write's own comment for why this exists at all
 
 const barChars = (pct, width = 30) => {
     const filled = Math.max(0, Math.min(width, Math.round((pct / 100) * width)));
@@ -59,6 +60,7 @@ const escapeHtml = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, (c) => (
 
 export default class ProgressReporter {
     constructor() {
+        this._lastWriteAt = 0;   // t2443 — mid-run write throttle; see _write
         this.total = 0;
         this.completed = 0;
         this.passed = 0;
@@ -124,6 +126,22 @@ export default class ProgressReporter {
 
     _write(status) {
         const now = Date.now();
+        // t2443 (advisor) — THROTTLED, as HYGIENE. This used to write on EVERY onTestEnd including non-final
+        // attempts: ~3000 tests × THREE synchronous writeFileSync calls (one re-rendering a whole HTML doc)
+        // ≈ 9,000 blocking writes on Playwright's MAIN process, the one coordinating six workers.
+        //
+        // ⚠ IT WAS PROPOSED AS THE CAUSE OF t2441's 46-FAILURE SUITE AND THAT IS NOT ESTABLISHED — the
+        // advisor's own arithmetic argues AGAINST it: three small files at ~0.3ms is ~3 SECONDS spread over a
+        // 25-minute run, which cannot tip a 60s timeout. ⛔ Do not cite this throttle as that fix. It is here
+        // because writing 9,000 times to render a progress bar is wasteful on its own terms, not because it
+        // was shown to break anything. If the 46 recur AFTER this, that is expected — look elsewhere.
+        //
+        // ⚠ ALSO NOTE THE THROTTLE BARELY BINDS at the real event rate (~2 test-ends/sec across the suite, so
+        // ~500ms apart already). Raising it would reduce writes further but buys nothing measured.
+        // ⭐ A terminal status ALWAYS writes — the final numbers and the stale-marker must never be throttled
+        // away. Only mid-run 'running' ticks are rate-limited.
+        if (status === 'running' && now - this._lastWriteAt < WRITE_THROTTLE_MS) return;
+        this._lastWriteAt = now;
         const elapsedMs = now - this.startedAt;
         const pct = this.total ? (this.completed / this.total) * 100 : 0;
         const rate = this.completed > 0 ? elapsedMs / this.completed : 0;
