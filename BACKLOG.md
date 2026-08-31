@@ -2223,10 +2223,19 @@ could still emit real content; this turn only confirmed the leaf-atom case defin
 
 ---
 
-### 25. [⭐ RULED 2026-08-26 — shape distinction approved, ready to build] THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
+### 25. [✅ SHIPPED t2365, 2026-08-28, commit `24135e9b` — ⚠ this doc entry was never updated to say so; re-verified
+still live t2451, 2026-08-31] THE DIRTY DOT CANNOT TELL "NEVER SAVED" FROM "CHANGED SINCE SAVING"
 
 *(surfaced 2026-08-25 by BACKLOG 17, which was NOT a bug — the dot was correct throughout. This is what the
 episode actually exposed.)*
+
+⚠ **t2451 dispatched this as still-open, "buildable-as-ruled."** It was not — this doc entry simply never got
+its SHIPPED header after t2365 built it. Re-verified live at t2451: `ui/fileSaveState.js`'s `refresh()` +
+`styles.css`'s `.hdr-ws-dirty-dot.is-never-saved` (hollow ring) both match the ruling below exactly, agree with
+`ui/workspaceManager.js`'s own three-state panel class, pass `workspace-dirty-dot-2188.spec.js` +
+`persistence-file-indicator.spec.js` (9/9), and read as a clean, legible hollow ring across three themes
+(studio/organic/steampunk, screenshot-checked at 8x scale). No code changed for this entry this turn — see
+WORK-LOG t2451 for the full re-verification and the doc fix.
 
 **STILL REAL IF:** open a workspace never saved to a file, and one saved-then-edited. **If the header dot looks
 identical in both, STILL REAL.**

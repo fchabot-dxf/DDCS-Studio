@@ -65591,3 +65591,44 @@ file changed, so `test:changed`'s import graph has nothing new to pick up).
 
 Files: `tests/node/__snapshots__/preview-spec-1688.txt`.
 
+## t2451 — BACKLOG #25 was ALREADY SHIPPED (t2365, commit `24135e9b`, 2026-08-28) — dispatch was
+working from a stale BACKLOG.md entry; corrected the doc, verified the shipped feature is still live and correct
+
+Dispatched as "buildable-as-ruled, not a design turn" — the owner's shape-distinction ruling from 2026-08-26 was
+never marked shipped in `BACKLOG.md`, so the advisor read it as still-open. **It is not.** `git log --oneline -- 
+web/ui/fileSaveState.js` shows `24135e9b "BACKLOG #25: the dirty dot distinguishes never-saved from stale"`,
+2026-08-28, already an ancestor of this branch's HEAD. Read the file in hand before touching anything (per the
+dispatch's own "establish first" instruction) and found the FULL three-state distinction already built and
+commented as such: `ui/fileSaveState.js`'s `refresh()` sets `.is-never-saved` (hollow ring) vs plain `.is-on`
+(filled, stale) vs neither (clean, hidden) on `#hdrWsDirtyDot`; `styles.css`'s `.hdr-ws-dirty-dot.is-never-saved`
+carries the hollow-ring CSS (`background:transparent` + a themed border, `color-mix` against `--text-main` the
+same way the filled fill is computed — a semantic token, not a hardcoded color); `ui/workspaceManager.js`'s own
+`renderCurrent()` already had the matching `is-never-saved`/`is-stale`/`is-saved` three-state class on the
+overlay panel. Both surfaces already agree, which is exactly the defect entry #25 itself named as unmet.
+
+**Did not rebuild it — verified it instead, since the dispatch's own instruction was to establish the current
+state before touching anything:**
+- `tests/workspace-dirty-dot-2188.spec.js` + `tests/persistence-file-indicator.spec.js` (the two files the
+  original shipping commit rebaselined): **9/9 passing**, live-run, not just "exists in git log."
+- Live screenshot check across three themes (`studio`, `organic`, `steampunk`) in the never-saved (hollow-ring)
+  state, at 8x device scale for legibility — the shape reads as a clean, distinct ring against all three
+  backgrounds; the token-driven border color (`color-mix` against each theme's own `--accent`/`--text-main`)
+  adapts correctly, not hardcoded per-theme. The filled/stale state is already covered by the 9/9 automated
+  suite above; a manual scratch repro of "dirty" via a raw `localStorage` poke didn't trip the real
+  signature-based detector (`workspaceSignature()` over the declared `BACKUP_STORES` registry, not a
+  string-length check) — expected, not a finding, and not worth chasing further given the automated coverage
+  already exists.
+- Scratch screenshots and the throwaway spec used to take them were deleted before commit — not part of this
+  turn's diff.
+
+**Corrected `BACKLOG.md`'s #25 entry** to `[✅ SHIPPED t2365 / verified-still-live t2451]`, citing the commit
+and this turn's re-verification, so a future turn doesn't re-read it as open and re-derive the same build a
+third time — the same staleness trap the tail item above just cost two turns to re-triage.
+
+**No code changes were needed or made for #25 itself.** The only code-adjacent change this turn made is the
+tail item's snapshot regeneration, logged separately above as its own commit per the dispatch's own instruction.
+
+Tier: doc-only for #25 (`BACKLOG.md`) — nothing to gate.
+
+Files: `BACKLOG.md`.
+
