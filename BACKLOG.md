@@ -3675,7 +3675,7 @@ and culling/renaming Blockly's native context-menu entries. The canvas keeps its
 
 ---
 
-### 47. EXACT-NAME REFERENCES ON THE EMIT-SIDE BLOCKS ARE FREE TEXT — extend #42's picker principle to them
+### 47. [⚠ TIER 1 SHIPPED t2395 — goto/ifgoto/probecheck/confirm target pickers + the `assign.var` pilot with the live per-dialect traffic light. TIERS 2-4 STILL OPEN: the other var fields, tool/pin numbers, `flip.setup`] EXACT-NAME REFERENCES ON THE EMIT-SIDE BLOCKS ARE FREE TEXT — extend #42's picker principle to them
 
 *(from the 2026-08-28 block-def sweep, all 136 defs audited with file:line. The principle is ALREADY
 owner-ruled in #42 — "wherever we need an exact variable name don't allow typing"; this entry is its
