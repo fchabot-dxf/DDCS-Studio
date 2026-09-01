@@ -67489,3 +67489,104 @@ zero code changes, as a clean-repo sanity check: **3013 passed, 2 failed, 15 fla
 both failures are the same two already-known, unrelated flakes this session has seen before (`sf-pos-snapback`,
 documented since t2465; `open-as-modal-1625`'s preview-chrome test, re-confirmed solo at t2485), consistent with
 zero product code touched this turn.
+
+## t2489 — completed the clamp vocabulary (authorized, symmetric addition), then ported odTurn on it: byte-
+identical gate numbers, 41/41 existing lathe tests unedited, onEdit deliberately kept hand-written
+
+One ruled-out lead, no action needed, filed for whoever next touches BACKLOG #66: the advisor checked whether
+the missing max clamp explained parting's own dead partPos handle -- it does not. latheProfileCanvas.js
+(current, pre-this-turn) showed partPos's own drag writing zFace straight from world.x with NO bounding at all,
+clamp-shaped or otherwise. Every clamp-shaped theory for #66 is eliminated by this, not just the max-clamp one
+-- worth restating in #66 itself next time it's touched, not left standing only in this entry.
+
+THE CLAMP COMPLETION (web/viz/canvasWidgets.js): the advisor overruled t2487's own rule-of-three deferral,
+reasoning that rule-of-three governs building ENGINES, not completing an asymmetric declaration -- clampMin
+already existed, consumed at exactly 7 call sites (d.min x3, d.minw + d.minh, d.minR x2) across 6 of the 11
+gestures; a bound with only a lower side was an omission, not a decision. Renamed clampMin(v, lo) to clamp(v,
+lo, hi) (both optional, hi == null behaves identically to the old function -- confirmed, not assumed: test:node's
+own 32-twin x 2-state snapshot gate came back with ZERO diff after this rename alone, before any declaration
+used the new hi param) and threaded a symmetric max/maxw/maxh/maxR alongside each of the 7 existing
+min/minw/minh/minR call sites -- mechanical, uniform, no gesture-shape changes.
+
+THE PORT (odProfileSpec, same file): the shoulder's "one corner, two fields" shape maps onto rect exactly as
+derived at t2487 -- ax:0, ex:zEnd, sx:-1, minw:0.001 for depth, ay:0, ey:endR, sy:0.5, minh:0, maxh:2x(barR-0.001)
+for the diameter (the sy:0.5 divisor performs the radius-to-diameter x2 conversion, so the new bound has to be
+diameter-scaled too -- 2x(barR-0.001), not barR-0.001 itself; got this right by working the algebra through
+explicitly, not by eyeballing units). FACE_DIA_HANDLE_ID (taper-only) is the same rect gesture with only sy
+active (sx/field omitted, so the "if (d.sx)" branch in rect.drag never fires -- a single-field diameter handle,
+not a second gesture).
+
+onEdit KEPT HAND-WRITTEN, and this is a deliberate, reported design choice, not a gap. Attempting the full port
+surfaced a mismatch the clamp work didn't touch: buildCanvasWidgets's own generic onEdit can only route a
+click-to-edit to d.field -- never d.fieldH -- and the shoulder handle's own editable value (the diameter a
+person actually clicks) lives on fieldH in this declaration (field carries depth). Using the generic onEdit
+would have silently misrouted an edit to depth instead of the diameter -- a real regression, confirmed by
+reading buildCanvasWidgets's own onEdit implementation, not assumed. pocket's own pk_size (the ONLY existing
+rect-based handle with a comparable fused shape) sidesteps the question entirely -- it never sets value, so it
+was never click-editable via the generic path either, per featureCanvas.js's own "h.value != null" gate. So
+this is genuinely the FIRST case the registry's onEdit shape has been asked to cover and cannot. Per the
+advisor's own tightened guardrail ("if it ramifies into the gesture shapes... STOP AND REPORT" -- scoped to
+drag math, but the same reasoning applies: don't paper over a capability gap by force), kept onEdit on the
+ALREADY-SHARED onEditFromMap helper this file's every other lathe spec already uses (not odTurn-specific, not a
+second copy) -- buildCanvasWidgets returns {handles, onDrag, onEdit} as three separate properties; nothing
+requires a caller to consume all three, and using only the two that fit cleanly (place/drag, the actual
+duplicated MATH this port exists to collapse) costs nothing observable while avoiding a forced, incorrect
+generic-onEdit wiring.
+
+Gate numbers, before vs. after, side by side -- byte-identical, three seed directions
+(dragHandleRenderTruth(page,'shoulder',...), live boot, real pointer drags):
+  diag  (dx-50,dy30): before={x:1239.158,y:480.876} mid={x:1189.159,y:503.677} -- SAME before and after.
+        movedMid=54.952 movedAfter=54.952 -- SAME before and after.
+  pureX (dx80,dy0):   before={x:1239.158,y:480.876} mid={x:1319.159,y:480.876} -- SAME before and after.
+        movedMid=80.001 movedAfter=80.001 -- SAME before and after.
+  pureY (dx0,dy-40):  before={x:1239.158,y:480.876} mid={x:1239.158,y:471.108} -- SAME before and after.
+        movedMid=9.768 movedAfter=9.768 -- SAME before and after.
+No digit moved in any of the six coordinates x three seeds. Captured via a temporary "git checkout HEAD --"
+(both canvasWidgets.js and latheProfileCanvas.js saved to a scratch copy first, restored and diff-confirmed
+byte-identical after) -- this repo's own "no git stash" rule, same technique as t2483/t2485.
+
+Every existing lathe test re-run, unedited -- 41/41 passed: lathe-odturn-1273.spec.js (28 tests, incl. "THE
+SHOULDER CORNER is ONE handle with TWO outputs -- and the drag moves the EMIT, not just the pixel", the taper
+test, the .wiz round trip, gating, the header-comment test), lathe-world-1283.spec.js (13), lathe-matrix.spec.js
+(6, incl. the OD TURNING 8-configuration sweep), census-finding2-emits-teal-1684.spec.js (4, incl. the shoulder
+handle's own emits:true -> teal render). Zero edits to any of these files.
+
+The snapshot diff, ENUMERATED BY DIRECTION (the correction absorbed from t2487 -- not summarised by explanation
+this time), from preview-spec-1688.txt, odTurn's own 5 changed lines only, nothing else in the 32-twin x
+2-state fixture moved (confirmed via git diff --stat, 5 lines changed):
+- ADDED (present-but-undefined, buildCanvasWidgets's own generic wrapper spread): color, manual, noSnap -- on
+  both handles, both param states. ADDED, gesture-specific this time (NEW vs. facing's own t2485 diff --
+  rect.place() itself always includes this key, length.place() does not): labelDir -- on both handles, both
+  states.
+- REMOVED: axis:"y" -- ONLY from faceDia (the @offdefaults state; shoulder never had an axis key in the
+  original literal at all, so nothing was removed there). Confirmed inert by the SAME reasoning the advisor
+  independently verified for facing's own removal at t2487: featureCanvas.js never reads a handle's own .axis
+  -- every .axis hit in that file is the edge-picker/grid mechanism, unrelated.
+- ALTERED: onDrag "<fn/2>" -> "<fn/3>" -- both states. Same as facing: featureCanvas.js's own call site
+  (this.spec.onDrag(this.active.id, {x,y})) always passes exactly 2 args, so the extra param is never
+  populated in practice.
+- UNCHANGED, checked explicitly against the four protected defect classes: emits still true (t1684), onEdit
+  still "<fn/2>" (t1680 -- literally unchanged, since it stayed hand-written), no noSnap:true was ever declared
+  for either odTurn handle either way (t1674 -- nothing to lose). x/y/value/kind/label/id identical on every
+  line (the actual geometry, unmoved).
+
+Tier: viz/canvasWidgets.js is a shared registry consumed by every mill wizard's own handles -- rule 1b, full
+suite before concluding.
+
+### VERIFY
+
+odTurn gate numbers before/after: IDENTICAL, stated side by side above, no digit moved. The 7 existing
+clampMin -> clamp call sites: test:node's own snapshot gate re-ran with ZERO diff immediately after the rename
+(before any declaration used the new hi param) -- provable, not asserted, since that gate captures EVERY
+twin's own handle geometry and would have caught a single-pixel drift at any of the 7 sites.
+tests/lathe-odturn-1273.spec.js + 3 other lathe files: 41/41 passed unedited. test:node: 238/238 after the
+reviewed, direction-enumerated snapshot regeneration. test:changed: 0 tests found (Playwright's changed-file
+detection can't map a bare .js module change through to spec files for this class of change -- same gap noted
+at t2485, not a coverage hole given the 41 lathe tests + full suite both ran). Full suite --workers=4 BEFORE
+concluding: **3019 passed, 1 failed, 10 flaky, 26 skipped** (3056 total) -- the one failure is the same
+pre-existing sf-pos-snapback load-contention timeout documented since t2465, unrelated. git status --porcelain:
+confirmed exactly the intended files (BACKLOG.md, WORK-LOG.md, web/viz/canvasWidgets.js,
+web/viz/latheProfileCanvas.js, tests/node/__snapshots__/preview-spec-1688.txt), staged BY PATH per this turn's
+own explicit instruction -- none of the pre-existing unrelated verification PNGs touched. handoff.py amendments
+--role worker polled clean before the full-suite run. proc_health.py watch: clean. Scratch _live-check.spec.js
+(the before/after gate-number capture) and the two scratch source-file backups deleted, never committed.

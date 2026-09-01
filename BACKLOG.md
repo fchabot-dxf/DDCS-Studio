@@ -5520,6 +5520,43 @@ worth adding to the registry if a third case turns up, not something to bolt on 
 **GUARDRAIL TRIPPED. No product code touched, no registry change, no contorted shape shipped.** Full account:
 WORK-LOG t2487.
 
+**RULED OUT (t2489, no action): the missing max clamp does NOT explain BACKLOG #66's dead `partPos` handle** —
+`partPos`'s own drag writes `zFace` straight from `world.x` with no bounding at all, clamp-shaped or otherwise.
+Every clamp-shaped theory for #66 is eliminated by this, not just the max-clamp one.
+
+### ⭐⭐⭐⭐ t2489 — THE CLAMP VOCABULARY COMPLETED (authorized override of t2487's own rule-of-three deferral),
+THEN `odTurn` PORTED ON IT: byte-identical gate numbers, `onEdit` deliberately kept hand-written
+
+The advisor overruled t2487's own deferral: rule-of-three governs building ENGINES, not completing an
+ASYMMETRIC declaration — `clampMin` already existed at 7 call sites across 6 gestures; a lower-only bound was
+an omission, not a decision. `web/viz/canvasWidgets.js`'s `clampMin(v, lo)` → `clamp(v, lo, hi)` (both optional,
+backward-compatible — confirmed via a snapshot-gate re-run showing ZERO diff immediately after the rename,
+before any declaration used the new param), threaded symmetrically as `max`/`maxw`/`maxh`/`maxR` alongside the
+existing `min`/`minw`/`minh`/`minR` at all 7 sites.
+
+`odProfileSpec`'s shoulder handle ported onto `rect` exactly as t2487 derived: `sx:-1` for depth, `sy:0.5` (a
+radius→diameter ×2 conversion, so the new `maxh` bound is `2×(barR−0.001)`, diameter-scaled) for the clamped
+diameter. Gate numbers before/after: **byte-identical**, three seed directions, no digit moved. 41/41 existing
+lathe tests (`lathe-odturn-1273`/`lathe-world-1283`/`lathe-matrix`/`census-finding2-emits-teal-1684`) passed
+UNEDITED.
+
+**`onEdit` deliberately kept hand-written** — a SECOND mismatch, found only by attempting the real port:
+`buildCanvasWidgets`'s own generic `onEdit` can only route to `d.field`, never `d.fieldH`, but the shoulder's
+own click-editable value (the diameter) lives on `fieldH` (`field` carries `depth`). Using the generic version
+would silently misroute an edit to the wrong field. `pocket`'s own `pk_size` (the only other fused `rect`
+handle) never exercises this path at all (no `value` declared, so never click-editable). Kept `onEdit` on the
+ALREADY-SHARED `onEditFromMap` helper (not odTurn-specific) rather than force the generic one or extend the
+registry a second time this turn — `buildCanvasWidgets` returns three separate properties; using two of them
+is not a contortion.
+
+Snapshot diff enumerated BY DIRECTION (the correction absorbed from t2487): **ADDED** `color`/`manual`/`noSnap`
+(generic wrapper) + `labelDir` (new this time — `rect.place()`'s own shape, `length.place()` never had it).
+**REMOVED**: `axis:"y"`, only from `faceDia` (confirmed inert, same reasoning as facing's own removal).
+**ALTERED**: `onDrag` arity `<fn/2>`→`<fn/3>` (never populated in practice). Checked against all four protected
+defect classes (t1672/1686/1680/1674): none touched.
+
+Full account: WORK-LOG t2489.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`

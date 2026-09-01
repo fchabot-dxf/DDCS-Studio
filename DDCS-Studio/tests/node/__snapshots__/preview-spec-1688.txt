@@ -625,27 +625,27 @@ user_lathe_odprobe @offdefaults .onEdit "<fn/2>"
 user_lathe_odprobe @offdefaults .stock {"h":13.5,"ox":-60,"oy":0,"w":61}
 user_lathe_odturn @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_odturn @defaults .handles <1 entries>
-user_lathe_odturn @defaults .handles[0] {"emits":true,"id":"shoulder","kind":"size","label":"shoulder","value":14,"x":-25,"y":7}
+user_lathe_odturn @defaults .handles[0] {"color":"<undefined>","emits":true,"id":"shoulder","kind":"size","label":"shoulder","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":14,"x":-25,"y":7}
 user_lathe_odturn @defaults .items <5 entries>
 user_lathe_odturn @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_odturn @defaults .items[1] {"cls":"fc-feature-pocket","h":3,"kind":"rect","w":25,"x":-25,"y":7}
 user_lathe_odturn @defaults .items[2] {"kind":"line","x1":0,"x2":-25,"y1":7,"y2":7}
 user_lathe_odturn @defaults .items[3] {"kind":"line","x1":-25,"x2":-25,"y1":7,"y2":10}
 user_lathe_odturn @defaults .items[4] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
-user_lathe_odturn @defaults .onDrag "<fn/2>"
+user_lathe_odturn @defaults .onDrag "<fn/3>"
 user_lathe_odturn @defaults .onEdit "<fn/2>"
 user_lathe_odturn @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_odturn @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_odturn @offdefaults .handles <2 entries>
-user_lathe_odturn @offdefaults .handles[0] {"emits":true,"id":"shoulder","kind":"size","label":"far end","value":"<NaN>","x":-32,"y":10.5}
-user_lathe_odturn @offdefaults .handles[1] {"axis":"y","emits":true,"id":"faceDia","kind":"size","label":"face Ø","value":21,"x":0,"y":10.5}
+user_lathe_odturn @offdefaults .handles[0] {"color":"<undefined>","emits":true,"id":"shoulder","kind":"size","label":"far end","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":"<NaN>","x":-32,"y":10.5}
+user_lathe_odturn @offdefaults .handles[1] {"color":"<undefined>","emits":true,"id":"faceDia","kind":"size","label":"face Ø","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":21,"x":0,"y":10.5}
 user_lathe_odturn @offdefaults .items <5 entries>
 user_lathe_odturn @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_odturn @offdefaults .items[1] {"cls":"fc-feature-pocket","h":0,"kind":"rect","w":32,"x":-32,"y":10.5}
 user_lathe_odturn @offdefaults .items[2] {"kind":"line","x1":0,"x2":-32,"y1":10.5,"y2":10.5}
 user_lathe_odturn @offdefaults .items[3] {"kind":"line","x1":-32,"x2":-32,"y1":10.5,"y2":10}
 user_lathe_odturn @offdefaults .items[4] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
-user_lathe_odturn @offdefaults .onDrag "<fn/2>"
+user_lathe_odturn @offdefaults .onDrag "<fn/3>"
 user_lathe_odturn @offdefaults .onEdit "<fn/2>"
 user_lathe_odturn @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_parting @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}

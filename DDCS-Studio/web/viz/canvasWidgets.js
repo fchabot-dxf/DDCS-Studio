@@ -19,7 +19,20 @@
  */
 
 const DEG = 180 / Math.PI;
-const clampMin = (v, m) => (m == null ? v : Math.max(m, v));
+// t2489 — COMPLETES the clamp vocabulary: was clampMin(v, lo), a lower bound only, at all 7 of its call sites
+// below (d.min/d.minw/d.minh/d.minR). A bound with only one side was an OMISSION, not a decision — the missing
+// upper half is what BACKLOG #61's own odTurn/parting pilots needed ("never drag a turned diameter past the
+// bar's own surface") and neither could express. Declare-over-hand-roll's own "free" condition is met exactly:
+// the slot (a clamp parameter per axis) and the shape (mirroring the existing min* names) already existed, so
+// this is DATA completing an existing mechanism, not a new one — and it is symmetric across every call site,
+// not shaped around the one op that forced the question. Backward-compatible by construction: an omitted `hi`
+// clamps nothing (`m == null` behaved identically before this turn), so all 7 existing sites are unchanged
+// unless a caller starts passing the new max-side param.
+const clamp = (v, lo, hi) => {
+    let r = lo == null ? v : Math.max(lo, v);
+    r = hi == null ? r : Math.min(hi, r);
+    return r;
+};
 
 /** Each gesture: place(d) → a handle {x,y,kind,label?,value?}; drag(d, world) → a {field: value} map (or null). `d` is
  *  the view's declaration (the field id(s) + the geometry context). FeatureCanvas renders kind 'move' as a snapping
@@ -35,13 +48,13 @@ export const CANVAS_GESTURES = {
     // 1D LENGTH from an anchor along an axis (e.g. height). Handle at anchor + value·axis; drag → the axis distance.
     length: {
         place: (d) => ({ x: d.ax + (d.axis === 'x' ? d.value : 0), y: d.ay + (d.axis === 'x' ? 0 : d.value), kind: 'size', label: d.label, value: d.value }),
-        drag: (d, w) => ({ [d.field]: clampMin(d.axis === 'x' ? w.x - d.ax : w.y - d.ay, d.min) }),
+        drag: (d, w) => ({ [d.field]: clamp(d.axis === 'x' ? w.x - d.ax : w.y - d.ay, d.min, d.max) }),
     },
     // Horizontal SCALE factor about an x-anchor. Handle at the current right edge; drag scales proportionally (so the
     // tracking/constant part of the span is preserved — the factor follows the cursor's fraction of the current span).
     scaleX: {
         place: (d) => ({ x: d.edgeX, y: d.ay, kind: 'size', label: d.label, value: d.value }),
-        drag: (d, w) => { const span = d.edgeX - d.ax; if (Math.abs(span) < 1e-6) return null; return { [d.field]: clampMin(d.value * (w.x - d.ax) / span, d.min) }; },
+        drag: (d, w) => { const span = d.edgeX - d.ax; if (Math.abs(span) < 1e-6) return null; return { [d.field]: clamp(d.value * (w.x - d.ax) / span, d.min, d.max) }; },
     },
     // SHEAR / skew angle (deg): horizontal offset over a height `h` about a baseline anchor. Handle rides the slanted top.
     shear: {
@@ -50,7 +63,8 @@ export const CANVAS_GESTURES = {
     },
     // 2D SIZE / corner from an anchor → two fields. The handle sits at anchor + extents (ex/ey); a drag maps the corner
     // offset back to each field through a per-axis DIVISOR `sx`/`sy` (1 = literal W/H · `cols-1` = grid pitch · 0.5 =
-    // half-extent radius), and clamps with `minw`/`minh`. A zero divisor skips that axis (e.g. a single-column grid).
+    // half-extent radius), and clamps with `minw`/`minh` (and, t2489, the symmetric `maxw`/`maxh`). A zero divisor
+    // skips that axis (e.g. a single-column grid).
     rect: {
         place: (d) => {
             const vx = d.vx !== undefined ? d.vx : 1;
@@ -66,12 +80,12 @@ export const CANVAS_GESTURES = {
             const vx = d.vx !== undefined ? d.vx : 1;
             const vy = d.vy !== undefined ? d.vy : 1;
             if (d.sx) {
-                const nw = clampMin((w.x - d.ax) / (d.sx * vx), d.minw);
+                const nw = clamp((w.x - d.ax) / (d.sx * vx), d.minw, d.maxw);
                 m[d.field] = nw;
                 if (d.fx) m[d.fx] = d.ax - nw * d.sx;
             }
             if (d.sy) {
-                const nh = clampMin((w.y - d.ay) / (d.sy * vy), d.minh);
+                const nh = clamp((w.y - d.ay) / (d.sy * vy), d.minh, d.maxh);
                 m[d.fieldH] = nh;
                 if (d.fy) m[d.fy] = d.ay - nh * d.sy;
             }
@@ -81,7 +95,7 @@ export const CANVAS_GESTURES = {
     // POLAR handle about a center → a radius field + an angle field (the "rotate" gesture, fused with radius like a
     // drill ring/line-end). Handle at center + r·(cos,sin)a; a drag sets the angle (atan2) and scales the dragged
     // distance into the radius field via `rScale` (2 = Ø from a radius · 1/(n-1) = pitch). Omit `fieldA` for radius-only,
-    // or `rScale` for angle-only (pure rotate). `minR` clamps the radius.
+    // or `rScale` for angle-only (pure rotate). `minR`/`maxR` (t2489) clamp the radius.
     radial: {
         // t2327 (BACKLOG #33) — `shape: 'diamond'` swaps the rendered kind so a Ø/pitch-only handle (no `fieldA`)
         // never reads as a hole (FeatureCanvas draws every plain 'size' handle as a circle, the same shape holes
@@ -105,17 +119,18 @@ export const CANVAS_GESTURES = {
                 // whatever the raw distance happens to be — "it slides along the arm only." Omitting `lockA`
                 // (every existing radius-only caller) keeps the original isotropic hypot() math, unchanged.
                 const proj = d.lockA ? (dx * Math.cos(d.a) + dy * Math.sin(d.a)) : Math.hypot(dx, dy);
-                m[d.field] = clampMin(proj * d.rScale, d.minR);
+                m[d.field] = clamp(proj * d.rScale, d.minR, d.maxR);
             }
             return m;
         },
     },
     // PERPENDICULAR projection onto an axis `(nx,ny)` about an anchor → one symmetric field (e.g. a slot width measured
     // off its centreline). The handle rides the axis at `off` (the current half-extent); a drag projects the cursor onto
-    // the axis (signed distance), takes |·|·`scale` (2 = a half-distance → full width), and clamps to `min` (the tool Ø).
+    // the axis (signed distance), takes |·|·`scale` (2 = a half-distance → full width), and clamps to `min`/`max`
+    // (t2489) — `min` is the tool Ø.
     projLength: {
         place: (d) => ({ x: d.cx + d.nx * d.off, y: d.cy + d.ny * d.off, kind: 'size', label: d.label, value: d.value }),
-        drag: (d, w) => ({ [d.field]: clampMin(d.scale * Math.abs((w.x - d.cx) * d.nx + (w.y - d.cy) * d.ny), d.min) }),
+        drag: (d, w) => ({ [d.field]: clamp(d.scale * Math.abs((w.x - d.cx) * d.nx + (w.y - d.cy) * d.ny), d.min, d.max) }),
     },
     // MIDDLE ② DIAGONAL-AIM: the trans-axial diagonal ends ON ②. The handle sits at the diagonal target — on the PRIMARY axis
     // at `prim` (diagPrimary #22, numeric; the stock centre at rest when it holds '#53'), on the SECONDARY axis at
@@ -152,7 +167,7 @@ export const CANVAS_GESTURES = {
             return {
                 [d.fieldAxis]: horiz ? 'X' : 'Y',
                 [d.fieldDir]: (horiz ? dx : dy) >= 0 ? 'pos' : 'neg',
-                [d.field]: clampMin(Math.hypot(dx, dy), d.minR),
+                [d.field]: clamp(Math.hypot(dx, dy), d.minR, d.maxR),
             };
         },
     },

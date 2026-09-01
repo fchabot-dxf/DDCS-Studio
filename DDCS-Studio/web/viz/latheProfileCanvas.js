@@ -209,6 +209,19 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
  * CLAMPED INSIDE THE BAR: a target at or outside the bar diameter is a pass that never touches metal, and a depth
  * of zero or less is not a turn. The handle stops at what the machine can actually do.
  *
+ * t2489 (BACKLOG #61 / L5) — `handles`/`onDrag` are now DECLARED through `canvasWidgets.js`'s `rect` gesture:
+ * the shoulder's own "one corner, two fields" shape IS `rect`'s own anchor+per-axis-divisor structure (`sx:-1`
+ * reproduces the depth math, `sy:0.5` a radius→diameter conversion falls straight out of the existing divisor),
+ * and the two-sided "never past the bar's own surface" clamp — which no gesture could express before this turn
+ * — is now `maxh` (t2489's own completion of the clamp vocabulary, symmetric with the pre-existing `minh`).
+ * `onEdit` is DELIBERATELY KEPT HAND-WRITTEN, via the SAME shared `onEditFromMap` helper every other lathe spec
+ * in this file already uses (not odTurn-specific, not a second copy) — `buildCanvasWidgets`'s own generic
+ * `onEdit` can only route a click-to-edit to `d.field` (the X-axis field), never `d.fieldH` (the Y-axis one),
+ * and the shoulder's own editable value — the diameter a person actually clicks — lives on `fieldH`. Swapping
+ * in the generic version would silently misroute an edit to `depth` instead: a genuine capability gap, not
+ * something a symmetric clamp completion should paper over. Splitting the return this way costs nothing
+ * observable (`onEditFromMap`'s own output is unchanged, byte-for-byte) while still collapsing the actual
+ * duplicated math (place/drag) onto the shared registry.
  * @param {object} bar   {diameter, stickOut, allowance}
  * @param {object} od    {kind, targetDiameter, endDiameter, depth}
  * @param {(patch:object) => void} onChange  called with the changed FIELDS ({targetDiameter, depth, …}) on a drag
@@ -241,30 +254,26 @@ export function odProfileSpec(bar, od, onChange) {
         { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
     ];
 
-    const handles = [
-        { id: SHOULDER_HANDLE_ID, x: zToCanvas(zEnd), y: endR, kind: 'size', emits: true,
-          label: taper ? 'far end' : 'shoulder', value: taper ? o.endDiameter : o.targetDiameter },
-    ];
-    if (taper) handles.push({ id: FACE_DIA_HANDLE_ID, x: zToCanvas(0), y: targetR, kind: 'size', axis: 'y', emits: true,
-                              label: 'face Ø', value: o.targetDiameter });
+    // the bar's own outer surface, minus the same 0.001 margin the hand-written version used — "a hair inside the
+    // bar, never AT it: a pass at exactly the bar radius cuts nothing but air." maxDia is the CLAMPED-DIAMETER
+    // upper bound `rect`'s own `sy:0.5` divisor needs (the divisor performs the ×2 radius→diameter conversion,
+    // so the bound must already be diameter-scaled: `2 × (barR − 0.001)`, not `barR − 0.001` itself).
+    const maxDia = 2 * (barR - 0.001);
+    const { handles, onDrag } = buildCanvasWidgets([
+        { type: 'rect', id: SHOULDER_HANDLE_ID, field: 'depth', fieldH: taper ? 'endDiameter' : 'targetDiameter',
+          ax: 0, ay: 0, ex: zEnd, ey: endR, sx: -1, sy: 0.5, minw: 0.001, minh: 0, maxh: maxDia,
+          emits: true, label: taper ? 'far end' : 'shoulder', value: taper ? o.endDiameter : o.targetDiameter },
+        ...(taper ? [{ type: 'rect', id: FACE_DIA_HANDLE_ID, fieldH: 'targetDiameter',
+                       ax: 0, ay: 0, ex: 0, ey: targetR, sy: 0.5, minh: 0, maxh: maxDia,
+                       emits: true, label: 'face Ø', value: o.targetDiameter }] : []),
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
 
     return {
         // the frame IS the bar's half-section — the canvas draws it as the outline, so no second silhouette
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
         items,
         handles,
-        onDrag: (id, world) => {
-            if (typeof onChange !== 'function') return;
-            // …a hair inside the bar, never AT it: a pass at exactly the bar radius cuts nothing but air.
-            const insideBar = (r) => Math.min(Math.max(0, r), barR - 0.001);
-            if (id === SHOULDER_HANDLE_ID) {
-                const dia = r3(diameterOf(insideBar(world.y)));
-                const len = r3(Math.max(0.001, -canvasToZ(world.x)));    // depth grows into −Z; zero is not a turn
-                onChange(taper ? { endDiameter: dia, depth: len } : { targetDiameter: dia, depth: len });
-                return;
-            }
-            if (id === FACE_DIA_HANDLE_ID) onChange({ targetDiameter: r3(diameterOf(insideBar(world.y))) });
-        },
+        onDrag,
         onEdit: onEditFromMap({
             [SHOULDER_HANDLE_ID]: (v) => (taper ? { endDiameter: v } : { targetDiameter: v }),
             [FACE_DIA_HANDLE_ID]: 'targetDiameter',
