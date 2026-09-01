@@ -5378,3 +5378,42 @@ own state), but building the actual FIX is a separate turn's job, and a presence
 specific defect would need to reproduce the LAYOUT interaction (form length × viewport × stacked mode), not
 just hide an element — a materially different, larger mutation than L2's own acceptance seed. Named as the
 concrete next step, not attempted here.
+
+---
+
+### 63. `undo-blind-writes-2427.spec.js` flakes SOLO (`--workers=1`, fully isolated) — a boot-timeout shape, the
+SAME class as BACKLOG #57, structurally distinct from #56's contention-only shape
+
+*(filed t2465, per that turn's own explicit instruction — t2463 declined to file this from the SAME evidence,
+reasoning it "wasn't reproduced from a stable baseline first"; that reasoning was wrong, the measurement WAS
+the reproduction. Corrected here, not silently.)*
+
+**OBSERVED, t2463's own investigation (re-purposed as this entry's reproduction, not re-run from scratch)**:
+while ruling out t2463's own two full-suite failures as contention rather than regressions, `undo-blind-
+writes-2427.spec.js` was run **fully isolated, `--workers=1`, nothing else executing**, twice:
+- At `--workers=2` (alongside nothing else, but not the strictest isolation): **3 of 4 tests flaky.**
+- At `--workers=1`, truly alone: **2 of 4 tests still flaky** — `8 RAPID input-only writes... coalesce into
+  exactly one undo entry` and `a DRAG-SHAPED burst (~27 writes...) still yields exactly ONE undo entry, not
+  dozens`.
+
+**The first error in both cases is a bare boot timeout**, not anything about undo/write-coalescing logic:
+`TimeoutError: page.waitForFunction: Timeout 5000ms exceeded` at `page.goto('/'); await page.waitForFunction(()
+=> window.ddcsStudio && window.showApp);` — the app has not finished booting within 5 seconds, even completely
+alone with no other test competing for the CPU/browser.
+
+⇒ **Same class as BACKLOG #57** (`undo-reproject-echo.spec.js` — flakes solo, not a contention artifact) —
+**genuinely distinct from BACKLOG #56** (`open-as-modal-1625` — only misbehaves under 6-worker contention,
+clean when isolated). Two confirmed SOLO flakes now exist, in different files, with no shared root cause
+established yet and no shared entry — worth someone eventually asking whether they share a cause (a
+slow-boot condition affecting ANY test that races a fixed short timeout against `window.ddcsStudio` readiness)
+or are coincidentally similar in shape only.
+
+⛔ **Not investigated further this turn** (t2465's own scope: the presence primitive + the small item, not a
+new root-cause hunt) — for whoever picks it up: start from WHY the boot itself intermittently exceeds 5
+seconds solo, not from the undo-coalescing logic these tests nominally exercise (which never got the chance to
+run in either failing case — the boot never completed).
+
+**STILL REAL IF**: `undo-blind-writes-2427.spec.js` fails/flakes again — alone, `--workers=1`, nothing else
+running — on a turn that touches none of `programModel.js`'s save-state batching or `blocksApp.js`'s own boot
+sequence. Cross-link BACKLOG #57 — if a shared root cause is ever found, merge the two rather than duplicating
+the fix.

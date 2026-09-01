@@ -66451,3 +66451,20 @@ time; confirmed via `git status`, not assumed). `test:node` 238/238.
 Files: `tests/support/affordancePresence.js` (new), `tests/support/previewMutations.js` (extended, new 5th
 entry + sf-pos status updated), `tests/preview-mutation-manifest-2463.spec.js` (tightened assertion, presence
 dispatch), `BACKLOG.md` (#62 extended with the live confirmation + third reproduction).
+
+## t2465 (SMALL ITEM, own commit per rule 4) — BACKLOG #63 filed: `undo-blind-writes-2427.spec.js` flakes solo,
+same class as #57, distinct from #56
+
+t2463 declined to file this from its own measurement, reasoning it "wasn't reproduced from a stable baseline
+first" — that reasoning was corrected this turn: the measurement WAS the reproduction. Re-confirmed at
+`--workers=1`, truly alone: **2 of 4 tests still flaky** (`8 RAPID input-only writes...` and `a DRAG-SHAPED
+burst (~27 writes...)`), first error a bare `page.goto('/') → waitForFunction(ddcsStudio && showApp)` timeout —
+a BOOT timeout, not anything about the undo/write-coalescing logic these tests nominally exercise (which never
+gets a chance to run when the boot itself doesn't complete in time). Filed as BACKLOG #63, cross-linked to #57
+(the same solo-flake shape — a boot/settle race, not #56's contention-only shape), with a `STILL REAL IF`.
+Root cause not investigated (out of this turn's own scope).
+
+Tier: doc-only (`BACKLOG.md`) — nothing to gate.
+
+Files: `BACKLOG.md` (#63 new).
+
