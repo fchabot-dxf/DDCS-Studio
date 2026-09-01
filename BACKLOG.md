@@ -6076,8 +6076,9 @@ single number, is the claim. The sharper, root-confirming check: the B-moves-whe
 
 ---
 
-### 66. [t2479 — root PRECISELY BOUNDED (a width-dependent threshold between 15mm and 20mm), NOT fully pinned
-to one mechanism — several hypotheses tested and REFUTED, GUARDRAIL TRIPPED, not fixed] `parting`'s `partPos`
+### 66. [t2479 — root PRECISELY BOUNDED (a width-dependent threshold between 15mm and 20mm); ⭐⭐⭐⭐⭐⭐ t2499 —
+ROOT CAUSE FOUND AND CONFIRMED BY DIRECT OBSERVATION: a NEIGHBOURING handle's own click-to-edit LABEL occludes
+`partPos`'s circle. DIAGNOSED, still NOT FIXED (out of this turn's own explicit scope)] `parting`'s `partPos`
 handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT
 ONLY, not fixed. Different SHAPE from #64/#65 — non-responsive, not a snap-back
 
@@ -6197,6 +6198,69 @@ entirely, as a class — not just this one declaration's own shape, but "somethi
 is written" as a category of explanation. Whatever is broken has to live in something `partPos` alone touches
 that `facing`'s handle does not (its own id, its own field name, or something about WHERE in the DOM/render
 order this particular op's handle lands) — a much narrower place to look than before this turn.
+
+### ⭐⭐⭐⭐⭐⭐ t2499 — ROOT CAUSE FOUND AND CONFIRMED BY DIRECT OBSERVATION, four turns and roughly a dozen refuted
+hypotheses later: `partFloor`'s own click-to-edit LABEL occludes `partPos`'s handle circle. STILL NOT FIXED —
+diagnose-only, per this turn's own explicit scope
+
+*(dispatched to answer a DIFFERENT question — does this share a root with BACKLOG #70's own polygon hang — and
+the shared-root question is answered NO, see #70's own entry. Finding this along the way was the byproduct of
+doing that comparison properly: t2495's own framing, "something about WHERE this handle lands," pointed exactly
+here.)*
+
+**OBSERVED, directly, via `document.elementFromPoint()` at `partPos`'s own handle centre**: swept `elementFromPoint`
+at REST (no drag) for every currently-ported lathe handle with a value label — ten handles across seven ops
+(`facing`/`centerDrill`/`faceProbe`/`odProbe`/`odTurn`/`parting`'s three/`polygon`'s two). **`partPos` is the
+ONLY one where the point under the handle's own centre resolves to something OTHER than the handle itself** —
+every other handle correctly resolves to its own `<circle class="fc-handle">`; `partPos` resolves to a
+`<text class="fc-handle-label">` instead, with `e.target.closest('.fc-handle')` returning `null` (the label
+element is not a descendant of the handle circle — a completely separate DOM node happening to sit on top of
+it, confirmed via `featProbe.js`'s own passive `pointerdown` capture-phase listener never firing the
+`▼ DRAG | hid:partPos` line at all when a real synthetic pointer lands there — the app's own drag machinery
+never even SEES the gesture as targeting a handle).
+
+**IDENTIFIED THE SPECIFIC OCCLUDING ELEMENT, by reading its own bounding rect against every label on the same
+canvas**: `partFloor`'s own click-to-edit label ("stop Ø 12" in the default boot) — NOT `partPos`'s own label
+("face -10", confirmed separately positioned, does not self-occlude) and NOT `partWidth`'s own label ("blade
+3", confirmed vertically clear of `partPos`'s own centre). `partFloor`'s label right-edge/vertical-range
+(`left:1288, right:1342, top:467, bottom:478`) DIRECTLY CONTAINS `partPos`'s own handle centre (`~1288,471`).
+
+**THE MECHANISM, fully explained by the app's OWN label-placement rule** (`featureCanvas.js`, the `~c.x+10*lx,
+c.y+8*ly` offset, default `lx:1, ly:-1` — "up and to the right" — declared once, per-handle, with NO awareness
+of any OTHER handle that might sit in that direction): `partFloor` sits LOW on the bar (near the centreline,
+small radius) while `partPos` sits HIGH (the bar's own outer surface) at a SIMILAR Z position (both near
+`zBlade`/`zFace`, close together along the bar) — so `partFloor`'s own "up and to the right" label offset rides
+UP far enough to land squarely on `partPos`'s own SEPARATE handle, directly above it in screen space. Neither
+handle's own declaration is wrong in isolation; the collision is between TWO handles' own independently-correct
+placements, on the SAME canvas, with no cross-handle label-collision avoidance anywhere in the rendering path.
+
+**THIS EXPLAINS BOTH OF THE SYMPTOMS THIS ENTRY ALREADY DOCUMENTED, PRECISELY**:
+1. **Zero movement in EVERY direction, always** (t2471/t2473's own finding) — the mousedown never reaches the
+   handle's own drag-start logic at all; it lands on `partFloor`'s label instead, which the app treats as a
+   click-to-edit target (a discrete action), not a drag-continuation surface. There is no drag to fail partway
+   through; there is no drag AT ALL.
+2. **The width-dependent threshold** (t2479's own finding — dead through `width:15`, alive at `width:20`) —
+   `width` is the DISTANCE between `partPos`'s own `zFace` and `partFloor`'s own `zBlade` (`zBlade = zFace −
+   width`). As `width` grows, the TWO handles' own Z (screen-X) positions separate further, and past some
+   threshold `partFloor`'s label — offset a FIXED number of pixels from ITS OWN handle, not from `partPos`'s —
+   no longer reaches far enough to overlap `partPos`'s own circle. This is not a coincidence needing its own
+   separate explanation; it is the SAME mechanism, measured from a different angle.
+
+**Confirmed the mechanism is genuinely NOT present for `polygon`'s own two handles** (`polyDepth`/`polyFlats`),
+even pushed toward `polyFlats`' own clamp boundary (`acrossFlats:30`) — both remain cleanly hit-testable, no
+label from either handle reaches the other (they sit ~92px apart on screen, well clear). This is the direct
+measurement that answers BACKLOG #70's own shared-root question: **NO**, #70 is not this mechanism — see #70's
+own entry for what that rules in/out for it instead.
+
+⛔ **NOT FIXED — diagnose only, per this turn's own explicit scope.** The natural fix shape (once someone picks
+this up): label placement needs to be aware of OTHER handles on the same canvas, not just its own anchor — a
+genuine cross-handle collision-avoidance concern, plausibly shared by other close-together handle pairs
+elsewhere in the app (not audited this turn; `parting`'s own `partPos`/`partFloor` pairing is the one confirmed
+instance, found because it happens to be the one this entry's own four-turn history kept pointing back at).
+
+**STILL REAL IF**: `document.elementFromPoint()` at `partPos`'s own handle centre, on a live `user_lathe_parting`
+boot at default params, still resolves to `partFloor`'s own `<text class="fc-handle-label">` rather than
+`partPos`'s own `<circle class="fc-handle">`.
 
 ---
 
@@ -6496,3 +6560,30 @@ test evidence independently confirms the port's own correctness regardless of th
 **STILL REAL IF**: the identical `dragHandleRenderTruth` call against a live `user_lathe_polygon` boot still
 hangs on a pure +Y drag of `polyFlats` at or near its own clamp boundary, while the SAME op's other handles and
 other drag directions on the same handle complete normally.
+
+### ⭐⭐⭐⭐ t2499 — DOES THIS SHARE A ROOT WITH BACKLOG #66's own `partPos`? MEASURED DIRECTLY: NO. RULES OUT
+label-occlusion for this entry specifically; #66's own root (found this same turn) is a DIFFERENT mechanism
+
+Dispatched to compare this entry against #66's own frozen-value/render-loop symptom, using a WORKING sibling on
+the identical code path for each (per the dispatch's own suggested method) — see #66's own t2499 entry for the
+full account of what that comparison found FOR #66. The short version here: #66's own root turned out to be a
+STATIC hit-test occlusion (a neighbouring handle's own click-to-edit label sitting on top of `partPos`'s
+circle, confirmed by `document.elementFromPoint()` and by `featProbe.js`'s own passive drag-start listener
+never firing for it) — a mechanism this entry does NOT share.
+
+**Confirmed directly, not inferred**: swept `document.elementFromPoint()` at BOTH `polyDepth`'s and `polyFlats`'
+own handle centres — at rest, AND with `acrossFlats` pushed to `30` (well up toward `polyFlats`' own clamp
+ceiling, mirroring the conditions the hang itself occurs under) — both resolve cleanly to their OWN
+`<circle class="fc-handle">`, no occlusion, no interference from each other's own labels (they sit ~92px apart
+on screen, clear of each other's own label offsets in every configuration checked).
+
+⇒ **This entry's own hang is a genuinely SEPARATE, still-unexplained mechanism** — the `featProbe` console
+evidence already on record (a frozen model value alongside an incrementing frame counter) remains the best lead,
+but it is NOT the same shape as #66's own static label collision. Whatever causes THIS hang has to be something
+about the DRAG ITSELF (a live, in-progress gesture) rather than anything visible in the DOM at rest — narrowing
+away one entire candidate family (hit-test occlusion) without narrowing toward a specific alternative yet.
+
+**Named plainly, per the dispatch's own explicit request for either outcome**: this is a complete, useful
+answer even though it is a "no" — it rules out the render-loop-via-occlusion family for this entry, which was
+the most concrete hypothesis on the table, and it means whoever picks this entry up next should look at the
+DRAG-TIME render/event path specifically, not at static handle geometry.

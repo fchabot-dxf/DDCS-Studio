@@ -68038,3 +68038,73 @@ including confirming no leftover process from the diagnostic session's own stray
 timed-out command left a `node.exe` holding port 3211; identified by matching its start time, killed directly,
 confirmed the port free before continuing -- worth naming since it briefly blocked further test runs mid-turn).
 All scratch files deleted, never committed.
+
+## t2499 — DO BACKLOG #66 AND #70 SHARE A ROOT? Measured directly: NO. Found #66's own actual root cause along
+the way (a 4-turn-old bug), diagnose-only, nothing fixed
+
+Dispatched as a pure diagnostic turn: does #66's frozen-value symptom and #70's frozen-value-plus-hang symptom
+come from the same mechanism. Used the advisor's own suggested method -- compare a WORKING sibling on the
+IDENTICAL code path against the broken one, for each entry, and instrument the render loop rather than reason
+about either symptom in isolation.
+
+**#66 (partPos) vs facing (WORKING, same `length` gesture)** -- booted both, armed `featProbe.js` (an existing,
+already-built, passive drag-probe overlay this app ships behind `?debug=feat`, never used on this entry before),
+drove a real synthetic pointer drag on each. Facing's own `faceLine` produced a clean, textbook frame sequence
+(`f1..f56`, pointer/handle position tracking 1:1, `writes`/`redraws` counting up together, `model:{"allowance":
+...}` climbing smoothly with every frame) -- a confirmed-working baseline. `partPos`, under the IDENTICAL
+drive: `featProbe` armed, but its own `pointerdown` capture-phase listener NEVER FIRED THE `▼ DRAG` LINE AT
+ALL -- meaning the app's own drag machinery never even recognised the gesture as targeting a handle, on the
+very first frame, before any drag math runs.
+
+**Followed that thread directly**: swept `document.elementFromPoint()` at the handle's own bounding-box centre,
+at rest, for all TEN currently-ported lathe handles with a value label (`facing`/`centerDrill`/`faceProbe`/
+`odProbe`/`odTurn`/`parting`'s three/`polygon`'s two). NINE resolve cleanly to their own `<circle
+class="fc-handle">`. `partPos` is the ONE exception -- it resolves to a `<text class="fc-handle-label">`
+instead, and `e.target.closest('.fc-handle')` on that element returns `null` (a completely separate DOM node,
+not a descendant of the handle it's sitting on top of).
+
+**Identified the SPECIFIC occluding element**, by reading every label's own `getBoundingClientRect()` against
+`partPos`'s own handle rect directly (not guessed from adjacency): `partPos`'s OWN label ("face -10") sits
+clear, `partWidth`'s own label ("blade 3") sits clear (vertically above `partPos`'s own centre, not overlapping
+it) -- but `partFloor`'s own label ("stop Ø 12") DIRECTLY CONTAINS `partPos`'s own handle centre in both X and
+Y. `partFloor` sits low on the bar (near the centreline); `partPos` sits high (the bar's own outer surface),
+at a similar Z -- `featureCanvas.js`'s own label-placement rule (`tx:c.x+10, ty:c.y-8`, "up and to the right",
+declared per-handle with NO awareness of any OTHER handle in that direction) rides `partFloor`'s own label
+straight onto `partPos`'s separate, unrelated handle, directly above it on screen.
+
+**This explains BOTH symptoms this entry has carried since t2471/t2479, precisely, not just plausibly**: (1)
+zero movement in every direction always -- the mousedown never reaches a handle's own drag-start logic, it
+lands on `partFloor`'s label (a discrete click-to-edit target) instead, so there is no drag to fail partway
+through, there never was one. (2) the width-dependent threshold (dead through `width:15`, alive at `width:20`)
+-- `width` is the Z-distance between `partPos`'s `zFace` and `partFloor`'s `zBlade`; as it grows the two
+handles' own screen positions separate, and past a threshold `partFloor`'s own FIXED-offset label no longer
+reaches far enough to overlap `partPos`'s circle. Not a second explanation needed -- the SAME mechanism,
+measured from a different angle, matches the ALREADY-DOCUMENTED threshold exactly.
+
+**#70 (polyFlats) checked the SAME way, decisively RULED OUT**: swept `elementFromPoint` for `polyDepth`/
+`polyFlats` at rest AND with `acrossFlats` pushed to 30 (well up toward `polyFlats`' own clamp ceiling,
+mirroring the hang's own live conditions) -- both resolve cleanly to their own circles in every configuration,
+~92px apart on screen, no cross-handle label reach at all. **The shared-root question is answered: NO.** #66's
+own root (static hit-test occlusion) is confirmed absent for #70; #70's own mechanism (a frozen model value
+alongside an incrementing `featProbe` frame counter, already on record from t2497) remains genuinely
+unexplained, narrowed only to "something about the live drag itself," not static handle geometry.
+
+⛔ **NOT FIXED, either entry — diagnose only, per this turn's own explicit scope.** #66's own natural fix shape
+(for whoever picks it up): label placement needs cross-handle awareness, not just its own anchor -- plausibly a
+shared concern elsewhere in the app, not audited this turn (`parting`'s own pair is the one confirmed instance).
+
+Tier: doc-only (BACKLOG #66/#70 updates) -- zero product/test files touched this turn.
+
+### VERIFY
+
+The shared-root question answered by direct measurement, both directions: `elementFromPoint` sweeps across ten
+handles (ruling #66's own mechanism IN for `partPos` specifically, OUT for everything else including `polygon`'s
+own two) and `featProbe.js`'s own passive capture confirmed the drag-start never fires for `partPos`. Every
+claim in both BACKLOG entries marked OBSERVED (direct DOM/console measurement) vs INFERRED (the exact re-render
+mechanism behind #70's own hang, not pinned) per this session's own discipline. `git status --porcelain`:
+confirmed zero product or test files touched -- this file plus BACKLOG.md are the only edits. `handoff.py
+amendments --role worker` polled clean. `proc_health.py watch`: clean. Full suite `--workers=4` run anyway per
+the dispatch's own unconditional VERIFY ask, even with zero code changes, as a clean-repo sanity check:
+**3018 passed, 1 failed, 12 flaky, 26 skipped** (3057 total) -- the one failure is the same pre-existing
+`sf-pos-snapback` load-contention timeout documented since t2465, unrelated (consistent with zero product/test
+code touched this turn -- no existing test currently exercises either BACKLOG entry's own reproduction recipe).
