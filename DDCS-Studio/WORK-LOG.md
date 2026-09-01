@@ -66711,3 +66711,81 @@ Both failures explained, neither a regression from this turn's own product-code 
 `git status --porcelain`: confirmed clean of every source file this turn's own manifests/tests name beyond
 what's listed in each half's own Files line.
 
+## t2471 — FIRST fixed the manifest's own false-positive trap (t2469's own scar), THEN ran L4: the gate,
+wide, across all 32 declared twins. Caught my own sweep bug before trusting it; found 3 real defects; refuted
+this arc's own lathe-family prediction
+
+### THE MANIFEST FIX — precise claim, proven non-vacuous AND specific
+
+`preview-mutation-manifest-2463.spec.js:222-230`'s old form asserted a guarded file was absent from `git
+status` ENTIRELY — too broad: t2469's own legitimate, uncommitted `styles.css` edit tripped it for a reason
+that had nothing to do with a leaked mutation. Rewrote to the precise claim: each mutation's own `find` string
+is still present, on disk, exactly once — indifferent to any OTHER edit in the same file, and doubling as a
+staleness detector (a legitimate edit to that EXACT line is a true positive, since `applyMutations`' own live
+`hits!==1` guard would throw the identical way at run time). Added a second test proving this in-memory (never
+touches a real file): a simulated write makes the check go RED (non-vacuous), a simulated unrelated edit
+elsewhere leaves it GREEN (specific — the exact property the old form lacked). Both new tests pass; the full
+manifest file (7 tests) re-run clean.
+
+### THE SWEEP BUG, CAUGHT BEFORE TRUSTING THE TABLE
+
+First attempt: a generic per-op boot loop (fresh `?debug=feat` page per op, `_framed(opType, {})`, find every
+`.fc-handle[data-hid]`, drag one representative handle) — NO custom viewport set. Result: 21 of 32 ops RED,
+every single one at EXACTLY `movedMid:0, movedAfter:0`. That uniformity was the tell — not 21 real bugs.
+Diagnosed directly: `document.elementFromPoint()` at a handle's own reported screen center returned `null` —
+the coordinates were off-screen. `preview-mutation-manifest-2463.spec.js` itself carries
+`test.use({viewport:{width:1400,height:1000}})`, needed because `?debug=feat` renders the canvas far down a
+tall page; my sweep never inherited it (Playwright's default viewport is much shorter). Re-ran with the same
+1400×1000 viewport: EVERY handle now sits within the visible area, and the false-red pattern vanished entirely.
+**This is exactly the "measure before trusting the table" discipline this session runs on, applied to my own
+work in the same turn it was produced, not just to inherited claims.**
+
+### THE HONEST TABLE — 32/32, none omitted
+
+GREEN 18 / RED 3 / CAN'T-RUN 11. Full per-op detail in BACKLOG #61's own new L4 section. Three items worth
+calling out here specifically:
+
+1. **Three apparent REDs (`centerDrill`/`drillDepth`, `faceProbe`/`probeFace`, `odProbe`/`probeOD`) were
+   RECLASSIFIED to GREEN** after a second pass testing 5 drag directions each (pure ±X, pure ±Y, a larger
+   diagonal) — all three are genuinely single-axis-constrained handles (move cleanly along their own one axis,
+   zero movement on the orthogonal one, ZERO snap-back in the axis that responds). The generic two-axis drag
+   my sweep used by default was the wrong shape for these three, not a defect in the product. Reported as a
+   correction, not silently folded into a cleaner table — the axis-sweep evidence is what makes this a
+   confirmed reclassification, not a hopeful one.
+2. **Three genuine, confirmed defects found**: `rotaryClock`'s `__simstart0` (a real snap-back, 44.7→12.3px
+   on release), `alignment`'s `__simstart0` (REPRODUCED across 5 independent trials with different drag
+   vectors, settling near ~54-55px regardless of drag magnitude/direction — a clamp-to-value shape, not
+   threshold noise), `parting`'s `partPos` (zero movement in EVERY one of 5 tested directions — a
+   non-responsive handle, structurally different from the other two's snap-back shape). All three filed as
+   new BACKLOG entries (#64/#65/#66), none fixed, per the dispatch's own explicit "report, becomes its own
+   turn" scope.
+3. **This arc's own prior prediction is REFUTED**: BACKLOG #61's t2465 section predicted the lathe family's
+   hand-written geometry would be the gate's own can't-drive wall, licensing L5 (the lathe port) on that
+   basis. It isn't — all 7 lathe ops render real, draggable `.fc-handle` elements; 6 of 7 are GREEN, and
+   `parting` is a real, confirmed bug, not a gate-reach failure. L5 is no longer justified by "the gate can't
+   reach it" — corrected in BACKLOG #61 directly, not left standing.
+
+`drill`'s own CAN'T-RUN deserves its own note: its rendered form copy explicitly says *"Drag the handles in
+the 2D layout... round handle sizes it, square handle places it"* — it claims to have handles. But its
+`svg.feature-canvas` never mounted under this gate's own boot method (`hasFeatureCanvas: false`,
+`fcHandleCount: 0`, confirmed via direct DOM inspection, not assumed). Not investigated further (out of
+scope) — a genuine gap in L4's OWN reach, named precisely rather than lumped into "no handle by design" where
+it does not belong.
+
+### Tier
+
+New test assertions in `preview-mutation-manifest-2463.spec.js` (product-adjacent test infra, not product
+code). No product code touched this half — every drag defect found is REPORTED via BACKLOG, not fixed. Full
+suite run below covers both halves.
+
+### VERIFY (both halves of this turn)
+
+The manifest fix: non-vacuous AND specific, proven above, both new tests passing; full manifest file (7 tests)
+re-run clean. The L4 table: 32/32 ops in exactly one bucket, counted (18+3+11=32), none silently omitted.
+`test:changed`: 7/7 passed. `test:node`: 238/238 passed. Full suite `--workers=4`, BEFORE concluding: **3014
+passed, 1 failed, 14 flaky, 26 skipped.** The one failure is the SAME pre-existing `sf-pos-snapback` load-
+contention timeout documented since t2465, reconfirmed again at t2467/t2469 and once more here — unrelated to
+this turn's own work (this turn touched test infra and BACKLOG/WORK-LOG only, zero product code). Notably the
+REWRITTEN disk-cleanliness check did NOT false-positive this run — the exact failure mode it was rewritten to
+retire did not recur. `git status --porcelain`: confirmed clean of every source file the manifests name.
+

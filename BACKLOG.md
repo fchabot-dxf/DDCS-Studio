@@ -5336,6 +5336,71 @@ finding still holds) AND `grep -c "getBoundingClientRect\|boundingBox" tests/com
 still returns ≥1 (the gate precedent is still there to generalize from). If either check no longer holds,
 re-verify before acting on this entry's own conclusion — rule 8b applies to this entry too.
 
+### ⭐⭐⭐⭐ L4 — t2471: THE GATE, RUN WIDE ACROSS ALL 32 DECLARED TWINS. THREE genuine defects found (REPORT ONLY,
+not fixed per this turn's own scope) — AND this entry's own lathe-family prediction, above, is REFUTED
+
+Per the advisor's own dispatch: point `dragHandleRenderTruth` at every declared twin with a draggable handle,
+not just the four hand-picked defects L1/L2 were proven against, and publish the honest table — GREEN/RED/
+CAN'T-RUN, all three useful, none padded.
+
+⚠ **First attempt was itself a false table, caught before trusting it**: a generic sweep across all 32 ops
+(fresh boot per op, no custom viewport) showed 21/32 RED, ALL at exactly `movedMid:0, movedAfter:0` — a
+methodology tell, not 21 real bugs. Root cause: `preview-mutation-manifest-2463.spec.js`'s own
+`test.use({viewport:{width:1400,height:1000}})` (a TALL viewport, needed because `?debug=feat` renders the
+canvas far down the page) was never carried into the new sweep script — every handle sat below the fold,
+every drag landed on nothing (`document.elementFromPoint` at a handle's own reported center returned `null`,
+confirmed directly). Re-run with the correct viewport. **This is exactly the kind of self-caught methodology
+error this session's own discipline exists to catch before it becomes a wrong table someone acts on.**
+
+**THE HONEST TABLE, 32/32 accounted for, none silently omitted:**
+
+- **GREEN (18)**: `tap`, `bore`, `slot`, `surfacing`, `contour`, `pocket`, `text`, `corner`, `edge`, `middle`,
+  `rotaryCenter`, `homing`, `facing`, `odTurn`, `polygon`, `centerDrill`, `faceProbe`, `odProbe`. The gate
+  holds — tracks the pointer, no snap-back.
+- **RED (3)**: `rotaryClock`, `alignment`, `parting` — see the three new BACKLOG entries below (#64/#65/#66).
+  Real, reproduced defects, none fixed this turn.
+- **CAN'T-RUN (11)**: `atc_warmup`/`atc_length`/`atc_check`/`atc_test`/`atc_change`/`atc_table` (6 — no
+  geometry canvas at all, expected: housekeeping ops with nothing to drag), `wcs`/`comm`/`io_step`/
+  `pause_confirm` (4 — same, logic/selection ops, no drag affordance), `drill` (1 — genuinely surprising, see
+  below).
+
+⭐ **`drill`'s CAN'T-RUN is NOT "no affordance by design"** — its own rendered form copy reads *"Drag the
+handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it"* — the
+op DECLARES it has draggable handles. But under this gate's own boot method (`_framed('user_drill_data', {})`
++ `ddcsLoadBlockStack`, `?debug=feat`), `hasFeatureCanvas: false` — the `svg.feature-canvas` element itself
+never mounted, `fcHandleCount: 0`. Not investigated further (out of this turn's scope) — named as a genuine
+gap in L4's OWN reach, not glossed into the "no handle by design" bucket it does NOT belong in. Worth a look:
+whatever makes drill's canvas mount differs from every other op this sweep drove successfully.
+
+⭐⭐ **This entry's OWN prediction is falsified, corrected here rather than left standing**: t2465's own passage
+above reads *"the lathe family's six ops are precisely the ones the gate can't drive... if it can't, that IS
+L5's whole justification."* **It CAN drive all seven** (facing/odTurn/parting/centerDrill/polygon/faceProbe/
+odProbe all render real `.fc-handle` elements and respond to drags) — six of seven are GREEN; the seventh
+(`parting`) is a genuine, confirmed defect, not a gate-reach failure. **L5 (porting the lathe family's hand-
+written geometry onto `canvasWidgets.js`'s declared registry) is NOT justified by "the gate can't reach it" —
+that premise no longer holds.** If L5 is still worth doing, the reason has to be something else (maintenance,
+consistency with the mill family's own declared shape) — not testability via this gate, which this turn
+proved wrong.
+
+⭐⭐⭐ **THREE handles initially read RED were RECLASSIFIED to GREEN after closer testing — reported here
+precisely so the correction is visible, not silently absorbed into a cleaner-looking table**: `centerDrill`'s
+`drillDepth`, `faceProbe`'s `probeFace`, `odProbe`'s `probeOD` all failed the FIRST pass's generic diagonal
+drag (`dx:40,dy:25`) at `movedMid` values landing suspiciously exactly on one of that drag's own input
+numbers (40, 40, 25). Re-tested each across FIVE directions (pure +X/−X/+Y/−Y, a larger diagonal): every one
+of the three is a genuinely SINGLE-AXIS-CONSTRAINED handle (moves fully and cleanly along its own one axis,
+zero movement on the orthogonal one, **zero snap-back in the axis that does respond**) — a legitimate design
+constraint (a depth/radial-only handle), not a defect. The generic two-axis drag this sweep used by default
+was simply the wrong shape for these three. Confirmed, not assumed — the axis-sweep is the evidence.
+
+### Scope, per the dispatch's own explicit limits
+
+No fixes to anything the gate reds on. No lathe port. No new primitives. Full account, incl. every raw
+progress line and the axis-diagnosis runs: WORK-LOG t2471.
+
+**STILL REAL IF**: any of `tests/support/dragRenderTruth.js`'s own two exports change shape, OR the SEED_BUILDERS
+registry count moves away from 32 (`grep -c "DataDef" web/app.js`'s own `SEED_BUILDERS` array literal) — either
+would mean this table needs re-running, not just re-reading.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
@@ -5555,3 +5620,85 @@ timeout is downstream, at a `waitX` AFTER `clickUndo`, reached only once boot al
 wait on a different subsystem (the undo/reproject pipeline), not the boot-readiness pipeline this entry's own
 failure sits in. Different mechanisms; only a generic "async scheduling can be slow under load" factor is
 common to both, which is not an actionable shared cause. See #57 for the same conclusion recorded there.
+
+---
+
+### 64. `rotaryClock`'s `__simstart0` marker SNAPS BACK on release — a real drag-render-truth defect, found by
+L4 (BACKLOG #61), REPORT ONLY, not fixed
+
+*(filed t2471, per L4's own explicit "report, don't fix, each becomes its own turn" scope — see BACKLOG #61's
+own L4 section for the full sweep this was found in.)*
+
+**OBSERVED, live, via `dragHandleRenderTruth`/`assertDragRenderFaithful`** (`user_rotary_clock_data`, default
+params, `?debug=feat`, the manifest's own 1400×1000 viewport): dragging the `__simstart0` marker (a
+`def.simStartParams`-declared handle, `rotaryClockData.js:161-165`) tracks the pointer well during the drag
+(moved 44.7px) but settles at only 12.3px from start once released — **lost ~72% of its tracked movement on
+release**, the exact "value reverting on release" signature `dragHandleRenderTruth` was built to catch
+(t2447's own original bug class, BACKLOG #61's own header).
+
+Not reproduced across multiple directions/repeats this turn (out of L4's own scope — the sweep tests ONE
+representative handle per op, not exhaustive per-defect archaeology); the single measurement is reported as
+what it is; a future turn confirming this should re-run before assuming it's stable across drag direction, the
+way alignment's own entry (#65) was confirmed.
+
+**STILL REAL IF**: `dragHandleRenderTruth(page, '__simstart0', {dx:44,dy:0,...})` (or similar) against
+`user_rotary_clock_data`, booted per BACKLOG #61's own L4 recipe, shows `movedAfter` meaningfully less than
+`movedMid` again.
+
+---
+
+### 65. `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle point regardless of drag
+direction or magnitude — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed
+
+*(filed t2471, same L4 sweep as #64 — see BACKLOG #61's own L4 section.)*
+
+**OBSERVED, live, REPRODUCED across 5 independent trials** (`user_alignment_data`, default params, fresh boot
+between each trial so no committed state carries over): dragging `__simstart0` (`alignmentData.js:149-154`,
+another `simStartParams`-declared handle) by five DIFFERENT vectors —
+
+```
+  original (dx40,dy25):   moved 60.7 mid -> settled 54.7   (lost  6.0px)
+  repeat of the same:      moved 61.3 mid -> settled 55.3   (lost  6.0px)
+  pure +X (dx60,dy0):      moved 75.4 mid -> settled 55.3   (lost 20.1px)
+  pure +Y (dx0,dy60):      moved 45.6 mid -> settled 54.0   (GAINED 8.4px — overshoot on release, not a loss)
+  bigger diagonal (90,60): moved 100.9 mid -> settled 55.5  (lost 45.4px)
+```
+
+⇒ **The settle position clusters tightly around ~54-55px from start in FOUR of five trials, regardless of how
+far or which direction the handle was dragged** — a genuine snap/clamp-to-value behavior, not a threshold
+artifact of any one drag's own parameters (the "bigger" trial alone proves it: dragged 100.9px away, settled
+at 55.5, losing 45px). The one outlier (`pure +Y`, which OVERSHOT slightly on release rather than losing
+ground) is itself informative — the clamp target may not be a simple screen-space point but something
+computed from the op's own two `simStartParams` bindings (`{x:'ax',y:'ay'}` then a `relSpanFrom` second
+marker) interacting in a way this turn did not fully characterize.
+
+**STILL REAL IF**: repeating any of the five trials above against `user_alignment_data` still shows
+`movedAfter` clustering near a value independent of the drag's own `dx`/`dy` — the reproducibility, not any
+single number, is the claim.
+
+---
+
+### 66. `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth
+defect, found by L4, REPORT ONLY, not fixed. Different SHAPE from #64/#65 — non-responsive, not a snap-back
+
+*(filed t2471, same L4 sweep — see BACKLOG #61's own L4 section. Also directly refutes that entry's own
+lathe-family "the gate can't drive it" prediction for the OTHER six lathe ops, which all responded correctly —
+`parting` is the one genuine lathe-family defect this sweep found, not a gate-reach limitation.)*
+
+**OBSERVED, live, REPRODUCED across FIVE drag directions, all showing IDENTICAL zero movement**
+(`user_lathe_parting`, default params — `kind` defaults to `'part'` per `PART_DEFAULTS`): dragging `partPos`
+(one of three declared handles on this op, alongside `partWidth`/`partFloor`) by pure +X, pure −X, pure +Y,
+pure −Y, and a 60×40 diagonal — **every single trial: `movedMid: 0, movedAfter: 0`**. The handle is present in
+the DOM at a real, non-zero rendered position (confirmed via the L4 sweep's own inventory pass, `x:290 y:1348`
+at the un-viewport-corrected coordinates, i.e. genuinely on-canvas once the correct 1400×1000 viewport is
+used), and `dragHandleRenderTruth` successfully locates and clicks it (no "handle never appears" throw) — so
+this is not a selector miss or an absence bug. **The handle exists, is hit-testable, and simply never updates
+its own rendered position no matter which direction or how far it's dragged.**
+
+⇒ **A different defect SHAPE from #64/#65** (which both track the pointer during the drag and only fail on
+release) — `partPos` never tracks at all, in any direction. `partWidth`/`partFloor` (the other two declared
+handles on this same op) were NOT tested this turn (L4's own scope: one representative handle per op) — worth
+checking whether the defect is specific to `partPos` or affects all three of `partingData.js`'s own handles.
+
+**STILL REAL IF**: `dragHandleRenderTruth(page, 'partPos', {dx:60,dy:0,...})` (or any direction) against
+`user_lathe_parting`, booted per BACKLOG #61's own L4 recipe, still shows zero movement.

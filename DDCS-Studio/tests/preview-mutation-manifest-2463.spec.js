@@ -219,12 +219,49 @@ for (const entry of PREVIEW_MUTATIONS) {
     });
 }
 
-test('t2463: no mutation ever reached disk — every source file the manifest names is clean in git', async () => {
-    const { execSync } = await import('node:child_process');
-    const files = [...new Set(PREVIEW_MUTATIONS.flatMap((e) => e.files.map((f) => f.path)))];
-    const status = execSync('git status --porcelain', { cwd: process.cwd() }).toString();
-    for (const f of files) {
-        const rel = f.replace(/^\//, 'web/');
-        expect(status.includes(rel), `${rel}: must be absent from git status (a mutation reaching disk means the design failed)`).toBe(false);
+// t2471 — REWRITTEN. The old form asserted each guarded file was absent from `git status` ENTIRELY, which
+// is not the claim this test means to make: five of the most-edited files in the repo (styles.css,
+// featureCanvas.js, panelTypes.js, dropdownPopup.js, pocketData.js) are guarded here, so ANY future turn that
+// legitimately edits one of them and runs the suite before committing got a red — exactly what happened this
+// turn (t2469's own uncommitted `styles.css` dvh fix). A check that cries wolf on unrelated work gets ignored,
+// which is worse than no check. THE PRECISE CLAIM: each mutation's own `find` string is still present in the
+// file ON DISK. If a mutation had ever been written out for real, `find` would be gone from disk — exactly
+// what this test wants to know, and it is indifferent to any OTHER edit in the same file. As a bonus this is
+// also a STALENESS detector: if someone legitimately edits that exact line, the count drops to 0 here too —
+// a TRUE positive, because the manifest is then stale and `applyMutations`' own live `hits!==1` guard (above)
+// would throw the identical way at run time.
+function countOccurrences(text, find) {
+    return String(text).replace(/\r\n/g, '\n').split(find).length - 1;
+}
+
+test('t2463: no mutation ever reached disk — every find-string is still present, on disk, exactly once', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    for (const entry of PREVIEW_MUTATIONS) {
+        for (const { path: p, find } of entry.files) {
+            const rel = p.replace(/^\//, 'web/');
+            const abs = path.join(process.cwd(), rel);
+            const onDisk = fs.readFileSync(abs, 'utf8');
+            const hits = countOccurrences(onDisk, find);
+            expect(hits, `${entry.id}: "${rel}" find-string must be present on disk EXACTLY once (0 = a mutation reached disk for real, OR the manifest went stale against an unrelated edit to that exact line — either way, investigate; >1 = the find-string is no longer unique)`).toBe(1);
+        }
     }
+});
+
+// Non-vacuity + specificity, proven in-memory (never touches a real file) — the two properties the dispatch
+// asked to see demonstrated, not just claimed: (1) the check genuinely CAN go red if a mutation reaches disk,
+// (2) it does NOT fire on an unrelated edit elsewhere in the same file — the exact failure mode being retired.
+test('t2463: the disk-cleanliness check is non-vacuous (catches a real write) AND specific (ignores unrelated edits)', () => {
+    const entry = PREVIEW_MUTATIONS.find((e) => e.files.length && !e.synthetic) || PREVIEW_MUTATIONS[0];
+    const { find, replace } = entry.files[0];
+    const originalSourceShape = `// unrelated line above\n${find}\n// unrelated line below\n`;
+
+    // (1) simulate the mutation having actually been written to disk -- the checker must go RED.
+    const asIfMutatedOnDisk = originalSourceShape.replace(find, replace);
+    expect(countOccurrences(asIfMutatedOnDisk, find), 'non-vacuous: a real disk write makes the find-string vanish, and the checker must see that as 0').toBe(0);
+
+    // (2) simulate a legitimate, UNRELATED edit elsewhere in the same file -- the find-string itself is
+    // untouched, so the checker must stay GREEN, unlike the old git-status form this turn tripped over.
+    const withUnrelatedEditNearby = originalSourceShape.replace('// unrelated line above', '// a completely different, legitimate change');
+    expect(countOccurrences(withUnrelatedEditNearby, find), 'specific: an edit elsewhere in the file must NOT trip this check').toBe(1);
 });
