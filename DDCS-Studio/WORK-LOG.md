@@ -65963,3 +65963,154 @@ touched. `test:changed`/`test:node` would show nothing (no source touched); not 
 
 Files: `BACKLOG.md`, this entry.
 
+## t2459 — MEASUREMENT TURN: the third leg (PREVIEW), re-measured per-fact across all 32 twins, plus a
+gate-feasibility assessment. No porting, no declaring, no fixes — per the dispatch's own explicit instruction
+
+Same discipline as t2457. `ROADMAP.md:238`'s own claim — "PREVIEW 0/32 declared... hand-written renderers, each
+deciding independently" — was measured 2026-08-09, before this session's own form-reproduction arc. **It is
+badly stale.** Re-measured directly (4 parallel research passes, one per 8-op batch, each reading the actual
+`<name>Data.js` source and cross-checking whether any legacy `<name>View.js` is still reachable) rather than
+trusted.
+
+### THE CORRECTED PICTURE, per fact, across all 32
+
+```
+Panel type (2D/3D/commscreen/form-only)     32/32   fully declared, generic (PANEL_TYPES) — unchanged, was
+                                                     already known correct
+Coordinate frame                            ~30/32  ONE declared source per op (def.previewGeometry /
+                                                     def.layout.kind+the shared latheProfileCanvas dispatch /
+                                                     sim+simStartsProvider) — no per-op view computes its own
+                                                     frame independently anymore
+Legacy per-op View.js still LIVE              0/32   EVERY <name>View.js found (pocket/slot/surfacing/text/
+                                                     drill/bore/contour/comm/atc_change/atc_check/atc_length/
+                                                     atc_table/atc_test) is CONFIRMED DEAD — wizardLibrary.js's
+                                                     own `opensAs` redirects the ONLY live menu entry straight
+                                                     to the generic twin renderer; the old file is reachable
+                                                     only by an already-nonexistent legacy raw opType. The
+                                                     ROADMAP's own "hand-written renderers... deciding
+                                                     independently" is describing dead code.
+Handles via the DECLARED canvasWidgets registry ~14/32  pocket/slot/surfacing/text/drill/bore/contour + the
+                                                     `previewGeometry`-driven mill family — point/rect/radial/
+                                                     translate/projLength gesture objects, read generically
+Handles via generic relTo/simStartParams markers ~9/32  the probe family (corner/edge/middle/alignment/
+                                                     rotaryCenter/rotaryClock/homing) — also genuinely
+                                                     declared, just a DIFFERENT declared shape than
+                                                     canvasWidgets (a marker-position formula, not a gesture
+                                                     type), read generically by panelTypes.js/userOpView.js
+Handles via a PARALLEL HAND-WRITTEN system        6/32  the lathe family (facing/odTurn/parting/centerDrill/
+                                                     faceProbe/odProbe) — DISPATCH is declared (def.layout.
+                                                     kind==='lathe_profile' routes generically), but the
+                                                     per-shape geometry MATH (facingSpec/odProfileSpec/
+                                                     partProfileSpec/…) is hand-written JS using FeatureCanvas's
+                                                     own onDrag/onEdit, not canvasWidgets.js's registry — the
+                                                     ONE genuinely still-hand-coded category found
+No preview surface at all (correctly)             3/32  ioStep/pauseConfirm/wcs — form-only by nature (no
+                                                     motion/geometry to show); comm is `commscreen` (a live
+                                                     screen mock, also correctly not this leg's concern)
+Handle AFFORDANCES (onEdit/noSnap/emits)        SPARSE   inconsistently declared — corner/middle/surfacing/
+                                                     drill/bore/lathe-family carry real flags; pocket/slot/
+                                                     tap/text/polygon/rotaryCenter/rotaryClock show NONE found
+                                                     — a genuine, uneven gap, not a false negative (grepped
+                                                     directly per op)
+```
+
+**Also found, unprompted**: `layout_2d_canvas`/`sim_3d_box`/`code_preview_panel` — three DECLARED block types
+in the palette with **zero readers anywhere in the app** (confirmed via corner's own header comment, which
+explicitly rejected using them for exactly this reason). A 5th instance of this project's own recurring
+declared-but-unread pattern (`emits`/`modalPre`/`noSnap`/`mouth`/now this). Not fixed — named, per this turn's
+own scope.
+
+### THE HONEST RE-STATEMENT
+
+"0/32 declared" is wrong. The correct statement is closer to: **the DISPATCH layer (which frame, which handles,
+what's drawn) is genuinely declared and centrally read for essentially all 32 twins — no live per-op renderer
+exists anymore for any of them.** What remains hand-written is narrower and different in shape than "each
+wizard has its own renderer": (1) the lathe family's per-shape geometry MATH (6 ops, a real, bounded gap — the
+dispatch is declared, the content isn't yet), and (2) handle AFFORDANCES, declared on some ops and silently
+absent on others with no apparent rule for which get them.
+
+### THE GATE ASSESSMENT — the harder, decisive half
+
+**The candidate is not hypothetical — it has already shipped, once, for one bug class.**
+`tests/commit-on-release-2429.spec.js` (this session, t2429/t2447) already reuses `web/debug/featProbe.js`
+DIRECTLY inside an automated Playwright test — capturing its console rows as assertion evidence — AND
+separately asserts real rendered geometry via `handle.boundingBox()` / a `getBoundingClientRect()`-based
+`posScreen()` helper, mid-drag and post-release. This is featProbe's own pattern (assert what is ACTUALLY
+RENDERED, not a data/attribute proxy for "did something change") already generalized from a human debug
+instrument into a working, green, automated regression gate. The question isn't "can this generalize" — it
+already has, for the feature-canvas handle-drag class specifically.
+
+**What makes a GENERIC harness version realistic, not just possible**: the re-measurement above found that
+~30/32 twins now have ONE declared/computed source of truth their renderer reads from (`def.previewGeometry`
+for the mill family, the shared lathe-profile spec builders for the lathe family, `simStartParams`/
+`simStartsProvider` for the probe family). A generic `previewEquivalence(op, params)` harness — mirroring
+`emitEquivalence(builtin, twin, sweep)`'s own shape — is a REALISTIC next build, not a leap: render the op,
+read each handle's REAL `getBoundingClientRect()`, convert to world coordinates via the SVG's own viewBox/
+transform, and assert it equals what the op's OWN declared/computed geometry function predicts for those
+params, within an epsilon. This is actually an EASIER claim than emit's own ("two independent implementations
+agree") — it only has to prove "the renderer didn't drift from what it was itself told to draw," which is
+EXACTLY the bug class featProbe caught (t2447's own auto-refit-on-idle firing against stale geometry).
+
+**Worked against the 5 owner-found defects this week, per the dispatch's own explicit instruction — a concrete
+design test, not a hand-wave:**
+
+```
+1. drag not following the finger      CAUGHT — direct fit: rendered handle position vs. pointer/declared
+                                       math, mid-drag. Already proven (commit-on-release-2429.spec.js).
+2. value reverting on release         CAUGHT — direct fit: post-release rendered position + model value
+                                       vs. the declared committed value. Already proven (same file, the
+                                       POST_UP_MS-equivalent post-up check).
+3. the missing pane sizer             NOT CAUGHT by this gate shape. This is an ELEMENT-ABSENCE bug (an
+                                       expected affordance never rendered at all), not a position-accuracy
+                                       bug on an element that DOES render. A geometry-vs-declaration diff
+                                       assumes the element exists to measure. Needs a DIFFERENT, simpler
+                                       primitive: a declared manifest of "which affordances this panel type
+                                       should render" + a presence check per entry.
+4. pane sizing from the window, not   NOT CAUGHT by this gate shape either. A CSS container-query-vs-
+   itself                             viewport-query bug — the pane's OWN dimension source, not a handle's
+                                       position. Needs a computed-style/dimension assertion under a
+                                       resized-but-not-fullscreen harness (embed the pane in a narrower
+                                       host, assert its rendered width tracks the HOST not window.innerWidth).
+                                       Arguably not preview-specific at all — a general responsive-layout
+                                       hazard that could hit any pane, not just a wizard preview.
+5. the flyout landing in a corner     CAUGHT — same pattern as 1/2: assert the flyout's own rendered rect
+                                       is near its trigger element, not pinned to a corner. A position-
+                                       accuracy claim on an element that DOES render.
+```
+
+**3 of 5 are directly caught by the SAME rendered-truth-vs-declaration primitive** (already proven once);
+**2 of 5 need a genuinely different, smaller primitive** (presence/manifest, and container-relative sizing) —
+naming this precisely, rather than either overclaiming "one gate catches everything" or underclaiming "the
+gate idea doesn't work," is the actual answer this measurement owes.
+
+### THE RECOMMENDATION
+
+**Start the arc — narrowly, with the gate first, exactly as the ROADMAP's own condition requires — and it
+should not be refused.** The evidence against refusing is concrete, not optimistic: the primitive the arc's
+whole premise depends on (rendered-truth assertion) is not a research question, it is a GENERALIZATION of code
+already shipped and green in this repo. The remaining hand-written surface to declare is narrower than the
+ROADMAP's own "0/32" framing implied (the lathe family's geometry math, ~6 ops; affordance declarations,
+sparse but additive, not a rewrite). Concretely, in order:
+
+1. **Build the gate primitive first, generic, mirroring `emitEquivalence`'s own shape** — a
+   `previewEquivalence(op, params)` reusable harness (render → read real DOM geometry → diff against the op's
+   own declared/computed source). Prove it on 2-3 already-declared ops (pocket/corner are good candidates —
+   rich handle sets, already fully declared) before trusting it broadly.
+2. **Separately build the presence/manifest check** (item 3's class) and flag the container-relative-sizing
+   hazard (item 4's class) as its own, non-arc-specific finding — do not fold either into the geometry-gate's
+   own scope; they are different claims needing different assertions.
+3. **THEN, and only then, port the lathe family's geometry math onto `canvasWidgets.js`'s declared registry**
+   (the one genuine remaining "0" in this measurement) — the gate from step 1 is what would prove the port
+   didn't silently change anything, the exact role byte-identity played for the emit port.
+
+**If the arc is refused instead**, the ROADMAP's own named fallback ("frame + emit-driving contract only") is
+real and cheap — but per this measurement, refusing would be declining an arc whose hardest precondition is
+already met, not a genuinely open question.
+
+### Tier
+
+Reading and research only — zero code/test files changed. `git status` confirms only `BACKLOG.md`/`WORK-LOG.md`
+touched.
+
+Files: `BACKLOG.md`, this entry.
+

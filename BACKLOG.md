@@ -5129,3 +5129,68 @@ odTurnData.js` still returns ≥1 with a live-param call (odTurn still tautologi
 `facingStack`/`centerDrillStack` against their own twins. Any of these returning false means that PART of this
 entry shipped — re-check per-part, do not treat the whole entry as one unit (rule 8b: a partial ship with a
 heading still claiming "open" for the whole thing is the same trap this entry itself was filed to stop).
+
+---
+
+### 61. [MEASURED t2459, NOT SHIPPED — reading/research only] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED"
+IS STALE — RE-MEASURED, PLUS A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
+
+*(owner ask, via the advisor: does wizards-as-data work fully — emit AND form AND previews? Emit/form measured
+t2457 (BACKLOG #60). This is the third leg. Full account + the 32-op per-fact table: WORK-LOG t2459.)*
+
+⭐ **`ROADMAP.md:238`'s own claim — "PREVIEW 0/32 declared... hand-written renderers, each deciding
+independently" — is badly stale** (measured 2026-08-09, before this session's own form-reproduction arc). Every
+legacy `<name>View.js` checked (13 files) is confirmed DEAD — `wizardLibrary.js`'s own `opensAs` redirects every
+live menu entry straight to a GENERIC twin renderer (`panelTypes.js`'s `_previewGeometryOf`/`buildCanvasWidgets`
+dispatch), reading a DECLARED source of truth per op (`def.previewGeometry` for the mill family, `def.layout.
+kind`+the shared lathe-profile spec builders for the lathe family, `simStartParams`/`simStartsProvider` for the
+probe family). The ROADMAP is describing dead code as if it still runs.
+
+**What's genuinely still hand-written, narrower than "0/32":**
+1. **The LATHE family's per-shape geometry math** (facing/odTurn/parting/centerDrill/faceProbe/odProbe, 6 ops)
+   — DISPATCH is declared (one generic entry point routes by `def.layout.kind`), but each shape's own geometry
+   (`facingSpec`/`odProfileSpec`/`partProfileSpec`/…) is hand-written JS using FeatureCanvas's own `onDrag`/
+   `onEdit`, not `canvasWidgets.js`'s declared gesture registry (point/rect/radial/translate/projLength) the
+   mill family already rides.
+2. **Handle AFFORDANCES** (`onEdit`/`noSnap`/`emits`) — declared on some ops (corner/middle/surfacing/drill/
+   bore/the lathe family), absent with no apparent rule on others (pocket/slot/tap/text/polygon/rotaryCenter/
+   rotaryClock).
+3. **Found unprompted**: `layout_2d_canvas`/`sim_3d_box`/`code_preview_panel` — three DECLARED block types with
+   ZERO readers anywhere (corner's own header comment names this explicitly). A 5th instance of this project's
+   recurring declared-but-unread pattern (`emits`/`modalPre`/`noSnap`/`mouth`, now this).
+
+### THE GATE — ROADMAP.md's own stated make-or-break condition, ASSESSED: BUILDABLE, not hypothetical
+
+`tests/commit-on-release-2429.spec.js` (this session) already reuses `web/debug/featProbe.js` DIRECTLY inside
+an automated Playwright test (captures its console rows as assertion evidence) AND separately asserts real
+rendered geometry (`handle.boundingBox()` / a `getBoundingClientRect()`-based helper) mid-drag and post-release.
+**The generalization the ROADMAP's own condition asks about has already happened once, for one bug class, and
+is green today.** A generic `previewEquivalence(op, params)` harness — mirroring `emitEquivalence`'s own shape
+— is a realistic next build, not a research question: render → read real DOM geometry → diff against the op's
+OWN declared/computed geometry source, which ~30/32 twins already have.
+
+**Worked against the 5 owner-found defects this week (the dispatch's own concrete design test):**
+- CAUGHT by this ONE gate shape: drag-not-following-the-finger, value-reverting-on-release, flyout-landing-in-
+  a-corner — all three are rendered-position-vs-declaration claims, and the pattern is already proven.
+- NOT CAUGHT — needs a DIFFERENT, smaller primitive: the missing pane sizer (an ELEMENT-ABSENCE bug — needs a
+  declared affordance-manifest + presence check, not a position diff) and the pane sizing from the window
+  instead of itself (a container-query-vs-viewport-query CSS bug — needs a dimension assertion under a resized-
+  host harness; arguably not preview-specific at all, a general responsive-layout hazard).
+
+### ⭐ RECOMMENDATION: START THE ARC, gate-first, exactly per ROADMAP's own ordering — do not refuse it
+
+The evidence against refusing is concrete: the arc's hardest precondition (a cheap, buildable preview-
+equivalent of emit's byte-identity) is not a hope, it is a generalization of code already shipped and green in
+this repo. In order:
+1. Build `previewEquivalence(op, params)` generic, prove it on 2-3 already-fully-declared ops (pocket/corner)
+   before trusting it broadly.
+2. Build the presence/manifest check and the container-relative-sizing check as their OWN, separate primitives
+   — do not fold either into the geometry-gate's scope; they prove different claims.
+3. THEN port the lathe family's geometry math onto `canvasWidgets.js`'s declared registry (the one genuine
+   remaining "0" this measurement found) — step 1's gate is what proves the port didn't silently change
+   anything, the exact role byte-identity played for the emit port.
+
+**STILL REAL IF**: `grep -rL "opensAs" web/blocks/wizardLibrary.js` still shows the 25 entries (the dead-view
+finding still holds) AND `grep -c "getBoundingClientRect\|boundingBox" tests/commit-on-release-2429.spec.js`
+still returns ≥1 (the gate precedent is still there to generalize from). If either check no longer holds,
+re-verify before acting on this entry's own conclusion — rule 8b applies to this entry too.
