@@ -66940,6 +66940,42 @@ seed-into-L1) do not apply — nothing changed to demonstrate. Item 3 (the contr
 IS what both fix attempts' own re-tests already re-confirmed: dragging A still moves B by the same ~24.6px/
 62.7px as t2473 found, unchanged by either candidate.
 
+## t2475 (SMALL ITEM, own commit per rule 4) — BACKLOG #67 (new): drill's Blocks-tab canvas-mount gap is a
+REAL product defect, not a gate/boot limitation
+
+### THE A/B, three boot methods compared
+
+1. `window.openWiz('drill')` (legacy modal): canvas mounts correctly (`hasFeatureCanvas:true,
+   fcHandleCount:1`).
+2. `stackToWorkspace([op], window.__blkws)` — a REAL toolbox-drag simulation, not a synthetic shortcut — into
+   the Blocks-tab pane: canvas never mounts (`hasFeatureCanvas:false, fcHandleCount:0`).
+3. L4's own boot (`_framed`+`makeOp`+`ddcsLoadBlockStack`): same failure as (2), confirming (2) and (3) agree
+   with each other and disagree with (1).
+
+⇒ Rules out a gate-reach/boot-method artifact: the SAME twin, the SAME declared `previewGeometry`
+(`drillData.js:452`, confirmed present, the identical mechanism every working op uses), renders through ONE
+real code path and not the OTHER, current-generation surface every other tested op succeeds on.
+
+### THE MECHANISM, pinned by direct DOM read
+
+`#blk_wiz_user .wiz-visual` — the container hosting the WHOLE 3D+2D split, not just the 2D canvas — renders
+`style="display: none;"` for drill specifically. `#blk_userVizContainer` exists but is completely empty
+(nothing ever attempts to render into it). `userOpView.js`'s own `applyPanel()` sets exactly this toggle from
+`panelType(_def.panel).viz`; drill's def declares `panel:'form3d+2d'` (`drillData.js:444`), the SAME value
+every correctly-rendering op uses — so the discrepancy is not in the declared panel value itself.
+
+### LIKELY ROOT, INFERRED not confirmed — a genuinely useful lead for whoever picks this up
+
+drill is the ONLY op in L4's tested set on the TREE render path (`hasTreeLayout()`, landed t2341 — "THE FLIP,"
+an 8-attempt migration wrapping drill's `uiChildren` in `split_horizontal`). Found, in passing, that
+`drill-form-reproduction-2299.spec.js`'s own header comment claims the tree "has no split_* node" — STALE:
+the CURRENT `drillData.js:329` plainly declares one. The migration's own extensive test suite (8 files) is
+thorough on form-structure fidelity and the standalone modal; plausible it never exercised the Blocks-tab
+pane's own `applyPanel()` visibility toggle specifically. Not confirmed to that precision this turn — named as
+the concrete next step, not chased further, per the dispatch's own explicit "report, don't fix" scope.
+
+Tier: doc-only (`BACKLOG.md` #61 correction + new #67 entry) — no test/product code touched for this half.
+
 ### VERIFY (both halves)
 
 Main: the advisor's own lead tested directly (not confirmed as the release-time cause); a second, independent

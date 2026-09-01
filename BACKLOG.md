@@ -5399,6 +5399,13 @@ never mounted, `fcHandleCount: 0`. Not investigated further (out of this turn's 
 gap in L4's OWN reach, not glossed into the "no handle by design" bucket it does NOT belong in. Worth a look:
 whatever makes drill's canvas mount differs from every other op this sweep drove successfully.
 
+⭐⭐ **t2475 — RESOLVED: NOT a gate-reach limitation, a REAL product defect.** `window.openWiz('drill')` (the
+legacy modal) mounts the canvas correctly; the Blocks-tab pane (the surface every other one of the 31 tested
+ops actually uses) does not — `#blk_wiz_user .wiz-visual` renders `display:none` for drill specifically,
+confirmed via a real toolbox-drag simulation (`stackToWorkspace`), not just the synthetic boot. Filed as its
+own entry, BACKLOG #67, with the precise mechanism and a likely root (`applyPanel()`'s visibility toggle
+possibly not wired for drill's own tree-render migration, t2341). REPORT ONLY, not fixed. Full account there.
+
 ⭐⭐ **This entry's OWN prediction is falsified, corrected here rather than left standing**: t2465's own passage
 above reads *"the lathe family's six ops are precisely the ones the gate can't drive... if it can't, that IS
 L5's whole justification."* **It CAN drive all seven** (facing/odTurn/parting/centerDrill/polygon/faceProbe/
@@ -5856,3 +5863,58 @@ than "something is wrong with parting's preview." Not fixed this turn, per the d
 `user_lathe_parting`, booted per BACKLOG #61's own L4 recipe, still shows zero movement — while
 `partWidth`/`partFloor` (the diagnostic contrast) still respond normally on their own axis. If the siblings
 ALSO stop responding, the shape of this entry has changed and needs re-diagnosing, not just re-confirming.
+
+---
+
+### 67. `drill`'s Blocks-tab "Wizard View" pane hides its ENTIRE visual panel (`display:none`) — a REAL product
+defect, NOT a gate/boot limitation. REPORT ONLY, not fixed, per t2475's own explicit scope
+
+*(filed t2475, small item — L4's own CAN'T-RUN outlier for `drill`, BACKLOG #61's own L4 section. Drilling is
+among the most-used ops in the app; this is the significant-find outcome that dispatch anticipated.)*
+
+**OBSERVED, three independent boot methods compared, a clean A/B**:
+1. `window.openWiz('drill')` (the legacy standalone modal path) — **the feature canvas mounts correctly**:
+   `hasFeatureCanvas:true, fcHandleCount:1`. Real, working, on-screen.
+2. `stackToWorkspace([op], ws)` (a REAL toolbox-drag simulation — the same primitive a genuine drag-from-
+   palette uses, not a synthetic `ddcsLoadBlockStack` shortcut) into the Blocks-tab pane — **the canvas never
+   mounts**: `hasFeatureCanvas:false, fcHandleCount:0`.
+3. The L4 sweep's own boot (`_framed`+`makeOp`+`ddcsLoadBlockStack`) — same failure, confirming methods 2 and
+   3 agree with each other and disagree with method 1.
+
+⇒ **Not a gate-reach limitation** — the SAME underlying twin (`user_drill_data`), the SAME `def.previewGeometry`
+(`drillData.js:452`, confirmed declared, same mechanism every working op uses), renders correctly through ONE
+real code path and not through the OTHER, REAL, CURRENT-generation surface (the Blocks-tab pane every other of
+the 31 tested ops uses successfully).
+
+**THE PRECISE MECHANISM, pinned by direct DOM inspection**: `#blk_wiz_user .wiz-visual` — the container
+hosting the WHOLE 3D+2D preview split, not just the 2D handle canvas — renders with `style="display: none;"`
+for drill specifically in the Blocks-tab pane. `#blk_userVizContainer` (where the feature-canvas SVG would
+mount) exists but is completely empty — nothing ever tries to render into it, because the whole panel is
+hidden before that point. `userOpView.js`'s own `applyPanel()` sets exactly this: `vis.style.display =
+panelType(_def.panel).viz ? '' : 'none'` — and drill's own def DOES declare `panel:'form3d+2d'` (confirmed,
+`drillData.js:444`), the SAME value every correctly-rendering op uses. So `panelType('form3d+2d').viz` should
+resolve `true` for drill exactly as it does for every other op — the discrepancy is NOT in the panel value
+itself.
+
+**LIKELY ROOT, INFERRED not confirmed this turn**: drill is the ONLY op in the entire L4-tested set built on
+the TREE render path (`hasTreeLayout()` → `renderUiTree`, landed t2341 — "THE FLIP," an 8-attempt, extensively
+documented migration wrapping drill's own `uiChildren` in a `split_horizontal` node so its live render is
+driven by its own declaration instead of the old hardcoded `#wiz_drill` shell). t2341's own referenced test
+suite (`drill-form-reproduction-2299.spec.js` and 7 siblings) is thorough on FORM STRUCTURE fidelity and the
+standalone-modal render — but `drill-form-reproduction-2299.spec.js`'s own header comment states the tree "has
+no `split_*` node... confirmed in the header comment above `drillDataStack`" — **that comment is now STALE**:
+the CURRENT `drillData.js:329` literally declares `type:'split_horizontal'`, meaning drill DID move onto the
+tree path at some point after that comment was written, and the comment was never updated. Plausible that the
+tree-migration's own test suite, written and passing BEFORE (or without exercising) the Blocks-tab pane's own
+`applyPanel()` visibility toggle specifically, never caught this — the migration's own extensive prior work
+(11 findings across 8 attempts) is real and thorough, but this ONE surface may genuinely have been outside its
+own test net.
+
+⛔ **Not fixed, not investigated further this turn** — per the dispatch's own explicit scope ("report, don't
+fix"). Concrete next step for whoever picks this up: read `applyPanel()`/`panelType()`'s own resolution
+against `_def` specifically when `hasTreeLayout(_def.template)` is true, and check whether the visibility
+toggle runs BEFORE or reads from a DIFFERENT value than the tree-render path expects.
+
+**STILL REAL IF**: `stackToWorkspace([op], window.__blkws)` for `user_drill_data` (booted per this entry's own
+method 2 above) still shows `#blk_wiz_user .wiz-visual` computed `display:none` while `window.openWiz('drill')`
+still renders `svg.feature-canvas` correctly — the A/B contrast, not either fact alone, is the claim.
