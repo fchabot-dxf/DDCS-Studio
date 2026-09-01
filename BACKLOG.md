@@ -6036,7 +6036,10 @@ control cases, `split-node-responsive-2327`, `stack-bridge-multi-mouth-2333`, `f
 sweep) — **19/19 passed.** The preview mutation manifest (7 tests, incl. the t2471 disk-cleanliness rewrite) —
 **7/7 passed.**
 
-### ⭐ L4 RE-SWEEP on drill — an honest, INCONCLUSIVE secondary finding, reported not chased
+### ⭐ L4 RE-SWEEP on drill — an honest, INCONCLUSIVE secondary finding, reported not chased. ⭐⭐ RESOLVED at
+t2479 (BACKLOG #68) — a REAL reachability defect, not instrumentation: the inner visual pane can render with
+computed `width:0`, positioning its own handle past the viewport edge with no scroll mechanism to reach it.
+Filed, not fixed. Full account in #68
 
 Per the dispatch's own VERIFY item 4: re-ran the drag-render-truth gate against drill's own primary handle
 (`dr_pos`) now that the canvas mounts. **Result: RED — `movedMid:0, movedAfter:0`.** Before trusting that as a
@@ -6061,4 +6064,57 @@ tree-rendered one populated with real children under `#blk_userViz3dContainer_tr
 tree` — if either goes empty again, the namespace fix regressed. The `.blk-formpane` overlap finding is
 separately still real if `elementFromPoint` at `dr_pos`'s own coordinates returns anything other than the
 handle itself.
+
+---
+
+### 68. `drill`'s Blocks-tab visual pane can render with ZERO computed width, positioning its own handles PAST
+the viewport edge with no scroll mechanism to reach them — a REAL reachability defect, distinct from BACKLOG
+#67's own namespace fix. REPORT ONLY, not fixed
+
+*(filed t2479, small item — characterizing BACKLOG #67's own L4 gate-RED finding on `drill`. Bounded to the
+narrow question the dispatch asked: instrumentation artifact, or a real overlay/reachability issue a user
+would also hit? Answer: the latter — filed, not left as a characterization note.)*
+
+**OBSERVED, a clean single measurement** (`user_drill_data`, default params, `stackToWorkspace` boot — the
+same real toolbox-drag simulation BACKLOG #67's own A/B used, 1400×1000 viewport, the SAME viewport L4's own
+sweep uses throughout): `dr_pos`'s own handle renders at `x:1524.8` — **beyond the 1400px viewport itself**
+(`handleOffscreen: true`). The INNER, tree-rendered `.wiz-visual` pane (the one BACKLOG #67's own namespace
+fix populates) has a computed **`width: 0`** at this exact boot condition — `x:1412, right:1412`, itself
+sitting just past the viewport's own right edge. **`document.documentElement.scrollWidth` and
+`document.body.scrollWidth` both equal exactly `1400`** — the viewport width, with NO horizontal overflow at
+all — meaning there is **no scrollbar, no scroll mechanism of any kind** that could bring this content into
+view. The handle isn't merely off the CURRENT scroll position; it's rendered somewhere the document itself
+never expands to reach.
+
+⇒ **This is not a Playwright hit-test artifact — the earlier "`.blk-formpane` intercepts the click" finding
+(BACKLOG #67's own report) was a downstream SYMPTOM of this, not a separate cause.** A real user opening drill
+in the Blocks-tab pane, under whatever layout condition produces this zero-width inner pane, would face the
+identical problem: content rendered, technically present in the DOM, genuinely un-reachable — no amount of
+scrolling, on a real device either, would bring it into view, because the DOCUMENT never grows to contain it
+(the content escapes its own zero-width container without expanding anything that could be scrolled).
+
+**LIKELY MECHANISM, INFERRED not confirmed**: a flex/layout sizing failure specific to the SECOND pane
+(`ui-split-pane2`, the tree's own `split_horizontal` RIGHT mouth) computing a `0` width under this boot
+condition — the SVG content inside then renders using its own internal viewBox coordinates, which are NOT
+clipped to a zero-width parent, escaping visually to wherever the pattern's own world-to-screen transform
+places it. Plausibly related to, but not confirmed as the same root as, BACKLOG #58's own prior "the pane
+sizes itself from the window, not from itself" class of bug — not chased to that precision this turn, per the
+dispatch's own explicit "bound it to the narrow question" scope.
+
+⛔ **Not fixed, not investigated further this turn** — REPORT ONLY, per the dispatch's own explicit scope.
+Concrete next step for whoever picks this up: measure `.ui-split-pane2`'s own computed flex-basis/width at the
+exact moment this zero-width state occurs, and whether it self-corrects on a later resize/layout pass (a
+"first paint before layout settles" race) or is a genuinely stable, wrong final state.
+
+**Consequence for L5, named plainly since the dispatch specifically asked**: this means the drag-render-truth
+gate's own RED on `drill` is **NOT purely an instrumentation limitation** — it found something real. The
+narrower, more precise claim for L5's own safety argument: the gate DOES still faithfully report what it
+measures (a real reachability gap), it just measured a DIFFERENT layer (pane sizing) than the ORIGINAL L1/L2
+gate family was built to catch (drag-render fidelity once a handle IS reachable). Not a false RED — a
+genuinely different, valid RED.
+
+**STILL REAL IF**: `stackToWorkspace([op], window.__blkws)` for `user_drill_data`, booted at 1400×1000 (BACKLOG
+#61's own L4 viewport), still shows the inner `.wiz-visual`'s own computed `width:0` alongside
+`document.documentElement.scrollWidth === window.innerWidth` (no scroll mechanism exists to reach the
+escaped content).
 

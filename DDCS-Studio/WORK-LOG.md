@@ -67130,6 +67130,27 @@ turn family.
 
 Tier: no product code touched — diagnosis and BACKLOG updates only.
 
+## t2479 (SMALL ITEM, own commit per rule 4) — BACKLOG #67's own L4 gate-RED on drill: RESOLVED as a REAL
+reachability defect, not instrumentation. Filed as BACKLOG #68, not fixed
+
+Bounded to the dispatch's own narrow question: is the `.blk-formpane` hit-test overlap purely a Playwright
+artifact, or does something genuinely cover drill's handle for a real user too? A clean single measurement
+(`stackToWorkspace` boot, 1400×1000 — the standard L4 viewport) answered it: `dr_pos`'s own handle renders at
+`x:1524.8`, PAST the 1400px viewport itself (`handleOffscreen: true`). The inner, tree-rendered `.wiz-visual`
+pane (the one t2477's own namespace fix populates) has a computed `width:0` at this exact boot condition.
+**`document.documentElement.scrollWidth` and `document.body.scrollWidth` both equal exactly `1400`** — no
+horizontal overflow, meaning NO scroll mechanism exists that could bring the content into view. This settles
+the question precisely: not instrumentation — a real, reproducible layout bug a real user would also hit,
+since the content escapes its own zero-width container without expanding anything scrollable. The earlier
+`.blk-formpane` hit-test finding was a downstream SYMPTOM of this, not a separate cause. Filed as BACKLOG #68
+with the likely mechanism named (a flex-sizing failure in the tree's own `ui-split-pane2`, possibly related to
+but not confirmed as the same root as BACKLOG #58's own prior pane-sizing class of bug) — not fixed, per the
+dispatch's own explicit scope. Named the consequence for L5 plainly, as the dispatch asked: the gate's own RED
+here is not a false positive — it measured something real, just a different layer (pane sizing) than the
+original drag-render-fidelity claim L1/L2 were built to catch.
+
+Tier: doc-only (`BACKLOG.md` new #68 entry + #67 cross-link) — no test/product code touched for this half.
+
 ### VERIFY (both halves)
 
 Root established by measurement, OBSERVED/INFERRED marked per claim throughout (four hypotheses tested and
