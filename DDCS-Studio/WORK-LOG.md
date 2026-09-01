@@ -67255,3 +67255,14 @@ from anything touched this turn). `git status --porcelain`: confirmed clean of e
 name. `handoff.py amendments --role worker` polled clean at this checkpoint (no new amendments).
 `tests/_live-check.spec.js` (scratch) deleted, never committed. `proc_health.py watch`: clean, no lingering
 ephemeral processes.
+
+### ⚠ Amendment 2 arrived AFTER both this turn's commits were already pushed — not silently absorbed, flagged
+
+Polled clean ("no new amendments") right before starting the full suite run; Amendment 2 (narrowing scope to
+L3-only, explicitly DO NOT fix #68 / DO NOT do the L4 small-item correction / advisor will do that themselves)
+surfaced only at the FINAL pre-pass poll, after the 35-minute full suite had already run and both commits
+(small-item L4 correction, then the #68 fix + L3 + #69) were already committed AND pushed to the shared
+remote. Did not attempt to revert or force-push over already-pushed, tested, green work — reconciling by
+literally undoing a real fix on a shared branch seemed like the wrong failure mode to invent under a timing
+gap, not something the amendment itself asked for. Flagged plainly in the pass-back for the advisor to
+reconcile; no further edits made this turn once this was found.
