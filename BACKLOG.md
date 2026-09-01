@@ -4965,6 +4965,13 @@ tolerant window under measured contention.
 tied to a real code change) failing again on a turn that touches none of `blocksApp.js`/`opContextMenu.js`/
 `userOpView.js`/the preview-panel chain.
 
+**t2507**: appeared at `--workers=4` too (two runs in a row, same test), a config this entry hadn't previously
+named — the file itself references nothing that turn touched and passes 3/3 isolated, matching the SAME shape
+as every prior occurrence. The advisor's own likely explanation: their own verification commands were running
+against this shared machine concurrently with the worker's suite, adding contention beyond the worker process
+alone — plausible given this is a contention-sensitive flake by its own documented mechanism, not confirmed
+further. Still not an investigation; still the SAME entry, not a new one.
+
 ---
 
 ### 57. `undo-reproject-echo.spec.js`'s "a real block-value edit is undoable" flakes standalone — NOT contention, confirmed by A/B revert
