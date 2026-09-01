@@ -5827,10 +5827,10 @@ single number, is the claim. The sharper, root-confirming check: the B-moves-whe
 
 ---
 
-### 66. [t2473 small item — partWidth/partFloor tested: BOTH RESPOND correctly (axis-constrained, no snap-back);
-the defect is `partPos`-SPECIFIC, not op-wide] `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL —
-a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed. Different SHAPE from
-#64/#65 — non-responsive, not a snap-back
+### 66. [t2479 — root PRECISELY BOUNDED (a width-dependent threshold between 15mm and 20mm), NOT fully pinned
+to one mechanism — several hypotheses tested and REFUTED, GUARDRAIL TRIPPED, not fixed] `parting`'s `partPos`
+handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT
+ONLY, not fixed. Different SHAPE from #64/#65 — non-responsive, not a snap-back
 
 *(filed t2471, same L4 sweep — see BACKLOG #61's own L4 section. Also directly refutes that entry's own
 lathe-family "the gate can't drive it" prediction for the OTHER six lathe ops, which all responded correctly —
@@ -5870,6 +5870,62 @@ than "something is wrong with parting's preview." Not fixed this turn, per the d
 `user_lathe_parting`, booted per BACKLOG #61's own L4 recipe, still shows zero movement — while
 `partWidth`/`partFloor` (the diagnostic contrast) still respond normally on their own axis. If the siblings
 ALSO stop responding, the shape of this entry has changed and needs re-diagnosing, not just re-confirming.
+
+### ⭐⭐⭐⭐ t2479 — FOUR hypotheses tested against the diagnostic contrast (`partWidth`/`partFloor`), all four
+REFUTED by direct measurement. Root PRECISELY BOUNDED but not fully pinned. GUARDRAIL TRIPPED, not fixed
+
+**Hypothesis 1 — missing/malformed declaration (the dispatch's own anticipated L6 shape): REFUTED.** Read
+`partProfileSpec` (`web/viz/latheProfileCanvas.js:277-326`) directly: `partPos`'s own declaration is
+STRUCTURALLY IDENTICAL in shape to `partWidth`'s (`{id, x, y, kind:'size', axis, emits:true, label, value}`,
+same fields, same `onDrag`/`onEdit` wiring pattern) — nothing missing, nothing malformed. Both are declared,
+both are wired the same way.
+
+**Hypothesis 2 — `partPos`'s drag silently grabs `partWidth` instead (they sit close together, ~10 screen px
+apart at default `width:3`): REFUTED, directly.** Dragged at `partPos`'s own coordinates and measured BOTH
+handles' screen positions before/mid/after — `partWidth` did NOT move either (`movedWidth: 0.0`). Nothing was
+secretly grabbed; the gesture registered as a background pan, not a handle grab at all.
+
+**Hypothesis 3 — the handle's own DOM bounding box is skewed by its label text, so the "center" Playwright
+clicks isn't the true clickable circle: REFUTED.** Dumped the actual DOM: `.fc-handle[data-hid="partPos"]` is
+a bare `<circle cx="221.02" cy="83.71" r="6">`, no children, a clean 12×12 bounding box exactly matching its
+own radius — not skewed by the sibling `<text>` "face -10" (confirmed as a SEPARATE sibling element, rendered
+on top visually but irrelevant to hit-testing — `featureCanvas.js`'s own `pointerdown` listener is bound to
+the `<svg>` itself and hit-tests by WORLD COORDINATE math (`_hit()`), never by `e.target` — so the earlier
+`elementFromPoint` "hits the text label" finding was a real but IRRELEVANT visual detail, not the cause).
+
+**Hypothesis 4 — simple screen-proximity to `partWidth` (a hit-test tolerance overlap): REFUTED, decisively,
+by a width-threshold sweep.** If proximity to `partWidth` were the cause, `partPos` should start working as
+soon as the two handles are far enough apart. Measured `partPos`'s own responsiveness across `width` = 3, 5,
+8, 10, 15, 20, 30mm (`_framed('user_lathe_parting', {width})`) — **fails through width=15 (49px screen
+separation from `partWidth` — far beyond any plausible hit-test tolerance radius), and only starts working at
+width=20 (65px separation).** A 49px gap failing while 65px succeeds is not explainable by "the two handles
+are too close together" — the failure boundary sits well past where any reasonable proximity-based tolerance
+argument would predict success. **This result surprised the turn's own leading hypothesis and is reported as
+the refutation it is, not smoothed into a weaker version of the same theory.**
+
+⚠ **Root NOT fully pinned — an honest gap, not glossed over.** The width-threshold sweep proves the mechanism
+is real, reproducible, and tied to `width` specifically — but WHY a width-dependent boundary exists between
+15mm and 20mm was not isolated to one line this turn. The most plausible remaining candidate (not tested,
+named for whoever picks this up): `featureCanvas.js`'s own auto-fit (`_fit()`) may compute a DIFFERENT overall
+view `scale` as the kerf rectangle's own width changes (even though the STOCK bounds it fits to come from the
+bar's fixed profile, not `width` — worth checking whether `_fit()` ALSO considers handle/item extents, not
+just `stock`), and since `_hit()`'s own tolerance is `13 / scale` — a smaller `scale` (more zoomed OUT) would
+make the SAME 13-unit constant more forgiving in world terms, independent of on-screen handle spacing. Not
+measured directly this turn (would need the live `FeatureCanvas` instance's own `_tf.scale` at each width,
+not reachable from outside without new instrumentation).
+
+⛔ **GUARDRAIL TRIPPED, stopped — no fix attempted.** Every candidate fix available without a confirmed
+mechanism carries real risk: widening `PART_DEFAULTS.width` doesn't address the underlying capability (still
+breaks for any REAL user who sets a realistic 2-4mm blade width, a legitimate value for actual parting
+tools — this is not an edge case at the shipped default); touching `featureCanvas.js`'s own `_hit()` tolerance
+or `_fit()` scale computation is a SHARED, cross-cutting change reaching every one of the 18 GREEN ops this
+arc has already proven, exactly the kind of under-confident, broad change this session's own standing
+discipline (and #64/#65's own precedent, same turn family) argues against. Four tested, refuted hypotheses is
+real, valuable narrowing — a fifth, UNTESTED guess would not be. Full account: WORK-LOG t2479.
+
+**STILL REAL IF**: unchanged — see the entry's own existing `STILL REAL IF` above; the width-threshold finding
+adds a SECOND, sharper reproduction recipe: `partPos` fails at `width:15`, succeeds at `width:20`, using the
+SAME `_framed('user_lathe_parting', {width})` boot this turn used.
 
 ---
 
@@ -6005,3 +6061,4 @@ tree-rendered one populated with real children under `#blk_userViz3dContainer_tr
 tree` — if either goes empty again, the namespace fix regressed. The `.blk-formpane` overlap finding is
 separately still real if `elementFromPoint` at `dr_pos`'s own coordinates returns anything other than the
 handle itself.
+

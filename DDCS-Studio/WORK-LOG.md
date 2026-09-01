@@ -67082,3 +67082,61 @@ this turn does not meet. Re-ran both isolated (`--workers=1`) rather than the fu
 passed outright, 4 flaky-then-passed-on-retry — consistent with their own established flake rate across
 multiple prior turns, not a new or worsened symptom. `git status --porcelain`: confirmed clean of every source
 file the manifests name.
+
+## t2479 — BACKLOG #66: parting's partPos handle is dead. Diagnosed with the ideal contrast the prior turn
+built; four hypotheses tested and refuted; root PRECISELY BOUNDED but not fully pinned; GUARDRAIL TRIPPED
+
+### FOUR hypotheses, tested in order, each with direct measurement — not argued, not assumed
+
+**1. Missing/malformed declaration** (the dispatch's own anticipated L6 shape) — REFUTED. Read
+`partProfileSpec` (`web/viz/latheProfileCanvas.js:277-326`) directly: `partPos`'s own declaration is
+structurally identical to `partWidth`'s, same fields, same wiring. Nothing missing.
+
+**2. Drag secretly grabs `partWidth` instead** (the two handles sit ~10 screen px apart at default `width:3`)
+— REFUTED, directly. Dragged at `partPos`'s own coordinates, measured BOTH handles before/mid/after —
+`partWidth` did not move either. The gesture fell through to a background pan, not a handle grab.
+
+**3. The handle's own DOM bounding box is skewed by its label text** (so the "center" a test reads isn't the
+true clickable circle) — REFUTED. `.fc-handle[data-hid="partPos"]` is a bare `<circle r="6">`, no children, a
+clean 12×12 box — the sibling `<text>` "face -10" renders on top visually but is irrelevant to hit-testing
+(`featureCanvas.js`'s own `pointerdown` listener is bound to the `<svg>`, hit-tests by world-coordinate math,
+never by `e.target`).
+
+**4. Simple screen-proximity to `partWidth`** (a hit-test tolerance overlap) — REFUTED, decisively, by a
+width-threshold sweep. Tested `partPos`'s own responsiveness at `width` = 3/5/8/10/15/20/30mm. **Fails through
+width=15 (49px screen separation — far beyond any plausible hit-test tolerance radius) and only starts working
+at width=20 (65px).** A 49px gap failing while 65px succeeds directly refutes "the handles are too close" as
+the mechanism — the boundary sits well past where that theory would predict success. This result contradicted
+the turn's own leading hypothesis and is reported as the refutation it is.
+
+### Root NOT fully pinned — an honest gap
+
+The width-threshold sweep proves the mechanism is real, reproducible, and width-dependent — but WHY a boundary
+exists between 15mm and 20mm wasn't isolated to one line. Most plausible remaining candidate, named for
+whoever picks this up: `featureCanvas.js`'s own auto-fit may compute a different overall `scale` as the kerf
+rectangle's own width changes, and since `_hit()`'s tolerance is `13 / scale`, a smaller scale (more zoomed
+out) would make the same constant more forgiving in world terms — independent of on-screen handle spacing.
+Not measured directly (would need the live `FeatureCanvas` instance's own `_tf.scale` at each width, not
+reachable from outside without new instrumentation this turn didn't build).
+
+### GUARDRAIL TRIPPED — no fix attempted
+
+Every available candidate without a confirmed mechanism carries real risk: widening `PART_DEFAULTS.width`
+doesn't address the underlying capability (still breaks for a real user's own legitimate 2-4mm blade width —
+not an edge case at the shipped default); touching `featureCanvas.js`'s own `_hit()`/`_fit()` is a shared,
+cross-cutting change reaching all 18 GREEN ops this arc has proven. Four tested, refuted hypotheses is real,
+valuable narrowing; a fifth, untested guess would not be — same discipline #64/#65 already established this
+turn family.
+
+Tier: no product code touched — diagnosis and BACKLOG updates only.
+
+### VERIFY (both halves)
+
+Root established by measurement, OBSERVED/INFERRED marked per claim throughout (four hypotheses tested and
+refuted for #66; the reachability mechanism confirmed directly for #68's small item). No fix landed either
+half, so items 2/3/4 of the dispatch's own VERIFY list (partPos responding across five directions,
+partWidth/partFloor still working, seeding into L1's manifest) don't apply — nothing changed to demonstrate.
+`test:changed`: 0 tests (expected — doc-only turn). `test:node`: 238/238 passed. Full suite `--workers=4`,
+BEFORE concluding: **3014 passed, 1 failed, 14 flaky, 26 skipped.** The one failure is the same pre-existing
+`sf-pos-snapback` load-contention timeout documented since t2465 — unrelated (zero product/test code touched
+this turn). `git status --porcelain`: confirmed clean of every source file the manifests name.
