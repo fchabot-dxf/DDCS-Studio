@@ -67854,3 +67854,65 @@ Mechanism proven inert before use: `test:node` 238/238, zero snapshot diff, run 
 `valueField`. New unit test (`tests/canvas-widgets.spec.js`) proves the mechanism does what's intended, in
 isolation, for all three real shapes. Existing `rect.onEdit` ambiguous-case test unchanged and still green.
 Full suite deferred to the combined end-of-turn run — see the retrofit half's own VERIFY section.
+
+## t2495b — odTurn/odProbe/parting retrofitted to drop their hand-written `onEdit`: geometry AND written-field-
+and-value proven identical before and after, for all seven edit paths
+
+With the mechanism proven inert, retrofitted the three ops it was built for:
+
+- **`odTurn`'s shoulder** (`odProfileSpec`): the ONE genuinely declared case — added `valueField: 'fieldH'`
+  (both `field`='depth' and `fieldH`=the diameter are active on this handle, so nothing about the shape alone
+  says which one the displayed number is). `FACE_DIA_HANDLE_ID` (taper-only, fieldH-only) needed no change at
+  all — already derives correctly.
+- **`odProbe`**: no declaration change — `fieldH`-only, derives automatically.
+- **`parting`**: no declaration change for any of its three handles — `partPos`/`partWidth` were already
+  `field`-only (the default path, unchanged since t2491/t2493), `partFloor` is `fieldH`-only (derives).
+
+All three now destructure `{ handles, onDrag, onEdit }` from `buildCanvasWidgets` directly and return `onEdit`
+as-is — `onEditFromMap` (the shared hand-written helper) is UNTOUCHED and still exactly one legitimate consumer
+left: `polygonProfileSpec`, the one op this arc has not yet reached — not orphaned, not dead code.
+
+**Geometry re-verified unedited** (already proven byte-identical at the ports' own original turns; re-ran the
+full existing lathe test suite to confirm the onEdit swap didn't disturb anything else): `lathe-odturn-1273`
+(28), `lathe-probe-1299` (10), `census-finding2-emits-teal-1684` (4), `lathe-part-drill-1275` (11),
+`lathe-world-1283` (13), `lathe-feel-1321` (8), `lathe-pilot-1271` (8, facing — untouched by this turn, re-run
+as a sanity check on the shared file), `canvas-widgets.spec.js` (7) — **79/79 passed, unedited**. `test:node`:
+238/238, zero snapshot diff (onEdit's own arity stays `<fn/2>` regardless of which implementation backs it, so
+the snapshot — which only records `<fn/arity>` — cannot itself distinguish generic from hand-written; the REAL
+proof is below).
+
+**THE ACTUAL PROOF the advisor asked for — WRITTEN FIELD AND VALUE, not just geometry**: built a direct
+`spec.onEdit(id, value)` capture for all seven distinct edit paths across the three ops (odTurn straight-mode
+shoulder, odTurn taper-mode shoulder, odTurn taper-mode faceDia, odProbe, parting's partPos/partWidth/
+partFloor), ran it once against the pre-retrofit code (`git checkout HEAD --`, hand-written `onEditFromMap`)
+and once against the retrofit (restored from a scratch copy, `diff`-confirmed byte-identical first) — the two
+FULL JSON captures (every field on the model object, not just the edited one, so a wrong-field write would
+show up as an unexpected key changing) are **byte-identical, only the test's own elapsed-time line differs**:
+```
+odTurnStraightShoulder: targetDiameter 12.5 (depth untouched)             -- SAME before/after
+odTurnTaperShoulder:    endDiameter 6.5 (targetDiameter/depth untouched)  -- SAME before/after
+odTurnTaperFaceDia:     targetDiameter 14.5 (endDiameter untouched)       -- SAME before/after
+odProbe:                caliperDiameter 18.25                            -- SAME before/after
+partingPartPos:         zFace -7.5 (width/floorDiameter untouched)       -- SAME before/after
+partingPartWidth:       width 4.25 (zFace/floorDiameter untouched)       -- SAME before/after
+partingPartFloor:       floorDiameter 9.5 (zFace/width untouched)        -- SAME before/after
+```
+Every capture also confirms the OTHER fields on the same model object stayed untouched — an edit path that
+silently ALSO wrote a sibling field (the exact "unobservable in geometry" regression shape the dispatch named)
+would have shown up here and did not.
+
+Tier: `viz/latheProfileCanvas.js`, shared file — rule 1b, full suite run once at the end, covering both this
+commit and t2495a's own mechanism commit together.
+
+### VERIFY (both halves, full turn)
+
+Mechanism proven inert before use (t2495a's own VERIFY). Three retrofits, each with geometry AND written-
+field-and-value identical before and after — stated precisely above, all seven edit paths, byte-identical
+JSON captures. 79 existing lathe/canvas-widgets tests passed unedited. `test:node`: 238/238, zero snapshot
+diff for either half. Full suite `--workers=4`, once, at the end, covering the whole turn: **3016 passed, 1
+failed, 14 flaky, 26 skipped** (3057 total) -- the one failure is the same pre-existing `sf-pos-snapback`
+load-contention timeout documented since t2465, unrelated (zero test files touched besides the two lathe/
+canvas-widgets specs this turn's own scope). `git status --porcelain`: confirmed exactly the intended file
+set across both commits, staged BY PATH throughout. `handoff.py amendments --role worker` polled clean at the
+start of this turn and again before this commit. `proc_health.py watch`: clean. All scratch files (the two
+onEdit-capture text dumps, the two source-file backups, `_live-check.spec.js`) deleted, never committed.

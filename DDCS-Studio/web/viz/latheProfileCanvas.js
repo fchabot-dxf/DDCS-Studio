@@ -214,14 +214,17 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
  * reproduces the depth math, `sy:0.5` a radius→diameter conversion falls straight out of the existing divisor),
  * and the two-sided "never past the bar's own surface" clamp — which no gesture could express before this turn
  * — is now `maxh` (t2489's own completion of the clamp vocabulary, symmetric with the pre-existing `minh`).
- * `onEdit` is DELIBERATELY KEPT HAND-WRITTEN, via the SAME shared `onEditFromMap` helper every other lathe spec
- * in this file already uses (not odTurn-specific, not a second copy) — `buildCanvasWidgets`'s own generic
- * `onEdit` can only route a click-to-edit to `d.field` (the X-axis field), never `d.fieldH` (the Y-axis one),
- * and the shoulder's own editable value — the diameter a person actually clicks — lives on `fieldH`. Swapping
- * in the generic version would silently misroute an edit to `depth` instead: a genuine capability gap, not
- * something a symmetric clamp completion should paper over. Splitting the return this way costs nothing
- * observable (`onEditFromMap`'s own output is unchanged, byte-for-byte) while still collapsing the actual
- * duplicated math (place/drag) onto the shared registry.
+ *
+ * t2495 — `onEdit` is NOW GENERIC too. Was hand-written (t2489) because `buildCanvasWidgets`'s own onEdit could
+ * only route to `d.field`, never `d.fieldH`, and the shoulder's own editable value (the diameter a person
+ * actually clicks) lives on `fieldH`. Rule-of-three reached honestly across three separate turns (odTurn here,
+ * `odProbeSpec`, `partProfileSpec`'s own floor — see BACKLOG #61's own t2489/t2491/t2493 entries) — the
+ * registry's own `onEdit` now resolves this itself via a declared `valueField: 'fieldH'` (this is the ONE case
+ * of the three that genuinely NEEDED the declaration: both `field` AND `fieldH` are active on this handle, so
+ * nothing about the shape alone says which one the displayed number represents — the other two cases derive it
+ * for free, only one axis is ever active on either). Confirmed inert before use (a snapshot-gate zero-diff
+ * re-run right after the mechanism itself was added, before this declaration existed) and unit-tested directly
+ * (`tests/canvas-widgets.spec.js`).
  * @param {object} bar   {diameter, stickOut, allowance}
  * @param {object} od    {kind, targetDiameter, endDiameter, depth}
  * @param {(patch:object) => void} onChange  called with the changed FIELDS ({targetDiameter, depth, …}) on a drag
@@ -259,9 +262,9 @@ export function odProfileSpec(bar, od, onChange) {
     // upper bound `rect`'s own `sy:0.5` divisor needs (the divisor performs the ×2 radius→diameter conversion,
     // so the bound must already be diameter-scaled: `2 × (barR − 0.001)`, not `barR − 0.001` itself).
     const maxDia = 2 * (barR - 0.001);
-    const { handles, onDrag } = buildCanvasWidgets([
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
         { type: 'rect', id: SHOULDER_HANDLE_ID, field: 'depth', fieldH: taper ? 'endDiameter' : 'targetDiameter',
-          ax: 0, ay: 0, ex: zEnd, ey: endR, sx: -1, sy: 0.5, minw: 0.001, minh: 0, maxh: maxDia,
+          valueField: 'fieldH', ax: 0, ay: 0, ex: zEnd, ey: endR, sx: -1, sy: 0.5, minw: 0.001, minh: 0, maxh: maxDia,
           emits: true, label: taper ? 'far end' : 'shoulder', value: taper ? o.endDiameter : o.targetDiameter },
         ...(taper ? [{ type: 'rect', id: FACE_DIA_HANDLE_ID, fieldH: 'targetDiameter',
                        ax: 0, ay: 0, ex: 0, ey: targetR, sy: 0.5, minh: 0, maxh: maxDia,
@@ -274,10 +277,7 @@ export function odProfileSpec(bar, od, onChange) {
         items,
         handles,
         onDrag,
-        onEdit: onEditFromMap({
-            [SHOULDER_HANDLE_ID]: (v) => (taper ? { endDiameter: v } : { targetDiameter: v }),
-            [FACE_DIA_HANDLE_ID]: 'targetDiameter',
-        }, onChange),
+        onEdit,
     };
 }
 
@@ -310,10 +310,12 @@ export const DRILL_DEPTH_HANDLE_ID = 'drillDepth';
  * the two-sided `maxh` clamp t2489 added — `PART_FLOOR_HANDLE_ID`'s own clamp was BYTE-IDENTICAL in shape to
  * `odProfileSpec`'s shoulder before this port, confirmed by inspection, not assumed).
  *
- * `onEdit` KEPT HAND-WRITTEN for the WHOLE spec (not split per-handle) — `partFloor`'s sole field lives on
- * `fieldH`, the SAME `buildCanvasWidgets`-can't-reach-it shape as `odProfileSpec`'s shoulder and `odProbeSpec`.
- * This is the THIRD occurrence of that mismatch (odTurn, odProbe, now parting) — reported as a count, per the
- * advisor's own explicit instruction, not acted on: still not building a `valueField` concept this turn.
+ * t2495 — `onEdit` is NOW GENERIC, for all three handles. `partFloor`'s sole field lives on `fieldH` with no
+ * `field`/`sx` declared at all — the registry's own onEdit DERIVES the target from that alone, same as
+ * `odProbeSpec`'s own handle, no `valueField` needed. `partPos`/`partWidth` were already generic-onEdit-
+ * compatible (plain `field`, the default path, unchanged since t2491/t2493). This was the THIRD occurrence of
+ * the fieldH mismatch (odTurn, odProbe, now this) — the count that triggered building the mechanism; see
+ * `odProfileSpec`'s own comment for the mechanism's full account.
  *
  * `partPos` IS BACKLOG #66's own known-dead handle (never tracks the pointer, root not pinned) — this port
  * changes ONLY how its place/drag math is EXPRESSED (`length`, no clamp), not what it computes, and the
@@ -342,7 +344,7 @@ export function partProfileSpec(bar, part, onChange) {
     // handles both kinds correctly, so a part-off spigot now draws where the operator actually typed it.
     const maxDia = 2 * (barR - 0.001);   // the SAME two-sided diameter bound odProfileSpec's own shoulder uses
 
-    const { handles, onDrag } = buildCanvasWidgets([
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
         { type: 'length', id: PART_POS_HANDLE_ID, field: 'zFace', ax: 0, ay: barR, axis: 'x',
           emits: true, label: 'face', value: zFace },
         // …the FAR WALL is the blade's width: drag it and the kerf widens. It sits at the same Z as the stop-Ø
@@ -370,7 +372,7 @@ export function partProfileSpec(bar, part, onChange) {
         ],
         handles,
         onDrag,
-        onEdit: onEditFromMap({ [PART_POS_HANDLE_ID]: 'zFace', [PART_WIDTH_HANDLE_ID]: 'width', [PART_FLOOR_HANDLE_ID]: 'floorDiameter' }, onChange),
+        onEdit,
     };
 }
 
@@ -533,10 +535,12 @@ export function faceProbeSpec(bar, probe, onChange) {
  *
  * t2491 (BACKLOG #61 / L5) — DECLARED through `rect`, Y-only (`ax:zTouch, ex:0` fixes X as a constant, never
  * tied to a field; `sy:0.5` performs the radius→diameter ×2 conversion, the SAME technique `odProfileSpec`'s
- * own diameter handles already proved, `minh:0.002` = `0.001` doubled). `onEdit` KEPT HAND-WRITTEN, for the
- * SAME reason as `odProfileSpec`'s own shoulder (t2489/t2491): the sole field lives on `fieldH` (the Y axis),
- * and `buildCanvasWidgets`' generic `onEdit` can only reach `d.field`. Not a new mismatch — the same one
- * recurring, resolved the same already-approved way (`onEditFromMap`, not a registry extension).
+ * own diameter handles already proved, `minh:0.002` = `0.001` doubled).
+ *
+ * t2495 — `onEdit` is NOW GENERIC. Only `fieldH` is ever declared on this handle (no `field`, no `sx`) — the
+ * registry's own onEdit DERIVES the target from that alone, no `valueField` needed (unlike `odProfileSpec`'s
+ * own shoulder, which activates BOTH axes and genuinely needs to be told which one). See that function's own
+ * comment for the mechanism's full account and BACKLOG #61's own t2489/t2491/t2493/t2495 entries for the count.
  */
 export function odProbeSpec(bar, probe, onChange) {
     const b = normalizeBar(bar);
@@ -547,7 +551,7 @@ export function odProbeSpec(bar, probe, onChange) {
     const tip = Math.max(0.3, Number(p.tipRadius) || 2);
     const zTouch = -Math.max(2, (prof.bounds.z2 - prof.bounds.z1) * 0.15);   // …on the round, a little back from the face
 
-    const { handles, onDrag } = buildCanvasWidgets([
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
         { type: 'rect', id: OD_PROBE_HANDLE_ID, fieldH: 'caliperDiameter', ax: zTouch, ay: 0, ex: 0, ey: measuredR,
           sy: 0.5, minh: 0.002, emits: true, label: 'measured Ø', value: r3(dia) },
     ], (m) => { if (typeof onChange === 'function') onChange(m); });
@@ -563,7 +567,7 @@ export function odProbeSpec(bar, probe, onChange) {
         ],
         handles,
         onDrag,
-        onEdit: onEditFromMap({ [OD_PROBE_HANDLE_ID]: 'caliperDiameter' }, onChange),
+        onEdit,
     };
 }
 

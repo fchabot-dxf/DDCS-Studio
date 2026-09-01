@@ -5613,6 +5613,33 @@ Gate numbers for `partWidth`/`partFloor`: byte-identical, four seeds. 32 existin
 `lathe-feel-1321`, `lathe-part-drill-1275`) passed unedited. Snapshot diff enumerated by direction (7 lines,
 parting's own only). Full account: WORK-LOG t2493.
 
+### ⭐⭐⭐⭐⭐ t2495 — RULE-OF-THREE CLOSED: the fieldH/onEdit gap, then odTurn/odProbe/parting retrofitted to drop
+their hand-written `onEdit` entirely
+
+The count named across t2489/t2491/t2493 (odTurn's shoulder, odProbe, parting's floor) reached three — this
+project's own rule-of-three trigger, earned honestly over four separate turns rather than argued for in one.
+
+Measured the three real cases before designing anything: `odProbe`/`partFloor` only ever declare `fieldH` (no
+`field`, no `sx`) so the destination is DERIVABLE by construction; `odTurn`'s shoulder activates BOTH axes, so
+it genuinely needs a new optional `valueField` ('field' or 'fieldH') naming which one the displayed value
+represents. `canvasWidgets.js`'s own generic `onEdit` now resolves this — `field` wins whenever set and
+`valueField` is absent, byte-identical to every one of the 11 OTHER `rect`-consumer call sites in the app
+(confirmed by reading each, including a `panelTypes.js` one that declares both fields AND a value — the one
+case genuinely at risk, confirmed unchanged since it doesn't opt in).
+
+Proven inert via the snapshot gate BEFORE any declaration used it (238/238, zero diff — the SAME ordering
+t2489's own clamp completion established), then retrofitted all three ops: `odTurn`'s shoulder gained the one
+`valueField` declaration it needed; `odProbe`/`parting` needed NO declaration changes at all, just swapping
+from `onEditFromMap` to the registry's own `onEdit`. `onEditFromMap` itself is untouched, still legitimately
+used by `polygonProfileSpec` — the one op this arc hasn't reached yet.
+
+**Proof went beyond geometry, per the dispatch's own explicit ask**: captured `spec.onEdit(id, value)`'s own
+WRITTEN FIELD AND VALUE (not just the handle's rendered position) for all seven distinct edit paths across the
+three ops, before and after the retrofit — byte-identical JSON, including confirmation that no edit silently
+touched a sibling field. 79 existing lathe/canvas-widgets tests passed unedited.
+
+Full account: WORK-LOG t2495a (the mechanism) / t2495b (the three retrofits), two commits.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
@@ -6109,6 +6136,16 @@ port: `movedMid:0.000, movedAfter:0.000` in every trial, unchanged either side. 
 search: the deadness survives a COMPLETE rewrite of the declaration's own expression, which is strong evidence
 the root sits somewhere in FeatureCanvas's own render path (as this entry's own diagnosis already concluded),
 not in anything specific to how `partProfileSpec` itself declares the handle.
+
+⭐ **The framing that makes this the cleanest diagnostic contrast this entry has ever had** (t2495): `partPos`
+is now a FULLY registry-driven `length` gesture — the exact same gesture, the exact same `buildCanvasWidgets`
+builder, the exact same code path `facing`'s own handle uses, and `facing` WORKS (drags correctly, settles
+correctly, no snap-back — proven repeatedly since t2485). One handle built by this code path works; the other,
+built by the IDENTICAL code path with only its own numbers different, does not. That rules out the DECLARATION
+entirely, as a class — not just this one declaration's own shape, but "something about how a lathe canvas spec
+is written" as a category of explanation. Whatever is broken has to live in something `partPos` alone touches
+that `facing`'s handle does not (its own id, its own field name, or something about WHERE in the DOM/render
+order this particular op's handle lands) — a much narrower place to look than before this turn.
 
 ---
 
