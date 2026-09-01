@@ -508,6 +508,13 @@ export function faceProbeSpec(bar, probe, onChange) {
  * THE OD PROBE PICTURE. The bar is drawn at the MEASURED diameter, because that is what the op declares and what the
  * DRO will read afterwards; the handle IS that measurement. It is a DIAMETER on the way in and out — the halving
  * happens once, on the controller.
+ *
+ * t2491 (BACKLOG #61 / L5) — DECLARED through `rect`, Y-only (`ax:zTouch, ex:0` fixes X as a constant, never
+ * tied to a field; `sy:0.5` performs the radius→diameter ×2 conversion, the SAME technique `odProfileSpec`'s
+ * own diameter handles already proved, `minh:0.002` = `0.001` doubled). `onEdit` KEPT HAND-WRITTEN, for the
+ * SAME reason as `odProfileSpec`'s own shoulder (t2489/t2491): the sole field lives on `fieldH` (the Y axis),
+ * and `buildCanvasWidgets`' generic `onEdit` can only reach `d.field`. Not a new mismatch — the same one
+ * recurring, resolved the same already-approved way (`onEditFromMap`, not a registry extension).
  */
 export function odProbeSpec(bar, probe, onChange) {
     const b = normalizeBar(bar);
@@ -518,6 +525,11 @@ export function odProbeSpec(bar, probe, onChange) {
     const tip = Math.max(0.3, Number(p.tipRadius) || 2);
     const zTouch = -Math.max(2, (prof.bounds.z2 - prof.bounds.z1) * 0.15);   // …on the round, a little back from the face
 
+    const { handles, onDrag } = buildCanvasWidgets([
+        { type: 'rect', id: OD_PROBE_HANDLE_ID, fieldH: 'caliperDiameter', ax: zTouch, ay: 0, ex: 0, ey: measuredR,
+          sy: 0.5, minh: 0.002, emits: true, label: 'measured Ø', value: r3(dia) },
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
+
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: Math.max(measuredR, radiusOf(b.diameter)) },
         items: [
@@ -527,15 +539,8 @@ export function odProbeSpec(bar, probe, onChange) {
             { kind: 'line', x1: zToCanvas(0), y1: 0, x2: zToCanvas(0), y2: measuredR },
             ...touchMarker(zTouch, measuredR, 'x', tip),
         ],
-        handles: [
-            { id: OD_PROBE_HANDLE_ID, x: zToCanvas(zTouch), y: measuredR, kind: 'size', axis: 'y', emits: true,
-              label: 'measured Ø', value: r3(dia) },
-        ],
-        onDrag: (id, world) => {
-            if (id !== OD_PROBE_HANDLE_ID || typeof onChange !== 'function') return;
-            // a diameter out, because a diameter went in: diameterOf is the one converter, and it runs once
-            onChange({ caliperDiameter: r3(diameterOf(Math.max(0.001, world.y))) });
-        },
+        handles,
+        onDrag,
         onEdit: onEditFromMap({ [OD_PROBE_HANDLE_ID]: 'caliperDiameter' }, onChange),
     };
 }

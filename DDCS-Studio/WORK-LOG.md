@@ -67657,3 +67657,56 @@ Tier: same file as op 1, other ops untouched. test:node green (238/238, reviewed
 to the end of this turn, covering all completed ports together.
 
 Separate commit, rule 4.
+
+## t2491c — L5, op 3 of 3: odProbe ported onto the registry (rect, Y-only) -- onEdit kept hand-written, the
+SAME already-resolved mismatch recurring, not a new one
+
+odProbeSpec's own handle needed the SAME radius->diameter ×2 conversion odProfileSpec's own diameter handles
+already proved -- `rect` Y-only (`ax:zTouch, ex:0` fixes X as a constant never tied to a field; `sy:0.5,
+minh:0.002` = 0.001 doubled). `length` doesn't fit (no scale factor); `rect` with only `sy` active does,
+matching FACE_DIA_HANDLE_ID's own precedent from t2489.
+
+`onEdit` KEPT HAND-WRITTEN (`onEditFromMap`), for the SAME reason as `odProfileSpec`'s own shoulder: the sole
+field lives on `fieldH` (the Y axis), and `buildCanvasWidgets`' generic `onEdit` can only reach `d.field`. This
+is genuinely the advisor's own predicted "second op" recurrence of the odTurn mismatch -- named explicitly as
+such, not treated as a fresh finding, and resolved the identical already-approved way. Still not extending the
+registry with an editField concept over this: two occurrences of the SAME shape, both solved by the SAME
+existing workaround, is not yet the rule-of-three case the advisor described (that would need a THIRD, novel
+occurrence to actually justify the extra concept).
+
+Gate numbers, before vs. after, all three seeds, byte-identical:
+  diag  (dx30,dy50): movedMid=32.569 movedAfter=32.569 -- SAME before and after (dx has zero weight on this
+        Y-only handle; the observed 32.569px move is entirely from dy, matching the hand-written code exactly).
+  pureX (dx60,dy0):  movedMid=0.000 movedAfter=0.000 -- SAME before and after (X is fixed at zTouch, never a
+        drag target, matching the original's own `world.x` being ignored either way).
+  pureY (dx0,dy65):  movedMid=32.569 movedAfter=32.569 -- SAME before and after.
+`tests/lathe-probe-1299.spec.js` (10) + `tests/census-finding2-emits-teal-1684.spec.js` (4) -- 14/14 passed
+UNEDITED (both files also re-verify `faceProbe`'s own port from op 2, still green).
+
+Snapshot diff, ENUMERATED BY DIRECTION, odProbe's own 4 lines only:
+- ADDED: color, labelDir, manual, noSnap (rect.place()'s own shape, same as centerDrill's/odTurn's own diffs).
+- REMOVED: axis:"y" (confirmed inert).
+- ALTERED: onDrag "<fn/2>" -> "<fn/3>" (never populated in practice).
+- UNCHANGED: onEdit stays "<fn/2>", STILL the hand-written implementation this time (not generic — the actual
+  underlying code differs from centerDrill's/faceProbe's own "same arity, different implementation" case, but
+  the snapshot has no way to distinguish that; confirmed correct via the passing test suite, not the snapshot
+  alone). emits still true. x/y/value/kind/label/id identical on every line.
+
+**ALL THREE ops in this turn's scope ported — none hit a mismatch requiring a stop.** Every one reused an
+ALREADY-PROVEN technique from facing (t2485) or odTurn (t2489): `length` for the byte-identical case
+(faceProbe), `rect` with a sign-flipped `sx` for the negative-position case (centerDrill), `rect` with `sy`'s
+own ×2 divisor for the diameter case (odProbe) — no registry extension, no contorted shape, in any of the
+three.
+
+Tier: same file, other ops untouched. test:node green (238/238, reviewed snapshot).
+
+### VERIFY (all three ops, this turn)
+
+Gate numbers before/after: IDENTICAL for all three ops, all three seeds each (nine drag captures total, zero
+digits moved). Existing lathe specs: `lathe-part-drill-1275` (11), `lathe-probe-1299` (10),
+`census-finding2-emits-teal-1684` (4) — 25 distinct tests across the three ops' own coverage, all passed
+UNEDITED (some counted more than once across ops sharing a file, per-op totals stated in each op's own entry
+above). Snapshot lines enumerated by direction for all three. `test:node`: 238/238 after each op's own reviewed
+regeneration. Full suite `--workers=4`, once, at the end, covering all three ports together: pending (running
+next). `git status --porcelain`: will confirm each op's own exact file set, staged BY PATH throughout.
+`handoff.py amendments --role worker` polled at each op boundary.
