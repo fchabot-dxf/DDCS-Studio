@@ -355,6 +355,13 @@ export function partProfileSpec(bar, part, onChange) {
 /**
  * THE HOLE, on the centreline, with one handle: its bottom. There is nothing else to drag — the drill has no radius
  * to choose, and the whole point of this op's frame is that it never leaves X0.
+ *
+ * t2491 (BACKLOG #61 / L5) — DECLARED through `rect` (not `length`): the depth handle's own X position runs
+ * NEGATIVE as depth grows (`x: -depth`, drilling proceeds into −Z), the opposite sign of `field`'s own positive
+ * value — `length` has no scale/sign parameter, but `rect`'s `sx` divisor does (`sx:-1`), the SAME technique
+ * `odProfileSpec`'s own depth field already proved. Used with only `sx` active (`sy`/`fieldH` omitted, so
+ * `rect.drag`'s own Y branch never fires) — a single-field handle, not a fused one, so the generic `onEdit`
+ * (`d.field` is set correctly) needs no hand-written override this time.
  */
 export function drillProfileSpec(bar, drill, onChange) {
     const b = normalizeBar(bar);
@@ -362,6 +369,11 @@ export function drillProfileSpec(bar, drill, onChange) {
     const barR = radiusOf(b.diameter);
     const depth = Math.max(0, Number((drill || {}).depth) || 0);
     const holeR = Math.max(0.4, barR * 0.06);     // drawn thin: the hole's SIZE is the drill's, not this op's to say
+
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'rect', id: DRILL_DEPTH_HANDLE_ID, field: 'depth', ax: 0, ay: 0, ex: -depth, ey: 0, sx: -1,
+          minw: 0.001, emits: true, label: 'depth', value: depth },
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
 
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
@@ -371,15 +383,9 @@ export function drillProfileSpec(bar, drill, onChange) {
             { kind: 'rect', x: zToCanvas(-depth), y: 0, w: depth, h: holeR, cls: 'fc-feature-pocket' },
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
-        handles: [
-            { id: DRILL_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: 0, kind: 'size', axis: 'x', emits: true, label: 'depth', value: depth },
-        ],
-        onDrag: (id, world) => {
-            if (id !== DRILL_DEPTH_HANDLE_ID || typeof onChange !== 'function') return;
-            // depth grows into −Z, and a hole of zero depth is not a hole
-            onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) });
-        },
-        onEdit: onEditFromMap({ [DRILL_DEPTH_HANDLE_ID]: 'depth' }, onChange),
+        handles,
+        onDrag,
+        onEdit,
     };
 }
 

@@ -67590,3 +67590,40 @@ web/viz/latheProfileCanvas.js, tests/node/__snapshots__/preview-spec-1688.txt), 
 own explicit instruction -- none of the pre-existing unrelated verification PNGs touched. handoff.py amendments
 --role worker polled clean before the full-suite run. proc_health.py watch: clean. Scratch _live-check.spec.js
 (the before/after gate-number capture) and the two scratch source-file backups deleted, never committed.
+
+## t2491a — L5, op 1 of 3: centerDrill ported onto the registry (rect, X-only, sx:-1) -- FULL port this time,
+onEdit included
+
+drillProfileSpec's own depth handle needed the SAME sign-flip technique odTurn's own depth field already
+proved: its own X position runs NEGATIVE as depth grows (drilling proceeds into -Z) while the field's own value
+is positive -- length has no scale/sign parameter, rect's sx divisor does (sx:-1). Used with ONLY sx active
+(sy/fieldH omitted, so rect.drag's own Y branch never fires) -- a genuine single-field handle, so unlike
+odTurn's shoulder, the field the drag writes IS d.field (not d.fieldH), meaning buildCanvasWidgets' own generic
+onEdit reaches it correctly -- no hand-written override needed this time, matching facing's own fully-registry
+-driven shape.
+
+Gate numbers, before vs. after, all three seeds, byte-identical (same technique as t2483/t2485/t2489 -- a
+temporary git checkout HEAD --, restored from a scratch copy, diff-confirmed):
+  diag  (dx-40,dy20): movedMid=39.999 movedAfter=39.999 -- SAME before and after.
+  pureX (dx70,dy0):   movedMid=48.856 movedAfter=48.856 -- SAME before and after (clamped short of 70px by the
+        depth>=0.001 floor, expected and unchanged either side of the port).
+  pureY (dx0,dy-50):  movedMid=0.000 movedAfter=0.000 -- SAME before and after (drill never leaves X0, by design).
+tests/lathe-part-drill-1275.spec.js (11 tests, incl. "THE DRILL DEPTH HANDLE moves the EMIT, and never leaves
+the centreline") passed UNEDITED.
+
+Snapshot diff, ENUMERATED BY DIRECTION, centerDrill's own 4 lines only (confirmed via git diff, nothing else in
+the 32-twin fixture moved):
+- ADDED (present-but-undefined, buildCanvasWidgets' generic wrapper + rect.place()'s own shape): color, manual,
+  noSnap, labelDir.
+- REMOVED: axis:"x" (the original literal handle carried it; confirmed inert, same reasoning as facing's/
+  odTurn's own removals -- featureCanvas.js never reads a handle's own .axis).
+- ALTERED: onDrag "<fn/2>" -> "<fn/3>" (never populated in practice, FeatureCanvas always calls with 2 args).
+- UNCHANGED: onEdit stays "<fn/2>" (now the GENERIC implementation, not hand-written -- same arity, confirmed
+  functionally correct by the passing test suite, not just the arity match). emits still true (t1684). x/y/
+  value/kind/label/id identical on every line.
+
+Tier: `viz/latheProfileCanvas.js` (shared file, other ops in it untouched) -- test:node green (238/238 with the
+reviewed snapshot), the op's own 11-test file green. Full suite deferred to the END of this turn (per dispatch:
+"full suite workers=4 once at the end"), covering all three ports together.
+
+Separate commit, rule 4 (one op = one commit).
