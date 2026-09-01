@@ -6076,11 +6076,11 @@ single number, is the claim. The sharper, root-confirming check: the B-moves-whe
 
 ---
 
-### 66. [t2479 — root PRECISELY BOUNDED (a width-dependent threshold between 15mm and 20mm); ⭐⭐⭐⭐⭐⭐ t2499 —
-ROOT CAUSE FOUND AND CONFIRMED BY DIRECT OBSERVATION: a NEIGHBOURING handle's own click-to-edit LABEL occludes
-`partPos`'s circle. DIAGNOSED, still NOT FIXED (out of this turn's own explicit scope)] `parting`'s `partPos`
-handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT
-ONLY, not fixed. Different SHAPE from #64/#65 — non-responsive, not a snap-back
+### 66. [t2479 — root PRECISELY BOUNDED; t2499 — ROOT CAUSE FOUND: a NEIGHBOURING handle's own click-to-edit
+LABEL occludes `partPos`'s circle; ⭐⭐⭐⭐⭐⭐⭐ ✅ FIXED t2501 — handle shapes now paint (and hit-test) above every
+label, app-wide, plus a permanent guard (`tests/lathe-handle-hit-2501.spec.js`) covering all ten ported lathe
+handles] `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth
+defect, found by L4, REPORT ONLY at first. Different SHAPE from #64/#65 — non-responsive, not a snap-back
 
 *(filed t2471, same L4 sweep — see BACKLOG #61's own L4 section. Also directly refutes that entry's own
 lathe-family "the gate can't drive it" prediction for the OTHER six lathe ops, which all responded correctly —
@@ -6252,15 +6252,58 @@ label from either handle reaches the other (they sit ~92px apart on screen, well
 measurement that answers BACKLOG #70's own shared-root question: **NO**, #70 is not this mechanism — see #70's
 own entry for what that rules in/out for it instead.
 
-⛔ **NOT FIXED — diagnose only, per this turn's own explicit scope.** The natural fix shape (once someone picks
-this up): label placement needs to be aware of OTHER handles on the same canvas, not just its own anchor — a
-genuine cross-handle collision-avoidance concern, plausibly shared by other close-together handle pairs
-elsewhere in the app (not audited this turn; `parting`'s own `partPos`/`partFloor` pairing is the one confirmed
-instance, found because it happens to be the one this entry's own four-turn history kept pointing back at).
+⛔ **NOT FIXED — diagnose only, per that turn's own explicit scope.** The natural fix shape named then: label
+placement needs to outrank a neighbour's handle, without teaching labels about their neighbours.
+
+### ⭐⭐⭐⭐⭐⭐⭐ ✅ FIXED t2501 — handle shapes now paint (and hit-test) ABOVE every label, app-wide; a permanent
+guard added covering all ten currently-ported lathe handles
+
+**THE FIX, deliberately NOT cross-handle collision avoidance** (the advisor's own explicit guardrail: "do not
+build it" — teaching a label about its neighbours is machinery an ordering rule makes unnecessary): 
+`featureCanvas.js`'s own handle-drawing loop used to `appendChild` each handle's SHAPE, then immediately its
+own LABEL, interleaved per-handle (`[h0-shape, h0-label, h1-shape, h1-label, h2-shape, h2-label, …]`). In SVG,
+later-in-document-order paints (and hit-tests) on top — so a LATER handle's label could sit above an EARLIER
+handle's own shape. Changed to collect every handle's own SHAPE into a `pendingHandles` array during the loop
+(labels still append immediately, unchanged), then flush `pendingHandles` in a SECOND pass after the loop ends
+— so every declared handle's own shape is now LAST in document order, collectively, regardless of which handle
+appears earlier/later in the declaration array. One ordering rule, touching zero per-op code, zero new
+declarations, zero label-to-handle awareness.
+
+**Confirmed this does NOT break the one thing a naive fix (`labels: pointer-events:none`) would have** — an
+EDITABLE label's own `pointer-events:auto` is untouched; it still wins over a `pointer-events:none` handle
+sitting behind it in ITS OWN area (labels and their own handle don't overlap by construction, only a
+NEIGHBOUR'S handle could ever be under a label, and that's exactly the case this fix reorders). Verified live:
+clicked `partFloor`'s own "stop Ø" label after the fix, the inline editor opened, typed a new value, `Enter`,
+and the model updated (`{"floorDiameter":9.5}`) — editing is completely undisturbed.
+
+**Verified the actual bug is gone, at the SPECIFIC previously-dead configuration, not a different one**:
+`partPos` dragged in all FIVE directions from this entry's own `STILL REAL IF` recipe, at `width:15` (the
+CONFIRMED-dead width from t2479's own threshold sweep, not the 20mm width where it already worked) —
+`pureX+`/`pureX-`/`diag` all move correctly (`movedMid:59.999/59.999/39.999`), `pureY+`/`pureY-` correctly show
+zero (a legitimate single-axis constraint, `partPos` is an X-only handle, matching every other X-only handle in
+the app — not a residual bug). `partWidth`/`partFloor` still drag correctly too (unaffected siblings).
+
+**THE PERMANENT GUARD**: `tests/lathe-handle-hit-2501.spec.js` — a NEW claim this arc's own primitives (L2
+presence, L3 reachability) never asked: not "does the affordance exist," not "is it inside the viewport," but
+**can it be HIT** — does `document.elementFromPoint()` at a declared handle's own rendered centre resolve to
+THAT handle, or does something else win the hit-test first. Ten tests, one per currently-ported lathe handle
+(the `parting` family pinned to `width:15`, the exact dead configuration, not left at whatever the default
+happens to be). Built with tools that already exist (`elementFromPoint`, standard Playwright locators) — no
+new `tests/support/` primitive module, per the dispatch's own explicit instruction.
+
+**Proven NON-VACUOUS, not assumed**: ran this exact guard against the code as it stood immediately before this
+turn's own fix (`git checkout HEAD --` on `featureCanvas.js`, restored after, `diff`-confirmed byte-identical
+restore) — `partPos` FAILED with the precise error naming `elementFromPoint` resolving to `partFloor`'s own
+label, and all NINE other handles passed unchanged. Specific (doesn't cry wolf on unrelated handles) and
+non-vacuous (catches exactly the bug it exists to catch) — confirmed both ways, not just one.
+
+101 existing lathe/canvas-widgets tests (8 files) passed unedited. `test:node`: 238/238, zero snapshot diff (a
+DOM append-order change touches nothing the snapshot gate captures — the declared spec shape is unchanged).
+Full account: WORK-LOG t2501.
 
 **STILL REAL IF**: `document.elementFromPoint()` at `partPos`'s own handle centre, on a live `user_lathe_parting`
-boot at default params, still resolves to `partFloor`'s own `<text class="fc-handle-label">` rather than
-`partPos`'s own `<circle class="fc-handle">`.
+boot at `width:15`, resolves to anything other than `partPos`'s own `<circle class="fc-handle">` — or
+`tests/lathe-handle-hit-2501.spec.js` goes red for any of its ten cases.
 
 ---
 

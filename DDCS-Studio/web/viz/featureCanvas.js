@@ -567,6 +567,20 @@ export class FeatureCanvas {
         });
 
         // --- handles (top layer, always above holes) ---------------------
+        // t2501 (BACKLOG #66) — handle SHAPES are collected here and appended in a SECOND pass, after every
+        // label, rather than interleaved per-handle as before. Interleaved order meant a LATER handle's own
+        // label could paint (and hit-test) on top of an EARLIER handle's circle — confirmed live: `parting`'s
+        // `partFloor` (3rd in the array) sits far from `partPos` (1st) in world space, but its own editable
+        // label rides `featureCanvas.js`'s own fixed "up and to the right" offset onto `partPos`'s SEPARATE,
+        // unrelated circle, and — being later in DOM order — WON every pointer event landing there, so
+        // `partPos`'s drag never started at all (`elementFromPoint` resolved to the label, `closest('.fc-handle')`
+        // returned null). A handle's own hit target must always outrank a NEIGHBOUR's label; an editable
+        // label outranking its OWN handle is correct (they don't overlap by construction) and stays exactly
+        // as before — this changes ONLY the relative order between one handle's shape and ANOTHER'S label,
+        // never a label's own priority over the pointer-events:none default. One ordering rule, not per-op
+        // logic and not label-to-handle collision avoidance (an editable label still has no idea any
+        // neighbour exists — it doesn't need to; painting every handle shape after every label is enough).
+        const pendingHandles = [];
         (spec.handles || []).forEach((h) => {
             const c = this._disp(h.x, h.y);
             const col = h.color || null;   // t81 — reposition SOURCE colour (auto=cyan / manual=amber), matching the top panel; null → the CSS default
@@ -592,7 +606,7 @@ export class FeatureCanvas {
                 else el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...hid });   // square = auto reposition
                 if (!g.fill) { el.style.fill = 'none'; el.style.stroke = fillCol; el.style.strokeWidth = '2'; }
                 else { el.style.fill = fillCol; el.style.stroke = fillCol; }
-                handles.appendChild(el);
+                pendingHandles.push(el);
             } else if (h.kind === 'diamond') {
                 // t2327 (BACKLOG #33) — a Ø/pitch-only radial handle (canvasWidgets.js's `shape:'diamond'`) draws
                 // as a diamond, never a circle: circles are holes on this same canvas, and a handle that LOOKS
@@ -604,13 +618,13 @@ export class FeatureCanvas {
                 const emitCol = h.emits ? '#14b8a6' : null;
                 const fillCol = emitCol || col;
                 if (fillCol) { el.style.fill = fillCol; el.style.stroke = fillCol; }
-                handles.appendChild(el);
+                pendingHandles.push(el);
             } else {
                 const el = svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid });
                 const emitCol = h.emits ? '#14b8a6' : null;   // t1684 — emits:true (lathe's dimension handles) tints TEAL, the declared convention
                 const fillCol = emitCol || col;
                 if (fillCol) { el.style.fill = fillCol; el.style.stroke = fillCol; }   // a GROUP-coloured point handle (e.g. the ATC setup canvas's blue pockets vs orange station); inline beats the .fc-handle CSS default. Uncoloured handles are unaffected.
-                handles.appendChild(el);
+                pendingHandles.push(el);
             }
             // Raw axis-delta readouts (the grid "dx"/"dy" labels) are unhelpful clutter — the handle stays
             // draggable (it still drives its field), we just drop its on-canvas text. Useful named dimensions
@@ -641,6 +655,8 @@ export class FeatureCanvas {
                 handles.appendChild(t);
             }
         });
+        // …every handle SHAPE, appended AFTER every label above — see this block's own opening comment.
+        pendingHandles.forEach((el) => handles.appendChild(el));
 
         this._drawStockAttach(spec);
         this._drawCornerPick(spec);

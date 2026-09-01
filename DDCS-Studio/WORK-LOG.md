@@ -68108,3 +68108,80 @@ the dispatch's own unconditional VERIFY ask, even with zero code changes, as a c
 **3018 passed, 1 failed, 12 flaky, 26 skipped** (3057 total) -- the one failure is the same pre-existing
 `sf-pos-snapback` load-contention timeout documented since t2465, unrelated (consistent with zero product/test
 code touched this turn -- no existing test currently exercises either BACKLOG entry's own reproduction recipe).
+
+## t2501 — BACKLOG #66 FIXED: handle shapes now paint (and hit-test) above every label, app-wide, plus a
+permanent guard covering all ten currently-ported lathe handles
+
+**THE FIX** (`web/viz/featureCanvas.js`): the handle-drawing loop used to `handles.appendChild(el)` (the
+shape) then immediately `handles.appendChild(t)` (the label), interleaved per-handle across the whole `spec.
+handles` array. SVG paints (and hit-tests) later-in-document-order elements on top -- so `partFloor` (3rd in
+`parting`'s own array) could paint its own label over `partPos` (1st), an entirely separate handle, whenever
+the two happened to sit close together on screen. Collected every handle's own SHAPE into a `pendingHandles`
+array during the loop instead of appending immediately; labels still append immediately, unchanged; flushed
+`pendingHandles` in a SECOND pass right after the loop ends. Every declared handle's own shape is now LAST in
+document order collectively, regardless of array position -- one ordering rule, touching zero per-op code, no
+new declarations, no label-to-handle cross-awareness (the advisor's own explicit guardrail: do not build
+collision avoidance -- an ordering rule makes it unnecessary).
+
+**Confirmed the naive fix's own failure mode does NOT occur**: an editable label's `pointer-events:auto` is
+completely untouched by this change -- it still wins over a `pointer-events:none` HANDLE sitting behind it in
+its OWN area (a label and its own handle don't overlap by construction; only a NEIGHBOUR's handle could ever be
+under a label, which is exactly the case this reorders). Verified live: real click on `partFloor`'s own "stop
+Ø" label opened the inline editor, typed `9.5`, pressed Enter, model updated to `{"floorDiameter":9.5}` --
+editing survives the fix exactly as before.
+
+**Verified the actual bug is gone, at the SPECIFIC previously-dead configuration**, per the advisor's own
+explicit VERIFY instruction (not just at a width where it already worked): drove `partPos` in all FIVE
+directions from BACKLOG #66's own `STILL REAL IF` recipe, at `width:15` -- the CONFIRMED-dead width from
+t2479's own threshold sweep:
+```
+partPos width:15 pureX+ : movedMid=59.999 movedAfter=59.999   -- real movement, was 0.000 before this fix
+partPos width:15 pureX- : movedMid=59.999 movedAfter=59.999   -- real movement, was 0.000 before this fix
+partPos width:15 pureY+ : movedMid=0.000  movedAfter=0.000    -- EXPECTED: partPos is X-only, matches every
+partPos width:15 pureY- : movedMid=0.000  movedAfter=0.000       other X-only handle in the app, not a bug
+partPos width:15 diag   : movedMid=39.999 movedAfter=39.999   -- real movement, was 0.000 before this fix
+```
+(One transient timeout hit the FIRST attempt at the 5-seed sequence — `handleScreenPos` hung mid-run; re-ran
+both in isolation and as the full sequence again immediately after, both clean, both times, confirming the
+first hit was an environmental blip from the earlier diagnostic session's own load, not a reproducible issue —
+named honestly rather than silently re-run past without comment.) `partWidth`/`partFloor` (the unaffected
+siblings) still drag correctly too: `movedMid=29.999`/`13.026` respectively.
+
+**THE PERMANENT GUARD** (`tests/lathe-handle-hit-2501.spec.js`, NEW): a genuinely new claim this arc's own
+primitives never asked -- L2 (`affordancePresence`) asks "does it exist," L3 (`affordanceReachability`) asks
+"is it inside the viewport," this asks **can it be HIT** -- does `document.elementFromPoint()` at a declared
+handle's own rendered centre resolve to THAT handle, or does something else win first. Ten tests, one per
+currently-ported lathe handle (`facing`/`centerDrill`/`faceProbe`/`odProbe`/`odTurn`/`parting`'s three/
+`polygon`'s two) -- the `parting` family pinned to `width:15`, the exact dead configuration, not left at
+whatever the boot's own default happens to be. Built with tools that already exist (`elementFromPoint`,
+standard Playwright locators) -- explicitly NOT a fourth `tests/support/` primitive module, per the dispatch's
+own instruction; this file IS the check.
+
+**Proven NON-VACUOUS, both directions, not assumed**: saved the fixed `featureCanvas.js` to a scratch copy,
+`git checkout HEAD --` to the pre-fix state, ran the new guard -- `partPos` FAILED with the EXACT diagnostic
+error (`elementFromPoint(1288,471) for "partPos" resolved to {"tag":"text","cls":"fc-handle-label",
+"dataHid":null}`), all NINE other handles passed unchanged (1 failed, 9 passed -- specific, not crying wolf).
+Restored the fix from the scratch copy, `diff`-confirmed byte-identical, re-ran: 10/10 green.
+
+**101 existing lathe/canvas-widgets tests re-run, unedited, across 8 files** (`lathe-pilot-1271`,
+`lathe-odturn-1273`, `lathe-probe-1299`, `lathe-part-drill-1275`, `lathe-world-1283`, `lathe-feel-1321`,
+`lathe-polygon-1277`, `lathe-matrix`, `census-finding2-emits-teal-1684`, `canvas-widgets`) plus the new guard
+-- all passed. `test:node`: 238/238, zero snapshot diff -- a DOM append-order change touches nothing the
+32-twin snapshot gate captures (the DECLARED spec shape is byte-identical; only the rendered DOM's own paint
+order moved).
+
+Tier: `viz/featureCanvas.js` is shared by EVERY op with a canvas, across the whole app, not just the lathe
+family -- rule 1b, full suite before concluding.
+
+### VERIFY
+
+`partPos` drags correctly in all 5 directions from BACKLOG #66's own `STILL REAL IF` recipe, AT `width:15`
+(the confirmed-dead width, stated explicitly per the dispatch's own request, not glossed as "it works now").
+`partWidth`/`partFloor` still drag AND their own labels still click-to-edit (the exact path a naive
+`pointer-events:none` fix would have broken) -- both asserted explicitly, not assumed from "the drag still
+works." The new sweep green across all 10 currently-ported handles, proven non-vacuous both ways (fails on the
+pre-fix code, specific to `partPos` only; passes on the fix). 101 existing tests unedited. `test:node`:
+238/238, zero diff. Full suite `--workers=4` BEFORE concluding: **DONE in 35m23s -- 3029 passed, 1 failed,
+11 flaky, 26 skipped.** The 1 failure is `preview-mutation-manifest-2463.spec.js` / `sf-pos-snapback` -- the
+same pre-existing flake this session has hit before (t2447's own `sf_pos` point/move-handle fix, unrelated to
+lathe/parting/featureCanvas paint order), not a regression from this turn's change. No other failures.
