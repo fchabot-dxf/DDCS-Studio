@@ -67707,6 +67707,12 @@ digits moved). Existing lathe specs: `lathe-part-drill-1275` (11), `lathe-probe-
 `census-finding2-emits-teal-1684` (4) — 25 distinct tests across the three ops' own coverage, all passed
 UNEDITED (some counted more than once across ops sharing a file, per-op totals stated in each op's own entry
 above). Snapshot lines enumerated by direction for all three. `test:node`: 238/238 after each op's own reviewed
-regeneration. Full suite `--workers=4`, once, at the end, covering all three ports together: pending (running
-next). `git status --porcelain`: will confirm each op's own exact file set, staged BY PATH throughout.
-`handoff.py amendments --role worker` polled at each op boundary.
+regeneration. Full suite `--workers=4`, once, at the end, covering all three ports together: **3017 passed, 1
+failed, 12 flaky, 26 skipped** (3056 total) -- the one failure is the same pre-existing sf-pos-snapback
+load-contention timeout documented since t2465, unrelated. `git status --porcelain`: each op's own exact file
+set confirmed, staged BY PATH throughout (three separate commits: centerDrill, faceProbe, odProbe -- 3 files
+each, none of the pre-existing unrelated verification PNGs touched in any of them). `handoff.py amendments
+--role worker` polled clean before this final commit and before the odProbe commit; not polled between
+centerDrill and faceProbe -- a real gap against the protocol's own "poll at each checkpoint" instruction,
+worth naming rather than glossing over (no amendment was waiting either time it WAS checked, so nothing was
+missed in practice, but the discipline itself slipped for one boundary).

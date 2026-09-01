@@ -5557,6 +5557,39 @@ defect classes (t1672/1686/1680/1674): none touched.
 
 Full account: WORK-LOG t2489.
 
+### ⭐⭐⭐⭐⭐ t2491 — THREE MORE L5 PORTS: `centerDrill`, `faceProbe`, `odProbe` — every one fit the registry
+using ALREADY-PROVEN techniques, none required a stop
+
+Dispatched as "one shape, three applications" (facing's own `length` gesture); turned out to be three DIFFERENT
+already-proven shapes, not one — worth recording precisely rather than flattening to the dispatch's own
+prediction:
+
+- **`faceProbe`**: facing's own `length` shape, byte-for-byte (`ax:0, axis:'x', min:0`). Fully registry-driven
+  (`handles`/`onDrag`/`onEdit` all from `buildCanvasWidgets`).
+- **`centerDrill`**: needed a sign flip (`x` runs negative as depth grows, the opposite sign of the field's own
+  positive value) — `length` has no scale parameter, `rect`'s `sx` divisor does (`sx:-1`, the SAME technique
+  `odProfileSpec`'s own depth field proved at t2489). A genuine single-field handle despite using `rect`, so
+  `d.field` is set correctly and the generic `onEdit` fits — fully registry-driven too.
+- **`odProbe`**: needed the radius→diameter ×2 conversion (`rect`'s `sy:0.5`, matching `odProfileSpec`'s own
+  `FACE_DIA_HANDLE_ID`), with X held constant via `ex:0` (never a drag target). Since the sole field lives on
+  `fieldH` (the Y axis), `onEdit` was kept hand-written via the already-shared `onEditFromMap` — the SAME
+  odTurn mismatch recurring, resolved the identical already-approved way. Named explicitly as the advisor's own
+  predicted "second op," and explicitly NOT treated as grounds to extend the registry — two occurrences of one
+  shape, solved twice by one existing workaround, isn't yet the rule-of-three case a genuinely novel THIRD
+  occurrence would be.
+
+Gate numbers byte-identical for all three, three seeds each (nine drag captures, zero digits moved). 25 test
+instances across the three ops' own existing coverage (`lathe-part-drill-1275`, `lathe-probe-1299`,
+`census-finding2-emits-teal-1684`) passed UNEDITED. Snapshot diffs enumerated by direction for each op
+separately (the t2489 correction, applied consistently this time, not just once).
+
+**L5 status after this turn**: `facing`, `centerDrill`, `faceProbe`, `odProbe` fully ported. `odTurn` ported
+with `onEdit` deliberately hand-written. Still open: `parting` (its floor handle needs exactly the max-clamp
+capability t2489 added — unblocked, not yet attempted) and `polygon` (a two-view layout, may be genuinely
+different — unassessed). Both are their own future turns.
+
+Full account: WORK-LOG t2491a/b/c (one entry per op, three separate commits per rule 4).
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
