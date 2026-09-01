@@ -67417,3 +67417,75 @@ caused by this change. `git status --porcelain`: confirmed exactly two files tou
 the reviewed `preview-spec-1688.txt` snapshot) — nothing else. `handoff.py amendments --role worker` polled
 clean before the full-suite run. Scratch `_live-check.spec.js` (the before/after gate-number capture) deleted,
 never committed.
+
+## t2487 — ONE THING: L5's second pilot, `odTurn` — GUARDRAIL TRIPPED. Not ported, honestly reported, no product
+code touched
+
+First, the correction the dispatch itself asked for: t2485's own pass-back summary described the
+`preview-spec-1688.txt` diff as "adding present-but-undefined color/manual/noSnap keys plus a wider onDrag
+arity" — true, but incomplete. The diff ALSO REMOVED `axis:"x"` from facing's handle object, and that line was
+not named in the summary (it WAS documented correctly in this file's own t2485 entry and in BACKLOG #61's own
+addendum — the gap was specifically in the terse pass-back note, not the record). The advisor traced `axis`
+themselves (`canvasWidgets.js:37-38` consumes `d.axis` from the DECLARATION to compute the gesture, and
+`featureCanvas.js` never reads a built handle's own `.axis` at all — every `.axis` hit there is the edge-picker/
+grid mechanism) and confirmed the removal was inert, so t2485's conclusion stood — but the METHOD (summarising
+a snapshot diff by explanation instead of enumerating every changed line by direction) is the real lesson:
+next time, list every ADDED/REMOVED/ALTERED line, not just the ones that fit the story being told.
+
+**odTurn, per the dispatch's own explicit choice of the HARD op first** (not the three that look like more of
+`facing`'s own `length` shape) — deliberately, to find L5's real limit early rather than after three easy
+wins built false momentum. Read `odProfileSpec` (`web/viz/latheProfileCanvas.js`) in full before touching
+anything.
+
+**Traced the geometry against `canvasWidgets.js`'s declared vocabulary, term by term — almost all of it fits
+EXACTLY**: the "ONE HANDLE, TWO OUTPUTS" shoulder corner (X drags depth, Y drags a diameter) is the `rect`
+gesture's own shape (an anchor + two independent per-axis divisors, `sx`/`sy`, each producing one field) — not
+a coincidence, a genuine structural match. Depth: `ax:0, sx:-1, minw:0.001` reproduces
+`Math.max(0.001, -canvasToZ(world.x))` exactly (verified algebraically: `clampMin((w.x-0)/-1, 0.001) ==
+Math.max(0.001, -w.x)`). The diameter axis: `ay:0, sy:0.5, minh:0` reproduces the LOWER half of
+`diameterOf(clamp(world.y,...))` exactly (`clampMin((w.y-0)/0.5, 0) == Math.max(0, w.y*2)` — a radius-to-
+diameter conversion falls straight out of the existing divisor mechanism, no new concept needed). The taper-
+only face-Ø handle and the field-name switch (`targetDiameter` vs `endDiameter` depending on `taper`) are both
+ordinary declaration-time JS, no registry involvement at all.
+
+**Where it genuinely does not fit, confirmed by reading AND by a live drag**: the original code clamps the
+diameter axis on BOTH sides — `Math.min(Math.max(0, world.y), barR - 0.001)` before converting to a diameter —
+not just the lower bound `rect`'s `sy`/`minh` already covers. Grepped `canvasWidgets.js` for every clamp shape
+in the file (`Math.min\(|clampMax|maxR|maxw|maxh|max:`): **zero matches, in the entire registry**. Every
+gesture's own clamp helper (`clampMin`) is a lower bound only — `radial`'s `minR`, `length`'s `min`, `scaleX`'s
+`min`, `rect`'s `minw`/`minh` — none of the eleven declared gestures has ANY mechanism for an upper bound.
+Confirmed this is not dead/vestigial code: booted a live odTurn, called `odProfileSpec`'s own `onDrag('shoulder',
+{x:-5, y: barR+50})` (50mm past a 10mm-radius bar) directly, and it clamped to `targetDiameter: 19.998` — exactly
+`2 × (barR − 0.001)`, the bar's own outer surface minus the documented margin. The original code's own comment
+names WHY: *"a target at or outside the bar diameter is a pass that never touches metal... the handle stops at
+what the machine can actually do."* Dropping this clamp to fit the registry would be a real, observable
+behaviour change — a drag could write a targetDiameter the machine cannot physically cut — which the dispatch's
+own bar ("nothing observable changes at all") rules out directly, and expressing it WOULD require either
+extending `rect` (a `maxw`/`maxh` pair, mirroring the existing `minw`/`minh`) or contorting the drag math
+(inverting the axis so the min-clamp lands on the wrong side, changing the natural drag direction every other
+lathe handle in the family shares) — the dispatch's own two named escape hatches, both explicitly ruled out this
+turn.
+
+**NOT an odTurn-only quirk — the SAME two-sided clamp shape governs `parting`'s own floor handle too**
+(`PART_FLOOR_HANDLE_ID`'s onDrag: `diameterOf(Math.min(Math.max(0, world.y), barR - 0.001))`, byte-identical in
+shape to odTurn's own). If a THIRD op needing this same capability turns up, that is exactly this project's own
+rule-of-three trigger for actually adding it to the registry — but that is a registry-extension decision, not
+something to fold into a single-op pilot turn.
+
+**GUARDRAIL TRIPPED. Not ported. No product code touched, no registry change, no contorted shape shipped.**
+
+Tier: doc-only (WORK-LOG + BACKLOG #61's own addendum) — zero product/test files touched this turn.
+
+### VERIFY
+
+The finding traced two ways per this session's own OBSERVED-vs-INFERRED discipline: INFERRED from reading
+`canvasWidgets.js`'s full gesture set (an exhaustive grep for any two-sided clamp, zero hits) and the existing
+`odProfileSpec`'s own clamp expression; OBSERVED by driving `odProfileSpec`'s real `onDrag` live against a
+booted op and confirming the clamp actually fires at `barR - 0.001`, not merely reading it in source. No gate
+numbers before/after to report — nothing changed to compare. `git status --porcelain`: confirmed zero product
+or test files touched (this file plus BACKLOG.md are the only edits). `handoff.py amendments --role worker`
+polled clean. Full suite `--workers=4` run anyway per the dispatch's own unconditional VERIFY ask, even with
+zero code changes, as a clean-repo sanity check: **3013 passed, 2 failed, 15 flaky, 26 skipped** (3056 total) —
+both failures are the same two already-known, unrelated flakes this session has seen before (`sf-pos-snapback`,
+documented since t2465; `open-as-modal-1625`'s preview-chrome test, re-confirmed solo at t2485), consistent with
+zero product code touched this turn.

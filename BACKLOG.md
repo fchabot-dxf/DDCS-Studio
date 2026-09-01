@@ -5488,6 +5488,38 @@ reviewed the snapshot (a 4-line diff in a 900+-line fixture), which now shows `f
 `canvasWidgets`-built handle in the app, not less consistent. Full account, incl. what this implies for the
 remaining five ops: WORK-LOG t2485.
 
+### ⭐⭐⭐ t2487 — L5's SECOND PILOT, `odTurn`, the deliberately-hard op: GUARDRAIL TRIPPED, NOT PORTED — found
+the registry's real limit, exactly the point of trying the hard one first
+
+Dispatched deliberately ahead of the three easy-looking ops (`centerDrill`/`faceProbe`/`odProbe`, all more of
+`facing`'s own 1D `length` shape) specifically to find L5's limit early, cheaply, before three turns' worth of
+momentum made stopping harder.
+
+**Almost the whole shape fits the registry exactly**: `odProfileSpec`'s "one corner, two outputs" shoulder
+handle (X→depth, Y→a diameter) IS the `rect` gesture's own anchor+per-axis-divisor structure — traced
+algebraically, not assumed: `ax:0, sx:-1, minw:0.001` reproduces the depth math byte-for-byte, and `ay:0,
+sy:0.5, minh:0` reproduces the diameter math's LOWER bound (a radius→diameter conversion falls straight out of
+the existing divisor, no new concept). The taper-only face-Ø handle and the target/end field-name switch are
+ordinary declaration-time JS.
+
+**Where it breaks**: the diameter axis is clamped on BOTH sides in the original — `Math.min(Math.max(0,
+world.y), barR - 0.001)`, "a target at or outside the bar diameter is a pass that never touches metal." Grepped
+`canvasWidgets.js`'s entire gesture set for any two-sided clamp: **zero matches** — every gesture's own clamp
+(`clampMin`) is a lower bound only, across all eleven declared gestures. Confirmed LIVE, not just read: drove
+`odProfileSpec`'s real `onDrag` 50mm past a 10mm-radius bar and it clamped to exactly `2×(barR−0.001)` —
+currently active, user-facing behaviour, not vestigial. Dropping it to fit the registry would be a real,
+observable behaviour change (a drag could write a diameter the machine cannot cut) — exactly what this pilot's
+own bar rules out. Expressing it would need EITHER a registry extension (`maxw`/`maxh` alongside the existing
+`minw`/`minh`) or contorting the drag math (inverting the axis, changing the natural drag direction every other
+lathe handle shares) — the dispatch's own two named escape hatches, both explicitly declined this turn.
+
+**Not odTurn-specific**: `parting`'s own `PART_FLOOR_HANDLE_ID` clamps its diameter axis the exact same
+two-sided way — the SAME missing capability, a second op already needing it. This project's own rule-of-three:
+worth adding to the registry if a third case turns up, not something to bolt on for one pilot turn.
+
+**GUARDRAIL TRIPPED. No product code touched, no registry change, no contorted shape shipped.** Full account:
+WORK-LOG t2487.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
