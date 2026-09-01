@@ -5,8 +5,17 @@ import { registerFormReproductionSuite } from './support/formReproduction.js';
  * `drillDataStack`) is declared to reproduce `#wiz_drill`'s hardcoded shell (index.html:326-433)
  * structurally — same section order, same field order, same PATTERN-group grouping (grid/circle/rect/
  * line), same "no section wrapper" treatment for HOLE Ø/PECK. This pins that structure as a regression
- * tripwire, independent of whether/when `hasTreeLayout()` ever flips drill's live render path (it does
- * not today — the tree has no `split_*` node, confirmed in the header comment above `drillDataStack`).
+ * tripwire, independent of `hasTreeLayout()`'s own render-path choice.
+ *
+ * t2477 (BACKLOG #67) — CORRECTED, a claim about the past nobody re-checked: this comment used to read
+ * "hasTreeLayout() does not flip drill's live render path today — the tree has no split_* node." That
+ * stopped being true at t2341 ("THE FLIP," an 8-attempt migration wrapping drill's own `uiChildren` in a
+ * `split_horizontal` node so its render IS driven by `renderUiTree` today) — landed AFTER this file's own
+ * header was written and never updated here. The staleness went unnoticed for enough turns that the
+ * Blocks-tab pane's own visual panel silently rendered `display:none` for drill the whole time (BACKLOG
+ * #67, fixed this same turn) — this file's own axis-independence claim (the FORM-structure assertions
+ * below don't care which render path is active) is what kept this specific suite itself green throughout,
+ * which is exactly why nobody re-checked the comment: the tests never needed the claim to be true.
  *
  * Three things get asserted on an axis independent of "it rendered without throwing" (the green-test-
  * over-a-dead-path failure this project has hit twice, [[green-tests-over-a-dead-ui-path]]):

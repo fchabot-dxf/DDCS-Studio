@@ -67052,6 +67052,19 @@ into GREEN or RED.
 `formWidgets.js`/`userOpView.js` are both shared render-path files (rule 1b) — targeted regression suite run
 BEFORE the full suite (26 tests, all passing), full suite result below. Screenshots + BACKLOG updates.
 
+## t2477 (SMALL ITEM, own commit per rule 4) — fix the stale comment in drill-form-reproduction-2299.spec.js
+
+Corrected the header comment's claim that `hasTreeLayout()` "does not flip drill's live render path today —
+the tree has no split_* node." That stopped being true at t2341 ("THE FLIP"), landed AFTER this comment was
+written, never updated here. Noted plainly why the staleness went unnoticed for this many turns: this specific
+suite's own axis-independence design (its assertions don't care WHICH render path is active) kept it green the
+whole time regardless of whether the comment's own claim was true — exactly why nobody had reason to re-check
+it, and exactly the AGENTS.md rule 8b pattern this session has now hit multiple times. Confirmed the edit is
+comment-only: all 3 tests in the file still pass unchanged.
+
+Tier: comment-only, one test file — no assertion changed. `test:node`/full suite cover it as part of the
+broader run.
+
 ### VERIFY (both halves)
 
 Root established by measurement, OBSERVED throughout (both killed theories and the real one — see above).
