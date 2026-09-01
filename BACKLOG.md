@@ -5247,6 +5247,22 @@ probe family). The ROADMAP is describing dead code as if it still runs.
    ZERO readers anywhere (corner's own header comment names this explicitly). A 5th instance of this project's
    recurring declared-but-unread pattern (`emits`/`modalPre`/`noSnap`/`mouth`, now this).
 
+   ⚠ **CORRECTED 2026-09-01 (advisor) — this said THREE; only ONE was still live when it was written.**
+   `sim_3d_box` was deleted at **t1734** (`vizBlocks.js`'s own header records it: zero readers, confirmed
+   t1724, acted on t1734). `code_preview_panel` was deleted in **`0bd8b38c`**, the same commit that introduced
+   `renderUiTree`, and has a live SUCCESSOR — `code_preview`, which renders today via `formWidgets.js:1497`.
+   Only **`layout_2d_canvas`** survives. The grep that produced "three" matched the two tombstone COMMENTS
+   recording their own deletion — [[grep-gives-a-line-not-a-scope]] in its purest form.
+
+   ⭐ **And `layout_2d_canvas` is not a missing capability — it is a THIRD way to say something already live.**
+   `formWidgets.js:1478` renders a `panel` node as the 2D FEATURE CANVAS, placeable anywhere in the
+   `uiChildren` tree, alongside `sim` (1402), `code_preview` (1497), `split_horizontal`/`split_vertical`
+   (1339), `section`, `group_box`, `grid_container` and `tab_group`. Layout placement is ALREADY fully
+   declarable and drill ships on exactly that shape. `layout_2d_canvas` adds only `minHeight`/`showRuler`,
+   and rulers are already declared via `def.zRuler`.
+   ⇒ **OWNER RULING, 2026-09-01: DELETE it**, same as its two siblings — wiring it would create a competing
+   duplicate of a working mechanism, which is the exact duplication this arc exists to remove. Queued as L7.
+
 ### THE GATE — ROADMAP.md's own stated make-or-break condition, ASSESSED: BUILDABLE, not hypothetical
 
 `tests/commit-on-release-2429.spec.js` (this session) already reuses `web/debug/featProbe.js` DIRECTLY inside
@@ -6564,8 +6580,11 @@ still shows `movedMid`/`movedAfter` near zero despite the handle being on-screen
 a small value — a NEW finding, surfaced as a side effect of L5's own port, NOT caused by it (reproduces
 identically on the pre-port hand-written code too). t2503 — CONFIRMED REAL, not a harness artifact (measured,
 not guessed); mechanism still NOT pinned (`polygonStack`/`polygonSweeps` regeneration checked and RULED OUT as
-the cause). REPORT ONLY, still not fixed — this is now its own fix turn's own scope, per the dispatch that
-ordered this diagnosis
+the cause). ⭐⭐⭐⭐⭐⭐⭐ ✅ FIXED t2505 — root pinned via a live CPU profile (Blockly's own workspace-layout
+internals, not this app's own render path); fixed by forwarding a `preview`/commit-on-release opt the lathe
+drag-write chain was silently dropping in three places, routing polygon's own drag through the EXISTING,
+already-proven mill/pattern preview mechanism (BACKLOG #46) instead of new machinery; permanent bounded-time
+guard added (`tests/lathe-drag-responsive-2505.spec.js`)
 
 *(filed t2497, discovered while gate-verifying `polygonProfileSpec`'s own port onto `canvasWidgets.js` —
 BACKLOG #61 / L5's last op. Explicitly the SAME class of allowance the dispatch itself sanctioned for #68/#69:
@@ -6695,3 +6714,91 @@ and whether anything there re-triggers itself once a value stops changing rather
 **STILL REAL IF**: the same three diagnostics above (documented seed + concurrent evaluate probe; slow
 discrete human-paced moves in a headed browser + concurrent evaluate probe) still show multi-second stalls on
 an UNRELATED `evaluate()` call while dragging `polyFlats` toward a small across-flats value.
+
+### ⭐⭐⭐⭐⭐⭐⭐ ✅ FIXED t2505 — root pinned via a live CPU profile; fixed by routing polygon's own drag through
+an EXISTING, already-proven preview/commit-on-release mechanism the lathe family was silently bypassing
+
+**ROOT, pinned by measurement, not by inspection** (per the dispatch's own explicit ask): a CDP `Profiler`
+capture during the slow region (`Profiler.enable`/`start`/`stop`, top self-time samples ranked) showed the
+overwhelming majority of CPU time inside **Blockly's own internal functions** (`mb`, `recomputeAriaContext`,
+`hasLayer`, `getRelativeToSurfaceXY`, `setConnectionTracking` — vendor/blockly/blockly.min.js), NOT in
+`featureCanvas.js`'s own render path (`_draw()` call count stayed bounded at 2 per move throughout, even during
+an 8-second stall — proven via a prototype-patch counter — and the canvas's own SVG node count stayed FLAT at 35
+the whole time, proven via a live count — ruling OUT both a re-entrant render loop and DOM accumulation as the
+advisor's own two candidate theories, in that order, by direct measurement of each).
+
+**The actual chain**: `polygonData.js`'s own `def.postInstantiate = rebuildPolygon` regenerates the WHOLE block
+stack via `polygonStack`/`polygonSweeps` on every Studio-side param write (its own doc comment says exactly
+this — "every Studio-side parameter changes the whole sweep... rebuilds the program") — up to ~868 blocks as
+`acrossFlats` shrinks (t2503's own measurement). That regenerated stack feeds the LIVE Blockly workspace, which
+then has to lay out however many blocks that turn out to be, SYNCHRONOUSLY, on the main thread. Every OTHER
+lathe op's own drag write is cheap (a single `#var`-bound scalar patch, not a whole-stack regenerate), so nobody
+had ever noticed that `viz/latheProfileCanvas.js`'s own `latheLayoutSpec` → `write` wrapper, AND
+`wizards/ops/panelTypes.js`'s own `latheLayoutSpec(...)` call site, were BOTH silently dropping the `opts`
+argument `canvasWidgets.js`'s own `onDrag(id, world, commitNow)` already tries to pass on every frame
+(`setFields(updates, commit ? undefined : { preview: true })` — this ALREADY marks every ordinary lathe drag
+frame `{preview:true}` by default, since no lathe call site ever passes `commitNow`). `panelTypes.js`'s own
+`_writeParam(name, val, opts)` has carried a fully-built, ALREADY-TESTED preview branch since BACKLOG #46
+(t2429/t2447) — used by every mill/pattern handle in the app — that defers the actual model write (and whatever
+it triggers) to a `data-ddcsCommitted`-tracked flush at drag-end, while the DOM value (and so the live-tracking
+canvas, which reads params off the live FORM FIELDS, never the model) still updates every frame. The lathe
+family's own three-layer wrapper chain (`polygonProfileSpec`'s inner callback → `latheLayoutSpec`'s own `write`
+→ `panelTypes.js`'s own call site) was dropping that `opts` at EVERY layer, so every lathe drag — not just
+polygon's — has always committed on every raw frame instead of on release. Every op except polygon is cheap
+enough that this never mattered.
+
+**THE FIX, narrowly scoped** — reuses 100% pre-existing, already-tested machinery; adds no new mechanism:
+- `viz/latheProfileCanvas.js`: `latheLayoutSpec`'s own `write` wrapper now forwards `opts`; `polygonProfileSpec`'s
+  own inner `buildCanvasWidgets(...)` callback now forwards `opts` too (the ONE spec function changed among the
+  seven in this file — every other lathe spec's own wrapper is untouched, so `opts` stays `undefined` for them
+  regardless of `write`'s own change, provably no-op for the other five).
+- `wizards/ops/panelTypes.js`: the lathe branch's own callback into `latheLayoutSpec` now forwards `opts` to
+  `_writeParam` too (same no-op-for-the-other-five argument). `onDragEnd` (the SAME generic, op-agnostic flush
+  BACKLOG #46 already built — reads `_host`'s own live DOM for any field carrying a stale `data-ddcsCommitted`
+  marker and flushes it as a real write) is now attached to the returned spec, but ONLY when `isPolygon` —
+  deliberately NOT merged into the whole lathe branch (an earlier version of this fix did, and the `test:node`
+  snapshot gate caught it immediately: it would have added a new `.onDragEnd` key to EVERY lathe op's own
+  declared spec shape, provably behaviourally inert for the other five but a real, avoidable footprint on their
+  declaration and an extra no-op DOM scan on every one of their own drag-releases — narrowed to touch only
+  polygon once the gate flagged it).
+- Two `architecture-map-1698.test.mjs` citations (`TRAP2`/`Q3`) that quoted the exact old source line verbatim
+  updated to match — the map's own "prove it stale, fix it in the same act" duty, not a separate task.
+
+**Do NOT build cross-handle/per-op collision machinery, do NOT touch `featureCanvas.js` or `canvasWidgets.js`'s
+own gesture math** — neither was touched. `canvasWidgets.js`'s own `onDrag` already computed the right `opts`
+on every call; the only defect was three call sites silently discarding it.
+
+**VERIFIED, timings side by side, exact documented seed** (`dx:0,dy:40,steps:8`, 400ms human-paced, headed
+browser — the SAME repro t2503 used to prove the freeze real):
+```
+pre-fix : 2327ms, 4044ms, 4120ms, 5011ms(STUCK-5s), 5011ms(STUCK-5s), 4032ms, 227ms, 263ms
+post-fix:   68ms,   80ms,   82ms,   95ms,   86ms,   25ms,  23ms,  19ms
+```
+Final committed model value confirmed correct after release (`{"acrossFlats":0.002}`, the clamp floor reached
+by this seed's own direction) — the deferred commit is not silently dropped. `polyDepth` (the OTHER polygon
+handle, riding the same forwarded `opts` but carrying no expensive rebuild either way) drags and commits
+correctly, 237ms. Click-to-edit on `polyFlats`'s own label (the exact path BACKLOG #66's own naive-fix trap
+would have broken, if this fix had gone anywhere near labels — it does not) verified live: typed `9.5`, Enter,
+model updated to `{"acrossFlats":9.5}` exactly.
+
+**THE PERMANENT GUARD** (`tests/lathe-drag-responsive-2505.spec.js`, NEW): a genuinely new claim this arc's own
+primitives never asked — not L2 "does it exist," not L3 "can it be reached," not t2501's own "can it be HIT,"
+but **does dragging it stay RESPONSIVE**. Asserts every move in the documented trouble seed resolves within
+1500ms (generous over the ~20-100ms a healthy move takes, far under the 2.3s-8s+ pre-fix stalls). Built with
+existing tools (`page.mouse.move`, `Date.now()`), not a fifth primitive module, per the dispatch's own explicit
+instruction. Four tests: the bounded-time assertion itself, `polyDepth` unaffected, the drag-end commit lands
+the real value, click-to-edit still writes the model.
+
+**Proven NON-VACUOUS, both directions, not assumed**: saved the three fixed files to scratch, `git checkout
+HEAD --` to the pre-fix state (all three files were uncommitted at the time — safe), ran the guard — the
+bounded-time test FAILED, three consecutive attempts (Playwright's own retry), consistent numbers each time
+(`1885, 2728, 3356, 4847, 5833, 345, 336, 351ms` / `1904, 2759, 3382, 4919, 5863, 351, 301, 297ms` / `1904, 2745,
+3409, 4941, 5686, 318, 292, 288ms`), specific to the `polyFlats` bounded-time test only — the other three tests
+(`polyDepth`, commit-lands, click-to-edit) passed even pre-fix, correctly, since THEIR properties held before
+too. Restored the fix from the scratch copies, `diff`-confirmed byte-identical, re-ran: 4/4 green.
+
+**Regression**: `test:node` 238/238, zero diff beyond the intended, minimal `user_lathe_polygon`-only addition
+(`.onDragEnd` key + entry, both twins — confirmed by `git diff` on the regenerated snapshot: exactly 4 lines
+changed, zero touching any of the other five lathe ops). 101 existing lathe/canvas-widgets/census tests
+(including BACKLOG #66's own t2501 guard) re-run unedited, all pass. Full suite `--workers=4` (rule 1b —
+`panelTypes.js` is shared by every mill AND lathe op with a canvas): see WORK-LOG t2505 for the actual result.
