@@ -142,7 +142,11 @@ export function latheLayoutSpec(def, params, setFields) {
     const kind = def && def.layout && def.layout.kind;
     if (kind !== LATHE_LAYOUT_KIND) return null;
     const p = params || {};
-    const write = (patch) => { if (typeof setFields === 'function') setFields(patch); };
+    // t2505 (BACKLOG #70) — `opts` now forwarded (was silently dropped): only `polygonProfileSpec`'s own inner
+    // wrapper actually passes one through (its own `acrossFlats` drag is the one lathe handle expensive enough to
+    // need commit-on-release — see that function's own comment). Every other spec below still calls its `onChange`
+    // with one argument, so `opts` stays `undefined` for them here regardless of this forward — unchanged.
+    const write = (patch, opts) => { if (typeof setFields === 'function') setFields(patch, opts); };
     // FACING: the face line writes the allowance. OD: the shoulder corner writes the diameter and the length.
     if (/facing/.test(String(def.opType || ''))) {
         const bar = barFromSettings({ allowance: Number(p.allowance) || 0 });
@@ -623,7 +627,20 @@ export function polygonProfileSpec(bar, poly, onChange) {
         // …on the middle of a flat, where the across-flats size IS the distance from the centre
         { type: 'rect', id: POLY_FLATS_HANDLE_ID, fieldH: 'acrossFlats', ax: cx, ay: cy, ex: 0, ey: apothem,
           sy: 0.5, minh: 0.002, maxh: maxFlats, emits: true, label: 'across flats', value: across },
-    ], (m) => { if (typeof onChange === 'function') onChange(m); });
+    // t2505 (BACKLOG #70) — `opts` forwarded here (every other spec in this file still drops it, unchanged): this
+    // op's own `postInstantiate` (`rebuildPolygon`) regenerates the WHOLE block stack on every Studio-side param
+    // write — up to ~868 blocks as `acrossFlats` shrinks — and Blockly then has to lay out that many blocks live.
+    // Committing on every drag FRAME (canvasWidgets.js's own `onDrag` already marks every frame `{preview:true}`
+    // by default; this was the only thing discarding it) froze the tab for several seconds at a stretch — CPU-
+    // profiled and confirmed real, not a test-harness artifact (BACKLOG #70's own t2503 entry). Forwarding `opts`
+    // here routes a mid-drag write through `_writeParam`'s own EXISTING preview branch (panelTypes.js, BACKLOG #46
+    // t2429/t2447 — already used by every mill/pattern handle in the app): the DOM value still updates every frame
+    // (the canvas keeps tracking the pointer live — it reads params off the live FORM FIELDS, never the model),
+    // but the actual model write — and the expensive rebuild it triggers — is deferred to ONE call at drag-end
+    // (`onDragEnd`, now merged into the lathe branch's own return in panelTypes.js). `polyDepth` (this same call)
+    // rides along too: harmless, since `depth` is a plain #var-bound value (POLY_BINDING_SPECS, not
+    // POLY_STRUCT_BINDINGS) with no expensive rebuild behind it either way.
+    ], (m, opts) => { if (typeof onChange === 'function') onChange(m, opts); });
 
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },

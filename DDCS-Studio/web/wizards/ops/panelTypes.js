@@ -251,12 +251,40 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         delete f.dataset.ddcsCommitted;   // this value is now the model's own — the next drag starts a fresh baseline
         f.dispatchEvent(new CustomEvent('input', { bubbles: true }));
     };
+    // t2505 (BACKLOG #70) — the drag-end commit flush, moved up from below (still the SAME function, still used by
+    // the mill/pattern return paths below too) so the lathe branch can share it. 100% generic: it reads `_host`'s
+    // OWN live DOM for any `[data-param]` field a preview write left uncommitted (`data-ddcsCommitted` set and
+    // stale) and flushes each as a real, non-preview `_writeParam` call. Op-agnostic by construction — but merged
+    // into ONLY polygon's own return below (`isPolygon`), not the whole lathe branch: it would be a behavioural
+    // no-op for every other lathe op too (none of them ever sends `opts.preview`, so nothing is ever left
+    // uncommitted for this to flush), but scoping it to the one op that actually needs it keeps every other lathe
+    // op's declared spec shape (and the extra no-op DOM scan `featureCanvas.js` would otherwise run on every
+    // release) untouched — narrower than "provably harmless," which is the standard this turn's fix holds to.
+    const onDragEnd = () => {
+        if (!_host) return;
+        const toFlush = [];
+        _host.querySelectorAll('[data-param]').forEach((f) => {
+            const committed = f.dataset.ddcsCommitted;
+            if (committed !== undefined && committed !== String(f.value)) toFlush.push([f.dataset.param, f.value]);
+        });
+        for (const [name, val] of toFlush) _writeParam(name, val);
+    };
     // t1273 — A LATHE OP DRAWS ITSELF. Everything below this line reasons about an XY stock rectangle: a datum corner,
     // a top-down footprint, corner picks. None of that means anything for a bar spinning on centres, so a lathe op
     // DECLARES its layout kind and gets its half-profile instead. Its handles route to the SAME _writeParam field
     // writer as every other canvas handle — a lathe drag and a mill drag reach the form by one path.
-    const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });
-    if (_lathe) return _lathe;
+    // t2505 (BACKLOG #70) — `opts` now forwarded (was silently dropped): `polygonProfileSpec`'s own `acrossFlats`
+    // drag is the ONE lathe handle expensive enough (its own `postInstantiate` regenerates the whole block stack,
+    // up to ~868 blocks as the value shrinks, which Blockly then has to lay out live) that committing on EVERY
+    // drag FRAME rather than on release freezes the tab for several seconds at a stretch — see BACKLOG #70's own
+    // t2503 CPU-profile evidence. Every OTHER lathe op's own spec function still calls `onChange(m)` with no
+    // `opts` (latheProfileCanvas.js, unchanged) — so `opts` stays `undefined` for them here regardless of this
+    // forward, and `onDragEnd`'s own scan above finds nothing to flush (it only acts on a field carrying
+    // `data-ddcsCommitted`, which ONLY a preview write ever sets) — provably a no-op for the other five, but
+    // `onDragEnd` itself is still only ATTACHED for polygon (isPolygon, below) — see that const's own comment.
+    const isPolygon = /polygon/.test(String((def && def.opType) || ''));
+    const _lathe = latheLayoutSpec(def, params, (m, opts) => { for (const k in m) _writeParam(k, m[k], opts); });
+    if (_lathe) return isPolygon ? { ..._lathe, onDragEnd } : _lathe;
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock
@@ -598,15 +626,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // by-name lookup made AFTER an earlier field's own rebuild still finds the right element) — what was wrong
     // was reading a LATER field's VALUE only after an EARLIER field had already possibly triggered that
     // rebuild, not the re-resolution itself.
-    const onDragEnd = () => {
-        if (!_host) return;
-        const toFlush = [];
-        _host.querySelectorAll('[data-param]').forEach((f) => {
-            const committed = f.dataset.ddcsCommitted;
-            if (committed !== undefined && committed !== String(f.value)) toFlush.push([f.dataset.param, f.value]);
-        });
-        for (const [name, val] of toFlush) _writeParam(name, val);
-    };
+    //
+    // t2505 (BACKLOG #70) — `onDragEnd` itself is now DEFINED ABOVE (before the lathe early-return), unchanged
+    // otherwise, so the lathe branch can share this exact same generic, op-agnostic flush.
     // t718 LAYOUT PLACEMENT PARITY — PLACE the previewGeometry handles: bake the shift into their RENDER position and
     // INVERSE-map their drag world (world − shift → the raw param), keyed by the previewGeometry handle ids. Role/probe
     // handles + the sim Start are untouched (the shift is 0 for probe ops anyway). Size/delta fields pass through — the

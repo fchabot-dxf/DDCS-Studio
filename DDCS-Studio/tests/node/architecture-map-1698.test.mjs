@@ -288,7 +288,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', find: "import { cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments } from '../../wizards/stacks/cornerWizard.js';" },
     { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', find: 'const exec = cornerStack(params, { superset: true });' },
     { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', find: 'getTransform() {' },
-    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });' },
+    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m, opts) => { for (const k in m) _writeParam(k, m[k], opts); });' },
     { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', find: 'const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_host || !!_field(name));' },
     { id: 'TRAP4 RESOLVED — activeDialectOpts returns {dialect} only now, matching the three copies below', file: 'web/wizards/previewEmit.js', find: 'try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; }' },
     { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', find: 'function dialectOpts() { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } }' },
@@ -392,7 +392,7 @@ const Q3_CLAIMS = [
     { id: 'Q3 partZeroShift is the ONE declared transform', file: 'web/viz/sceneFrame.js', find: 'export function partZeroShift(machine, stock, stockFloorZ) {' },
     { id: 'Q3 stockPinOffset — a DIFFERENT number', file: 'web/viz/sceneFrame.js', find: 'export function stockPinOffset(machine, stock) {' },
     { id: 'Q3 placeShiftFromParams / PlaceOnStock attach shift', file: 'web/wizards/ops/placement.js', find: 'export function placeShiftFromParams(p = {}, liveBbox = null) {' },
-    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });' },
+    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m, opts) => { for (const k in m) _writeParam(k, m[k], opts); });' },
 ];
 
 test('architecture map ASSERTED: Q3 frame-algebra citations still hold (the highest-cost defect class), uniquely', () => {
