@@ -5650,9 +5650,10 @@ common to both, which is not an actionable shared cause. See #57 for the same co
 
 ---
 
-### 64. [t2473 — ROOT DIAGNOSED, ONE SHARED root with #65, NOT FIXED — confidence/risk judgment call, see below]
-`rotaryClock`'s `__simstart0` marker SNAPS BACK on release — a real drag-render-truth defect, found by
-L4 (BACKLOG #61), REPORT ONLY, not fixed
+### 64. [t2475 — a NARROW candidate fix was built AND TESTED, empirically REFUTED (zero effect on the repro) —
+GUARDRAIL TRIPPED, stopped per the dispatch's own explicit condition, not fixed] `rotaryClock`'s `__simstart0`
+marker SNAPS BACK on release — a real drag-render-truth defect, found by L4 (BACKLOG #61), REPORT ONLY, not
+fixed
 
 *(filed t2471, per L4's own explicit "report, don't fix, each becomes its own turn" scope — see BACKLOG #61's
 own L4 section for the full sweep this was found in.)*
@@ -5718,6 +5719,43 @@ re-sweep. (Other ops use `simStartsProvider` for sim-only, non-declared markers 
 those never route through `writeSimStartFrac` at all, per the code's own comment: "Absent (corner/edge) → the
 existing single sim-only Start marker, unchanged.")
 
+### ⭐⭐⭐⭐⭐ t2475 — THE ADVISOR'S OWN LEAD TESTED AND NOT CONFIRMED; A SECOND, INDEPENDENTLY-DERIVED CANDIDATE
+FIX BUILT AND EMPIRICALLY REFUTED; GUARDRAIL TRIPPED — stopped, per the dispatch's own explicit stop condition
+
+**The advisor's own lead (INFERRED, from reading): `starts[dj]` reflects B's already-shifted world, not its
+pre-drag world, so every frame recomputes the dependent span against a moving baseline.** Frame-by-frame
+instrumentation (reading the `span` DOM field + both markers' screen positions at each single mouse-move step)
+found the `span` value DOES climb across frames (20→36.8→46.0) — consistent with the lead on its face — but
+crucially, **between the LAST live-drag frame and the release event, `span` stayed EXACTLY UNCHANGED (45.99
+both times) while A's own on-screen position still shifted (507.4→496.8) with no further write of any kind in
+between.** Since nothing recomputes `span`/the fraction store between the last drag frame and release, a
+stale-baseline theory about the SPAN MATH cannot be what produces the RELEASE-time jump specifically — the
+data feeding the render was already stable; only the RENDER of that stable data changed. The lead may still
+describe a real, secondary effect during the drag itself; it is not what causes the final settle discrepancy.
+
+**A second, independently-derived candidate, built from reading `featureCanvas.js`'s own `end()` handler
+(t2447/BACKLOG #46's own fix site)**: the auto-fit recompute (`render()`'s own `if (!this._tf || (!this.
+_userAdjusted && !this.active && !this._suppressFitOnCommit)) this._tf = this._fit(...)`) is frozen for the
+WHOLE drag (`this.active` truthy) and unfreezes the instant `this.active` is cleared on release — but
+`_suppressFitOnCommit` (which guards exactly this one eligible refit for pocket/surfacing-style handles) is
+only ever set around a `spec.onDragEnd` call, and `simMarkers` (userOpView.js:828-832) declare `onDrag` only,
+never `onDragEnd`. **Tested directly**: added `onDragEnd: () => mgr.update()` to `simMarkers` (a one-line,
+narrow, structurally-motivated candidate, mirroring the EXISTING, proven pattern exactly) and re-ran BOTH
+ops' own full 5-vector repro tables plus the B-moves-with-A test. **Result: byte-identical to before the
+change, in every number, for both ops.** The fix had zero measurable effect — REFUTED, not just unconfirmed.
+Reverted immediately (`git diff` confirmed byte-identical to HEAD before moving on).
+
+⛔ **GUARDRAIL TRIPPED, stopped here — per the dispatch's own explicit condition**: *"if honouring the contract
+requires restructuring the marker/drag machinery... stop, and report what you found."* Two independently-
+motivated, structurally-reasonable candidates were TESTED (not merely proposed) and neither closes the gap.
+The remaining plausible territory — WHY `mgr.update()` inside a hypothetical `onDragEnd` doesn't actually land
+inside `_suppressFitOnCommit`'s own synchronous window (most likely: `mgr.update()`'s own call chain is
+asynchronous/deferred somewhere between `userOpView.js` and `featureCanvas.js`, closing the suppress window
+before the real render fires) — requires tracing `mgr.update()`'s OWN internal scheduling, which is exactly
+the "restructuring... rather than correcting a value or a capture point" the guardrail was written to catch.
+Not attempted further this turn. Full account, incl. the exact reverted diff and both fix-test result tables:
+WORK-LOG t2475.
+
 **STILL REAL IF**: `dragHandleRenderTruth(page, '__simstart0', {dx:44,dy:0,...})` (or similar) against
 `user_rotary_clock_data`, booted per BACKLOG #61's own L4 recipe, shows `movedAfter` meaningfully less than
 `movedMid` again — AND, separately, the `__simstart1`/B-moves-when-A-drags test (§ above) is the sharper,
@@ -5725,9 +5763,10 @@ root-confirming check: it should show `movedB` near 0, not 20+px, once/if this i
 
 ---
 
-### 65. [t2473 — SAME ROOT AS #64, see that entry's own diagnosis section — NOT FIXED, same confidence/risk
-call] `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle point regardless of drag
-direction or magnitude — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed
+### 65. [t2475 — SAME ROOT AS #64: two tested candidate fixes, both refuted; GUARDRAIL TRIPPED, see #64's own
+t2475 section for the full account] `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle
+point regardless of drag direction or magnitude — a real, REPRODUCED drag-render-truth defect, found by L4,
+REPORT ONLY, not fixed
 
 *(filed t2471, same L4 sweep as #64 — see BACKLOG #61's own L4 section.)*
 
@@ -5762,6 +5801,10 @@ ops that happen to look similar" to "one root, confirmed by direct behavioral ev
 SAME shared mechanism, produces the SAME class of violation on both, at different magnitudes consistent with
 each op's own different declared parameters (`spanAxisFrom`/`signed` for alignment vs a fixed Y axis for
 rotaryClock). Not fixed this turn — see #64's own entry for the full reasoning.
+
+**t2475 — the candidate `onDragEnd: () => mgr.update()` fix was tested against THIS op too (all 5 vectors +
+the B-moves-with-A check), not just rotaryClock**: byte-identical to before the change, same as #64's own
+result — refuted here too, same guardrail, see #64's own t2475 section for the full account.
 
 **STILL REAL IF**: repeating any of the five trials above against `user_alignment_data` still shows
 `movedAfter` clustering near a value independent of the drag's own `dx`/`dy` — the reproducibility, not any

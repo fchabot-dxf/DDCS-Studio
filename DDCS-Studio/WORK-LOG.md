@@ -66893,3 +66893,61 @@ turn (zero product code touched, pure diagnosis + BACKLOG/WORK-LOG). The rewritt
 (t2471) did NOT false-positive — confirmed quiet, as expected (this turn touches none of the manifest's own
 guarded files at all). `git status --porcelain`: confirmed clean of every source file the manifests name.
 
+## t2475 — BACKLOG #64/#65: TWO candidate fixes built and tested (not just proposed), both empirically
+REFUTED. Guardrail tripped, stopped as instructed — reported, not forced
+
+### FIRST — testing the advisor's own INFERRED lead directly, not building on it blind
+
+Lead: `starts[dj]` (B's world, read by the dependent-marker span recompute) reflects B's ALREADY-SHIFTED
+current position rather than its pre-drag one, so every frame recomputes against a moving baseline and drift
+accumulates with drag distance. Re-read the frame-by-frame instrumentation captured at t2473 (span field +
+both markers' screen positions, single-step frames): `span` DOES climb across frames (20→36.8→46.0) —
+consistent with the lead on its face. **But between the LAST live-drag frame and the release event, `span`
+stayed EXACTLY UNCHANGED (45.99 both times) while A's own on-screen position still shifted (507.4→496.8) with
+NO further write of any kind in between.** Nothing recomputes span or the fraction store between drag-end and
+release — so a stale-baseline theory about the SPAN MATH cannot be what produces the release-time jump
+specifically. The lead may describe a real, secondary in-drag effect; it does not explain the settle
+discrepancy the gate actually measures.
+
+### SECOND — an independently-derived candidate, from reading featureCanvas.js's own commit-path code
+
+`render()`'s own auto-fit condition (`if (!this._tf || (!this._userAdjusted && !this.active && !this.
+_suppressFitOnCommit)) this._tf = this._fit(...)`) freezes for the whole drag (`this.active` truthy) and
+unfreezes the instant release clears `this.active`. `_suppressFitOnCommit` — the SAME flag t2447/BACKLOG #46
+already built to guard exactly this one eligible refit — is only ever set around a `spec.onDragEnd` call.
+`simMarkers` (`userOpView.js:828-832`) declare `onDrag` only, never `onDragEnd` — unlike pocket/surfacing,
+which have both. **Tested directly**: added `onDragEnd: () => mgr.update()` — a one-line candidate mirroring
+the EXISTING, proven pattern exactly — and re-ran both ops' full 5-vector tables plus the B-moves-with-A test.
+
+**Result: byte-identical to before the change, every number, both ops.** Not "still fails" in a new way —
+literally unchanged. The fix has zero measurable effect. Reverted immediately (`git diff` confirmed
+byte-identical to HEAD).
+
+### GUARDRAIL — stopped, per the dispatch's own explicit condition
+
+Two independently-motivated, structurally-reasonable candidates were TESTED, not merely proposed, and neither
+closes the gap. The remaining plausible territory (why a synchronous `mgr.update()` call inside a hypothetical
+`onDragEnd` doesn't land inside `_suppressFitOnCommit`'s own window — most likely `mgr.update()`'s own call
+chain defers somewhere between `userOpView.js` and `featureCanvas.js`) requires tracing `mgr.update()`'s
+internal scheduling — exactly the "restructuring... rather than correcting a value or a capture point" the
+dispatch's own guardrail named as the stop condition. Not attempted further. `userOpView.js` and
+`featureCanvas.js` both untouched at the end of this turn (confirmed via `git diff`, no lingering edit).
+
+### VERIFY note on this half
+
+No fix landed, so items 1/2/4 of the dispatch's own VERIFY list (RED-before/GREEN-after, all-5-vectors,
+seed-into-L1) do not apply — nothing changed to demonstrate. Item 3 (the contract itself, measured directly)
+IS what both fix attempts' own re-tests already re-confirmed: dragging A still moves B by the same ~24.6px/
+62.7px as t2473 found, unchanged by either candidate.
+
+### VERIFY (both halves)
+
+Main: the advisor's own lead tested directly (not confirmed as the release-time cause); a second, independent
+candidate built and tested (refuted, zero effect); guardrail correctly tripped and honored. Small: the A/B
+comparison is the evidence (three boot methods, one real DOM fact — `display:none` — pinned by direct
+inspection). `test:changed`: 0 tests (expected — doc-only turn). `test:node`: 238/238 passed. Full suite
+`--workers=4`, BEFORE concluding: **3022 passed, 1 failed, 6 flaky, 26 skipped.** The one failure is the SAME
+pre-existing `sf-pos-snapback` load-contention timeout documented since t2465 — unrelated (zero net product
+code changed this turn; the one edit made was tested, refuted, and reverted). `git status --porcelain`:
+confirmed clean — `userOpView.js` reverted byte-identical to HEAD, no other product file touched.
+
