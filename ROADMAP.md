@@ -237,12 +237,21 @@ The north star says *every wizard becomes data*. Measured against the live regis
                             nobody writes form HTML per wizard
   PREVIEW  mostly declared  DISPATCH is declared for every op — wizardLibrary's
                             opensAs routes all live menu entries to a GENERIC twin
-                            renderer reading a declared source per op. What is still
-                            hand-written is narrower than "no declaration":
-                              · the LATHE family's per-shape geometry math (6 ops)
-                              · handle AFFORDANCES (onEdit/noSnap/emits) — declared
-                                on some ops, absent with no rule on 7 others
+                            renderer reading a declared source per op.
+                            · the LATHE family's geometry — ✅ PORTED 2026-09-01
+                              (L5, t2485-t2497). All seven ops declare their handles
+                              through canvasWidgets.js; zero hand-written place/drag/
+                              edit residue. Every port proved byte-identical rendered
+                              geometry before/after, or was refused.
+                            · handle AFFORDANCES (onEdit/noSnap/emits) — declared
+                              on some ops, absent with no rule on 7 others  ← L6, open
 ```
+
+⭐ **The registry gained exactly two capabilities across L5, each only after a THIRD op independently
+needed it, and each proved zero-diff through the snapshot gate BEFORE any declaration used it** —
+two-sided clamps (t2489) and `valueField` edit routing (t2495). Both are now available to every consumer,
+not just the lathe family. ⚠ That ordering — *prove the shared mechanism inert, then build on it* — is
+what made touching seven shared call sites safe. Reuse it for any future vocabulary change.
 
 ⚠ **This block previously read `PREVIEW 0/32 declared` (measured 2026-08-09) and was badly stale** — it
 described every legacy `<name>View.js` as live when all 13 are dead code, superseded by the generic
