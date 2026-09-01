@@ -5188,6 +5188,33 @@ still unfixed) — if it returns ≥1, re-run `facing-data-emit.spec.js`'s own `
 `finishFrontierPass` assertions FIRST (they're written to expect `false`; a fix would need them flipped to
 `true`, not the whole entry re-litigated from scratch).
 
+⚠ **t2471 (small item) — is `finish` a control that LIES? Is `allowance` reachable, and does editing it after
+placement do anything real? Determined, not fixed, per the dispatch's own 20-minute-check scope.**
+
+`finish` is **NOT reachable — a clean negative, not a lying control.** Confirmed two ways: (1) static — `finish`
+never appears in `FACING_BINDING_SPECS`, the ONLY source `facingData.js`'s form fields are derived from
+(`deriveBindingsFor`), and `facingDataDef` has no `postInstantiate` or other injection path that could add a
+field outside that list; (2) live — opened the real Blocks-tab form for `user_lathe_facing` and read its
+actual rendered `[data-param]` inputs: **exactly `allowance`, `doc`, `xStart`, `feed`** — the same four, no
+more, no fewer. `finish` genuinely never reaches the user; it stays permanently baked at `FACING_DEFAULTS.
+finish` (`0`, no finishing pass) as an internal constant. Not a control that lies — there IS no control.
+
+`allowance` **IS reachable, confirmed live** (the real "Material to remove" form field, editing it via a real
+`input`/`change` event genuinely changes the emitted program — confirmed `program changed: true`) — so this is
+NOT "does nothing," which would be the worse, silent-lie shape the dispatch asked to rule out. What t2469's own
+`facing-data-emit.spec.js` already proved stands: the PASS-COUNT loop (`IF #110<#111 GOTO52`) correctly reads
+the LIVE, edited register, so the number of roughing passes DOES respond correctly to an edited allowance. Only
+the two BAKED Z heights (the clearance-approach and final-retract lines) silently keep the DEFAULT allowance's
+own computed value. **Net effect for a user, stated plainly**: editing "Material to remove" away from its
+default (3mm) produces a program with the CORRECT number of passes at the CORRECT depths, but a clearance-
+approach/retract height computed as if the field were still at its default — wrong for large deviations from
+3mm, silently, with no error and nothing in the UI to suggest it. Worse than "does nothing" in one sense (a
+"does nothing" field is merely confusing; this one is quietly wrong), better in another (the core cutting
+behavior — pass depths — IS correct; only the approach/retract clearance is stale). Not fixed here, per scope.
+
+**STILL REAL IF**: unchanged from #60's own entry above — this is a characterization of the SAME frontier, not
+a new one; see that entry's own STILL REAL IF for the check that would confirm a future fix.
+
 ---
 
 ### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`); ⭐⭐ GATE PROVES ITSELF t2463

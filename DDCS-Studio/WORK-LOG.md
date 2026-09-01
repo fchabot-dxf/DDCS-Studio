@@ -66778,6 +66778,28 @@ New test assertions in `preview-mutation-manifest-2463.spec.js` (product-adjacen
 code). No product code touched this half — every drag defect found is REPORTED via BACKLOG, not fixed. Full
 suite run below covers both halves.
 
+## t2471 (SMALL ITEM, own commit per rule 4) — is `facing`'s `finish`/`allowance` reachable by a real user?
+Determined, filed, not fixed
+
+`finish`: confirmed UNREACHABLE two ways — statically (`FACING_BINDING_SPECS` is the ONLY source of this
+twin's form fields; `finish` is not in it, and `facingDataDef` has no other field-injection path) and live
+(opened the real Blocks-tab form for `user_lathe_facing`, read its actual `[data-param]` inputs: exactly
+`allowance`/`doc`/`xStart`/`feed`, no more). A clean negative — `finish` is not a control that lies, because
+there is no control; it stays a permanent internal constant at its default (0, no finishing pass).
+
+`allowance`: confirmed REACHABLE and PARTIALLY effective, not silently inert — editing the real "Material to
+remove" form field via a genuine `input`/`change` event demonstrably changes the emitted program. t2469's own
+`facing-data-emit.spec.js` already proved precisely WHAT changes and what doesn't: the pass-count loop reads
+the live, edited register correctly (right number of passes, right depths); two BAKED Z heights (the
+clearance-approach line and the final retract) silently keep the DEFAULT allowance's own value, computed once
+at template-freeze time. Net effect stated plainly for whoever picks this up: the core cutting behavior is
+correct; the approach/retract clearance is quietly wrong for allowance values far from the default (3mm),
+with nothing in the UI to suggest it — a real, reachable correctness gap, not a cosmetic one. Filed into
+BACKLOG #60's own entry (same frontier already named there, not a new one). Not fixed, per the dispatch's own
+20-minute-check scope.
+
+Tier: doc-only (`BACKLOG.md` #60 update) — no test/product code touched for this half.
+
 ### VERIFY (both halves of this turn)
 
 The manifest fix: non-vacuous AND specific, proven above, both new tests passing; full manifest file (7 tests)
