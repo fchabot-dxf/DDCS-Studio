@@ -66198,3 +66198,141 @@ new files immediately after.
 
 Files: `tests/support/dragRenderTruth.js` (new), `tests/drag-render-truth-gate-2461.spec.js` (new).
 
+## t2463 — ARC A / L1: THE MUTATION MANIFEST — the gate proves itself against declared data, not per-defect
+archaeology. sf_pos genuinely reproduces this way, contradicting t2461's own one-shot result — the strongest
+possible evidence for why this turn exists. Plus BACKLOG #57 (hypothesis corrected) and #62 (filed)
+
+Full spec read first, as instructed: `scratchpad/t2463-mutation-manifest.md`. Rule 8b self-check before
+touching anything (both of #61's own `STILL REAL IF`s): `opensAs` → 41 hits in `wizardLibrary.js` (spec claims
+41, confirmed), `getBoundingClientRect|boundingBox` → 5 hits in `commit-on-release-2429.spec.js` (spec claims
+5, confirmed). Entry live, proceeded.
+
+### THE ARCHITECTURE
+
+`tests/support/previewMutations.js` — `PREVIEW_MUTATIONS`, an array of inert data: `{id, defect, files, op,
+seed, proven}`, `files` a list of `{path, find, replace}` byte-mutations. `tests/preview-mutation-manifest-
+2463.spec.js` — the runner: for each entry, `applyMutations` registers ONE `page.route()` per unique target
+path (grouped — see the bug below), applies → probes → asserts RED, `page.unrouteAll()` → probes again →
+asserts GREEN, all within the SAME page/test.
+
+⛔ **The hard constraint, honored throughout**: every mutation applies via `page.route()` rewriting the served
+response body — nothing ever touches disk. The closing test in the runner (`no mutation ever reached disk`)
+greps `git status --porcelain` for every source path the manifest names and asserts none appear; this passed
+on every run, including the ones where a mutation bug (below) meant the FIRST attempt's assertions were wrong —
+the constraint held even while the manifest itself was still being debugged.
+
+### TWO REAL BUGS CAUGHT BUILDING THE RUNNER ITSELF, both live-caught before trusting a single result
+
+1. **Same-path mutations silently clobbering each other.** `styles.css` and `featureCanvas.js` each carry TWO
+   separate hunks to revert (BACKLOG #58's containment root + its `@container` unwrap; t2447's own two roots).
+   The first draft registered one `page.route()` PER MUTATION on an identical glob pattern — each handler
+   independently calls `route.fetch()` (a fresh network fetch of the ORIGINAL, unmutated body) and only one
+   ever wins `route.fulfill()`, so the second hunk for a shared path silently never applied. Fixed by grouping
+   mutations by `path` first, applying all of a path's find/replace pairs to the SAME fetched body in one
+   handler, one `fulfill()`.
+2. **CRLF vs LF.** This repo checks out CRLF (`core.autocrlf`); the manifest's own multi-line find-strings are
+   authored as plain `\n`. Every single-line CSS mutation matched fine; every MULTI-LINE find (both JS blocks,
+   the `@container` CSS block) matched ZERO times — a real "the manifest is stale" throw, caught immediately
+   rather than silently producing a false GREEN. Fixed in the runner, not the manifest: normalize the fetched
+   body's `\r\n`→`\n` before matching (functionally inert — neither JS nor CSS parsing cares about line-ending
+   style), never hand-encoding CRLF into every multi-line manifest entry.
+
+### THE FOUR SEEDS, in the dispatch's own order of confidence
+
+1. **`pk-size-snapback`** (ab59b869/t2447) — MUTATED: RED, `post-release position (moved 40.0px) must not snap
+   back from mid-drag (47.2px)` — byte-identical to t2461's own disk-revert numbers. CLEAN: GREEN. Matches
+   "PROVEN RED at t2461 — must stay red."
+2. **`sf-pos-snapback`** (same fix) — **the turn's real question.** MUTATED: **RED**, `moved 38.6px... must not
+   snap back from mid-drag (180.3px)` — reproduced across **3 separate runs, byte-identical numbers each time**
+   (deterministic, not racy — re-ran twice more specifically to rule out a lucky single sample before trusting
+   it). CLEAN: GREEN. **This CONTRADICTS t2461's own disk-revert finding**, which did not reproduce with the
+   identical drag parameters (`dx:-150, dy:100, steps:12, settleMs:500`) and identical boot sequence
+   (`?debug=feat`, confirmed by diffing both files' own boot functions line-for-line — no difference found).
+   Both methods revert the IDENTICAL code; the only variable is delivery mechanism (disk-write-and-restore vs
+   in-flight route-rewrite) and, necessarily, WHEN each ran (different moments, different system state) — since
+   t2447's own root cause is a genuine RENDER-TIMING race (an auto-refit firing against a specific frame), a
+   plausible account is that the race's outcome is sensitive to exact scheduling that varied between the two
+   separate sessions, and t2461's own single sample landed on the non-reproducing side of it. **Not resolved
+   further this turn** (out of scope — the manifest's job was to STOP one-shot archaeology, not become a new
+   round of it) — the manifest's own 3/3-consistent result is reported as the current, trustworthy answer, and
+   the DIVERGENCE from t2461 itself is reported as the finding, per the dispatch's own explicit instruction
+   ("if it doesn't [reproduce], that is a finding, not a failure... report which it was, with the evidence") —
+   read literally even though the actual result inverted what that instruction anticipated.
+3. **`flyout-corner-synthetic`** (no fix commit — synthetic) — mutates `dropdownPopup.js`'s own trigger-relative
+   popup positioning (`const x = r.left, y = r.top + r.height + 4;` → `const x = 0, y = 0;`), the ONE place a
+   custom Blockly field popup (t2453's own tool/pin pickers, the options editor) computes where it opens.
+   MUTATED: RED — a tool-number picker opened on a field at `(355,201)` rendered its popup at `(6,6)`, pinned to
+   the corner exactly as the mutation says. CLEAN: GREEN — popup at `(355,205)`, 4px below the field, dx=0.
+   **Proves the "assert real rendered geometry" gate family generalizes past its one proven bug class with NO
+   historical fix commit to derive from** — the whole point of building this as declared data instead of
+   per-commit archaeology.
+4. **`pane-sizes-from-window`** (84def5d1/t2423, BACKLOG #58 — ONE hunk of a bundled commit). Isolated exactly
+   #58's own hunk (the `container-type: inline-size` declaration + unwrapping the `@container (max-width:
+   860px)` block back to unconditional rules) from the SAME commit's unrelated #52/#59/flaky-trend work — never
+   touched anything else the commit carries. MUTATED: RED — `paneWidth=978 flexDirection=column` (wrong; a
+   978px pane should render two-pane). CLEAN: GREEN — `paneWidth=1295 flexDirection=row` (correct). Reused
+   `wizard-view-pane-container-width-2423.spec.js`'s own boot/splitter-drag/measure shape verbatim rather than
+   re-deriving it.
+
+### BACKLOG #57 — small item, re-confirmed live, hypothesis CORRECTED not blindly applied
+
+`STILL REAL IF` run first, per the dispatch's own instruction: `undo-reproject-echo.spec.js`'s "a real
+block-value edit is undoable" test, solo (`--workers=1`), 4 runs — **3 of 4 failed/flaky.** Still real; did not
+tag `[STALE]`.
+
+The entry's own first hypothesis (a raw `page.waitForTimeout(350)` guessing at an async settle, where the
+file's own `waitX` helper already does it properly) **does not match the actual failure**, checked directly
+rather than assumed: the real error is `page.waitForFunction: Timeout 6000ms exceeded` at **line 62** — a
+`waitX(page, 5)` call AFTER `clickUndo(page)` (the "Undo reverts the value edit" assertion) — which is
+**already** a proper `waitX`, not a raw sleep. The ONE raw `waitForTimeout(350)` inside this specific test
+(line 48) sits immediately BEFORE a `waitX` on the very next line, making it redundant (harmless) rather than
+the cause. **Did not apply the described fix** — swapping a timeout that isn't where the failure happens would
+fix the wrong thing while leaving the test exactly as flaky. Corrected the entry's own hypothesis in place
+(BACKLOG #57), named the real failure point for whoever picks it up next, left it open — the actual race is
+downstream of Undo itself, in the reproject pipeline, genuinely deeper than a test-authoring fix and out of
+this turn's own "small item" scope.
+
+### BACKLOG #62 — filed, per the dispatch's own instruction
+
+"The missing pane sizer" had no BACKLOG entry of its own — living only inside #61's own prose (one of the
+owner's 5 real defects this week) and, separately, inside `84def5d1`'s own commit message (a mid-turn
+amendment, investigated, NOT reproduced, NOT fixed — advisor's own two hypotheses both tested live and ruled
+out, a git-history sweep found no candidate fix commit at all). Filed as its own entry with a `STILL REAL IF`,
+naming plainly that these may be the SAME report or two different ones (not established) and that no mutation
+was attempted this turn (nothing to derive one from, and inventing a synthetic "element removed" mutation
+without first confirming the current sizer's own selector/mechanism would be guessing, not measuring).
+
+### VERIFY
+
+1. Manifest run: all 4 entries RED-then-GREEN (item 2's RED differs from t2461's own finding — reported as the
+   turn's own central result, not smoothed over). `no mutation ever reached disk` passed on every run.
+2. Full suite (`workers=4`, never 6, per `context/VERIFICATION.md`) run BEFORE concluding, per rule 1b's own
+   ORDER requirement: **3013 passed, 2 failed, 6 flaky, 26 skipped, 32m19s.** Checked the failed-COUNT, not
+   just the tail, per the same rule's own instruction. The 2 failures investigated individually rather than
+   assumed unrelated:
+   - `preview-mutation-manifest-2463.spec.js [sf-pos-snapback]` (this turn's own new test) — re-ran isolated
+     (`--workers=1`) **4 times total across this turn** (3 during the manifest's own development, 1 more after
+     the full-suite failure): **4/4 clean.** The underlying assertion is a real-pixel drag-timing measurement —
+     exactly the class of test sensitive to scheduling jitter under heavy parallel load, and this session's own
+     already-documented worker-oversubscription pattern (t2441/t2443) predicts precisely this shape of failure.
+   - `undo-blind-writes-2427.spec.js` (pre-existing, unrelated to anything this turn touched — no source files
+     changed, this file shares no code path with the manifest or the gate) — re-ran at `--workers=2`: **3 of 4
+     tests flaky**, first error a bare `page.goto('/')` → `waitForFunction(ddcsStudio && showApp)` TIMEOUT — an
+     app-BOOT timeout, unrelated to the undo logic the file actually tests. Re-ran again fully isolated
+     (`--workers=1`, alone): **still 2 of 4 flaky.** This file has a genuine PRE-EXISTING, environment-sensitive
+     flake independent of any parallelism this turn introduced — confirmed unrelated, not investigated further
+     (out of this turn's own scope; a candidate for its own BACKLOG entry, not filed here since it wasn't
+     reproduced from a stable baseline first).
+
+   Both failures are contention/environment flakes, not regressions from this turn's work — verified by
+   re-running, not assumed.
+3. `git status --porcelain` confirmed clean of every source file the manifest names, both mid-debugging (while
+   the CRLF bug was still live) and at the end.
+
+Tier: test-infrastructure files only (`tests/support/previewMutations.js`, `tests/preview-mutation-manifest-
+2463.spec.js`) plus two doc-only BACKLOG entries (#57 corrected, #62 filed) — no product code touched. `test:
+node` 238/238.
+
+Files: `tests/support/previewMutations.js` (new), `tests/preview-mutation-manifest-2463.spec.js` (new),
+`BACKLOG.md` (#57 corrected, #61 extended, #62 new).
+

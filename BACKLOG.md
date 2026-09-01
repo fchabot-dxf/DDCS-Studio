@@ -4990,9 +4990,26 @@ machine at that moment even solo). Worth trying `page.waitForFunction` on the ac
 of a blind timeout, mirroring how the file's OWN `waitX` helper already does it correctly for the LOAD steps —
 the raw `page.waitForTimeout(350)` calls are the one place in this file that doesn't.
 
+⚠ **t2463 — STILL REAL, confirmed live (3 of 4 solo `--workers=1` runs failed/flaky) — but THE FIRST HYPOTHESIS
+DOES NOT MATCH THE EVIDENCE, corrected here rather than mechanically applied.** The test's own real failure —
+read from the actual Playwright error, not assumed from the theory — is `page.waitForFunction: Timeout 6000ms
+exceeded` at **line 62**, `waitX(page, 5)` called AFTER `clickUndo(page)` (the "Undo reverts the value edit"
+assertion). Line 62 is **already** a proper `waitX` call, not a raw `waitForTimeout` — the ONE raw
+`page.waitForTimeout(350)` inside this specific test (line 48) sits BEFORE a `waitX` on the very next line
+(line 49), which already makes it redundant (a `waitX` immediately after would wait however long is actually
+needed regardless of the fixed sleep before it) and, more importantly, unrelated to where the timeout actually
+fires. **The real race is downstream of Undo itself** — the model sometimes does not reach the pre-edit value
+within 6 seconds after a real block-value edit + Undo — a genuinely deeper timing question in the undo/
+reproject pipeline than "swap a sleep for a proper wait," and NOT fixed this turn (t2463's own scope was the
+mutation manifest; this was picked up as its declared "small item," and swapping in a hypothesis that doesn't
+match the observed failure would fix the wrong thing while leaving the test still flaky). Left open, hypothesis
+corrected, for whoever picks it up next: start from line 62's own timeout, not line 48's redundant sleep.
+
 **STILL REAL IF:** this specific test fails again — alone, `--workers=1`, no other file failing alongside it —
 on a turn that touches none of `blocksApp.js`/the undo/reproject machinery (`opEdits.js`, the gesture-boundary
-tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`).
+tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`). ⚠ t2463's
+own re-check: still fails this way (3/4 solo runs) — the check itself still holds, only the FIRST hypothesis
+above needed correcting, not the entry's own open status.
 
 ---
 
@@ -5132,9 +5149,10 @@ heading still claiming "open" for the whole thing is the same trap this entry it
 
 ---
 
-### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`) — declarations/ports/lathe
-geometry still NOT started, deliberately] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED" IS STALE —
-RE-MEASURED, PLUS A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
+### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`); ⭐⭐ GATE PROVES ITSELF t2463
+(`tests/support/previewMutations.js` — the mutation manifest, L1) — declarations/ports/lathe geometry/L2/L3
+still NOT started, deliberately] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED" IS STALE — RE-MEASURED, PLUS
+A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
 
 *(owner ask, via the advisor: does wizards-as-data work fully — emit AND form AND previews? Emit/form measured
 t2457 (BACKLOG #60). This is the third leg. Full account + the 32-op per-fact table: WORK-LOG t2459.)*
@@ -5199,6 +5217,37 @@ lathe-family geometry migration, no build of the other two (smaller) primitives 
 arc's next turns, in the order t2459/t2461 both name: declare → port lathe → build the presence/manifest and
 container-sizing primitives separately.
 
+### ⭐⭐ THE GATE PROVES ITSELF — t2463 (BACKLOG #61 / L1, the mutation manifest)
+
+t2461's own honesty (1 of 3 claimed defects actually proven) had a root cause: the acceptance method was
+per-defect archaeology (locate a fix commit → revert on disk → run → restore), which can't test a defect with
+no fix commit and never re-checks itself. `tests/support/previewMutations.js` declares 4 mutations as INERT
+DATA (never touching disk — every mutation applies via `page.route()` rewriting the served file body,
+in-flight, for exactly one test's page); `tests/preview-mutation-manifest-2463.spec.js` runs each: apply →
+assert RED → remove → assert GREEN.
+
+**All 4 entries: clean RED-then-GREEN.** Including the SYNTHETIC one (`flyout-corner-synthetic`, mutating
+`dropdownPopup.js`'s own trigger-relative positioning to pin at the origin) — proving the "assert real rendered
+geometry" gate family generalizes past its one proven bug class even with NO historical fix commit to revert,
+exactly the design's own point. And `pane-sizes-from-window` (BACKLOG #58's own isolated hunk from the bundled
+`84def5d1`) — RED under the reverted CSS (`paneWidth=978 flexDirection=column`, wrong), GREEN restored
+(`paneWidth=1295 flexDirection=row`, correct).
+
+⭐ **`sf_pos` — the turn's own real question, answered, and it validates the WHOLE premise for building this
+manifest in the first place**: under the in-flight mutation, `sf_pos` reproduces the snap-back **RED,
+deterministically, 3 of 3 runs, byte-identical numbers each time** (`moved 38.6px... must not snap back from
+mid-drag (180.3px)`) — the OPPOSITE of what t2461's own one-shot disk-revert found. Both methods revert the
+identical code (`ab59b869`); the only difference is delivery mechanism. This is not glossed over as "now it's
+fixed" — it is reported as the strongest possible evidence for why t2461's own diagnosis (per-defect archaeology
+is a one-shot act nothing re-checks) was correct: a single manual run gave a DIFFERENT, apparently incomplete
+answer than the repeatable, declarative one. The manifest's own 3/3-consistent result is treated as the current,
+trustworthy answer.
+
+Also shipped, same turn, per its own scope: BACKLOG #57's flake re-confirmed live (still real, 3/4 solo runs)
+but its OWN first hypothesis corrected against the actual error (see #57's own entry) rather than mechanically
+applied; BACKLOG #62 filed for the missing-pane-sizer defect (previously living only in this entry's own prose,
+per rule 8's own premise about facts buried in another entry's body).
+
 ### ⭐ RECOMMENDATION: START THE ARC, gate-first, exactly per ROADMAP's own ordering — do not refuse it
 
 The evidence against refusing is concrete: the arc's hardest precondition (a cheap, buildable preview-
@@ -5216,3 +5265,46 @@ this repo. In order:
 finding still holds) AND `grep -c "getBoundingClientRect\|boundingBox" tests/commit-on-release-2429.spec.js`
 still returns ≥1 (the gate precedent is still there to generalize from). If either check no longer holds,
 re-verify before acting on this entry's own conclusion — rule 8b applies to this entry too.
+
+---
+
+### 62. THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES MISSING — reported twice, never reproduced, no fix
+landed, no test exists, no BACKLOG entry of its own until now
+
+*(filed t2463, per that turn's own explicit instruction: this defect has been living inside BACKLOG #61's own
+prose — one of the owner's "5 real defects this week" cited when ARC A's gate was scoped — and, separately,
+inside commit `84def5d1`'s own message as a "mid-turn amendment... investigated." Rule 8's whole premise is
+that a fact living only in another entry's body is invisible to a scan — filing it properly, not fixing it.)*
+
+**OBSERVED, twice, never reconciled:**
+1. `84def5d1` (t2423, the SAME commit BACKLOG #58/#61's own `pane-sizes-from-window` mutation reverts) records:
+   *"A mid-turn amendment (the pane's own bottom drag handle reportedly missing) was investigated — both of
+   the advisor's own hypotheses (selector miss, zero-size) tested live and ruled out; a git-history sweep of
+   every suspect commit found nothing touching the sizer's own mechanism or CSS at all. Not reproduced, not
+   fixed — reported honestly with the negative evidence rather than guessed at."*
+2. BACKLOG #61 (t2459) separately cites "the missing pane sizer" as one of five real preview defects the owner
+   found on a real device THIS WEEK, worked against the gate design.
+
+⇒ **These may be the SAME report or two separate ones — not established, and worth someone actually asking the
+owner rather than assuming.** What IS established: the defect has never been reproduced by either the advisor
+or a worker, no fix commit exists (t2423's own git-history sweep found nothing), and no test names or guards
+against it.
+
+⭐ **Why this is an ELEMENT-ABSENCE bug, structurally different from #61's own gate**: `dragRenderTruth.js`
+(t2461)/the mutation manifest (t2463) both assert a handle's REAL rendered position is faithful to a drag —
+they assume the handle EXISTS to measure. A sizer that never renders at all has no rect to read; this needs a
+DIFFERENT, smaller primitive — a declared manifest of "which affordances THIS panel type should render" plus a
+presence check per entry (BACKLOG #61's own L2, sized but not built).
+
+⛔ **Not investigated further this turn** (t2463's own scope: manifest + gate only, no L2 primitives, no
+product code unless a mutation exposes a live defect — this one was never mutated, since no fix commit exists
+to derive a mutation FROM, and inventing a synthetic "the sizer element is removed" mutation without first
+confirming the CURRENT sizer mechanism and selector would be guessing, not measuring).
+
+**STILL REAL IF**: open the Blocks tab's Wizard View pane on a real device (per the owner's own two reports,
+this may be a mobile/touch-specific reproduction, not a desktop one — neither hypothesis this was checked
+against was device-specific) and look for the bottom drag-resize handle. If it's present, this entry may be
+resolved incidentally by unrelated work since t2423 — re-verify against THAT hypothesis specifically (what
+changed) rather than closing it on "can't find it now." If it's genuinely absent, the STILL REAL IF is exactly
+that: reproduce it live, note the device/viewport/browser, and only then does a mutation for it become
+buildable.
