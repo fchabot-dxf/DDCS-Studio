@@ -66811,3 +66811,68 @@ this turn's own work (this turn touched test infra and BACKLOG/WORK-LOG only, ze
 REWRITTEN disk-cleanliness check did NOT false-positive this run — the exact failure mode it was rewritten to
 retire did not recur. `git status --porcelain`: confirmed clean of every source file the manifests name.
 
+## t2473 — BACKLOG #64/#65: are they ONE root? DIAGNOSED with direct, decisive evidence — YES — but NOT fixed,
+a deliberate confidence/risk judgment for a subtle bug in the most-shared preview-render file in the codebase
+
+### THE DIAGNOSIS PATH, in the order it actually happened (including a dead end, not smoothed over)
+
+**First**: repeated rotaryClock's own original drag 5 ways (2 repeats of the original dx40/dy25, pure X, pure
+Y, a bigger diagonal), mirroring t2471's own alignment protocol. Result: the original snap-back reproduces
+IDENTICALLY twice (44.7→12.3 both times — deterministic, not a flake), the bigger diagonal ALSO snaps (80→
+22.3), but **pure X and pure Y show ZERO snap-back** (`movedMid===movedAfter` in both) — a genuinely DIFFERENT
+pattern from alignment, which snapped in every direction t2471 tried. This was a real moment where the "one
+root" hypothesis looked shaky — different ops, different trigger conditions.
+
+**Then, the decisive test**: the code's OWN comment at `userOpView.js:330-335` states an explicit contract —
+*"HANDLES ARE INDEPENDENT: dragging [marker A] must NOT carry the dependent [marker B]... B's ABSOLUTE
+position stays PUT."* If that contract is what's actually broken (rather than two coincidentally-similar
+snap-backs), dragging ONLY A should leave B's own screen position UNCHANGED. Measured directly, for both ops:
+**B moved 24.6px for rotaryClock, 62.7px for alignment, when only A was dragged.** The documented invariant is
+violated, live, reproducibly, for BOTH ops, via the SAME code (`writeSimStartFrac`'s `dj`/`writeSpan`
+recompute — the ONLY place in the codebase that implements a `relSpanFrom`-dependent marker pair). **This is
+what elevates the finding from "two ops that look similar" to "one confirmed shared root."**
+
+**Frame-by-frame instrumentation** (reading the `span` DOM field + both markers' screen positions at each
+mouse-move step, single-frame drags, not the full multi-step gesture): the `span` value jumps in a way that
+doesn't track the raw pointer delta cleanly across two similar-sized steps (20→36.8→46.0), and A's own final
+RELEASE position measurably differs from its LAST live mid-drag position even though the mouse never moved
+between the last drag frame and the release event. Consistent with — but not conclusively pinned to — the SAME
+general bug class BACKLOG #46/t2447 already fixed once (a deferred-commit render landing against a position
+the live drag never actually showed), recurring in a SEPARATE code path this session's own `_suppressFitOnCommit`
+fix (scoped to `featureCanvas.js`'s generic `onDragEnd`) never touched.
+
+### WHY NOT FIXED — stated plainly, not glossed over as "ran out of time"
+
+`userOpView.js` is the shared preview host for every wizard with a preview pane. The exact mechanism producing
+the release-time divergence (most likely a fraction↔world round-trip through `opSimStarts` diverging from the
+live drag's direct clamped-world display) was NOT isolated to one line this turn — WHERE the bug lives and
+WHAT it does are both confidently established; PRECISELY WHY is not. Shipping a fix at that confidence level,
+to that file, is exactly the kind of rushed patch this session's own standing discipline (and this arc's own
+recent instances — t2469's own vh/dvh "no fix without full confidence," t2467's "stopped here, per the
+dispatch's own escape clause") argues against. Named as a deliberate judgment call, not a default outcome —
+the advisor can weigh it differently with fresh budget.
+
+### THE RE-SWEEP — required once one root confirmed, trivially COMPLETE
+
+`grep -rln "simStartParams\s*=" web/blocks/dataOps/*.js` returns EXACTLY `alignmentData.js` and
+`rotaryClockData.js` — no other op in the entire codebase declares a `relSpanFrom`-dependent marker pair.
+The blast radius of THIS SPECIFIC defect is bounded to exactly the two ops already found; there is nothing
+else to re-sweep, confirmed by grep rather than assumed from "these are the only two BACKLOG mentions."
+
+### Tier
+
+No product code touched — diagnosis and BACKLOG updates only (`BACKLOG.md` #64/#65 headers + full diagnosis
+sections). `git status` confirms no source file this turn's own investigation touched.
+
+### VERIFY (both halves of this turn)
+
+Root established by direct measurement (the B-moves-when-A-drags test), one-vs-two stated explicitly: ONE.
+Not fixed (confidence/risk call, explained above) — so #64/#65's own `STILL REAL IF` recipes were NOT re-run
+as a before/after pair (nothing changed to re-verify against). `test:changed`: 0 tests (expected — doc-only
+turn, no test/product files touched). `test:node`: 238/238 passed. Full suite `--workers=4`, BEFORE
+concluding: **3019 passed, 1 failed, 9 flaky, 26 skipped.** The one failure is the SAME pre-existing
+`sf-pos-snapback` load-contention timeout documented since t2465, reconfirmed again here — unrelated to this
+turn (zero product code touched, pure diagnosis + BACKLOG/WORK-LOG). The rewritten disk-cleanliness check
+(t2471) did NOT false-positive — confirmed quiet, as expected (this turn touches none of the manifest's own
+guarded files at all). `git status --porcelain`: confirmed clean of every source file the manifests name.
+

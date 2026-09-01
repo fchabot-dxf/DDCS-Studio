@@ -5650,7 +5650,8 @@ common to both, which is not an actionable shared cause. See #57 for the same co
 
 ---
 
-### 64. `rotaryClock`'s `__simstart0` marker SNAPS BACK on release — a real drag-render-truth defect, found by
+### 64. [t2473 — ROOT DIAGNOSED, ONE SHARED root with #65, NOT FIXED — confidence/risk judgment call, see below]
+`rotaryClock`'s `__simstart0` marker SNAPS BACK on release — a real drag-render-truth defect, found by
 L4 (BACKLOG #61), REPORT ONLY, not fixed
 
 *(filed t2471, per L4's own explicit "report, don't fix, each becomes its own turn" scope — see BACKLOG #61's
@@ -5668,13 +5669,64 @@ representative handle per op, not exhaustive per-defect archaeology); the single
 what it is; a future turn confirming this should re-run before assuming it's stable across drag direction, the
 way alignment's own entry (#65) was confirmed.
 
+### ⭐⭐⭐ t2473 — ROOT DIAGNOSIS: reproduced across 5 vectors (deterministic, not flaky), and CONFIRMED SHARED
+with #65 via a decisive, direct test. Not fixed — a confidence/risk call, explained plainly
+
+**OBSERVED, 5 trials, fully reproduced**: `repeat-orig`/`repeat-orig2` (dx40,dy25) both IDENTICAL — 44.7→12.3
+(deterministic, not a flake). `pureX` (dx60,dy0) and `pureY` (dx0,dy60): **NO snap-back at all**
+(`movedMid===movedAfter` in both). `bigger` (dx90,dy60): 80→22.3, a real snap-back, same diagonal shape as the
+original. ⇒ **Diagonal drags snap back; pure-axis drags don't** — unlike #65 (below), which snaps in every
+direction tested.
+
+**OBSERVED, the decisive test — does dragging A (`__simstart0`) also move B (`__simstart1`)?** It should NOT:
+`writeSimStartFrac`'s own code comment (`userOpView.js:330-335`) states explicitly *"HANDLES ARE INDEPENDENT:
+...dragging THIS one (A) must NOT carry the dependent (B)... B's ABSOLUTE position stays PUT."* **Measured: B
+moved 24.6px when only A was dragged** — the documented invariant is violated, live, reproducibly. THE SAME
+test against `alignment` (#65) shows B moving 62.7px under the identical circumstance — **the identical
+contract violation, in the identical code path** (`writeSimStartFrac`'s `dj`/`writeSpan` recompute block,
+`userOpView.js:330-335`, the ONLY code in the entire codebase that implements a `relSpanFrom`-dependent marker
+pair). ⇒ **ONE SHARED ROOT, confirmed by direct behavioral evidence, not merely by resemblance.**
+
+**INFERRED, not yet pinned to one line**: frame-by-frame instrumentation (reading the `span` form field + both
+markers' screen positions at each mouse-move step, mid-drag) shows the `span` value jumping in ways that don't
+track the raw pointer delta cleanly (20 → 36.8 → 46.0 across two modest, similar-sized steps), and A's own
+final RELEASE position lands measurably different from its last LIVE mid-drag position even though the mouse
+never moved between the last drag frame and release. This is consistent with — but not conclusively isolated
+to — the SAME general bug class BACKLOG #46/t2447 already fixed once (a deferred-commit render landing against
+a position the live drag never showed), recurring here in a SEPARATE code path (`userOpView.js`'s own
+`simStartParams` marker mechanism) that t2447's own fix (`_suppressFitOnCommit`, scoped to
+`featureCanvas.js`'s generic `onDragEnd`) never covered. The EXACT mechanism producing the release-time
+divergence — most likely a fraction↔world round-trip through `opSimStarts` that doesn't match the live drag's
+direct clamped-world display — was not isolated to a single line this turn.
+
+⛔ **NOT FIXED — a deliberate confidence/risk judgment, stated plainly rather than glossed over.**
+`userOpView.js` is the shared preview host for every wizard with a preview pane — an extremely high blast
+radius. A narrow fix to a subtle release-vs-live-drag render mismatch needs the EXACT mechanism pinned first;
+this turn's own evidence establishes WHERE the bug lives (confidently: `writeSimStartFrac`'s dependent-marker
+recompute) and WHAT it does (confidently: violates its own documented independence contract) but not yet
+PRECISELY WHY (the exact stale/round-trip step). Shipping a fix at this confidence level, to this file, risked
+being exactly the kind of rushed patch this session's own standing discipline warns against. Recommended next
+step, concrete: instrument `starts[dj]` and the fraction-store (`_simStartFracs`) directly across drag frames
+(not just the DOM-visible `span` field, which this turn's own instrumentation already used) to catch the exact
+frame where the divergence is introduced.
+
+**RE-SWEEP, per the dispatch's own task 3 (required once one root was confirmed) — trivially COMPLETE, not
+skipped**: `grep -rln "simStartParams\s*=" web/blocks/dataOps/*.js` returns EXACTLY `alignmentData.js` and
+`rotaryClockData.js` — **no other op in the codebase declares a `relSpanFrom`-dependent marker pair.** The
+blast radius of this SPECIFIC defect is therefore bounded to exactly these two ops; there is nothing else to
+re-sweep. (Other ops use `simStartsProvider` for sim-only, non-declared markers — corner/edge/homing/etc. —
+those never route through `writeSimStartFrac` at all, per the code's own comment: "Absent (corner/edge) → the
+existing single sim-only Start marker, unchanged.")
+
 **STILL REAL IF**: `dragHandleRenderTruth(page, '__simstart0', {dx:44,dy:0,...})` (or similar) against
 `user_rotary_clock_data`, booted per BACKLOG #61's own L4 recipe, shows `movedAfter` meaningfully less than
-`movedMid` again.
+`movedMid` again — AND, separately, the `__simstart1`/B-moves-when-A-drags test (§ above) is the sharper,
+root-confirming check: it should show `movedB` near 0, not 20+px, once/if this is ever fixed.
 
 ---
 
-### 65. `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle point regardless of drag
+### 65. [t2473 — SAME ROOT AS #64, see that entry's own diagnosis section — NOT FIXED, same confidence/risk
+call] `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle point regardless of drag
 direction or magnitude — a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed
 
 *(filed t2471, same L4 sweep as #64 — see BACKLOG #61's own L4 section.)*
@@ -5699,14 +5751,28 @@ ground) is itself informative — the clamp target may not be a simple screen-sp
 computed from the op's own two `simStartParams` bindings (`{x:'ax',y:'ay'}` then a `relSpanFrom` second
 marker) interacting in a way this turn did not fully characterize.
 
+### ⭐⭐⭐ t2473 — CONFIRMED SHARED ROOT with #64, see that entry's own full diagnosis (the "does dragging A also
+move B" test, the `simStartParams` grep bounding the blast radius to exactly these two ops, the confidence/
+risk reasoning for not fixing this turn)
+
+The decisive test run against THIS op specifically: dragging `__simstart0` (A) moved `__simstart1` (B) by
+**62.7px** — even larger than rotaryClock's own 24.6px — the identical documented-contract violation, in the
+identical code path (`writeSimStartFrac`, `userOpView.js:330-335`). This is what elevates #64/#65 from "two
+ops that happen to look similar" to "one root, confirmed by direct behavioral evidence": the SAME test, on the
+SAME shared mechanism, produces the SAME class of violation on both, at different magnitudes consistent with
+each op's own different declared parameters (`spanAxisFrom`/`signed` for alignment vs a fixed Y axis for
+rotaryClock). Not fixed this turn — see #64's own entry for the full reasoning.
+
 **STILL REAL IF**: repeating any of the five trials above against `user_alignment_data` still shows
 `movedAfter` clustering near a value independent of the drag's own `dx`/`dy` — the reproducibility, not any
-single number, is the claim.
+single number, is the claim. The sharper, root-confirming check: the B-moves-when-A-drags test should show
+`movedB` near 0, not 60+px, once/if this is ever fixed.
 
 ---
 
-### 66. `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL — a real, REPRODUCED drag-render-truth
-defect, found by L4, REPORT ONLY, not fixed. Different SHAPE from #64/#65 — non-responsive, not a snap-back
+### 66. `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL —
+a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed. Different SHAPE from
+#64/#65 — non-responsive, not a snap-back
 
 *(filed t2471, same L4 sweep — see BACKLOG #61's own L4 section. Also directly refutes that entry's own
 lathe-family "the gate can't drive it" prediction for the OTHER six lathe ops, which all responded correctly —
