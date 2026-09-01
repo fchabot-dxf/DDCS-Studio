@@ -66336,3 +66336,118 @@ node` 238/238.
 Files: `tests/support/previewMutations.js` (new), `tests/preview-mutation-manifest-2463.spec.js` (new),
 `BACKLOG.md` (#57 corrected, #61 extended, #62 new).
 
+## t2465 — ARC A / L2: THE PRESENCE PRIMITIVE. Plus: closed L1's one loose end (the sf_pos divergence settles
+in t2463's favour), confirmed BACKLOG #62's own selector/mechanism live and found a genuine THIRD reproduction
+(mobile-only, unreachable-via-scroll — neither of t2423's own two ruled-out hypotheses)
+
+### FIRST — collapsed the sf-pos-snapback special case, per its own now-stale instruction
+
+`preview-mutation-manifest-2463.spec.js:194-199` only LOGGED the mutated-phase result for `sf-pos-snapback`
+(t2463's own instruction: "report, don't pre-judge"). Collapsed to `expect(mutated.ok).toBe(false)`, identical
+to every other entry — one of four manifest entries was proving nothing on a CI run before this.
+
+**Isolated (`--workers=1`, alone): 5/5 clean** across this turn (1 more run added to t2463's own 4). **Under
+real load** (run alongside `commit-on-release-2429.spec.js` + `drag-render-truth-gate-2461.spec.js` + 4 canvas
+spec files, `--workers=4`, 24 tests total) — run TWICE, once standalone and once as part of the turn's own full
+938-file suite: **flaked both times**, and both flakes were the SAME shape — `Test timeout of 60000ms exceeded`
+at `page.mouse.up()` (the WHOLE TEST/gesture ran out of time under heavy contention), never a wrong
+measurement. Both times the retry that followed completed and showed the EXACT SAME numbers as every isolated
+run (`moved 38.6px... snap back from mid-drag (180.3px)`, byte-identical down to the decimal, twice). **The
+reproduction itself has never once produced a different VALUE across 7 total completions (5 isolated + 2
+under-load retries) — only, under heavy contention, occasionally a slower one that exceeds the test's own
+budget.** This settles the question the dispatch itself framed precisely:
+*"if the reproduction is genuinely scheduling-sensitive, the tightened assertion will flake under load and
+that is the finding."* It did flake once under load — but as a TIMEOUT (a resource-budget artifact matching
+this session's own well-documented worker-oversubscription pattern), never as a DIFFERENT measured outcome.
+**The t2461-vs-t2463 divergence closes in t2463's favour**: the manifest's repeatable, deterministic RED is the
+trustworthy answer; t2461's own single disk-revert run was the outlier, for reasons that remain unexplained
+but are no longer load-bearing on anything (the manifest is now what future turns should trust, not that one
+run).
+
+### MAIN — the presence primitive
+
+`dragRenderTruth.js`/the manifest's first 4 entries all assume a handle EXISTS to measure a position ON — an
+affordance that never renders has no rect to read (BACKLOG #62's own correct analysis). Built the smaller,
+structurally separate primitive:
+
+`tests/support/affordancePresence.js` (new) — `checkAffordancesPresent(page, {containerSelector, selectors})`,
+mirroring `dragRenderTruth.js`'s own shape (`page.evaluate` + a self-contained reader function, same convention
+`drawingCheck.js` established). Returns `{ok, missing, containerFound}` — a presence check, no position math at
+all.
+
+**The property L1 earned, kept, in a DIFFERENT shape than L1's own** — L1's risk was a stale FIND STRING (the
+mutation matches zero times, checked by asserting exactly-once). That check doesn't transfer directly here:
+under a presence check, "not found" is the CORRECT, expected answer during the RED phase — an always-absent
+selector and a correctly-mutated one look identical from that angle alone. The real risk is a selector that
+NEVER matches, even on a clean render — a rotted/wrong declaration, not a caught defect, and it would silently
+report "still red" forever. `checkAffordancesPresent` **THROWS** if the declared `containerSelector` itself
+never rendered at all (the whole render surface never came up — a boot failure or a stale declaration, louder
+and different than one missing affordance within it). Verified directly: pointed it at a selector that matches
+nothing and confirmed it throws (not `{ok:false}`) — the scratch test proving this was deleted before commit,
+not part of the diff.
+
+**Prove it by breaking it** — seeded as a NEW 5th entry in L1's OWN manifest (`previewMutations.js`), per the
+dispatch's own explicit instruction, not a second parallel manifest+runner: `pocket-size-handle-presence`.
+Mutation target CONFIRMED LIVE first (per "declare only against affordances you can confirm live" — the mill
+family's own handles were already proven rendering by both prior turns): `pocketData.js`'s own
+`pocketPreviewGeometry` pushes TWO handles for `shape:'rect'` (the seed this manifest already uses) — `pk_pos`
+(always) and `pk_size` (this branch). Mutates the `pk_size` push into a no-op — a genuine element-ABSENCE
+mutation, structurally distinct from every geometry mutation already in the manifest (nothing about WHERE a
+handle renders, only WHETHER one does). The runner's `PROBES` dispatch now keys off `entry.kind` first
+(`'presence'` vs the L1 default), since `'pocket'` is now shared by BOTH a drag entry and a presence entry —
+`op` alone could no longer pick the right probe.
+
+**Result, first run, no debugging needed this time** (unlike L1's own two live-caught runner bugs):
+MUTATED → `ok=false missing=[".fc-handle[data-hid=\"pk_size\"]"]` (pk_pos correctly still found, only pk_size
+gone). CLEAN → `ok=true missing=[]`. RED-then-GREEN, exactly as required.
+
+### BACKLOG #62 — confirmed the selector/mechanism live (not seeded blind, per the dispatch's own explicit
+instruction), and found a genuine THIRD reproduction along the way
+
+Mechanism: `web/ui/paneAccordion.js:340-348`, `addVisualSizer(split)` — appends `.viz-pane-splitter.viz-pane-
+sizer` as the LAST child of `.viz-split` inside `.wiz-visual`. Selector: `.viz-pane-sizer`.
+
+**Desktop (1800×900, corner op): renders correctly in both pane states** — narrow/stacked (349×6px) and widened
+past 860px/two-pane (574×6px), both visible with real dimensions. Re-confirms t2423's own "both hypotheses
+ruled out" finding directly, not just trusted.
+
+**Mobile (390×844, SAME op): a genuine, different reproduction — neither of t2423's own two hypotheses.** The
+element exists (`.viz-pane-sizer`, 1 match) with real dimensions (360×6px — rules out "zero-size" again) and IS
+technically a DOM descendant of `#blk-formpane` (confirmed via `Node.contains()`, the actual scroll container:
+`overflow-y:auto`, `scrollHeight:1390` vs `clientHeight:472`, a genuine overflow). But it renders at
+`top:1408px` on an 844px-tall viewport, and **scrolling `#blk-formpane` to its own true maximum
+(`scrollTop:918 = scrollHeight − clientHeight`) only moves the sizer's `top` from 1408px to 1354px** — a 54px
+shift, nowhere near enough to bring a 6px element into view. **The sizer is not effectively reachable by
+scrolling at all on this viewport/op combination**, despite technically living inside the page's own
+designated scroll surface. Root cause NOT diagnosed (out of this turn's scope — measurement, not a fix); a
+plausible lead named in the entry itself (`--viz-stack-h`'s own `@container`-scoped height budget interacting
+with a long form's own stacked-layout `order` rules) for whoever picks up the actual fix.
+
+Not seeded into the manifest this turn — a reproduction now exists (unlike t2463's own state), but the actual
+MUTATION would need to reproduce a layout INTERACTION (form length × viewport × stacked mode), a materially
+larger, different shape of mutation than L2's own single-element-removal acceptance seed. Named as the concrete
+next step.
+
+### VERIFY
+
+1. Tightened `sf-pos` assertion: isolated 5/5, under load 1 flake (a TIMEOUT, not a wrong value, retry
+   completed with identical numbers) — both reported above, neither pre-judged.
+2. Presence primitive: RED-then-GREEN on the seeded entry, first run.
+3. Full suite (`workers=4`, rule 1b's own ORDER — run before concluding): **3008 passed, 1 failed, 13 flaky, 26
+   skipped, 32m24s.** Checked the failed-COUNT, not just the tail. The 1 failure: `preview-mutation-manifest-
+   2463.spec.js [sf-pos-snapback]` — the SAME test-timeout-under-contention shape already characterized above
+   (item 1), not a new or different problem — re-ran once more to capture its own exact error this time:
+   `Test timeout of 60000ms exceeded` at `page.mouse.up()`, retry completed with byte-identical numbers to
+   every prior run. Not a regression, not a real flake in the reproduction itself — a resource-budget artifact
+   under 4-worker contention, matching this session's own well-documented pattern (t2441/t2443).
+4. `git status --porcelain`: confirmed clean of every source file BOTH manifests name — `pocketData.js` itself
+   was never touched (the mutation is entirely in-flight); only test-infrastructure files and `BACKLOG.md`
+   appear in `git status`.
+
+Tier: `test:changed` caught exactly the 6 affected tests (no source file changed at all this turn — the
+`pocketData.js` "mutation" never reaches disk — so there is no dynamic-import blind spot to broaden past this
+time; confirmed via `git status`, not assumed). `test:node` 238/238.
+
+Files: `tests/support/affordancePresence.js` (new), `tests/support/previewMutations.js` (extended, new 5th
+entry + sf-pos status updated), `tests/preview-mutation-manifest-2463.spec.js` (tightened assertion, presence
+dispatch), `BACKLOG.md` (#62 extended with the live confirmation + third reproduction).

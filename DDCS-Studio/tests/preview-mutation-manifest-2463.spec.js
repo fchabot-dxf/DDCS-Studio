@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { dragHandleRenderTruth, assertDragRenderFaithful } from './support/dragRenderTruth.js';
+import { checkAffordancesPresent } from './support/affordancePresence.js';
 import { PREVIEW_MUTATIONS } from './support/previewMutations.js';
 
 /**
@@ -167,12 +168,29 @@ async function probePaneSizing(page) {
     return { ok: r.flexDirection === 'row', detail: `paneWidth=${r.paneWidth.toFixed(0)} flexDirection=${r.flexDirection}`, r };
 }
 
-const PROBES = {
+/** t2465 (BACKLOG #61 / L2) — the presence probe: boot the op, then check the declared affordance selectors
+ *  under `entry.affordance` via the reusable `checkAffordancesPresent` primitive. Structurally distinct from
+ *  `probeDrag` above: no drag, no position math — only "does the DOM node exist at all." */
+async function probePresence(page, entry) {
+    await bootPocketRect(page);
+    return checkAffordancesPresent(page, entry.affordance);
+}
+
+const DRAG_PROBES = {
     pocket: (page, seed) => probeDrag(page, bootPocketRect, 'pk_size', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
     surfacing: (page, seed) => probeDrag(page, bootSurfacing, 'sf_pos', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
     'tool-picker-popup': (page) => probeFlyoutPosition(page),
     'wizard-view-pane': (page) => probePaneSizing(page),
 };
+
+/** Dispatches on `entry.kind` FIRST (defaulting to the L1 drag/position shape when absent — every existing
+ *  entry stays byte-behavior-identical), then `entry.op` for the specific boot/probe — 'pocket' is now shared
+ *  by a drag entry (pk-size-snapback) AND a presence entry (pocket-size-handle-presence), so `op` alone can no
+ *  longer pick the right probe. */
+function probeFor(entry) {
+    if (entry.kind === 'presence') return (page) => probePresence(page, entry);
+    return (page, seed) => DRAG_PROBES[entry.op](page, seed);
+}
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -180,23 +198,24 @@ for (const entry of PREVIEW_MUTATIONS) {
     test(`t2463 manifest [${entry.id}]: RED under the mutation, GREEN once removed — ${entry.defect}`, async ({ page }) => {
         // ── phase 1: mutated — the gate must go RED ──────────────────────────────────────────────────
         await applyMutations(page, entry.files);
-        const probe = PROBES[entry.op];
+        const probe = probeFor(entry);
         const mutated = await probe(page, entry.seed);
-        console.log(`[t2463 ${entry.id}] MUTATED: ok=${mutated.ok} ${mutated.detail || ''}`);
+        console.log(`[t2463 ${entry.id}] MUTATED: ok=${mutated.ok} ${mutated.detail || (mutated.missing ? `missing=${JSON.stringify(mutated.missing)}` : '')}`);
 
         // ── phase 2: clean — the gate must go GREEN, same page context, route removed ────────────────
         await page.unrouteAll({ behavior: 'ignoreErrors' });
         const clean = await probe(page, entry.seed);
-        console.log(`[t2463 ${entry.id}] CLEAN:   ok=${clean.ok} ${clean.detail || ''}`);
+        console.log(`[t2463 ${entry.id}] CLEAN:   ok=${clean.ok} ${clean.detail || (clean.missing ? `missing=${JSON.stringify(clean.missing)}` : '')}`);
 
         expect(clean.ok, `${entry.id}: the gate must be GREEN once the mutation is removed (a mutation that stays red after removal is broken, not a caught defect)`).toBe(true);
 
-        if (entry.id === 'sf-pos-snapback') {
-            // t2463's own real question — do NOT assert a predetermined answer; REPORT which it was.
-            console.log(`[t2463 sf-pos-snapback] RESULT: ${mutated.ok ? 'did NOT reproduce under mutation (matches t2461\'s own finding)' : 'DID reproduce — differs from t2461\'s disk-revert result'}`);
-        } else {
-            expect(mutated.ok, `${entry.id}: the gate must go RED under the mutation (${mutated.detail || 'no detail'})`).toBe(false);
-        }
+        // t2465 — the sf-pos-snapback special case (t2463's own "report, don't pre-judge" instruction) is
+        // now STALE: the answer arrived (RED, 3/3 at t2463, 4/4 isolated at t2465's own re-check below) and
+        // nothing was asserting it — one of four manifest entries proved nothing on a CI run, and t2463's own
+        // central finding wasn't locked in by anything. Collapsed to the same assertion every other entry
+        // uses; if the reproduction really is scheduling-sensitive, THIS is what will flake under load, and
+        // that flake is itself the finding — not pre-judged either way.
+        expect(mutated.ok, `${entry.id}: the gate must go RED under the mutation (${mutated.detail || (mutated.missing ? `missing=${JSON.stringify(mutated.missing)}` : 'no detail')})`).toBe(false);
     });
 }
 

@@ -108,6 +108,23 @@ const SYNTHETIC_FLYOUT_CORNER = {
     replace: `    const x = 0, y = 0;`,
 };
 
+// ── Entry 5 — t2465 (BACKLOG #61 / L2, THE PRESENCE PRIMITIVE's own acceptance seed). `dragRenderTruth.js`/the
+// manifest's first 4 entries all assume a handle EXISTS to measure a position on — this proves the SEPARATE,
+// smaller claim: does a declared affordance render AT ALL. CONFIRMED LIVE before declaring anything (per the
+// dispatch's own explicit instruction — a declaration written from a guess is worse than none): pocket's own
+// `pocketPreviewGeometry` (web/blocks/dataOps/pocketData.js) pushes TWO handles for shape:'rect' (the default
+// seed this manifest already uses) — `pk_pos` (always) and `pk_size` (this branch specifically). Mutates the
+// `pk_size` push into a no-op, so the resize affordance silently stops rendering while `pk_pos` stays — a
+// genuine element-ABSENCE mutation, structurally distinct from every geometry mutation above (nothing here
+// touches WHERE a handle renders, only WHETHER one does at all). NOT a seed for BACKLOG #62 itself (the
+// missing-pane-sizer report) — that defect has no confirmed-live selector/mechanism to mutate from; this is a
+// different, independently-confirmed affordance chosen specifically because #62 could not be seeded blind. ──
+const T2465_POCKET_SIZE_HANDLE_REMOVED = {
+    path: '/blocks/dataOps/pocketData.js',
+    find: `        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });`,
+    replace: `        /* t2465 mutation: pk_size intentionally not pushed */`,
+};
+
 export const PREVIEW_MUTATIONS = [
     {
         id: 'pk-size-snapback',
@@ -123,7 +140,7 @@ export const PREVIEW_MUTATIONS = [
         files: T2447_FILES,
         op: 'surfacing',
         seed: { type: 'surfacing', dx: -150, dy: 100, steps: 12, settleMs: 500 },
-        proven: 'UNRESOLVED at t2461 — this turn\'s real question, see WORK-LOG for the answer',
+        proven: 'RESOLVED at t2465: reproduces RED deterministically (3/3 at t2463, 4/4 isolated + 1/1 under contention at t2465) — the t2461-vs-t2463 divergence closes in t2463\'s favour, see WORK-LOG t2465',
     },
     {
         id: 'flyout-corner-synthetic',
@@ -139,5 +156,15 @@ export const PREVIEW_MUTATIONS = [
         files: [T2423_STYLES_CONTAINMENT, T2423_STYLES_UNWRAP],
         op: 'wizard-view-pane',
         proven: 'a real revert seed, isolated from the bundled commit\'s unrelated #52/#59 work',
+    },
+    {
+        id: 'pocket-size-handle-presence',
+        kind: 'presence',
+        defect: 'the L2 acceptance seed — pocket\'s pk_size (resize) handle silently stops rendering while pk_pos stays; a PRESENCE claim, not a position one — no historical fix commit, a confirmed-live affordance chosen specifically because BACKLOG #62 could not be seeded blind',
+        files: [T2465_POCKET_SIZE_HANDLE_REMOVED],
+        op: 'pocket',
+        seed: { type: 'pocket', shape: 'rect' },
+        affordance: { containerSelector: 'svg.feature-canvas', selectors: ['.fc-handle[data-hid="pk_pos"]', '.fc-handle[data-hid="pk_size"]'] },
+        proven: 'the presence primitive\'s own acceptance test — proves L2 by breaking it, exactly as L1 required',
     },
 ];

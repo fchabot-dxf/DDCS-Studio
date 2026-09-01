@@ -5150,9 +5150,10 @@ heading still claiming "open" for the whole thing is the same trap this entry it
 ---
 
 ### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`); ⭐⭐ GATE PROVES ITSELF t2463
-(`tests/support/previewMutations.js` — the mutation manifest, L1) — declarations/ports/lathe geometry/L2/L3
-still NOT started, deliberately] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED" IS STALE — RE-MEASURED, PLUS
-A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
+(`tests/support/previewMutations.js` — the mutation manifest, L1); ⭐⭐⭐ L2 SHIPPED t2465
+(`tests/support/affordancePresence.js` — the presence primitive) — declarations/ports/lathe geometry/L3 still
+NOT started, deliberately] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED" IS STALE — RE-MEASURED, PLUS A
+GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
 
 *(owner ask, via the advisor: does wizards-as-data work fully — emit AND form AND previews? Emit/form measured
 t2457 (BACKLOG #60). This is the third leg. Full account + the 32-op per-fact table: WORK-LOG t2459.)*
@@ -5248,6 +5249,34 @@ but its OWN first hypothesis corrected against the actual error (see #57's own e
 applied; BACKLOG #62 filed for the missing-pane-sizer defect (previously living only in this entry's own prose,
 per rule 8's own premise about facts buried in another entry's body).
 
+### ⭐⭐⭐ L2 SHIPPED — t2465 (THE PRESENCE PRIMITIVE)
+
+FIRST, closed L1's one loose end: `sf-pos-snapback`'s special-case (only logging, never asserting the mutated
+phase) collapsed to the same `expect(mutated.ok).toBe(false)` every other entry uses. Re-run isolated (5/5
+clean) and TWICE under real 4-worker contention (both times the ONLY failure mode was a whole-test timeout at
+`page.mouse.up()`, never a different measured value — retries both completed with byte-identical numbers to
+every other run). **The t2461-vs-t2463 divergence closes in t2463's favour**: the reproduction is genuinely
+deterministic; contention causes timeouts, not measurement variance.
+
+MAIN: `tests/support/affordancePresence.js` (new) — `checkAffordancesPresent(page, {containerSelector,
+selectors})`, mirroring `dragRenderTruth.js`'s own shape. Structurally separate from the geometry gate: no
+position math, only "does the declared DOM node exist at all." Keeps L1's own "a declaration that can't match
+must throw" property, in the shape that actually fits presence checks (a container that never renders throws —
+a stale declaration or boot failure — since "not found" is the EXPECTED, correct RED-phase answer and can't
+itself be the throw condition the way L1's exactly-once find-string check was). Seeded into L1's OWN manifest
+(not a second parallel one) as a 5th entry, `pocket-size-handle-presence`: mutates `pocketData.js`'s own
+`pocketPreviewGeometry` to silently drop the `pk_size` handle push while `pk_pos` stays — a confirmed-live
+affordance (per the dispatch's own explicit instruction not to declare from a guess), chosen specifically
+because BACKLOG #62 could not be seeded blind. RED-then-GREEN on the first run, no debugging needed.
+
+Also this turn: confirmed BACKLOG #62's own selector/mechanism live (`.viz-pane-sizer`,
+`paneAccordion.js:340-348`) — re-confirmed correct on desktop in both pane states, and found a genuine THIRD
+reproduction on mobile (390×844, corner op): the element exists with real dimensions and is technically a
+descendant of the page's own scroll container, yet is NOT reachable even at that container's own maximum
+scroll — a different hypothesis than either of t2423's own two ruled-out ones (selector miss, zero-size), root
+cause not diagnosed (measurement only, per this turn's own scope). BACKLOG #63 filed (separate commit, per
+rule 4) for `undo-blind-writes-2427.spec.js`'s own solo flake — same class as #57, distinct from #56.
+
 ### ⭐ RECOMMENDATION: START THE ARC, gate-first, exactly per ROADMAP's own ordering — do not refuse it
 
 The evidence against refusing is concrete: the arc's hardest precondition (a cheap, buildable preview-
@@ -5268,8 +5297,9 @@ re-verify before acting on this entry's own conclusion — rule 8b applies to th
 
 ---
 
-### 62. THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES MISSING — reported twice, never reproduced, no fix
-landed, no test exists, no BACKLOG entry of its own until now
+### 62. [⭐ REPRODUCED LIVE t2465 — mobile viewport specifically, a THIRD hypothesis (unreachable via scroll,
+not selector-miss/zero-size); root cause NOT diagnosed, no fix] THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES
+MISSING — reported twice, never reproduced (until now), no fix landed, no test exists
 
 *(filed t2463, per that turn's own explicit instruction: this defect has been living inside BACKLOG #61's own
 prose — one of the owner's "5 real defects this week" cited when ARC A's gate was scoped — and, separately,
@@ -5308,3 +5338,43 @@ resolved incidentally by unrelated work since t2423 — re-verify against THAT h
 changed) rather than closing it on "can't find it now." If it's genuinely absent, the STILL REAL IF is exactly
 that: reproduce it live, note the device/viewport/browser, and only then does a mutation for it become
 buildable.
+
+### ⭐⭐ t2465 — THE SELECTOR/MECHANISM CONFIRMED LIVE, AND A THIRD, GENUINE REPRODUCTION FOUND (not t2423's own
+two ruled-out hypotheses) — measurement only, per this turn's own explicit instruction not to seed a mutation
+blind
+
+**The mechanism, confirmed by reading the source and checking live**: `web/ui/paneAccordion.js:340-348`,
+`addVisualSizer(split)` — appends one `div.viz-pane-splitter.viz-pane-sizer` as the LAST child of `.viz-split`
+(itself inside `.wiz-visual`), called for every `.wiz-visual .viz-split` found under the panel root
+(`paneAccordion.js:745`). Selector: `.viz-pane-sizer` (scoped under `#blk_wiz_user` for the Blocks-tab Wizard
+View specifically).
+
+**DESKTOP (1800×900, corner op): renders correctly in BOTH pane states.** Default (narrow, stacked) pane:
+1 sizer, real dimensions (349×6px), visible. Pane widened past 860px (the two-pane desktop layout, BACKLOG
+#58's own condition): still 1 sizer, still real dimensions (574×6px), still visible. Matches t2423's own
+"both hypotheses ruled out" finding — confirmed again, not just trusted.
+
+**MOBILE (390×844, SAME corner op): the element exists with real dimensions, but is NOT REACHABLE — a genuine,
+different reproduction.** `.viz-pane-sizer` is present (360×6px, non-zero — rules out t2423's own "zero-size"
+hypothesis again) and IS technically a DOM descendant of `#blk-formpane` (`.wiz-body` → `.wiz-2pane` →
+`.wiz-visual` → `.viz-split` → the sizer — confirmed via `Node.contains()`, not assumed from the selector
+alone). But it renders at `top: 1408px` while the viewport is only 844px tall. **Scrolling `#blk-formpane`
+(confirmed to genuinely have `overflow-y:auto` and a real overflow, `scrollHeight:1390` vs `clientHeight:472`)
+to its own maximum scroll position (`scrollTop:918`, the true cap — `scrollHeight − clientHeight`) only moves
+the sizer's `top` from 1408px to 1354px** — a 54px shift, nowhere near enough to bring a 6px-tall element into
+an 844px viewport. **The sizer is not effectively reachable by scrolling on this viewport/op combination at
+all**, despite technically living inside the one container that IS the page's own designated scroll surface.
+
+⇒ **This is a THIRD hypothesis, not either of t2423's own two** (not a selector miss — the element resolves
+correctly; not zero-size — it has real, drawable dimensions). The shape is closer to "the element renders
+outside the effective scrollable range of its own scroll container" — root cause NOT diagnosed (out of this
+turn's own explicit scope: measurement only, report don't fix) — a plausible direction for whoever picks this
+up: `.wiz-visual`'s own height budget (`--viz-stack-h`, `calc()` rules in `styles.css`'s `@container` block)
+interacting with a LONG form (corner's own 23 fields) under the STACKED (mobile) layout's `order` rules in a
+way that doesn't compose the way the desktop two-pane layout does — a real, worthwhile lead, not a diagnosis.
+
+⛔ **Still not seeded into the mutation manifest this turn** — a REPRODUCTION is now confirmed (unlike t2463's
+own state), but building the actual FIX is a separate turn's job, and a presence-primitive mutation for THIS
+specific defect would need to reproduce the LAYOUT interaction (form length × viewport × stacked mode), not
+just hide an element — a materially different, larger mutation than L2's own acceptance seed. Named as the
+concrete next step, not attempted here.
