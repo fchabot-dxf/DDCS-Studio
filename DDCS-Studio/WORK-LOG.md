@@ -66600,3 +66600,53 @@ files touched). `test:node`: 238/238 passed.
 Files: `BACKLOG.md` (#57 cross-linked, #62 corrected, #63 cross-linked), `verification/t2467-1-drawer-closed-
 default-state.png` (new), `verification/t2467-2-drawer-open-sizer-reachable.png` (new).
 
+## t2469 (SMALL ITEM, own commit per rule 4) — BACKLOG #60: `facing`/`centerDrill` equivalence tests shipped —
+and `facing` turned out NOT as straightforward as the entry's own header claimed, corrected rather than forced
+
+`tests/centerdrill-data-emit.spec.js` (new) — FUNCTIONALLY byte-identical (`stripAnnotations`) across a 7-entry
+sweep + cross-dialect (21 combos, 0 diffs). ONE precisely-named cosmetic frontier: `kind:'straight'` writes a
+more specific `postInstantiate` note than the reference's generic comment — same `#162=0` register value,
+comment text only differs; asserted to diverge on EXACTLY those two sweep entries, nowhere else.
+
+`tests/facing-data-emit.spec.js` (new) — investigating this one surfaced a REAL frontier BACKLOG #60's own
+"no design call needed" framing had missed: `doc`/`feed` ARE byte-identical (7-entry sweep + cross-dialect,
+clean), but `allowance` and `finish` are NOT, for two different reasons. `allowance` is a bound register
+(`#111`) but the SAME value also drives two Z heights (`G0 X#113 Z<n>` clearance-approach, the final `G0 Z<n>`
+retract) computed via plain JS math ONCE at template-freeze time from `FACING_DEFAULTS.allowance` — the
+register updates live, those two literals never recompute. `finish` is entirely unbound, always the default.
+(`xStart` diverges too, but confirmed separately as BY DESIGN — the twin binds it independently while
+`facingStack` computes it live from unbound `barDiameter`/`clearance` — not conflated with the other two.)
+Isolated precisely via a live param-by-param sweep (`allowanceOnly`/`finishOnly`/`docOnly`/`feedOnly` run
+independently) before writing anything, rather than guessing which param caused the first diff. All three
+asserted as STILL-OPEN/BY-DESIGN frontiers (`expect(...).toBe(false)`), mirroring drill's own solved/still-open
+language — regression tripwires, not silently swept under the sweep's own scope. Not fixed (a real
+`postInstantiate` addition, mirroring `centerDrillData.js`'s own `applyStraightPeck` shape, is a code change
+out of scope for "write the test").
+
+Tier: `tests/facing-data-emit.spec.js` + `tests/centerdrill-data-emit.spec.js` (4 tests total, all passing) +
+`BACKLOG.md` #60 update. No product code touched for this half.
+
+### VERIFY (both halves of this turn)
+
+Claim (t2469 main item, §1 of the dispatch) settled by direct measurement, OBSERVED throughout — see above.
+Screenshot captured. Desktop re-confirmed live at both pane states. `test:changed`: 6/6 passed. `test:node`:
+238/238 passed. Full suite `--workers=4`, BEFORE concluding: **3012 passed, 2 failed, 14 flaky, 26 skipped.**
+Both failures explained, neither a regression from this turn's own product-code change (`styles.css`):
+
+1. `preview-mutation-manifest-2463.spec.js › [sf-pos-snapback]` — the SAME pre-existing load-contention timeout
+   documented at t2465/t2467 (5th+ occurrence this session), unrelated file, zero product code touched by this
+   turn's OWN prior turn (t2467) when it also reproduced under load.
+2. `preview-mutation-manifest-2463.spec.js › no mutation ever reached disk` — a FALSE POSITIVE this turn caused
+   directly, understood precisely: that check greps `git status --porcelain` for the literal substring
+   `web/styles.css` (one of L1's own mutation targets, from the `T2423_STYLES_CONTAINMENT`/`_UNWRAP` entries)
+   and fails if present AT ALL — it cannot distinguish "a leaked in-flight mutation" from "unrelated, real,
+   intentional uncommitted work in the same file." This turn's OWN `dvh` fix (lines 6770-6777, nowhere near
+   T2423's own targets at 6771/@container) was sitting uncommitted in `styles.css` while the suite ran,
+   confirmed directly (`git status --porcelain | grep styles.css` → `M ... styles.css`, at the exact moment of
+   the failure). Self-resolves the moment this turn's own change is committed — not a defect in the check's own
+   design (its real job, "did a mutation leak," is legitimate), and not touched here per this turn's own scope
+   (a docs/test turn does not un-ask-edit an unrelated safety check).
+
+`git status --porcelain`: confirmed clean of every source file this turn's own manifests/tests name beyond
+what's listed in each half's own Files line.
+

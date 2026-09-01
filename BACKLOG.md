@@ -5159,6 +5159,35 @@ odTurnData.js` still returns ≥1 with a live-param call (odTurn still tautologi
 entry shipped — re-check per-part, do not treat the whole entry as one unit (rule 8b: a partial ship with a
 heading still claiming "open" for the whole thing is the same trap this entry itself was filed to stop).
 
+### ⭐⭐ t2469 — `facing`/`centerDrill` TESTS SHIPPED, item 2 of the two-part gap — but `facing` was NOT as
+straightforward as this entry's own header claimed, corrected here rather than mechanically ported
+
+`tests/centerdrill-data-emit.spec.js` (new) — `centerDrillDataDef` is genuinely FUNCTIONALLY byte-identical to
+`centerDrillStack` across a 7-entry sweep (`stripAnnotations`), plus cross-dialect (7 dialects × 3 reps, 0
+diffs). ONE precisely-named cosmetic frontier: `kind:'straight'` writes a more specific `postInstantiate` note
+than the reference's generic one — same `#162=0`, different comment text only; the raw (non-stripped) sweep is
+asserted to diverge on EXACTLY those two entries and nowhere else, not "mostly passes."
+
+`tests/facing-data-emit.spec.js` (new) — **found a genuine, previously-unknown functional frontier writing
+this test, not assumed from this entry's own "no design call needed" framing**: `facingStack` is byte-identical
+to the twin across `doc`/`feed` (7-entry sweep + cross-dialect, clean), but `allowance` and `finish` do NOT
+converge, for two different reasons — `allowance` IS a bound register (`#111`) but the SAME value ALSO drives
+two Z heights (`G0 X#113 Z<n>`, the final `G0 Z<n>` retract) computed via plain JS math ONCE at template-freeze
+time, using `FACING_DEFAULTS.allowance` — the register updates live, those two Z literals never recompute;
+`finish` is not bound at all, always the default. (`xStart` diverges too, but BY DESIGN, confirmed separately:
+the twin binds it as an independent field while `facingStack` computes it live from unbound `barDiameter`/
+`clearance` — not the same shape as the other two, not conflated with them.) All three are asserted as
+STILL-OPEN/BY-DESIGN frontiers (mirroring drill's own solved/still-open language) — regression tripwires that
+flip to passing if a future `postInstantiate` (mirroring `centerDrillData.js`'s own `applyStraightPeck` shape)
+recomputes the two baked Z heights live. **Not built this turn** — a real code change (new `postInstantiate`
+logic), out of scope for "write the test," and this session's own standing rule against a test claiming more
+than what was proven. Full account: WORK-LOG t2469.
+
+**STILL REAL IF**: `grep -c postInstantiate web/blocks/dataOps/facingData.js` still returns 0 (the frontier is
+still unfixed) — if it returns ≥1, re-run `facing-data-emit.spec.js`'s own `allowanceFrontierPass`/
+`finishFrontierPass` assertions FIRST (they're written to expect `false`; a fix would need them flipped to
+`true`, not the whole entry re-litigated from scratch).
+
 ---
 
 ### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`); ⭐⭐ GATE PROVES ITSELF t2463
