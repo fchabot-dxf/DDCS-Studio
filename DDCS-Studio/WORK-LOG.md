@@ -66114,3 +66114,87 @@ touched.
 
 Files: `BACKLOG.md`, this entry.
 
+## t2461 — ARC A "PREVIEW AS DATA" STARTS: THE GATE, built first, exactly per the roadmap's own condition and
+t2459's own recommendation — GATE ONLY, no declarations, no ports, no lathe geometry
+
+Built `tests/support/dragRenderTruth.js` — a reusable harness generalizing `web/debug/featProbe.js`'s own
+pattern (already proven in anger, ad-hoc, inside `commit-on-release-2429.spec.js`) into a shared module any
+preview spec can import, mirroring `blocks/dataOps/equivalence.js`'s own shape: a small module, a clear
+contract, `page.evaluate`-with-a-self-contained-function for the real DOM read (same convention
+`drawingCheck.js` already established). Scoped to EXACTLY the "3/5" gate shape t2459 sized — a drag handle's
+REAL rendered position (`getBoundingClientRect()`) must track the pointer during the drag and must not snap
+back post-release — and no further, per the dispatch's own explicit instruction.
+
+### The harness, three exports
+
+- `handleScreenPos(page, hid)` — a handle's real screen-space center, keyed by its stable `data-hid` (re-queried
+  every call, never cached — `featProbe.js`'s own reasoning: a cached reference goes stale the instant
+  `render()` replaces the DOM node it points at).
+- `dragHandleRenderTruth(page, hid, {dx,dy,steps,frameDelayMs,settleMs})` — drives a REAL `page.mouse` drag
+  (not a programmatic field write) and samples `{before, mid, after}` real positions.
+- `assertDragRenderFaithful({before,mid,after}, {minTrackedPx,maxSnapbackPx,label})` — the gate assertion
+  itself: `movedMid > minTrackedPx` (catches "the drag not following the finger") and
+  `movedAfter > movedMid - maxSnapbackPx` (catches "the value reverting on release") — the exact tolerance
+  shape (`movedAfter > movedMid - 5`) `commit-on-release-2429.spec.js`'s own t2447 test already proved correct,
+  lifted verbatim rather than re-derived.
+
+### What this does NOT cover — named in the module's own header, not left implicit
+
+- **The missing pane sizer** — an element-ABSENCE bug. This harness assumes the element exists to measure; it
+  needs a different, smaller primitive (a declared affordance-manifest + presence check) — sized, not built.
+- **Pane sizing from the window instead of itself** — a container-query-vs-viewport-query CSS bug on a pane's
+  OWN dimensions, not a handle's position. Needs a dimension assertion under a resized-host harness — arguably
+  not preview-specific at all. Sized, not built.
+- **The flyout landing in a corner** — philosophically the same "assert real rendered geometry" family, but
+  mechanically a STATIC position-relative-to-trigger claim (no drag involved), not this primitive. **Not
+  acceptance-tested this turn**: I could not locate a specific fix commit for it to genuinely revert-and-prove
+  against (the acceptance-test discipline below refuses to claim coverage it hasn't shown red on) — named as a
+  real gap in THIS harness's own scope, not silently folded into "3/5 done."
+
+### THE ACCEPTANCE TEST — retrospective, per the dispatch's own explicit demand: "a gate that has never failed
+on a real defect is not proven — it is asserted"
+
+New spec `tests/drag-render-truth-gate-2461.spec.js` proves the harness on TWO ops `commit-on-release-2429.
+spec.js` doesn't already cover in this exact shape — surfacing's `sf_pos` (a move-kind handle, t2447's own
+original screenshot subject) and pocket's `pk_size` (a resize-kind handle) — plus a fails-closed check
+(`handleScreenPos` on a nonexistent handle returns `null`, not a stale/zero rect that would silently pass).
+
+**The retrospective half — reverted t2447's own fix, ran this NEW harness against the broken code, then
+restored:**
+1. Confirmed GREEN at HEAD (fixed code): 3/3 passed.
+2. `git checkout ab59b869~1 -- web/viz/canvasWidgets.js web/viz/featureCanvas.js web/wizards/ops/panelTypes.js`
+   — the three files t2447's own fix touched, reverted to their pre-fix state (scratch-backed: the fixed
+   versions were copied to the session scratchpad first).
+3. Re-ran the acceptance spec against the reverted code. **RED, deterministically, identically across all 3
+   attempts** (Playwright's own `retries:2`): `pocket pk_size: post-release position (moved 40.0px from start)
+   must not snap back from mid-drag (47.2px) — "the value reverting on release"` — the EXACT snap-back symptom
+   t2447's own bug report describes, caught by the NEW generic harness, not the old spec's own inline code.
+   **Reported honestly, not oversold**: the `sf_pos` test did NOT reproduce with this test's specific drag
+   parameters (12 steps, dx:-150/dy:100) — a real, named limit of this ONE run (a different delta/geometry
+   combination might trigger the same auto-refit race for that handle; this pass simply didn't hit it), not
+   silently smoothed into "both reproduced."
+4. Restored the three files from the scratch backup; confirmed `git diff` against HEAD is **empty** (byte-
+   identical restore, no broken code ever reached a commit).
+5. Re-ran the acceptance spec against the restored code: **GREEN again, 3/3.**
+
+This is the harness's own non-vacuity proof, matching this project's established discipline
+(`drawingCheck.js`'s own "blank the canvas, watch it fail" precedent) — not asserted, shown.
+
+### Tier
+
+New test-infrastructure files only (`tests/support/dragRenderTruth.js`, `tests/drag-render-truth-gate-2461.
+spec.js`) — no source touched (the revert-and-restore cycle left `web/viz/canvasWidgets.js`/`featureCanvas.js`/
+`wizards/ops/panelTypes.js` byte-identical to HEAD, confirmed via `git diff` before committing anything).
+`test:changed` caught exactly the 3 new tests (nothing else imports the brand-new harness module yet, so there
+is no dynamic-import blind spot to broaden past for THIS module specifically) + `test:node` 238/238. Broadened
+manually anyway, per the dispatch's own instruction and this session's own now-four-times-bitten discipline:
+ran the full canvas/drag-related surface (62 spec files matching `.fc-handle`/`featureCanvas`, 176 tests, 4
+workers): **172 passed, 4 failed, 0 flaky.** Investigated the 4 rather than assuming them unrelated: set the
+two new files ASIDE entirely (moved out of `tests/`, confirmed via `git status` they were gone) and re-ran
+exactly those 4 files at lower parallelism (2 workers) — **all 4 passed**, identically, with my files absent.
+This is this session's own already-diagnosed worker-oversubscription flake class (t2441/t2443, earlier this
+same session) — 4-worker contention on a 176-test batch, not anything the new harness touched. Restored the two
+new files immediately after.
+
+Files: `tests/support/dragRenderTruth.js` (new), `tests/drag-render-truth-gate-2461.spec.js` (new).
+

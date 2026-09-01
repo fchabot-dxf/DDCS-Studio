@@ -5132,8 +5132,9 @@ heading still claiming "open" for the whole thing is the same trap this entry it
 
 ---
 
-### 61. [MEASURED t2459, NOT SHIPPED — reading/research only] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED"
-IS STALE — RE-MEASURED, PLUS A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
+### 61. [MEASURED t2459; ⭐ GATE SHIPPED t2461 (`tests/support/dragRenderTruth.js`) — declarations/ports/lathe
+geometry still NOT started, deliberately] THE PREVIEW LEG: ROADMAP.md'S OWN "0/32 DECLARED" IS STALE —
+RE-MEASURED, PLUS A GATE-FEASIBILITY VERDICT: BUILDABLE, RECOMMEND STARTING THE ARC
 
 *(owner ask, via the advisor: does wizards-as-data work fully — emit AND form AND previews? Emit/form measured
 t2457 (BACKLOG #60). This is the third leg. Full account + the 32-op per-fact table: WORK-LOG t2459.)*
@@ -5170,12 +5171,33 @@ is green today.** A generic `previewEquivalence(op, params)` harness — mirrori
 OWN declared/computed geometry source, which ~30/32 twins already have.
 
 **Worked against the 5 owner-found defects this week (the dispatch's own concrete design test):**
-- CAUGHT by this ONE gate shape: drag-not-following-the-finger, value-reverting-on-release, flyout-landing-in-
-  a-corner — all three are rendered-position-vs-declaration claims, and the pattern is already proven.
+- CAUGHT by this ONE gate shape, PROVEN: drag-not-following-the-finger, value-reverting-on-release — both
+  rendered-position-vs-declaration claims, both acceptance-tested at t2461 (see below).
+- Philosophically the same family but NOT acceptance-tested (no fix commit located to genuinely revert-and-
+  prove against): flyout-landing-in-a-corner — mechanically a STATIC position-relative-to-trigger claim, no
+  drag gesture — named as a real, un-proven edge of the gate's own scope, not silently folded into "caught."
 - NOT CAUGHT — needs a DIFFERENT, smaller primitive: the missing pane sizer (an ELEMENT-ABSENCE bug — needs a
   declared affordance-manifest + presence check, not a position diff) and the pane sizing from the window
   instead of itself (a container-query-vs-viewport-query CSS bug — needs a dimension assertion under a resized-
   host harness; arguably not preview-specific at all, a general responsive-layout hazard).
+
+### ⭐ GATE SHIPPED — t2461
+
+`tests/support/dragRenderTruth.js` (new, reusable — `handleScreenPos`/`dragHandleRenderTruth`/
+`assertDragRenderFaithful`) generalizes `commit-on-release-2429.spec.js`'s own ad-hoc measurement code into a
+harness any preview spec can import, mirroring `emitEquivalence`'s own shape. Acceptance-tested per the
+dispatch's own demand ("a gate that has never failed on a real defect is not proven"): t2447's own fix
+(`web/viz/canvasWidgets.js`/`featureCanvas.js`/`wizards/ops/panelTypes.js`, commit `ab59b869`) was reverted
+(scratch-backed), the new harness run against the broken code — **RED, deterministically** on pocket's
+`pk_size` handle, the exact snap-back symptom t2447's bug report describes — then the files restored
+byte-identical to HEAD before anything was committed. `sf_pos` did NOT reproduce with that specific run's drag
+parameters — named honestly as this ONE acceptance run's own limit, not glossed over. Full account: WORK-LOG
+t2461.
+
+**Deliberately NOT done this turn** (per the dispatch's own explicit scope): no declarations, no ports, no
+lathe-family geometry migration, no build of the other two (smaller) primitives named above. Those are the
+arc's next turns, in the order t2459/t2461 both name: declare → port lathe → build the presence/manifest and
+container-sizing primitives separately.
 
 ### ⭐ RECOMMENDATION: START THE ARC, gate-first, exactly per ROADMAP's own ordering — do not refuse it
 
