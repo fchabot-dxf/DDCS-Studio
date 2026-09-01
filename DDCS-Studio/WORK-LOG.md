@@ -66468,3 +66468,52 @@ Tier: doc-only (`BACKLOG.md`) — nothing to gate.
 
 Files: `BACKLOG.md` (#63 new).
 
+## t2467 (SMALL ITEM, own commit per rule 4) — BACKLOG #57 and #63: characterized, not fixed — no shared root
+found
+
+Per the dispatch's own 15-minute-characterization scope (not a third flake investigation): checked what each
+test's own failing wait is ACTUALLY waiting ON, and whether the two share an underlying mechanism.
+
+**#63's own wait** (`page.goto('/'); await page.waitForFunction(() => window.ddcsStudio && window.showApp)`)
+depends on TWO INDEPENDENT ASYNC MODULE LOADS racing to both complete: `window.ddcsStudio` is set by `app.js`'s
+own `finishBoot()` (fired on `DOMContentLoaded`, also dispatches `ddcs:interactive`); `window.showApp` is set
+by a SEPARATE module, `ui/gatewayStatus.js:239` — grepped directly, not assumed. **#57's own wait**
+(`waitX(page,5)` after `clickUndo(page)`) depends on an entirely different subsystem: the Blockly-event-driven
+undo/reproject pipeline (`saveStates.js`'s own snapshot/restore, `blocksApp.js`'s own change-listener
+reprojection) — reached only WELL AFTER boot already completed successfully in that same test (the test's own
+`bootBlocks()` step passes before the Undo step is ever reached).
+
+⇒ **No shared SPECIFIC code path found** — module-load racing (a boot-time concern) and Blockly-event
+reprojection (a well-into-the-test, post-boot concern) are mechanically unrelated, and #57's own failure occurs
+in a test phase that already proved boot succeeded. **A refuted link, recorded as such rather than left
+unexamined**: the only plausible COMMON FACTOR is generic — "this machine occasionally schedules SOME async
+work slower than expected, regardless of which subsystem" — which is not itself a diagnosable root cause and
+would not be actionable even if confirmed. Cross-linked in both entries; neither's own `STILL REAL IF` changed
+(both remain independently real, per each entry's own prior evidence).
+
+Not fixed, not investigated further, per the dispatch's own explicit scope.
+
+### VERIFY (both halves of this turn)
+
+Full suite (`workers=4`, rule 1b's own ORDER — run before concluding), TWO runs: **3008 passed, 1 failed, 13
+flaky, 26 skipped** both times, same test both times —
+`preview-mutation-manifest-2463.spec.js › t2463 manifest [sf-pos-snapback]`. Re-ran per "an actually-green run,
+not an argued one" rather than assuming flake; also ran the same test isolated (`--workers=1`, alone): **1
+passed, 0 failed.** This is NOT a new finding — it reconfirms, a third and fourth time, the exact failure
+shape t2465's own entry already documented and closed ("twice under 4-worker contention, both times the ONLY
+failure mode was a whole-test timeout at `page.mouse.up()`, never a different measured value... contention
+causes timeouts, not measurement variance"). `git status --porcelain` at the time of both runs: zero
+product/test files touched by this turn (confirmed below) — this failure predates and is unrelated to t2467's
+own work, a pre-existing load-contention timeout in an unrelated spec. Did not attempt a third 32-minute run
+chasing a single-digit-percent timing artifact already characterized twice before; the isolated-clean result
+plus two consistent full-suite counts is the stronger evidence a third identical run would not add.
+`git status --porcelain`: confirmed clean of every source file the mutation manifest names — no product code
+was touched this entire turn (both halves ended in "no fix," a genuinely unusual but honest outcome).
+
+Tier: doc-only for both halves (`BACKLOG.md` #57/#62/#63 cross-links and corrections) plus two new
+`verification/*.png` screenshots — no test/product code changed. `test:changed`: 0 tests (expected — no test
+files touched). `test:node`: 238/238 passed.
+
+Files: `BACKLOG.md` (#57 cross-linked, #62 corrected, #63 cross-linked), `verification/t2467-1-drawer-closed-
+default-state.png` (new), `verification/t2467-2-drawer-open-sizer-reachable.png` (new).
+

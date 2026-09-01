@@ -5011,6 +5011,18 @@ tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `ge
 own re-check: still fails this way (3/4 solo runs) — the check itself still holds, only the FIRST hypothesis
 above needed correcting, not the entry's own open status.
 
+⚠ **t2467 (small item, characterization only, per that turn's own explicit "do not fix either" scope) — checked
+against #63 for a shared root, per #63's own "worth someone eventually asking" note. NO shared code path
+found; refuted, recorded rather than left open.** This test's own timeout fires at line 62, `waitX(page, 5)`
+called AFTER `clickUndo(page)` — reached only once boot has ALREADY succeeded earlier in the same test. #63's
+timeout fires at `page.goto('/')` → `waitForFunction(() => window.ddcsStudio && window.showApp)`, before
+anything else runs. `window.ddcsStudio` is set by `app.js`'s `finishBoot()` on `DOMContentLoaded`;
+`window.showApp` is set independently by `ui/gatewayStatus.js:239` — a separate module load, unrelated to the
+undo/reproject pipeline this test's own timeout sits inside. Two different waits, two different subsystems, no
+shared specific mechanism. The only plausible common factor is generic async-scheduling slowness under whatever
+load the machine happens to be under — not a specific shared bug, and not actionable as a merge target. Cross-
+linked from #63.
+
 ---
 
 ### 58. [✅ SHIPPED t2423 — container-query gate, same 860px figure, asked of the pane instead of the window] THE WIZARD VIEW PANE SIZES ITSELF FROM THE WINDOW, NOT FROM ITSELF
@@ -5417,3 +5429,12 @@ run in either failing case — the boot never completed).
 running — on a turn that touches none of `programModel.js`'s save-state batching or `blocksApp.js`'s own boot
 sequence. Cross-link BACKLOG #57 — if a shared root cause is ever found, merge the two rather than duplicating
 the fix.
+
+⚠ **t2467 (small item, characterization only) — the "worth someone eventually asking" question above, asked.
+NO shared root found; refuted.** This test's own timeout is at `page.goto('/')` →
+`waitForFunction(window.ddcsStudio && window.showApp)`, before anything else runs — `window.ddcsStudio` from
+`app.js`'s `finishBoot()`, `window.showApp` from the separate `ui/gatewayStatus.js:239` module load. #57's
+timeout is downstream, at a `waitX` AFTER `clickUndo`, reached only once boot already succeeded — a different
+wait on a different subsystem (the undo/reproject pipeline), not the boot-readiness pipeline this entry's own
+failure sits in. Different mechanisms; only a generic "async scheduling can be slow under load" factor is
+common to both, which is not an actionable shared cause. See #57 for the same conclusion recorded there.
