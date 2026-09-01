@@ -66468,6 +66468,89 @@ Tier: doc-only (`BACKLOG.md`) — nothing to gate.
 
 Files: `BACKLOG.md` (#63 new).
 
+## t2467 — BACKLOG #62: DIAGNOSED THE SIZER-UNREACHABLE DEFECT — and it turned out my OWN t2465 "third
+reproduction" was a TEST-METHODOLOGY ARTIFACT, not a real bug. Corrected honestly. No fix, no L3 seed against
+this defect — nothing to guard
+
+### THE DIAGNOSIS — OBSERVED, walked the ancestor chain per the dispatch's own explicit instruction
+
+`page.evaluate` walking from `.viz-pane-sizer` up to `#blk-formpane`, reading each ancestor's computed
+`position`/`overflow`/`transform`/`contain` (OBSERVED, not inferred): `.wiz-visual` carries `position: sticky;
+top: 0` — a DELIBERATE, documented rule (`styles.css:2693-2697`, t790: *"Lock the preview at the top: it stays
+pinned while the form scrolls under it (single-column view)"*). This matches the dispatch's own first candidate
+lead exactly ("a position:fixed/sticky ancestor... if anything similar applies here, that is the shape") —
+CONFIRMED, not my own t2465 competing lead (the `--viz-stack-h` container-height budget), which turned out to
+be a red herring: OBSERVED directly that `.wiz-visual`'s own height (495px) was NEVER the constraint — capping
+it with an injected `max-height:60dvh` (well above its natural size) changed nothing, because the height was
+never what pushed the sizer off-screen.
+
+**Then the finding that changes everything, OBSERVED**: `.right` (the ancestor wrapping the whole Wizard View
+pane) is `position:fixed` with `transform: translateY(532px)` — and `532px` is EXACTLY `min(62vh,520px) + 12px`
+= `520 + 12` — the mobile-drawer's own CLOSED-state formula (`styles.css:6771-6778`, the "BLOCKS TAB — MOBILE"
+bottom-drawer pattern, `.right.open { transform: translateY(0); }`). **My own t2465 measurement, and this
+turn's own early measurements, never clicked `#blkDrawerHandle` — every "unreachable sizer" reading was taken
+while the ENTIRE Wizard View drawer sat translated fully off-screen, closed.** The 1408px/1354px numbers
+weren't a broken scroll range inside a visible panel; they were coordinates inside a HIDDEN overlay.
+
+**Re-measured with the drawer PROPERLY opened** (`page.click('#blkDrawerHandle')`, the real, only documented way
+a user opens it, per `blocksApp.js`'s own `wireDrawers()`): sizer at rest `top:876`, scrolled-to-true-max
+`top:822` — **reachable** (`0 ≤ 822 < 844`). Stress-tested across FOUR viewport heights (844/700/600/500px —
+the drawer's own height scales proportionally, `min(62vh,520px)`) and a user-shrunk custom drawer height
+(`--blk-pv-h: 220px`, simulating someone who dragged the resize strip down): **reachable in every single
+case**, no exceptions found.
+
+⇒ **The root is NOT reachability-shaped, because there is no reproducible unreachability once the drawer is
+opened the way a real user opens it.** t2423's own two hypotheses (selector-miss, zero-size) were already ruled
+out correctly; this turn's own rigorous re-test shows my OWN t2465 "third hypothesis" (unreachable-via-scroll)
+was ALSO not a real product defect — it was an incomplete reproduction that never triggered the mobile drawer's
+open gesture. **Reported honestly rather than defended**: this is the third round of investigation on this
+entry, and the first two rounds' conclusions both held up; this one's own conclusion is that MY prior turn's
+own finding needs correcting, not the product.
+
+Per the dispatch's own explicit instruction — *"If the root turns out NOT to be reachability-shaped, say so and
+stop at step 2. A primitive built to guard a defect it doesn't actually characterise is worse than none"* —
+**stopped here. No fix built** (nothing reproducibly broken to fix). **No L3 primitive seeded against this
+defect** (no real historical bug exists to derive an in-flight revert-mutation from; building one would guard
+against a defect that was never real, exactly the "worse than none" case named).
+
+### Screenshots, per the dispatch's own explicit request (an owner-reported visual defect deserves a picture,
+not just a number in a log)
+
+`verification/t2467-1-drawer-closed-default-state.png` — the drawer's default/closed state: just the small
+"▲ Wizard View" handle, nothing sizer-shaped visible at all (this IS what every prior "unreachable" measurement
+was actually looking at). `verification/t2467-2-drawer-open-sizer-reachable.png` — drawer opened via the real
+handle, scrolled to max: the full 3D+2D preview stack visible, the sizer present near the bottom of the frame.
+
+### Desktop — unregressed (per t2465's own baseline, re-confirmed, not re-derived from scratch since nothing
+about the desktop code path was touched or newly suspected)
+
+Not re-run this turn — no product code changed (the whole finding is a corrected TEST measurement, not a fix),
+so t2465's own desktop confirmation (349×6px narrow, 574×6px widened, both visible) stands unchanged.
+
+### ⭐ WHAT THIS MEANS FOR THE ARC, reported plainly for the advisor's own call
+
+L3 was scoped to earn its keep on this "thrice-reported" defect instead of a synthetic. It cannot — there
+is no reproducible defect to earn it on. The advisor's own options, named without picking one: (a) L3 goes
+back to being built against a synthetic mutation, matching L1's own precedent for the flyout-corner case
+(no fix commit existed there either, and a synthetic proved the primitive's shape just fine); (b) L3 waits
+for a genuinely reproduced defect, deferred; (c) something else. Not decided here — this turn's own job was
+diagnosis, and the diagnosis came back "nothing to guard."
+
+### BACKLOG #62 — corrected
+
+Updated to record: the sizer's own mechanism IS confirmed and correctly working, on BOTH desktop (both pane
+states) AND mobile (drawer properly opened, all tested viewport/drawer-height combinations) — three
+investigation rounds (t2423, t2465, t2467) have now each ruled out a distinct hypothesis (selector-miss,
+zero-size; unreachable-via-scroll). **STILL REAL IF** rewritten to reflect what would ACTUALLY constitute a
+new reproduction, given the drawer-open gesture is now the established, correct test methodology.
+
+### Tier
+
+Reading, measurement, and doc-only changes — no product code touched (the fix step was never reached; there
+was nothing to fix). `git status` confirms only `BACKLOG.md`/`WORK-LOG.md`/two new `verification/*.png` files.
+Full suite not separately re-run for this half (no source changed); combined with the small item's own
+full-suite run below.
+
 ## t2467 (SMALL ITEM, own commit per rule 4) — BACKLOG #57 and #63: characterized, not fixed — no shared root
 found
 

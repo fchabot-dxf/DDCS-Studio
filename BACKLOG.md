@@ -5309,9 +5309,11 @@ re-verify before acting on this entry's own conclusion — rule 8b applies to th
 
 ---
 
-### 62. [⭐ REPRODUCED LIVE t2465 — mobile viewport specifically, a THIRD hypothesis (unreachable via scroll,
-not selector-miss/zero-size); root cause NOT diagnosed, no fix] THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES
-MISSING — reported twice, never reproduced (until now), no fix landed, no test exists
+### 62. [✅ RESOLVED t2467 — three investigation rounds (t2423/t2465/t2467), THREE hypotheses each ruled out
+(selector-miss, zero-size, unreachable-via-scroll); the sizer's own mechanism is confirmed WORKING correctly
+on both desktop AND mobile — t2465's own "third reproduction" was a TEST-METHODOLOGY ARTIFACT (the mobile
+drawer was never opened), corrected honestly] THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES MISSING — reported
+twice, three rounds of investigation, never a genuine reproduction that survived rigorous re-testing
 
 *(filed t2463, per that turn's own explicit instruction: this defect has been living inside BACKLOG #61's own
 prose — one of the owner's "5 real defects this week" cited when ARC A's gate was scoped — and, separately,
@@ -5390,6 +5392,47 @@ own state), but building the actual FIX is a separate turn's job, and a presence
 specific defect would need to reproduce the LAYOUT interaction (form length × viewport × stacked mode), not
 just hide an element — a materially different, larger mutation than L2's own acceptance seed. Named as the
 concrete next step, not attempted here.
+
+### ⭐⭐⭐ t2467 — CORRECTED: the "third reproduction" above was a TEST-METHODOLOGY ARTIFACT, not a real defect.
+Diagnosed per the dispatch's own explicit ancestor-chain-walk instruction; the finding overturns t2465's own
+conclusion, reported honestly rather than defended
+
+**OBSERVED**: walked the ancestor chain from `.viz-pane-sizer` to `#blk-formpane`, reading computed
+`position`/`overflow`/`transform`/`contain` at every level. `.wiz-visual` carries `position:sticky; top:0`
+(`styles.css:2693-2697`, deliberate, t790: *"Lock the preview at the top: it stays pinned while the form
+scrolls under it"*) — matching the dispatch's own first candidate lead exactly. `.right` (the ancestor wrapping
+the WHOLE Wizard View pane) carries `position:fixed; transform:translateY(532px)` — and `532px` is EXACTLY
+`min(62vh,520px)+12px`, the MOBILE BOTTOM-DRAWER's own CLOSED-state formula (`styles.css:6771-6778`,
+`.right.open { transform:translateY(0) }`). **Every prior measurement of this defect — t2465's own included —
+never clicked `#blkDrawerHandle`.** The 1408px/1354px readings were coordinates inside a CLOSED, translated-
+off-screen overlay, not a broken scroll range inside visible content.
+
+**Re-measured with the drawer properly opened** (a real click on `#blkDrawerHandle`, the only documented way a
+user opens it — `blocksApp.js`'s own `wireDrawers()`): sizer reachable, at rest AND at max scroll. Stress-
+tested across 4 viewport heights (844/700/600/500px) and a user-shrunk custom drawer height (`--blk-pv-h:
+220px`): **reachable in every case tested, no exceptions.**
+
+⇒ **The mechanism works correctly.** t2423's own two ruled-out hypotheses stand; t2465's own third hypothesis
+is now ALSO ruled out, for a different reason (incomplete test methodology, not a wrong code theory). Per the
+dispatch's own explicit instruction ("if the root turns out NOT to be reachability-shaped, say so and stop") —
+stopped here: **no fix built** (nothing reproducibly broken), **no L3 primitive seeded against this defect**
+(no real historical bug exists to build a guard from — a primitive guarding a defect that was never real would
+be worse than no primitive at all). Screenshots: `verification/t2467-1-drawer-closed-default-state.png` (what
+every prior measurement was actually looking at) / `verification/t2467-2-drawer-open-sizer-reachable.png` (the
+corrected, complete reproduction). Full account: WORK-LOG t2467.
+
+**Left for whoever revisits this entry**: since NO worker or advisor investigation across three rounds has
+produced a genuine, reproducible instance of "the sizer is missing," the two original owner reports (t2423's
+own "mid-turn amendment," and BACKLOG #61's own "5 real defects this week" citation) remain UNRECONCILED with
+any Playwright-reproducible mechanism. Possible explanations, named without picking one: the two reports are
+the same incident and the user simply hadn't opened the drawer either (a discoverability/UX question, not a
+bug); a genuine device-specific quirk (a real mobile browser's own viewport/`dvh` handling diverging from
+Playwright's emulation) that this testing environment cannot reproduce; or something not yet imagined. Not
+established — worth asking the owner directly rather than a fourth investigation round on the same evidence.
+
+**STILL REAL IF**: a NEW report describes the symptom AFTER confirming the mobile drawer was opened via
+`#blkDrawerHandle` (or its real-device equivalent) — that is the one condition none of the three rounds so far
+have actually tested against a genuine "opened, still unreachable" case.
 
 ---
 
