@@ -68185,3 +68185,92 @@ pre-fix code, specific to `partPos` only; passes on the fix). 101 existing tests
 11 flaky, 26 skipped.** The 1 failure is `preview-mutation-manifest-2463.spec.js` / `sf-pos-snapback` -- the
 same pre-existing flake this session has hit before (t2447's own `sf_pos` point/move-handle fix, unrelated to
 lathe/parting/featureCanvas paint order), not a regression from this turn's change. No other failures.
+
+## t2503 — BACKLOG #70 diagnosed: the `polyFlats` drag hang is CONFIRMED REAL (not a harness artifact), root
+still unpinned. Diagnose-only turn, no fix attempted, per the dispatch's own explicit scope
+
+Dispatched to answer ONE question: does BACKLOG #70's own `polyFlats` drag hang (first seen t2497, evidence
+gathered t2499 -- a frozen `featProbe` model value alongside an incrementing frame counter) reproduce with
+realistic pointer timing in a real browser, or is it an artifact of the harness's own fast synthetic
+`page.mouse.move` calls? The dispatch was explicit both ways are a complete answer; a guess is not.
+
+### METHOD -- three scratch diagnostics (`tests/_diag-2503-polyflats.spec.js`,
+`tests/_diag-2503-sweep-count.spec.js`, NOT committed, deleted before this turn's own commit)
+
+**DIAG B** -- the exact documented repro seed (`dragHandleRenderTruth`, `dx:0,dy:40,steps:8`, default pacing),
+run with a CONCURRENT `page.evaluate(() => performance.now())` polled every 250ms the whole time, each poll
+raced against a 1.5s cap. The drag itself completed in 37.2s this run (under the 60s ceiling -- confirming the
+hang is not perfectly deterministic, matching the original report's own character). For ~28 of those 37
+seconds the concurrent evaluate() calls alternated fast/**stuck-for-the-full-1.5s**, eight separate times:
+```
+t+1731ms  poll_took=1447ms result=ok(3951)
+t+3510ms  poll_took=1514ms result=EVAL-STUCK
+t+5263ms  poll_took=1502ms result=EVAL-STUCK
+t+7539ms  poll_took=1514ms result=EVAL-STUCK
+t+10335ms poll_took=1511ms result=EVAL-STUCK
+t+16357ms poll_took=1514ms result=EVAL-STUCK
+t+20380ms poll_took=1510ms result=EVAL-STUCK
+t+22158ms poll_took=1512ms result=EVAL-STUCK
+```
+A plain `1+1`-class evaluate call has nothing to do with the drag mechanism itself -- it has no reason to ever
+take 1.5s unless the browser's own main thread is genuinely busy.
+
+**DIAG C, the decisive one** -- fully human-paced, HEADED browser (`--headed`, real Chromium window, not
+headless): 8 SEPARATE discrete `page.mouse.move` calls, no Playwright `{steps:2}` sub-interpolation at all,
+spaced 400ms apart (slower/coarser than a real human drag, not faster, and no synthetic burst of any kind).
+Result:
+```
+move 1/8 took=2327ms result=ok
+move 2/8 took=4044ms result=ok
+move 3/8 took=4120ms result=ok
+move 4/8 took=5011ms result=STUCK-5s   (hit our own 5s cap without resolving)
+move 5/8 took=5011ms result=STUCK-5s   (hit our own 5s cap again)
+  eval-probe (right after move 5) took=3008ms result=EVAL-STUCK-3s
+move 6/8 took=4032ms result=ok
+move 7/8 took=227ms  result=ok          -- back to normal, past the trouble region
+move 8/8 took=263ms  result=ok
+```
+This is the test that most directly answers the dispatch's own question, and it is decisive: realistic pacing,
+in a real (headed, not headless) browser, still produces multi-second main-thread stalls, including on an
+UNRELATED concurrent evaluate() call. This rules OUT "the harness fires events too fast" as the explanation.
+
+**DIAG A** (an earlier, cruder check, dx:0/dy:40 with no `frameDelayMs` waits) additionally corrected an
+assumption from the original t2497 filing: on this seed `acrossFlats` moves in the DECREASING direction
+(15.1 -> 13.3 -> 11.4 -> 9.6 -> 7.7 -> 5.8...), i.e. the trouble region is `polyFlats` heading toward small/
+near-zero values, not (only) the "corner touches the bar" ceiling the original report's own working theory
+named.
+
+### VERDICT: CONFIRMED REAL, not a harness artifact
+
+Per the dispatch's own instruction for this outcome: this is a UI freeze in a shipping wizard and becomes its
+own fix turn -- NOT attempted this turn. BACKLOG #70's own heading retagged accordingly (rule 8).
+
+### One strong candidate mechanism checked directly and RULED OUT (not left as an unverified guess)
+
+`polygonData.js`'s own `rebuildPolygon` regenerates the WHOLE block stack via `polygonStack`/`polygonSweeps` on
+every Studio-side param change (its own doc comment says exactly this), and `polygonSweeps`'s own roughing-sweep
+count grows as `acrossFlats` shrinks -- the SAME direction the hang occurs in, and a plausible-looking
+synchronous-cost story. Measured directly in-page across `acrossFlats` 15 -> 0.001 (default `doc:1`): sweep
+count plateaus at 11, block count at 868, every call completes in under 1ms (`tests/_diag-2503-sweep-count.spec.js`
+output, see BACKLOG #70's own t2503 entry for the full table). NOT the bottleneck -- ruled out by measurement,
+not by inspection, however tempting the doc comment made it look.
+
+### STILL OPEN
+
+The mechanism itself remains unpinned. Best lead still the original `featProbe` evidence (frozen model value +
+incrementing frame counter, i.e. `requestAnimationFrame` keeps firing while the displayed value stops moving),
+now narrowed by elimination: not #66's own static occlusion (ruled out t2499), not `polygonStack`/
+`polygonSweeps` regeneration (ruled out this turn). Next candidate named in BACKLOG #70 for whoever picks this
+up: `featureCanvas.js`'s own per-frame work for the polygon END VIEW specifically (the one op with two views on
+one canvas), and whether anything there re-triggers itself once a value stops changing instead of settling.
+
+### VERIFY
+
+Diagnose-only turn -- no product code touched, so no functional regression surface. Both scratch diagnostic
+spec files (`tests/_diag-2503-polyflats.spec.js`, `tests/_diag-2503-sweep-count.spec.js`) deleted before commit,
+per this session's own established "temp repro spec, delete before finishing" convention. `git status` clean of
+anything but the two doc files (`BACKLOG.md`, this file) touched this turn. Full suite `--workers=4` run anyway
+per the dispatch's own unconditional VERIFY instruction: **DONE in 35m34s -- 3027 passed, 1 failed, 13 flaky,
+26 skipped.** The 1 failure is the SAME pre-existing `sf-pos-snapback` flake as t2501's own run (exit code 1
+reflects that one known flake, not a regression -- this turn touched no product code at all). Not started:
+fixing #70 itself, or L6 -- both explicitly out of scope per the dispatch.

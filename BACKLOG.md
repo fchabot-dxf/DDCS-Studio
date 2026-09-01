@@ -6560,9 +6560,12 @@ still shows `movedMid`/`movedAfter` near zero despite the handle being on-screen
 
 ---
 
-### 70. `parting`'s `polyFlats` handle (polygon turning) hangs a real pointer-drag sequence when the drag pushes
-across-flats toward its own clamp boundary — a NEW finding, surfaced as a side effect of L5's own port, NOT
-caused by it (reproduces identically on the pre-port hand-written code too). REPORT ONLY, not fixed
+### 70. `polygon`'s `polyFlats` handle hangs a real pointer-drag sequence when the drag pushes across-flats toward
+a small value — a NEW finding, surfaced as a side effect of L5's own port, NOT caused by it (reproduces
+identically on the pre-port hand-written code too). t2503 — CONFIRMED REAL, not a harness artifact (measured,
+not guessed); mechanism still NOT pinned (`polygonStack`/`polygonSweeps` regeneration checked and RULED OUT as
+the cause). REPORT ONLY, still not fixed — this is now its own fix turn's own scope, per the dispatch that
+ordered this diagnosis
 
 *(filed t2497, discovered while gate-verifying `polygonProfileSpec`'s own port onto `canvasWidgets.js` —
 BACKLOG #61 / L5's last op. Explicitly the SAME class of allowance the dispatch itself sanctioned for #68/#69:
@@ -6630,3 +6633,65 @@ away one entire candidate family (hit-test occlusion) without narrowing toward a
 answer even though it is a "no" — it rules out the render-loop-via-occlusion family for this entry, which was
 the most concrete hypothesis on the table, and it means whoever picks this entry up next should look at the
 DRAG-TIME render/event path specifically, not at static handle geometry.
+
+### ⭐⭐⭐⭐⭐ t2503 — REAL vs HARNESS ARTIFACT: MEASURED, not guessed. **CONFIRMED REAL.** A genuine main-thread
+stall a real person would feel, not a Playwright/CDP quirk. Mechanism still NOT pinned; one strong candidate
+checked directly and RULED OUT
+
+Dispatched to answer exactly one question, deliberately bounded: does this hang reproduce with realistic pointer
+timing, and in a real (not just headless-synthetic) browser, the way an actual person dragging `polyFlats` to its
+clamp would experience it — or is it an artifact of the harness's own fast, densely-interpolated synthetic
+`page.mouse.move` calls? The two readings have very different consequences, so this turn diagnosed only,
+per its own explicit instruction — no fix attempted.
+
+**METHOD, three diagnostics, most decisive first (OBSERVED, all three, not inferred):**
+
+1. **The exact documented repro seed** (`dragHandleRenderTruth`, `dx:0, dy:40, steps:8`, default pacing) run
+   with a CONCURRENT `page.evaluate(() => performance.now())` polled every 250ms throughout, racing each poll
+   against a 1.5s timeout. Result: the drag itself took **37.2s** (under the 60s ceiling this run, so it did not
+   technically time out THIS time — confirming the hang is not perfectly deterministic, consistent with the
+   original report's own "reproduces, but not on literally every seed" character) — but for roughly **28 of
+   those 37 seconds**, the concurrent `evaluate()` calls alternated between fast and **stuck for the full 1.5s**
+   repeatedly, EIGHT separate times. A plain `1+1`-class evaluate call, with NOTHING to do with the drag
+   mechanism itself, has no reason to ever take 1.5s unless the browser's own main thread is genuinely busy.
+2. **Fully human-paced, headed-browser repro** (`--headed`, real Chromium window, not headless): 8 SEPARATE
+   discrete `page.mouse.move` calls (no Playwright `{steps:2}` sub-interpolation at all — one real move per
+   call), spaced **400ms apart** — slower and coarser than a real human drag, not faster. Result: individual
+   moves took **2.3s, 4.0s, 4.1s, ≥5.0s (timed out our own 5s cap), ≥5.0s (timed out again), 4.0s**, then
+   dropped back to 227ms/263ms once past the trouble region. A concurrent `evaluate()` probe fired right after
+   the worst move **also stalled for the full 3s cap**. This is the test that most directly answers the
+   dispatch's own question: **realistic pacing, in a real (headed) browser, still produces multi-second
+   main-thread stalls** — this categorically rules out "the harness fires events too fast" as the explanation.
+3. An earlier, less-paced check (dx:0, dy:40 without the documented `frameDelayMs` waits) showed the same
+   character — degraded/slow but not infinite this run — and confirmed `acrossFlats` moves in the DECREASING
+   direction on this exact seed (15.1 → 13.3 → 11.4 → 9.6 → 7.7 → 5.8...), correcting an assumption from the
+   original t2497 filing: the trouble region is `polyFlats` heading toward its own SMALL/near-zero values, not
+   (only) the "corner touches the bar" ceiling the original report's own working theory named.
+
+**VERDICT: CONFIRMED REAL**, on the evidence, not a harness artifact. A person performing this exact drag in a
+real browser would feel the tab freeze for several seconds at a time as they approach this region — visible
+jank/unresponsiveness, not merely a synthetic-input measurement quirk. Per the dispatch's own explicit
+instruction for this outcome: **this is a UI freeze in a shipping wizard and becomes its own fix turn** — not
+attempted here.
+
+**ONE STRONG CANDIDATE MECHANISM CHECKED DIRECTLY AND RULED OUT** (measured, not left as a guess for the next
+turn to re-derive): `polygonData.js`'s own `rebuildPolygon` regenerates the ENTIRE block stack from
+`polygonStack`/`polygonSweeps` on every Studio-side param change (its own doc comment: "every Studio-side
+parameter changes the whole sweep... rebuilds the program"), and `polygonSweeps`'s own roughing-sweep count
+grows as `acrossFlats` shrinks (more radial distance to walk off the bar in fixed `doc`-sized bites) — exactly
+the direction the hang occurs in, and a highly plausible-LOOKING synchronous-cost explanation. Measured directly
+in-page (`polygonSweeps`/`polygonStack` called across `acrossFlats` 15 → 0.001, default `doc:1`): sweep count
+plateaus at **11**, block count at **868**, and every single call completed in **under 1ms** — this is NOT the
+bottleneck, however tempting it looked from the doc comment alone. Ruled out by measurement, not by inspection.
+
+**STILL OPEN, for whoever takes the fix turn**: the actual mechanism remains unpinned. The original `featProbe`
+evidence (a frozen model value alongside an INCREMENTING frame counter, i.e. `requestAnimationFrame` keeps
+firing while the displayed value stops changing) is still the best lead, now narrowed by elimination: it is NOT
+static hit-test occlusion (#66's own mechanism — ruled out t2499), and it is NOT `polygonStack`/`polygonSweeps`
+regeneration cost (ruled out this turn). Worth checking next: whatever `featureCanvas.js`'s own live-preview
+pipeline does per drag-frame for the polygon END VIEW specifically (the two-view canvas this op alone draws),
+and whether anything there re-triggers itself once a value stops changing rather than settling.
+
+**STILL REAL IF**: the same three diagnostics above (documented seed + concurrent evaluate probe; slow
+discrete human-paced moves in a headed browser + concurrent evaluate probe) still show multi-second stalls on
+an UNRELATED `evaluate()` call while dragging `polyFlats` toward a small across-flats value.
