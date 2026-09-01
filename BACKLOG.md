@@ -5770,7 +5770,8 @@ single number, is the claim. The sharper, root-confirming check: the B-moves-whe
 
 ---
 
-### 66. `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL —
+### 66. [t2473 small item — partWidth/partFloor tested: BOTH RESPOND correctly (axis-constrained, no snap-back);
+the defect is `partPos`-SPECIFIC, not op-wide] `parting`'s `partPos` handle DOES NOT RESPOND to a drag AT ALL —
 a real, REPRODUCED drag-render-truth defect, found by L4, REPORT ONLY, not fixed. Different SHAPE from
 #64/#65 — non-responsive, not a snap-back
 
@@ -5789,9 +5790,26 @@ this is not a selector miss or an absence bug. **The handle exists, is hit-testa
 its own rendered position no matter which direction or how far it's dragged.**
 
 ⇒ **A different defect SHAPE from #64/#65** (which both track the pointer during the drag and only fail on
-release) — `partPos` never tracks at all, in any direction. `partWidth`/`partFloor` (the other two declared
-handles on this same op) were NOT tested this turn (L4's own scope: one representative handle per op) — worth
-checking whether the defect is specific to `partPos` or affects all three of `partingData.js`'s own handles.
+release) — `partPos` never tracks at all, in any direction.
+
+### ⭐⭐ t2473 (small item) — `partWidth`/`partFloor` tested across 5 directions each: BOTH RESPOND CORRECTLY,
+settling the "op-wide vs handle-specific" question this entry itself named as open
+
+**OBSERVED**: `partWidth` — tracks along X (9.1px `pureX+`, 60px `pureX-`, 60px `diag`), zero on pure Y (a
+legitimate single-axis constraint, the SAME shape L4 already confirmed for `centerDrill`/`faceProbe`/`odProbe`
+— not a defect). `partFloor` — tracks along Y (19.5px `pureY+`, 32.6px `pureY-`, 32.6px `diag`), zero on pure
+X. **`movedMid === movedAfter` in EVERY responsive trial for both handles — no snap-back, ever.**
+
+⇒ **The defect is `partPos`-SPECIFIC, not op-wide** — the THIRD of the three possible outcomes this entry
+itself named, settled: not "all three dead" (ruled out) and not "mixed" in the sense of partial responsiveness
+on the others (ruled out — both siblings are FULLY responsive on their own axis) — cleanly "only `partPos` is
+dead." This is real diagnostic value for whoever fixes it next: `partWidth`/`partFloor` prove the op's own
+rendering/drag INFRASTRUCTURE and the feature-canvas gesture wiring work correctly in general; whatever is
+broken is specific to `partPos`'s own handle declaration or its own `onDrag` callback — a much narrower search
+than "something is wrong with parting's preview." Not fixed this turn, per the dispatch's own explicit scope
+(measurement to set up the next turn, not the fix).
 
 **STILL REAL IF**: `dragHandleRenderTruth(page, 'partPos', {dx:60,dy:0,...})` (or any direction) against
-`user_lathe_parting`, booted per BACKLOG #61's own L4 recipe, still shows zero movement.
+`user_lathe_parting`, booted per BACKLOG #61's own L4 recipe, still shows zero movement — while
+`partWidth`/`partFloor` (the diagnostic contrast) still respond normally on their own axis. If the siblings
+ALSO stop responding, the shape of this entry has changed and needs re-diagnosing, not just re-confirming.

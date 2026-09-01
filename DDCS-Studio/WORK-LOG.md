@@ -66864,6 +66864,23 @@ else to re-sweep, confirmed by grep rather than assumed from "these are the only
 No product code touched — diagnosis and BACKLOG updates only (`BACKLOG.md` #64/#65 headers + full diagnosis
 sections). `git status` confirms no source file this turn's own investigation touched.
 
+## t2473 (SMALL ITEM, own commit per rule 4) — BACKLOG #66: test `partWidth`/`partFloor` — is `parting`'s
+defect op-wide or `partPos`-specific?
+
+**OBSERVED, 5 directions each, fresh boot per handle**: `partWidth` tracks correctly along X (9.1px/60px/60px
+across `pureX+`/`pureX-`/`diag`), zero on pure Y — a legitimate single-axis constraint, the SAME shape L4
+already confirmed for `centerDrill`/`faceProbe`/`odProbe` (not a defect). `partFloor` tracks correctly along Y
+(19.5px/32.6px/32.6px), zero on pure X. **`movedMid === movedAfter` in EVERY responsive trial, both handles —
+no snap-back anywhere.**
+
+⇒ Settles the question BACKLOG #66 itself left open: **the defect is `partPos`-SPECIFIC, not op-wide.** Real
+diagnostic value for whoever fixes it next — the op's own rendering/gesture infrastructure works correctly in
+general (proven by two working siblings); the search is narrowed to `partPos`'s own handle declaration or
+`onDrag` callback specifically. Not fixed, per the dispatch's own explicit scope (measurement to set up the
+next turn).
+
+Tier: doc-only (`BACKLOG.md` #66 update) — no test/product code touched for this half.
+
 ### VERIFY (both halves of this turn)
 
 Root established by direct measurement (the B-moves-when-A-drags test), one-vs-two stated explicitly: ONE.
