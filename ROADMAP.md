@@ -225,9 +225,9 @@ floor: the validator guarantees the **protocol** (won't break the controller), n
 that semantics belongs to the author. Real-time loops (plasma THC) stay below the floor, delegated to the controller.
 Full essay: [`docs/archive/WIZARD-PLATFORM-VISION.md`](docs/archive/WIZARD-PLATFORM-VISION.md).
 
-### 📐 WHAT IS ACTUALLY DECLARED — the three legs, measured 2026-08-09 (advisor)
+### 📐 WHAT IS ACTUALLY DECLARED — the three legs, re-measured 2026-08-31 (worker t2457/t2459)
 
-The north star says *every wizard becomes data*. Measured against the live registry, that is **two-thirds true**:
+The north star says *every wizard becomes data*. Measured against the live registry:
 
 ```
   EMIT     32/32 declared   a block stack + bindings; fork-parity-1593 forks all 32
@@ -235,22 +235,40 @@ The north star says *every wizard becomes data*. Measured against the live regis
   FORM     32/32 declared   param · type · default · label · section · widget ·
                             options · help — rendered generically by renderOpForm;
                             nobody writes form HTML per wizard
-  PREVIEW   0/32 declared   hand-written renderers, each deciding independently what
-                            frame it draws in, what a handle looks like, whether a
-                            thing is drawn at all
+  PREVIEW  mostly declared  DISPATCH is declared for every op — wizardLibrary's
+                            opensAs routes all live menu entries to a GENERIC twin
+                            renderer reading a declared source per op. What is still
+                            hand-written is narrower than "no declaration":
+                              · the LATHE family's per-shape geometry math (6 ops)
+                              · handle AFFORDANCES (onEdit/noSnap/emits) — declared
+                                on some ops, absent with no rule on 7 others
 ```
+
+⚠ **This block previously read `PREVIEW 0/32 declared` (measured 2026-08-09) and was badly stale** — it
+described every legacy `<name>View.js` as live when all 13 are dead code, superseded by the generic
+dispatch above. It was corrected only when someone re-measured. **The 2026-08-09 figure is still why this
+arc exists**; it is the *scope* that shrank, not the problem.
 
 **Every defect the user hit on 2026-08-09 lived in the third leg**, and the emit was correct through all of them.
 The reason it went unnoticed: `preview-only, emit unaffected` was (correctly) a *safety* argument and slid into
 meaning *needs no declaration and no gate* — and ~2450 tests assert emitted text and data structures while
 essentially **none render anything**, so a preview defect cannot turn a test red. The only detector was the user.
 
-**ARC A — PREVIEW AS DATA (next, being scoped).** One declared source per presentation fact, read by every
+**ARC A — PREVIEW AS DATA (STARTED 2026-08-31).** One declared source per presentation fact, read by every
 renderer in a pane. ⚠ **The make-or-break is the GATE, not the declarations**: the emit port had byte-identity as
 its proof; the preview has no equivalent. If a preview-equivalent of byte-identity cannot be built cheaply, the
 arc should not start — build the gate first. Known members: the coordinate frame (t1672/t1686 — two renderers in
 one pane disagreeing), does-this-handle-drive-the-emit (t1684, `emits`/`teal`), handle affordances (t1680
 `onEdit`, t1674 `noSnap`). Cheaper alternative if the full arc is refused: frame + emit-driving contract only.
+
+⭐ **The gate condition above has been MET — that is what licensed the start.** `tests/support/
+dragRenderTruth.js` (t2461) generalizes `web/debug/featProbe.js`'s proven pattern into a reusable harness
+mirroring `emitEquivalence`'s shape: render → read real DOM geometry → diff against the op's own declared
+source. ⚠ Its coverage is **proven on one defect class, not yet on three** — t2463 declares the acceptance
+mutations as data so the gate re-proves itself on every run instead of by one-shot archaeology. **Live plan and
+per-rung breakdown: `BACKLOG.md` #61** (L1 manifest → L2 presence → L3 container-sizing → L4 prove wide → L5
+port the lathe geometry → L6 declare the 7 missing affordances). This paragraph states the arc's *premise*;
+#61 is the thing to read before acting.
 
 **ARC B — VALIDATION AS DATA (after A).** Today every lint rule is hand-added per case, so a field is checked only
 if someone remembered — the same shape as the four declared-but-unread findings in the t1678 census. Known
