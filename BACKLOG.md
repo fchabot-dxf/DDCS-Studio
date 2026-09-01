@@ -5640,6 +5640,57 @@ touched a sibling field. 79 existing lathe/canvas-widgets tests passed unedited.
 
 Full account: WORK-LOG t2495a (the mechanism) / t2495b (the three retrofits), two commits.
 
+### ⭐⭐⭐⭐⭐⭐ t2497 — L5 COMPLETE: `polygon`, the sixth and last lathe op, assessed carefully then PORTED IN
+FULL — both handles, no hand-written residue, `onEditFromMap` removed as dead code this port orphaned
+
+Assessed BEFORE porting, per the dispatch's own explicit instruction: `polyDepth` was an easy match (the same
+`rect`-X-only `sx:-1` shape already proven three times). `polyFlats` looked, at first read, like it might
+genuinely NOT fit — its own drag calls `polyRadiusAt` (a real trig function) and applies a CONDITIONAL rescale
+("if the polygon's corner would leave the bar, shrink the whole shape") that looked nothing like the registry's
+plain two-sided `clamp`.
+
+**Read `polyRadiusAt`'s own actual implementation before concluding either way** (not assumed): confirmed
+`corner = apothem / cos(π/sides)`. Worked the algebra through with that formula in hand — whenever the corner
+would exceed the bar radius, the conditional rescale makes the FINAL apothem collapse to the CONSTANT
+`barR·cos(π/sides)`, regardless of how far the cursor moved. That is EXACTLY what a plain upper clamp already
+does. The entire three-step scale computation reduces to `clamp(world.y − cy, 0.001, barR·cos(π/sides))`,
+doubled for the field — the SAME `rect`-Y-only `sy:0.5` + two-sided clamp shape `odProfileSpec`'s/`odProbeSpec`'s
+own diameter handles already proved, with a per-render-computed bound instead of a literal. `polygon` fit the
+registry completely; the FIRST read (assuming it needed a new gesture or a contortion) was wrong, and the
+turn's own job was to find that out empirically rather than guess.
+
+**`onEdit` needed NO hand-written piece either** — `polyDepth` is `field`-only (the default path); `polyFlats`
+is `fieldH`-only (no `field`, no `sx`), deriving automatically via t2495's own mechanism, no `valueField`
+declaration needed. This made `onEditFromMap` (the shared hand-written helper this whole arc used since t1680)
+ORPHANED — polygon was its last consumer. Confirmed by grep (zero remaining call sites) and REMOVED, along with
+the now-unused `polyRadiusAt` import — dead code this turn's own port created, not pre-existing, cleaned up per
+the project's own rule.
+
+**Gate numbers, three of four seeds, byte-identical before/after** — the fourth (`polyFlats`, pure +Y, pushing
+the value to its own clamp boundary) hung the drag harness on BOTH the ported AND the pre-port code identically,
+a genuine pre-existing finding surfaced by this turn's own thoroughness, not a port regression — filed
+separately as BACKLOG #70, not chased further (out of scope for an assessment-then-port turn, and the other
+three seeds plus the algebraic proof plus the snapshot plus 12 existing tests already settle the port's own
+correctness independently of this harness-level issue).
+
+**onEdit's own written field+value, both handles, byte-identical before/after** (direct `spec.onEdit(id,value)`
+capture, matching the standard this arc's own onEdit retrofits established at t2495).
+
+12 existing tests (`lathe-polygon-1277`, `lathe-matrix`'s own "POLYGON TURNING" case) passed unedited.
+
+**L5 IS NOW COMPLETE — the final state, all six lathe ops**: `facing`, `centerDrill`, `faceProbe`, `odProbe`,
+`polygon` — fully declared, zero hand-written geometry OR edit-routing. `odTurn` — fully declared geometry;
+`onEdit` is now ALSO generic (t2495), so odTurn is fully declared too. `parting` — fully declared, all three
+handles. **Every one of the six lathe ops is now fully declared through `canvasWidgets.js`, with no hand-written
+place/drag/edit residue left anywhere in the family.** `onEditFromMap` (the family's own hand-written onEdit
+helper since t1680) is gone — removed, not left dormant, once its last consumer was ported. The registry itself
+gained one real capability across the whole arc: the two-sided `clamp` (t2489) and the `valueField`-resolved
+`onEdit` (t2495), BOTH reached honestly through rule-of-three, both proven inert before use, both now serving
+every other `rect`/`length`/etc. consumer in the app for free, not just the lathe family that forced the
+question.
+
+Full account: WORK-LOG t2497.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
@@ -6399,3 +6450,49 @@ despite the rects not overlapping — check for a stacking-context/transform on 
 
 **STILL REAL IF**: dragging `dr_pos` on a live `user_drill_data` boot (Blocks tab, narrow pane, post-#68-fix)
 still shows `movedMid`/`movedAfter` near zero despite the handle being on-screen and hit-testable in principle.
+
+---
+
+### 70. `parting`'s `polyFlats` handle (polygon turning) hangs a real pointer-drag sequence when the drag pushes
+across-flats toward its own clamp boundary — a NEW finding, surfaced as a side effect of L5's own port, NOT
+caused by it (reproduces identically on the pre-port hand-written code too). REPORT ONLY, not fixed
+
+*(filed t2497, discovered while gate-verifying `polygonProfileSpec`'s own port onto `canvasWidgets.js` —
+BACKLOG #61 / L5's last op. Explicitly the SAME class of allowance the dispatch itself sanctioned for #68/#69:
+a side-effect finding surfacing during otherwise-unrelated work, reported rather than chased or hidden.)*
+
+**OBSERVED, reproduced on BOTH the ported and the pre-port (hand-written, `git checkout HEAD --`-reverted)
+code, identically**: `dragHandleRenderTruth(page, 'polyFlats', {dx:0, dy:40, steps:8, settleMs:400})` against a
+live `user_lathe_polygon` boot (default params, 1400×1000 viewport) — `page.mouse.move` inside the drag's own
+step loop times out (60s), never completing. THREE OTHER seeds against the SAME op — `polyDepth` diagonal,
+`polyDepth` pure-X, and `polyFlats` diagonal (`dx:20,dy:-30`) — all completed cleanly and fast (under 30s for
+all three combined). Only the ONE specific seed (`polyFlats`, pure +Y, magnitude 40) reproduces the hang,
+consistently, across four separate attempts (two different Playwright processes, after confirming the port
+holding the mechanism, and confirmed identically on both the ported and un-ported source).
+
+**Live console trace during the hang** (captured via `page.on('console', ...)`): the app's own `[featProbe]`
+debug trace shows THREE CONSECUTIVE frames (`f21`, `f22`, `f23`) with an INCREMENTING frame counter but an
+IDENTICAL, FROZEN model value (`acrossFlats: 3.972`) and an IDENTICAL, FROZEN pointer/handle screen position
+(`1327,470`) — the renderer is still actively producing frames, but the value and the handle's own on-screen
+position have both stopped moving, while Playwright's synthetic `page.mouse.move` never receives an
+acknowledgement from the browser. This reads as a RUNAWAY RE-RENDER (the browser's own event loop kept busy
+re-rendering identical frames) rather than a genuine JS deadlock, though the mechanism is not confirmed — named
+as the most consistent reading of the evidence gathered, not asserted as diagnosed.
+
+**A plausible mechanism, INFERRED not confirmed**: `polyFlats`'s own SCREEN POSITION is derived from the LIVE,
+currently-committed `acrossFlats` value every render (`y: cy + apothem`, `apothem = across/2`) — unlike most
+other ported handles, where the anchor stays constant through a drag. Once the drag pushes the value to its own
+clamp ceiling (the polygon's corner touching the bar), every subsequent frame recomputes the SAME clamped
+value, which recomputes the SAME handle position — a state that should be stable, not runaway, so if this
+mechanism is right, something ELSE (a redundant write-triggers-another-write path, or a preview/commit
+distinction the drag stream doesn't settle) is the actual trigger — not confirmed, flagged as the most likely
+starting point for whoever investigates next.
+
+⛔ **Not investigated further this turn** — out of scope for an assessment-then-port turn, and per this arc's
+own established discipline: a side-effect finding gets reported, not chased, unless it blocks the actual work
+in front of it (it did not — three of four seeds proved the port cleanly, and the algebraic/snapshot/existing-
+test evidence independently confirms the port's own correctness regardless of this harness-level hang).
+
+**STILL REAL IF**: the identical `dragHandleRenderTruth` call against a live `user_lathe_polygon` boot still
+hangs on a pure +Y drag of `polyFlats` at or near its own clamp boundary, while the SAME op's other handles and
+other drag directions on the same handle complete normally.

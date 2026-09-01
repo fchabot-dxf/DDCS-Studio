@@ -20,7 +20,7 @@
  */
 import { halfProfile, normalizeBar, radiusOf, diameterOf } from '../data/lathe.js';
 import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate, shared with gcodeViz3d.js/latheScene.js/latheDro.js
-import { polygonPath, polyRadiusAt, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
+import { polygonPath, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
 import { partBladeZ, partFloorRadius } from '../wizards/lathe/parting.js';   // t2030 — the SAME kerf helpers the real emit calls, "derived HERE so the emit and the tests cannot disagree" (parting.js's own words) — this canvas used to disagree with that on purpose, one level down
 import { buildCanvasWidgets } from './canvasWidgets.js';   // t2485 (BACKLOG #61 / L5 PILOT) — facing's own hand-rolled
 // handle math (place/drag) is now DECLARED through the shared gesture registry instead of hand-copied; see
@@ -32,19 +32,6 @@ export const zToCanvas = (z) => z;
 export const canvasToZ = (x) => x;
 
 export const FACE_HANDLE_ID = 'faceLine';
-
-/** t1680 — click-to-edit for a lathe handle. Every handle below sets `value` to the exact param it represents (by
- *  construction — the same number its own onDrag ultimately writes), so onEdit never needs onDrag's inverse
- *  geometry math (diameterOf/canvasToZ/clamps): a small id→field map is enough. A map entry may be a function
- *  instead of a field name for the one handle (odProfileSpec's shoulder) whose target field depends on a mode flag.
- *  Declared once, reused by every builder in this file — this project's own "declare over hand-roll" move, applied
- *  to the fix the t1678 census exists to enable (buildCanvasWidgets already gets this for free from its `field`
- *  convention; the lathe family hand-builds its handles, so it needs this one small equivalent). */
-const onEditFromMap = (map, write) => (id, val) => {
-    const f = map[id];
-    if (f == null || !Number.isFinite(val)) return;
-    write(typeof f === 'function' ? f(val) : { [f]: val });
-};
 
 /**
  * Build the canvas spec for a bar.
@@ -588,6 +575,22 @@ export const POLY_FLATS_HANDLE_ID = 'polyFlats';
  * THE END VIEW DRAWS THE OP'S OWN r(angle). It calls polygonPath — the same function the emit unrolls — so the
  * picture cannot show a shape the program will not cut. If they ever disagree, one consumer read the model wrong;
  * there is no second opinion to reconcile.
+ *
+ * t2497 (BACKLOG #61 / L5) — DECLARED through the registry, BOTH handles, no hand-written residue at all. The
+ * across-flats drag reads as polygon-specific (it calls `polyRadiusAt`, a real trig function, and its own clamp
+ * is CONDITIONAL — "if the CORNER would leave the bar, rescale") — assessed carefully before concluding that,
+ * not assumed to fit or not to fit. Worked the algebra through with `polyRadiusAt`'s own actual implementation
+ * open (`apothem / cos(π/sides)`, confirmed by reading it, not inferred): whenever the corner would exceed
+ * `barR`, `scale = barR/corner` makes the FINAL apothem collapse to the CONSTANT `barR·cos(π/sides)` regardless
+ * of how far the cursor moved — which is EXACTLY what a plain upper clamp already does. So the whole three-step
+ * scale computation collapses to `clamp(world.y − cy, 0.001, barR·cos(π/sides))`, doubled for the field — the
+ * SAME `rect`-Y-only `sy:0.5` + two-sided clamp shape `odProfileSpec`'s/`odProbeSpec`'s own diameter handles
+ * already proved, with a per-render-computed bound (`maxFlats`) instead of a literal, exactly like `maxDia` was
+ * for those. Confirmed the collapse algebraically before writing a line of the port, not by trial and error.
+ *
+ * `onEdit` needs NO hand-written piece either, for either handle — `polyDepth` is `field`-only (X-axis, the
+ * default path); `polyFlats` is `fieldH`-only (no `field`, no `sx`), the SAME derived shape `odProbeSpec`'s own
+ * handle and `partFloor` already use, t2495's own mechanism resolves it with no `valueField` declaration.
  */
 export function polygonProfileSpec(bar, poly, onChange) {
     const b = normalizeBar(bar);
@@ -610,6 +613,18 @@ export function polygonProfileSpec(bar, poly, onChange) {
         y: cy + pt.x * Math.sin(pt.a * Math.PI / 180),
     }));
 
+    // the across-flats size at which the polygon's own CORNER just touches the bar — the constant the original
+    // scale-based clamp collapses to; `sy:0.5` below doubles it back into the field (acrossFlats = 2·apothem).
+    const maxFlats = 2 * barR * Math.cos(Math.PI / sides);
+
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'rect', id: POLY_DEPTH_HANDLE_ID, field: 'depth', ax: 0, ay: apothem, ex: -depth, ey: 0,
+          sx: -1, minw: 0.001, emits: true, label: 'extent', value: depth },
+        // …on the middle of a flat, where the across-flats size IS the distance from the centre
+        { type: 'rect', id: POLY_FLATS_HANDLE_ID, fieldH: 'acrossFlats', ax: cx, ay: cy, ex: 0, ey: apothem,
+          sy: 0.5, minh: 0.002, maxh: maxFlats, emits: true, label: 'across flats', value: across },
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
+
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
         items: [
@@ -623,23 +638,8 @@ export function polygonProfileSpec(bar, poly, onChange) {
         ],
         // the polygon itself, from the op's own r(angle) — a path, because that is what it is
         paths: [{ pts, cls: 'fc-path' }],
-        handles: [
-            { id: POLY_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: apothem, kind: 'size', axis: 'x', emits: true, label: 'extent', value: depth },
-            // …on the middle of a flat, where the across-flats size IS the distance from the centre
-            { id: POLY_FLATS_HANDLE_ID, x: cx, y: cy + apothem, kind: 'size', axis: 'y', emits: true, label: 'across flats', value: across },
-        ],
-        onDrag: (id, world) => {
-            if (typeof onChange !== 'function') return;
-            if (id === POLY_DEPTH_HANDLE_ID) { onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) }); return; }
-            if (id === POLY_FLATS_HANDLE_ID) {
-                // clamped inside the bar: a polygon whose CORNERS stand outside the stock has flats that were never
-                // cut — the corner radius, not the apothem, is what has to fit.
-                const wantApothem = Math.max(0.001, world.y - cy);
-                const corner = polyRadiusAt(0, wantApothem * 2, sides);
-                const scale = corner > barR ? barR / corner : 1;
-                onChange({ acrossFlats: r3(wantApothem * 2 * scale) });
-            }
-        },
-        onEdit: onEditFromMap({ [POLY_DEPTH_HANDLE_ID]: 'depth', [POLY_FLATS_HANDLE_ID]: 'acrossFlats' }, onChange),
+        handles,
+        onDrag,
+        onEdit,
     };
 }

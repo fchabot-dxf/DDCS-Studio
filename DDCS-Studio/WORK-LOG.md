@@ -67916,3 +67916,125 @@ canvas-widgets specs this turn's own scope). `git status --porcelain`: confirmed
 set across both commits, staged BY PATH throughout. `handoff.py amendments --role worker` polled clean at the
 start of this turn and again before this commit. `proc_health.py watch`: clean. All scratch files (the two
 onEdit-capture text dumps, the two source-file backups, `_live-check.spec.js`) deleted, never committed.
+
+## t2497 — L5 COMPLETE: `polygon` assessed carefully then ported in full (both handles, no hand-written
+residue), `onEditFromMap` + the now-unused `polyRadiusAt` import removed as dead code this port created
+
+**ASSESSED BEFORE PORTING, per the dispatch's own explicit instruction.** `polyDepth` was an easy read: the
+same `rect`-X-only `sx:-1` sign-flip shape already proven three times (odTurn/centerDrill's own depth fields).
+`polyFlats` looked, on a first read, like it might genuinely be outside the registry's vocabulary — its own
+drag calls `polyRadiusAt` (a real trig function from `wizards/lathe/polygon.js`) and applies a CONDITIONAL
+rescale: "if the polygon's own CORNER would leave the bar, shrink the whole shape by the ratio needed to bring
+it back." Nothing about that reads like a plain two-sided `clamp` on first sight.
+
+**Read `polyRadiusAt`'s own actual implementation before concluding either way, not assumed**:
+```js
+const apothem = Math.max(0, Number(acrossFlats) || 0) / 2;
+const theta = (within - face / 2) * DEG;      // DEG = Math.PI/180 in THIS file (confirmed — different from
+return round3(apothem / Math.cos(theta));     // canvasWidgets.js's own DEG=180/Math.PI, checked both)
+```
+Called as `polyRadiusAt(0, wantApothem*2, sides)`: `within=0`, `face=360/n`, `theta = -(180/n)*(π/180) = -π/n`
+radians, `cos(theta)=cos(π/n)` (even function). So `corner = wantApothem / cos(π/n)`, confirmed by reading the
+real function, not inferred from its name or its call site.
+
+**Worked the algebra through with that confirmed formula**: `scale = corner>barR ? barR/corner : 1`.
+Substituting: when `corner>barR` (i.e. `wantApothem > barR·cos(π/n)`), `scale = barR·cos(π/n)/wantApothem`, so
+`final = wantApothem · 2 · scale = 2·barR·cos(π/n)` — a CONSTANT, independent of how far past the boundary the
+cursor moved. That is EXACTLY what a plain upper clamp does at its own ceiling. The WHOLE three-step scale
+computation (want → corner → scale → final) collapses to `final = 2 · clamp(world.y − cy, 0.001, barR·cos(π/n))`
+— the identical `rect`-Y-only `sy:0.5` + two-sided-clamp shape `odProfileSpec`'s/`odProbeSpec`'s own diameter
+handles already proved, with a PER-RENDER-COMPUTED bound (`maxFlats = 2·barR·cos(π/sides)`) instead of a
+literal — exactly like `maxDia` already was for those. `polygon` fits the registry COMPLETELY; the first read
+(assuming a new gesture or a contortion was needed) was wrong, and finding that out empirically — not guessing
+either way — was this turn's own actual job.
+
+**The port** (`web/viz/latheProfileCanvas.js`): `polyDepth` → `rect`, X-only, `sx:-1, ax:0, ay:apothem` (Y
+fixed, not tied to a field for this handle). `polyFlats` → `rect`, Y-only, `sy:0.5, ax:cx, ay:cy, minh:0.002,
+maxh:maxFlats` (X fixed at the end-view's own centre). Both fully registry-driven — `handles`/`onDrag`/`onEdit`
+all destructured straight from `buildCanvasWidgets`, no mixed return.
+
+**`onEdit` needed NO hand-written piece for either handle** — `polyDepth` is `field`-only (the default path);
+`polyFlats` is `fieldH`-only (no `field`, no `sx` declared at all), deriving automatically via t2495's own
+mechanism — no `valueField` needed. This made `onEditFromMap` (the shared hand-written click-to-edit helper
+this whole arc has used since t1680) genuinely ORPHANED for the first time — `polygon` was its last remaining
+consumer. Confirmed by `grep -n "onEditFromMap" web/viz/latheProfileCanvas.js` (zero call sites left after the
+port) and REMOVED entirely — both the function itself and its own JSDoc comment — along with the now-unused
+`polyRadiusAt` import (the port's own change removed its ONLY real call site; still referenced in a comment,
+grepped to confirm no code usage remained). Dead code THIS turn's change created, cleaned up per the project's
+own rule (pre-existing dead code would only be mentioned, not removed — this is different: it's this port's own
+byproduct).
+
+**Gate numbers, three of four seeds — byte-identical before/after, down to fractional pixels**:
+```
+                                       BEFORE (reverted, hand-written)      AFTER (ported)
+polyDepth depth-diag (dx-35,dy20):   movedMid=34.999 movedAfter=34.999   movedMid=34.999 movedAfter=34.999
+polyDepth depth-pureX (dx55,dy0):    movedMid=53.726 movedAfter=53.726   movedMid=53.726 movedAfter=53.726
+polyFlats flats-diag (dx20,dy-30):   movedMid=0.430  movedAfter=0.430    movedMid=0.431  movedAfter=0.431
+```
+(The last digit's 0.001px difference on `flats-diag` is sub-pixel rendering jitter between separate runs, the
+same tolerance every prior gate-capture in this arc has treated as noise, not signal — every OTHER digit,
+across both runs, at both handles, matches exactly.)
+
+**THE FOURTH SEED — `polyFlats` pure +Y (`dx:0,dy:40`) — hung the drag harness, on BOTH the ported AND the
+pre-port code, identically. A genuine, pre-existing finding, NOT a port regression, filed separately as
+BACKLOG #70, not chased further this turn.** Reproduced four separate times (two attempts against the reverted
+HEAD code, two against the port) with the identical symptom: `page.mouse.move` inside `dragHandleRenderTruth`'s
+own step loop times out at 60s, never completing. A raw, unhelpered mouse-down+single-move+mouse-up sequence on
+the SAME handle, and a plain (no-drag) position read, both completed instantly and cleanly — the hang is
+specific to the STEPPED multi-frame drag sequence, and specific to THIS ONE seed direction/magnitude (pushing
+`acrossFlats` toward its own clamp boundary). Captured the browser's own console during one hang attempt:
+`[featProbe]` frames `f21`/`f22`/`f23` show an INCREMENTING frame counter against a FROZEN, identical
+`acrossFlats:3.972` and a FROZEN handle screen position — reads as a runaway re-render (the browser stays busy
+producing frames, starving Playwright's own synthetic-input channel) rather than a deadlock, though the
+mechanism itself is not confirmed, only the symptom. Did not chase this further — per this arc's own established
+discipline, a side-effect finding gets reported and filed, not chased, when it doesn't block the actual work in
+front of it, and it did not: three of four seeds proved the port cleanly, and the algebraic derivation + the
+snapshot's own byte-identical handle positions/values + 12 existing tests (2 of which exercise `onDrag` via
+real function calls, not synthetic mouse events) independently confirm the port's own correctness regardless of
+this harness-level issue. This is the SAME shape of allowance the dispatch itself sanctioned for BACKLOG #68/
+#69 at t2481: a real finding surfacing as a side effect of otherwise-unrelated work, reported honestly rather
+than hidden or force-chased past the turn's own scope.
+
+**onEdit's own written field+value — byte-identical before/after, both handles** (direct `spec.onEdit(id,
+value)` capture, the standard this arc established at t2495): `polyDepth` → `depth:33.5` (`acrossFlats`
+untouched at 17), `polyFlats` → `acrossFlats:14.25` (`depth` untouched at 20) — identical JSON both sides.
+
+**12 existing tests re-run, unedited**: `lathe-polygon-1277.spec.js` (8, incl. "THE END VIEW draws the OP'S
+OWN polygon, and its flats handle writes the size"), `lathe-matrix.spec.js`'s own "POLYGON TURNING" case (1 of
+its own 6). All passed.
+
+Snapshot diff, ENUMERATED BY DIRECTION, polygon's own 6 lines only (confirmed via `git diff --stat`, `12 +6/-6`
+lines, nothing else in the 32-twin fixture moved): **ADDED** `color`/`manual`/`noSnap`/`labelDir` on both
+handles, both param states (`rect.place()`'s own shape, matching centerDrill's/odTurn's/parting's own diffs).
+**REMOVED**: `axis:"x"` (`polyDepth`), `axis:"y"` (`polyFlats`) — confirmed inert, same standing reasoning.
+**ALTERED**: `onDrag` `<fn/2>`→`<fn/3>`, both states. **UNCHANGED**: `onEdit` stays `<fn/2>` (now generic, same
+arity). `emits` still `true`. `x`/`y`/`value`/`kind`/`label`/`id`/`paths` (the polygon's own drawn geometry)
+identical on every line — the actual geometry, unmoved.
+
+**L5 IS NOW COMPLETE.** Final state, all six lathe ops: `facing`/`centerDrill`/`faceProbe`/`odProbe`/`polygon`
+— fully declared, zero hand-written geometry or edit-routing. `odTurn` — fully declared (place/drag since
+t2489, `onEdit` since t2495). `parting` — fully declared, all three handles (since t2493/t2495). Every one of
+the six lathe ops is now fully declared through `canvasWidgets.js`, with NO hand-written place/drag/edit
+residue left anywhere in the family — `onEditFromMap` is gone, not dormant. The registry itself gained two
+real, reusable capabilities across the whole arc, both reached through rule-of-three, both proven inert before
+use, both now available to every OTHER consumer in the app for free: the two-sided `clamp` (t2489) and the
+`valueField`-resolved `onEdit` (t2495).
+
+Tier: `viz/latheProfileCanvas.js`, shared file, other ops untouched — rule 1b, full suite before concluding.
+
+### VERIFY
+
+Assessment stated explicitly before any port (both handles individually reasoned through, `polyFlats`'s own
+apparent mismatch resolved by reading the real trig function rather than assumed either way). Gate numbers:
+three of four seeds byte-identical before/after; the fourth's own harness hang is a confirmed pre-existing,
+non-port-caused finding, filed as BACKLOG #70. Written field+value identical before/after, both handles. 12
+existing tests passed unedited. Snapshot diff enumerated by direction, polygon's own 6 lines only. `test:node`:
+238/238 after the reviewed regeneration. Full suite `--workers=4` BEFORE concluding: **3017 passed, 1 failed,
+13 flaky, 26 skipped** (3057 total) -- the one failure is the same pre-existing `sf-pos-snapback` load-
+contention timeout documented since t2465, unrelated; the full suite did not itself exercise BACKLOG #70's own
+specific seed, so it stayed clean. `git status --porcelain`: confirmed exactly the intended file set, staged
+BY PATH. `handoff.py amendments --role worker` polled clean before finalizing. `proc_health.py watch`: clean --
+including confirming no leftover process from the diagnostic session's own stray dev-server incident (a
+timed-out command left a `node.exe` holding port 3211; identified by matching its start time, killed directly,
+confirmed the port free before continuing -- worth naming since it briefly blocked further test runs mid-turn).
+All scratch files deleted, never committed.
