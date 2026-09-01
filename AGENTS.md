@@ -116,6 +116,26 @@ it or plans around a problem that no longer exists.
 #26. Every one had a `✅ UPDATE` in its body. **Not one had a tagged heading.** Two of them had been fixed
 three weeks earlier.
 
+#### ⛔ 8b. RUN THE ENTRY'S OWN `STILL REAL IF` BEFORE DISPATCHING AGAINST IT
+
+Rule 8 makes headings trustworthy *going forward*. It does nothing for the ones already stale — and a heading
+is a **claim about the past**, written by whoever last touched it.
+
+⚠ **Paid for three times on 2026-08-31 alone**, all by the advisor, all the same shape: **#25** was dispatched
+and came back "already shipped at t2365"; **#30** was dispatched as the opening turn of a whole new arc and
+came back "already shipped at t2303"; **#47**'s heading was silent about a tier that had shipped six turns
+earlier. ⭐ Between the first and the second, the advisor ran a "sweep" — it checked four headings picked from
+memory, and missed the one it was about to dispatch. **A sweep of what you happen to think of is not a check.**
+
+⇒ **Almost every entry carries its own `STILL REAL IF`. Run it.** It is a one-line grep or a ten-second live
+check, written by the person who understood the defect, precisely so nobody has to reconstruct their
+reasoning. Running it costs seconds; skipping it costs a whole dispatched turn.
+
+⚠ And when it disagrees with the heading, **fix the heading in the same breath** — otherwise the next reader
+pays the same cost. ⛔ Note the check itself can rot too (`#31` cited a file deleted at t2367; `#40`'s grep
+would have read "still broken" after its own fix) — a `STILL REAL IF` that cannot run any more is itself a
+finding, not a pass.
+
 **When you close one:**
 - tag the heading: `[✅ SHIPPED tNNNN — <commit>]`, or `[STALE]` / `[REFUTED]` / `[NOT A BUG]`
 - keep the body — the reasoning is worth more than the tidiness, and a REFUTED entry teaches more than a
