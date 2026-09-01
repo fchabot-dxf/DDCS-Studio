@@ -67330,3 +67330,90 @@ clean of every file this turn didn't intend to touch (the pre-existing modified 
 root files from before this session are untouched, not staged). `handoff.py amendments --role worker` polled
 clean before the full-suite run (no new amendments). `proc_health.py watch`: clean. Scratch `_live-check.spec.js`
 (rewritten repeatedly for the measurement/screenshot passes) deleted, never committed.
+
+## t2485 — ONE THING: L5's pilot — ported `facing`'s hand-rolled handle onto canvasWidgets.js's declared registry
+
+Per the dispatch's own explicit scope: exactly one op, not all six, not two. Root context: BACKLOG #61's own L4
+sweep (t2471) measured the lathe family's hand-written geometry as 6/7 GREEN — the "gate can't reach it"
+premise L5 was originally justified on no longer holds, so this port is duplication-collapse (north star 4),
+not a bug fix. The bar stated explicitly: nothing observable changes at all.
+
+**Captured facing's own gate numbers BEFORE touching anything** (`dragHandleRenderTruth` against a live,
+default-params boot, 3 seed vectors): diag (dx60,dy−40) before={x:1323.846,y:471.621} mid={x:1383.845,
+y:471.621} movedMid=59.999 movedAfter=59.999; pureX (dx90) movedMid=90.001 movedAfter=90.001; pureY (dy60)
+movedMid=0.000 (the handle is 1D, x-only — the hand-written code never reads `world.y` either, confirmed
+matching, not a surprise).
+
+**The port** (`web/viz/latheProfileCanvas.js`, `latheProfileSpec`): facing's own hand-written `handles`/
+`onDrag`/`onEdit` (the face-line handle: place at the raw end, drag clamped to the finished face at Z0) is
+EXACTLY `canvasWidgets.js`'s own `length` gesture — a 1D distance from an anchor along an axis — with `ax:0,
+ay:r (bar radius), axis:'x', min:0`. `stock`/`items` (the drawn bar/allowance-rect/datum-line) are UNCHANGED —
+those come from `halfProfile()`, not the handle-gesture registry, which only owns place/drag/edit math.
+
+**ONE behaviour deliberately dropped, traced and confirmed NOT observable**: the old code rounded the dragged
+value to 3dp (`Math.round(z*1000)/1000`) before calling `onAllowance`. Traced the ACTUAL call chain
+(`latheLayoutSpec`'s `write` → `panelTypes.js`'s own `setFields` closure → `_writeParam`) and found
+`_writeParam` ALREADY rounds every field write to the SAME 3dp (`r3`) unconditionally, for every op in the app
+— the local rounding was redundant, confirmed by reading the code, not assumed. Dropping it changes nothing
+that reaches the model or the emit.
+
+**Re-ran the gate numbers AFTER the port — byte-identical, down to the float**: all three seeds produced the
+EXACT SAME `before`/`mid`/`after` screen coordinates and `movedMid`/`movedAfter` values as the pre-port capture
+above (diag/pureX/pureY, no digit different). The existing `tests/lathe-pilot-1271.spec.js` (8 tests — the twin
+registration, the .wiz round trip, axis gating, the half-profile canvas contract INCLUDING `handle.id ===
+'faceLine'` and `handle.emits === true`, and the drag-writes-the-emit test that drives `spec.onDrag` directly
+with real numbers and asserts the resulting G-code passes) all passed unchanged — zero edits needed to that
+file, the port satisfied every pre-existing assertion as written.
+
+**THE ACTUAL COST OF THIS PORT — a real, worth-reporting finding**: `tests/node/preview-spec-gate-1688.test.mjs`
+(a snapshot gate over every twin's EXPORTED SPEC SHAPE, not just its rendered geometry) went red. Traced the
+diff precisely: facing's handle object now carries `color`/`manual`/`noSnap` as EXPLICIT `"<undefined>"` keys
+(the registry's own generic wrapper always spreads these 4 forwarding keys onto every handle it builds,
+regardless of whether a declaration sets them — the old hand-written object simply never had them at all,
+absent rather than undefined), the vestigial `axis:"x"` key is gone (confirmed unused by featureCanvas.js's own
+rendering — grepped, no `.axis` read on a handle object anywhere), and `onDrag`'s own function arity moved from
+`<fn/2>` to `<fn/3>` (`buildCanvasWidgets`'s onDrag takes an optional `commitNow` 3rd param the hand-written
+version never had — FeatureCanvas itself always calls `spec.onDrag(id, world)` with exactly 2 args regardless,
+confirmed by reading `featureCanvas.js`'s own call site, so the extra param is never populated in practice).
+NONE of these three differences touch any of the FOUR specific historical defect classes this snapshot exists
+to protect (t1672/1686 frame split, t1684 emits — still `true`, unchanged, t1680 onEdit — still `<fn/2>`,
+unchanged, t1674 noSnap — was never declared true for facing either way) — checked each by name against the
+diff, not assumed clear. The snapshot's own header explicitly designs for exactly this: "honest drift... a
+legitimate change... deserves the review the regeneration flag forces" — regenerated it
+(`UPDATE_PREVIEW_SNAPSHOT=1 npm run test:node`), reviewed the FULL diff (`git diff` on the fixture — confirmed
+via the diff stat that ONLY facing's own 4 lines changed across the entire 32-twin × 2-state snapshot, nothing
+else moved), and it now shows facing's handle looking like every OTHER `buildCanvasWidgets`-built handle in the
+app (the same forwarding keys alignment/pocket/etc. already carry) — this is facing becoming CONSISTENT with
+its siblings, not a departure.
+
+**Full suite re-ran clean apart from two flakes, neither caused by this change**: the known pre-existing
+`sf-pos-snapback` load-contention timeout (documented since t2465), plus `open-as-modal-1625.spec.js`'s "A REAL
+OPEN AFTER A PREVIEW" test — a NEW flake, not previously seen this session, but has zero relation to lathe/
+facing/canvasWidgets (grepped, no reference) and passed 3/3 clean when re-run solo — confirmed load-contention,
+not a regression, before concluding.
+
+**WHAT PORTING ONE OP ACTUALLY COST, for the remaining-five decision**: the geometry math itself fit the
+registry's declared vocabulary PERFECTLY — no extension, no contorted shape, the `length` gesture was already
+exactly this op's own shape. The friction was entirely in the EXPORTED OBJECT'S metadata shape (undefined-vs-
+absent keys, function arity) tracked by an existing snapshot gate — a one-time, reviewable, ~5-line diff, not a
+recurring cost. Given facing was the SIMPLEST case (one handle, one field, no fused radius+angle, no taper
+branch), the other five (`odTurn`'s fused shoulder corner, `parting`'s three independent handles, `polygon`'s
+two-view layout, `centerDrill`/probes' single handles) are worth judging individually — `centerDrill`/
+`faceProbe`/`odProbe` look like more of the SAME `length`-shaped case as facing; `odTurn`/`polygon` may need the
+registry's `rect`/`radial` shapes or reveal a genuine mismatch the way facing did not.
+
+Tier: `viz/canvasWidgets.js` is a shared registry consumed by every mill wizard's own handles — rule 1b, full
+suite before concluding.
+
+### VERIFY
+
+Facing's gate numbers, before vs. after, stated side by side (see above) — IDENTICAL, no digit moved.
+`tests/lathe-pilot-1271.spec.js`: 8/8 passed, unedited. `test:node`: 238/238 after the reviewed snapshot
+regeneration (237/238 before regeneration — the ONE expected, understood, reviewed diff). `test:changed`: 1/1
+passed. Full suite `--workers=4` BEFORE concluding: **3022 passed, 2 failed, 7 flaky, 26 skipped** (3057 total)
+— both failures are pre-existing/unrelated flakes (`sf-pos-snapback`, documented since t2465; `open-as-modal-
+1625`'s preview-chrome test, new this run but unrelated by content and re-confirmed 3/3 green solo), neither
+caused by this change. `git status --porcelain`: confirmed exactly two files touched (`viz/latheProfileCanvas.js`,
+the reviewed `preview-spec-1688.txt` snapshot) — nothing else. `handoff.py amendments --role worker` polled
+clean before the full-suite run. Scratch `_live-check.spec.js` (the before/after gate-number capture) deleted,
+never committed.

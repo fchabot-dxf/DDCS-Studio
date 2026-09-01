@@ -22,6 +22,9 @@ import { halfProfile, normalizeBar, radiusOf, diameterOf } from '../data/lathe.j
 import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate, shared with gcodeViz3d.js/latheScene.js/latheDro.js
 import { polygonPath, polyRadiusAt, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
 import { partBladeZ, partFloorRadius } from '../wizards/lathe/parting.js';   // t2030 — the SAME kerf helpers the real emit calls, "derived HERE so the emit and the tests cannot disagree" (parting.js's own words) — this canvas used to disagree with that on purpose, one level down
+import { buildCanvasWidgets } from './canvasWidgets.js';   // t2485 (BACKLOG #61 / L5 PILOT) — facing's own hand-rolled
+// handle math (place/drag) is now DECLARED through the shared gesture registry instead of hand-copied; see
+// latheProfileSpec's own comment below for why this ONE op and not the rest of the family.
 
 /** Lathe Z → canvas x. The bar runs left (chuck, −Z) to right (raw face, +Z), which is how a turner faces one. */
 export const zToCanvas = (z) => z;
@@ -45,6 +48,25 @@ const onEditFromMap = (map, write) => (id, val) => {
 
 /**
  * Build the canvas spec for a bar.
+ *
+ * t2485 (BACKLOG #61 / L5 PILOT) — the handle itself (place/drag/edit) is now DECLARED through
+ * `canvasWidgets.js`'s shared gesture registry, not hand-rolled here. The face line is exactly the registry's
+ * own `length` gesture: a 1D distance from an anchor along an axis (`ax:0, ay:r, axis:'x'`) — anchored at Z0
+ * (the finished face, always 0 per `halfProfile`'s own `zFace`), clamped to `min:0` for the SAME reason the old
+ * hand-written clamp existed (dragging past the finished face is not a smaller cut, it is a cut into the part).
+ * `zToCanvas`/`canvasToZ` are the identity function (see their own comment above), so `ax:0` IS `zToCanvas(0)`
+ * and the gesture's raw `w.x` IS already `canvasToZ(world.x)` — no translation needed at this call site.
+ *
+ * THE ONE BEHAVIOUR DELIBERATELY DROPPED, confirmed NOT observable: the old `onDrag` rounded to 3dp
+ * (`Math.round(z*1000)/1000`) before calling `onAllowance`. Every write from this file already funnels through
+ * `panelTypes.js`'s own `_writeParam`, which rounds to the SAME 3dp (`r3`) unconditionally on every field write
+ * — traced the actual call chain (`latheLayoutSpec`'s `write` → the caller's `setFields` → `_writeParam`) rather
+ * than assumed, so dropping the now-redundant local rounding changes nothing that reaches the model or the emit.
+ *
+ * WHY THIS OP AND NOT THE REST OF THE FAMILY: this project's own corner precedent — prove a mechanism once on
+ * one op, let the rest inherit once it's proven. facing is the SIMPLEST case (one handle, one field, no fused
+ * radius+angle, no taper branch) — the natural pilot for whether the family's geometry fits the registry's
+ * declared vocabulary AT ALL before committing the other five to the same shape.
  * @param {object} bar        {diameter, stickOut, allowance}
  * @param {(allowance:number) => void} onAllowance  called with the NEW allowance while the face line is dragged
  * @returns a FeatureCanvas spec: shapes to draw, one draggable handle, and the drag→parameter write
@@ -53,6 +75,14 @@ export function latheProfileSpec(bar, onAllowance) {
     const b = normalizeBar(bar);
     const prof = halfProfile(b);
     const r = radiusOf(b.diameter);
+
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        // t1684 — emits:true (the SAME declared convention corner's sim-start rows use, unified via opSimStarts.js's
+        // makeProvider) marks a handle whose drag writes a bound param that reaches the emit; featureCanvas.js reads
+        // it and tints the handle TEAL. It sits on the RAW END, because that is what moves when you decide to remove more or less.
+        { type: 'length', id: FACE_HANDLE_ID, field: 'allowance', ax: 0, ay: r, axis: 'x', min: 0,
+          value: b.allowance, emits: true, label: 'face' },
+    ], (m) => { if (typeof onAllowance === 'function' && m.allowance !== undefined) onAllowance(m.allowance); });
 
     return {
         // THE DRAWING FRAME IS THE BAR ITSELF — its half-section, Z across and radius up. The canvas draws `stock` as
@@ -69,21 +99,9 @@ export function latheProfileSpec(bar, onAllowance) {
             // Z0, the finished face
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: r },
         ],
-        handles: [
-            // t1684 — emits:true (the SAME declared convention corner's sim-start rows use, unified via opSimStarts.js's
-            // makeProvider) marks a handle whose drag writes a bound param that reaches the emit; featureCanvas.js reads
-            // it and tints the handle TEAL. It sits on the RAW END, because that is what moves when you decide to remove more or less.
-            { id: FACE_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', emits: true,
-              label: 'face', value: b.allowance },
-        ],
-        onDrag: (id, world) => {
-            if (id !== FACE_HANDLE_ID || typeof onAllowance !== 'function') return;
-            // …clamped at the finished face: dragging PAST Z0 would mean negative material, which is not a smaller
-            // cut, it is a cut into the finished part. The handle stops where the part starts.
-            const z = Math.max(0, canvasToZ(world.x));
-            onAllowance(Math.round(z * 1000) / 1000);
-        },
-        onEdit: (id, val) => { if (id === FACE_HANDLE_ID && typeof onAllowance === 'function' && Number.isFinite(val)) onAllowance(val); },
+        handles,
+        onDrag,
+        onEdit,
     };
 }
 

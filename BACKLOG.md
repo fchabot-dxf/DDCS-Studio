@@ -5464,6 +5464,30 @@ Seeded into the L1 mutation manifest as its own acceptance test (`drill-split-pa
 `tests/support/previewMutations.js`) — reverts BACKLOG #68's own fix in-flight, proven RED under the revert and
 GREEN against current code, same runner/same convention as every other entry. Full account: WORK-LOG t2481.
 
+### ⭐⭐ t2485 — L5's PILOT: `facing` ported onto `canvasWidgets.js`'s declared registry, byte-identical gate
+numbers before/after — geometry fits the registry perfectly, the real cost was elsewhere
+
+L4 (t2471) measured the lathe family at 6/7 GREEN under `dragHandleRenderTruth` — the "gate can't reach the
+lathe family, so port it" premise L5 was originally scoped on no longer holds. This turn re-scoped L5 as
+duplication-collapse (north star 4), not a bug fix, and shipped ONLY its pilot: `facing`, the family's simplest
+op (one handle, one field), with the bar stated as strictly as it can be stated — nothing observable may change
+at all.
+
+Captured `facing`'s own `dragHandleRenderTruth` numbers live BEFORE any edit, ported the hand-written
+`latheProfileSpec` handle (`web/viz/latheProfileCanvas.js`) onto `canvasWidgets.js`'s existing `length` gesture
+(no registry extension — the face-line handle IS a 1D anchored distance, exactly that gesture's own shape), then
+re-captured the SAME numbers after: byte-identical, no digit moved, across three drag directions. The existing
+`tests/lathe-pilot-1271.spec.js` (8 tests, including a direct `spec.onDrag('faceLine', ...)` drive that reads
+the emitted G-code back) passed UNEDITED.
+
+**The real, reportable cost**: `tests/node/preview-spec-gate-1688.test.mjs`'s own snapshot caught a shape
+change nothing else did — the registry's generic wrapper always forwards `color`/`manual`/`noSnap` as explicit
+keys (present-but-undefined, not absent) and gives `onDrag` an extra unused arity — traced against the gate's
+own FOUR protected defect classes (t1672/1686/1680/1674) and confirmed none are touched; regenerated and
+reviewed the snapshot (a 4-line diff in a 900+-line fixture), which now shows `facing` looking like every other
+`canvasWidgets`-built handle in the app, not less consistent. Full account, incl. what this implies for the
+remaining five ops: WORK-LOG t2485.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
