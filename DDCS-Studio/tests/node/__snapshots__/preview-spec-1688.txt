@@ -558,25 +558,25 @@ user_lathe_centerdrill @offdefaults .onEdit "<fn/2>"
 user_lathe_centerdrill @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_faceprobe @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_faceprobe @defaults .handles <1 entries>
-user_lathe_faceprobe @defaults .handles[0] {"axis":"x","emits":true,"id":"probeFace","kind":"size","label":"touched face","value":0,"x":0,"y":10}
+user_lathe_faceprobe @defaults .handles[0] {"color":"<undefined>","emits":true,"id":"probeFace","kind":"size","label":"touched face","manual":"<undefined>","noSnap":"<undefined>","value":0,"x":0,"y":10}
 user_lathe_faceprobe @defaults .items <4 entries>
 user_lathe_faceprobe @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_faceprobe @defaults .items[1] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
 user_lathe_faceprobe @defaults .items[2] {"cls":"fc-probe-touch","cx":2,"cy":5.5,"kind":"circle","r":2}
 user_lathe_faceprobe @defaults .items[3] {"cls":"fc-probe-approach","kind":"line","x1":10,"x2":2,"y1":5.5,"y2":5.5}
-user_lathe_faceprobe @defaults .onDrag "<fn/2>"
+user_lathe_faceprobe @defaults .onDrag "<fn/3>"
 user_lathe_faceprobe @defaults .onEdit "<fn/2>"
 user_lathe_faceprobe @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_faceprobe @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_faceprobe @offdefaults .handles <1 entries>
-user_lathe_faceprobe @offdefaults .handles[0] {"axis":"x","emits":true,"id":"probeFace","kind":"size","label":"touched face","value":7,"x":7,"y":10}
+user_lathe_faceprobe @offdefaults .handles[0] {"color":"<undefined>","emits":true,"id":"probeFace","kind":"size","label":"touched face","manual":"<undefined>","noSnap":"<undefined>","value":7,"x":7,"y":10}
 user_lathe_faceprobe @offdefaults .items <5 entries>
 user_lathe_faceprobe @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_faceprobe @offdefaults .items[1] {"cls":"fc-feature-pocket","h":10,"kind":"rect","w":7,"x":0,"y":0}
 user_lathe_faceprobe @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
 user_lathe_faceprobe @offdefaults .items[3] {"cls":"fc-probe-touch","cx":16,"cy":5.5,"kind":"circle","r":9}
 user_lathe_faceprobe @offdefaults .items[4] {"cls":"fc-probe-approach","kind":"line","x1":52,"x2":16,"y1":5.5,"y2":5.5}
-user_lathe_faceprobe @offdefaults .onDrag "<fn/2>"
+user_lathe_faceprobe @offdefaults .onDrag "<fn/3>"
 user_lathe_faceprobe @offdefaults .onEdit "<fn/2>"
 user_lathe_faceprobe @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_facing @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}

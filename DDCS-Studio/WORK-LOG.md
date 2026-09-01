@@ -67627,3 +67627,33 @@ reviewed snapshot), the op's own 11-test file green. Full suite deferred to the 
 "full suite workers=4 once at the end"), covering all three ports together.
 
 Separate commit, rule 4 (one op = one commit).
+
+## t2491b — L5, op 2 of 3: faceProbe ported onto the registry (length, byte-for-byte facing's own shape)
+
+faceProbeSpec's own handle IS facing's shape exactly -- `x = ahead` (positive relationship), `y` fixed at
+`barR`, clamp lower-bound-only at 0. No sign flip, no scale factor needed: `length` gesture, `ax:0, axis:'x',
+min:0, field:'ahead'`. Fully ported (handles/onDrag/onEdit all from `buildCanvasWidgets`), same as facing and
+centerDrill -- no fused-field ambiguity, `d.field` is the only field, generic `onEdit` fits cleanly.
+
+Gate numbers, before vs. after, all three seeds, byte-identical:
+  diag  (dx55,dy-25): movedMid=54.999 movedAfter=54.999 -- SAME before and after.
+  pureX (dx60,dy0):   movedMid=59.999 movedAfter=59.999 -- SAME before and after.
+  pureY (dx0,dy45):   movedMid=0.000 movedAfter=0.000 -- SAME before and after (the handle is X-only, matching
+        the hand-written code's own `world.y` being ignored either way).
+`tests/lathe-probe-1299.spec.js` (10 tests, incl. "THE HALF-PROFILE DRAWS THE TOUCH, and the handle writes the
+parameter the emit reads", the Iron Rule tests, the .wiz round trip) passed UNEDITED -- this file also covers
+`odProbe`, still unported at this point in the turn, unaffected.
+
+Snapshot diff, ENUMERATED BY DIRECTION, faceProbe's own 4 lines only:
+- ADDED: color, manual, noSnap (present-but-undefined, the generic wrapper). NO `labelDir` this time -- `length.
+  place()` never included it (unlike centerDrill's own `rect`-based diff), matching facing's own t2485 diff
+  exactly, byte-for-byte.
+- REMOVED: axis:"x" (confirmed inert, same reasoning as every prior removal).
+- ALTERED: onDrag "<fn/2>" -> "<fn/3>" (never populated in practice).
+- UNCHANGED: onEdit stays "<fn/2>", now the GENERIC implementation. emits still true. x/y/value/kind/label/id
+  identical on every line.
+
+Tier: same file as op 1, other ops untouched. test:node green (238/238, reviewed snapshot). Full suite deferred
+to the end of this turn, covering all completed ports together.
+
+Separate commit, rule 4.

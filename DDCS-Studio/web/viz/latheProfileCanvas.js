@@ -472,6 +472,9 @@ function touchMarker(z, r, axis, tip) {
  * THE FACE PROBE PICTURE. Two lines matter: the face the stylus will touch, and Z0. The distance between them is the
  * op's one real decision, so it is what the handle writes — the same grab, on the same line, as facing's allowance.
  * With the default of zero they coincide, which is the picture of "the face I touch IS zero".
+ *
+ * t2491 (BACKLOG #61 / L5) — this handle IS facing's own `length` shape, byte-for-byte (`ax:0, axis:'x', min:0`
+ * — the same anchor-at-Z0, positive-only distance `latheProfileSpec`'s own face-line handle already proved).
  */
 export function faceProbeSpec(bar, probe, onChange) {
     const b = normalizeBar(bar);
@@ -480,6 +483,11 @@ export function faceProbeSpec(bar, probe, onChange) {
     const p = probe || {};
     const ahead = Math.max(0, Number(p.ahead) || 0);
     const tip = Math.max(0.3, Number(p.tipRadius) || 2);
+
+    const { handles, onDrag, onEdit } = buildCanvasWidgets([
+        { type: 'length', id: FACE_PROBE_HANDLE_ID, field: 'ahead', ax: 0, ay: barR, axis: 'x', min: 0,
+          emits: true, label: 'touched face', value: ahead },
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
 
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
@@ -490,17 +498,9 @@ export function faceProbeSpec(bar, probe, onChange) {
             { kind: 'line', x1: zToCanvas(0), y1: 0, x2: zToCanvas(0), y2: barR },              // Z0, what gets written
             ...touchMarker(ahead, barR * 0.55, 'z', tip),
         ],
-        handles: [
-            { id: FACE_PROBE_HANDLE_ID, x: zToCanvas(ahead), y: barR, kind: 'size', axis: 'x', emits: true,
-              label: 'touched face', value: ahead },
-        ],
-        onDrag: (id, world) => {
-            if (id !== FACE_PROBE_HANDLE_ID || typeof onChange !== 'function') return;
-            // …never behind Z0: a face BEHIND the datum would mean the finished face is still to be found, which the
-            // probe cannot know. Dragging stops where the two coincide — the ordinary touch-off.
-            onChange({ ahead: r3(Math.max(0, canvasToZ(world.x))) });
-        },
-        onEdit: onEditFromMap({ [FACE_PROBE_HANDLE_ID]: 'ahead' }, onChange),
+        handles,
+        onDrag,
+        onEdit,
     };
 }
 
