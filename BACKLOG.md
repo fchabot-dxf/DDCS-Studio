@@ -5073,3 +5073,59 @@ the typo rather than fixing it).
 `CATEGORIES`); `field_ref` reachable under Wizard Layout; the pre-existing `palette-no-block-vanishes-1570.
 spec.js` (the general reachable-set invariant this exact scenario is drawn from) stays green.
 tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`).
+
+---
+
+### 60. [MEASURED t2457, NOT SHIPPED — reading/research only] WIZARDS-AS-DATA EMIT EQUIVALENCE: DIALECT COVERAGE
+IS UNEVEN ACROSS 25 ALREADY-TESTED TWINS, AND 3 TWINS HAVE A REAL, TESTABLE GAP WITH NO TEST AT ALL
+
+*(owner, thorough-measurement ask, 2026-08-31: "we need to be thorough" — dispatched as a check on whether
+wizards-as-data actually works fully, after the advisor told the owner the arc was "essentially complete" then
+found only 5 of 32 twins had an equivalence spec by one narrow naming-pattern grep. Full account: WORK-LOG
+t2457.)*
+
+⭐ **THE ADVISOR'S OWN "5 of 32" COUNT WAS WRONG BY ~5x** — 25 of the 32 wizards-as-data twins already have a
+genuine, non-tautological byte-identical equivalence test; they were just named `*-data-emit.spec.js` /
+`*-twin.spec.js` / `*-in-place.spec.js` / `*-cross-dialect-*.spec.js`, which a grep for `*-as-data.spec.js`
+alone never finds. **This entry is NOT "the arc is broken" — it corrects a premise, then names what's actually
+missing**, which is narrower and differently-shaped than "27 untested twins."
+
+**THE CRITERION, established with the file in hand (do not skip this before touching anything here)**: a twin
+is genuinely, independently testable only if its `instantiate()`/`postInstantiate` calls the hand-written
+builder AT MOST ONCE (to seed a frozen template, then drives every instance through DECLARED bindings) — never
+if it re-invokes the hand-written builder LIVE with the current params on every instantiate (that's
+tautological: the twin cannot diverge from the thing it's calling). Full reasoning + the 32-row evidence table:
+WORK-LOG t2457.
+
+**What's actually open, in two independent parts — fix them separately, they are not the same shape of work:**
+
+1. **14 of the 25 tested twins have partial-to-zero cross-dialect coverage** (`middle`/`edge`/`corner`/
+   `alignment`/`tap`/`surfacing` = zero; `bore`/`wcs`/`contour`/`comm`/`ioStep` = partial, missing dialects;
+   `atc_check`/`atc_length`/`atc_test` = thin, 1-2 reps/dialect on top of a bigger single-dialect sweep). **Cheap
+   and mechanical** — the exact pattern is already proven 11 times over (drill/slot/text/atc_warmup/pocket/
+   homing/atc_change/atc_table/rotaryCenter/rotaryClock/parting all do it correctly); add a `listPosts()` cross-
+   dialect test (or widen an existing thin one) per op, mirroring any of those 11. No design decision needed.
+2. **3 twins have NO equivalence test despite 2 of them being straightforwardly testable**: `facing` and
+   `centerDrill` use the SAME frozen-template-once pattern as drill — a real `*-data-emit.spec.js` for each is a
+   same-shape port of an already-proven pattern. `odTurn` is different and harder: its `postInstantiate` calls
+   `odTurnStack` LIVE every time, which is tautological by construction — writing a MEANINGFUL test here needs a
+   prior design decision (does odTurn's own architecture change to a frozen-template pattern, or does the claim
+   being tested get reframed to "the delegation glue is correct," a genuinely weaker and differently-worded
+   claim?) — do not build a test that reads like the other 11 but proves less, per this session's own standing
+   rule against dressing a weaker guarantee in a stronger one's language.
+
+**Correctly OUT of scope, not a gap**: `faceProbe`/`odProbe`/`polygon`/`pauseConfirm` — no second implementation
+was ever registered for these (`SEED_BUILDERS` holds only the data def), so there is nothing to be
+byte-identical WITH. An equivalence spec here would compare a thing to itself.
+
+**Separately named, not investigated further**: the FORM-side ratchet (`twin-form-completeness-1581.spec.js`,
+the same `SEED_BUILDERS`-driven sweep, genuinely 32/32) checks field PRESENCE and WIDGET-TYPE fidelity only —
+zero occurrences of `label`/`help`/`default` in that file. Whether every twin's field text (not just its
+existence) matches its declared metadata is unexplored.
+
+**STILL REAL IF**: `grep -L "listPosts\|profileId" tests/{middle,edge,corner,alignment,tap,surfacing}*.spec.js`
+lists all 6 (zero dialect coverage still true) OR `grep -c "postInstantiate.*Stack(" web/blocks/dataOps/
+odTurnData.js` still returns ≥1 with a live-param call (odTurn still tautological) OR no test file diffs
+`facingStack`/`centerDrillStack` against their own twins. Any of these returning false means that PART of this
+entry shipped — re-check per-part, do not treat the whole entry as one unit (rule 8b: a partial ship with a
+heading still claiming "open" for the whole thing is the same trap this entry itself was filed to stop).

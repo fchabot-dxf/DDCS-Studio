@@ -65815,3 +65815,151 @@ Tier: doc-only — nothing to gate.
 
 Files: `BACKLOG.md`.
 
+## t2457 — MEASUREMENT TURN, per the owner's own "we need to be thorough": does wizards-as-data actually work
+fully? A full 32-op classification, evidence-based, per rule 8b — no fixes, no ports, nothing closed
+
+Dispatched on the advisor's own preliminary count: "FORM is 32/32, EMIT has exactly FIVE specs." That count is
+**wrong, by roughly 5x** — 25 of the 32 twins already have a genuine, non-tautological byte-identical
+equivalence test, just under naming conventions the "`*-as-data.spec.js`" grep never caught
+(`*-data-emit.spec.js`, `*-twin.spec.js`, `*-in-place.spec.js`, `*-cross-dialect-*.spec.js`, one `.test.mjs`
+under `tests/node/`). Correcting this is the single biggest fact this turn establishes — but it does NOT mean
+the arc is done; the REAL gap is narrower and different in shape than "5 specs," reported precisely below.
+
+### THE CRITERION — established first, with the file in hand, per the dispatch's own explicit instruction
+
+Neither of the two candidates the dispatch offered turned out to be the right single answer:
+- **`opBuilders.js`'s `BUILDERS` table** (21 keys) tells you whether `builderOf(<bareType>)` still resolves the
+  hand-written function under its OWN pre-twin type key — real, but it's a REGISTRY-membership fact, not a
+  runtime-behavior fact.
+- **`wizardLibrary.js`'s `opensAs`** (25 wizard-bar entries) tells you whether the TRAY click routes to the
+  twin — real, but it's a UI-entry-point fact, not a code-independence fact.
+
+**The fact that actually decides whether an equivalence test can be MEANINGFUL is a third thing: does the
+twin's own `instantiate()`/`postInstantiate` call the hand-written builder LIVE, with the CURRENT params, every
+time — or does it call the hand-written builder AT MOST ONCE (to seed a frozen template shape, e.g. with
+`{superset:true}` for the guard-carrying twins, or at module-load with defaults for the simpler ones), then
+drive all per-instance variation through DECLARED bindings that never touch the hand-written function again?**
+
+- **Re-invoked live** → tautological. The twin cannot diverge from the hand-written builder by construction,
+  because at runtime they ARE the same call. An equivalence test here can prove "the delegation glue didn't
+  break," never "an independent reconstruction agrees." Found exactly once: **odTurn**
+  (`postInstantiate = rebuildOdTurn` calls `odTurnStack(resolvedParams)` fresh on every instantiate).
+- **Called at most once, then bindings-only** → genuinely testable. A binding-derivation bug (the twin's OWN
+  logic, not the hand-written builder's) can produce real, catchable divergence. This is the drill/bore/slot/
+  text/atc_warmup shape, and — confirmed by actually reading the code, not assumed from a header — it is ALSO
+  the shape of every other twin below, including several the dispatch's own framing treated as suspect
+  (`facing`/`centerDrill`/`tap`/`parting` all freeze the hand-written builder's output ONCE at defaults/superset,
+  then patch by declared var-identity or (blockIndex,key) binding — structurally identical to drill, just
+  younger and in most cases untested).
+- **No hand-written builder was ever registered as a second, independent implementation** → structurally moot,
+  not a gap. Found in exactly 4 ops (below) — `SEED_BUILDERS` registers ONLY the data def; the "Stack"-named
+  function, if one exists at all, is a private helper the twin's OWN `postInstantiate` calls, never a
+  separately reachable builtin.
+
+### THE 32-ROW TABLE
+
+Legend: **A** = two genuinely independent paths, a real byte-identical test exists (dialect coverage noted
+separately below the table — it varies enormously and is the actual remaining gap). **B** = structurally moot,
+no second path ever existed, nothing to prove. **C** = doesn't fit — named individually.
+
+| # | op | class | test file | evidence |
+|---|---|---|---|---|
+| 1 | drill | A | `drill-as-data.spec.js` | 21 combos (7 dialects × 3 reps); **also t2455's own exhaustive 140-combo full-sweep×7-dialect run, 0 diffs** |
+| 2 | bore | A | `bore-as-data.spec.js` | main sweep 1 dialect + 4-of-7 dialect spot-check (8 combos); **t2455 exhaustive 70-combo full-sweep×7-dialect, 0 diffs** |
+| 3 | slot | A | `slot-as-data.spec.js` | full `listPosts()` cross-dialect test; **t2455 exhaustive 35-combo broadened×7-dialect, 0 diffs** |
+| 4 | text | A | `text-as-data.spec.js` | 21 combos (7×3); **t2455 exhaustive 140-combo full-sweep×7-dialect, 0 diffs** |
+| 5 | atc_warmup | A | `atc-warmup-as-data.spec.js` | 21 combos (7×3); **t2455 exhaustive 56-combo full-sweep×7-dialect, 0 diffs** |
+| 6 | pocket | A | `pocket-data-emit.spec.js` | 144-combo main sweep (1 dialect) + 21-combo cross-dialect (7×3 reps) |
+| 7 | homing | A | `homing-data-emit.spec.js` | 66-combo main sweep + 14-combo cross-dialect (7×2 reps) |
+| 8 | atc_change | A | `atc-change-twin.spec.js` | **210 combos, FULL** — 7 dialects × 2 configs × 5 methods × 3 callMacro, all on the live registry |
+| 9 | atc_table | A | `atc-table-twin.spec.js` | **252 combos, FULL** — 7 dialects × 3×3×2×2 |
+| 10 | atc_test | A | `atc-test-twin.spec.js` | 72-combo main sweep on ONE dialect only + 14-combo cross-dialect (7×2 reps) |
+| 11 | atc_check | A | `atc-check-in-place.spec.js` | 8-combo main × 2 profiles + 7-combo cross-dialect (1 rep/dialect — thin) |
+| 12 | atc_length | A | `atc-length-in-place.spec.js` | same shape as atc_check — 8×2 main + 7×1 cross-dialect (thin) |
+| 13 | rotaryCenter | A | `rotary-center-data-emit.spec.js` | 112+4 combo main + 14-combo cross-dialect (7×2 reps) |
+| 14 | rotaryClock | A | `rotary-clock-data-emit.spec.js` | 88-combo main + 14-combo cross-dialect (7×2 reps) |
+| 15 | middle | A | `middle-data-emit.spec.js` | **1792+16 combos — the largest sweep found** — but **ZERO dialect coverage** (no `listPosts`/dialect anywhere in the file) |
+| 16 | edge | A | `edge-data-emit.spec.js` | 10+28 combos — **ZERO dialect coverage** |
+| 17 | corner | A | `corner-data-emit.spec.js` | 16 combos + spot-checks — **ZERO dialect coverage** |
+| 18 | alignment | A | `alignment-data-emit.spec.js` | 12 combos — **ZERO real dialect coverage** (2 stubbed "profiles," not actual dialects) |
+| 19 | wcs | A | `wcs-in-place.spec.js` | 25 combos — **5 of 7 dialects**, hand-typed list, silently missing Centroid + grblHAL |
+| 20 | contour | A | `contour-data-emit.spec.js` | 19 combos — **2 of 7 dialects** (grbl+rs274ngc spot-check only) |
+| 21 | comm | A | `comm-twin.spec.js`+`comm-post-fold.spec.js` | 16+45 combos — **2 or 5 of 7 dialects**, hardcoded, not `listPosts()` |
+| 22 | ioStep | A | `io-step-twin.spec.js` | 8 combos — **2 of 7 dialects** (Expert+V41 only) |
+| 23 | tap | A | `tap-twin-778.spec.js` | 5 combos, one dialect — **ZERO dialect coverage** (the file's only dialect-aware test checks G84 presence, not equivalence) |
+| 24 | parting | A | `parting-cross-dialect-1900.spec.js` | 14 combos (7×2), **FULL dialect** — the file's OWN header calls itself "the minimal one... safe-by-absence" (parting.js has no dialect branch YET, so nothing can currently diverge — the machinery is real, the current risk is just low) |
+| 25 | surfacing | A | `tests/node/surfacing-as-data.test.mjs` | 17 combos + binding-wiring — **ZERO dialect coverage**. ⚠ `surfacingData.js`'s own header cites `tests/surfacing-as-data.spec.js`, which **does not exist** — the header itself is stale, the real file lives under `tests/node/` with a different extension |
+| 26 | faceProbe | B | — | no separate builtin ever registered; `faceProbeStack` is a private helper only `faceProbeData.js`'s own `postInstantiate` calls |
+| 27 | odProbe | B | — | same shape as faceProbe |
+| 28 | polygon | B | — | same shape; the two tests that exist each check hand-derived numbers against ONE path, never diff two paths against each other |
+| 29 | pauseConfirm | B | — | no test, no separate builder; the twin's own comment: "Emit is exactly the pauseConfirm atom — no new logic" |
+| 30 | odTurn | C | `lathe-odturn-1273.spec.js` | **tautological**: `postInstantiate` calls `odTurnStack(resolvedParams)` live every time — cannot diverge by construction. Existing "ONE EMIT SOURCE" assertion also only diffs a REGEX-FILTERED line subset (`/^(G0|G1|#1[23]|IF|N6|GOTO)/`), not full text |
+| 31 | facing | C | `lathe-pilot-1271.spec.js` | a real, independent-enough builder (`facingStack`) DOES exist, frozen-template pattern (testable, like drill) — but **genuinely untested**: the only "byte-identical" claim in the file is a `.wiz` export/reimport self-check (twin vs itself), never twin vs `facingStack` |
+| 32 | centerDrill | C | — | same as facing: `centerDrillStack` is real, frozen-template, testable — **no test compares it to the twin at all** (`lathe-part-drill-1275.spec.js` calls `centerDrillStack` extensively but never through the twin) |
+
+### DIALECT-COVERAGE SUMMARY across the 25 class-A ops (the actual remaining gap, reshaped from BACKLOG #30)
+
+```
+FULL 7-dialect, solid sweep-per-dialect        11   drill·slot·text·atc_warmup·pocket·homing·
+                                                     atc_change·atc_table·rotaryCenter·rotaryClock·parting
+FULL 7-dialect, THIN (1-2 reps/dialect only)     3   atc_check·atc_length·atc_test
+PARTIAL (missing some of the 7)                  5   bore(4/7)·wcs(5/7)·contour(2/7)·comm(2-5/7)·ioStep(2/7)
+ZERO dialect coverage at all                      6   middle·edge·corner·alignment·tap·surfacing
+```
+
+**A V4.1- or DM500-only divergence in these 14 ops' own binding/postInstantiate logic (the PARTIAL + ZERO rows,
+14 of 25) would pass every test that exists today.** This is BACKLOG #30's own original concern — real, just
+attached to a different and WIDER set of ops than the "5 famous files" framing implied, since #30 only ever
+looked at the 5-file naming pattern.
+
+### THE FORM SIDE — checked for the SAME kind of thinness, per the dispatch's own explicit request
+
+The form-side ratchet is `tests/twin-form-completeness-1581.spec.js`, driven off the SAME `SEED_BUILDERS` list
+(32 entries, `app.js:99-106`) the emit side uses. It runs two checks, both **structural**:
+1. every declared binding's param has a form row somewhere (`formBindings()` doesn't drop a param) —
+   presence only, says nothing about the row's TEXT.
+2. materializing a param-group preserves each binding's WIDGET TYPE (dropdown stays a dropdown, a bool stays a
+   toggle) — control-kind fidelity, not content.
+
+**Zero occurrences of `label`/`help`/`default` anywhere in that file** (grepped directly) — "FORM is 32/32" is
+true as a claim about structural completeness and widget-type fidelity. It is NOT a content-completeness
+claim: a field could carry a stale label, missing help text, or a default that disagrees with the twin's own
+declared `default:` metadata, and this ratchet would not catch it. Named plainly, not investigated further
+(out of this turn's scope — the dispatch asked whether the thinness exists, not to fix it).
+
+### THE PLAIN-LANGUAGE ANSWER, per the dispatch's own deliverable
+
+**Does wizards-as-data work fully? Partly — and the "partly" is a different shape than either "5 specs" or "we
+said it's essentially complete" suggested.**
+
+The CORE claim (each twin independently reproduces its hand-written predecessor, not just delegates to it) is
+**proven for 25 of 32 ops**, correctly **inapplicable for 4** (faceProbe/odProbe/polygon/pauseConfirm — no
+second implementation was ever built, nothing to prove), and **genuinely open for 3** (facing/centerDrill —
+real, testable, simply never tested; odTurn — the existing "proof" is tautological by construction and only
+checks a partial line-subset, so it proves the least of any op on this list despite reading like the others).
+
+Of the 25 proven twins, only **11 have thorough cross-dialect verification** matching the standard BACKLOG #30
+itself asked for. **14 have partial-to-zero dialect coverage** — a real gap, wider than #30's own 5-file frame,
+but narrower than "the whole arc is unproven": these 14 ops' PARAMETER-sweep coverage is often excellent
+(middle alone sweeps 1808 combos) — what's missing specifically is running that sweep, or even a
+representative slice of it, against V4.1/DM500/the other non-Expert dialects.
+
+The FORM side's "32/32" is real but narrower than it reads: every twin's form has the right FIELDS in the right
+WIDGET shapes; no ratchet anywhere checks that a field's label/help/default text is actually correct.
+
+**Nothing was fixed, ported, or closed this turn** — per the dispatch's own explicit instruction. Filed as
+BACKLOG #60 (new entry, distinct from #30 — #30's own original concern, the 5 famous files, is fully resolved
+per t2455; this is the next, more precisely-scoped layer): 14 ops need dialect-coverage broadening (a known,
+cheap, mechanical fix — the pattern is proven 11 times over), 3 ops need a genuine new equivalence test written
+(facing/centerDrill are straightforward — same shape as drill; odTurn needs a design decision first, since its
+CURRENT architecture makes true independence structurally impossible without restructuring `postInstantiate`),
+and the FORM-side content-completeness question is named as unexplored, not investigated.
+
+### Tier
+
+Reading and research only — zero code/test files changed, `git status` confirms only `BACKLOG.md`/`WORK-LOG.md`
+touched. `test:changed`/`test:node` would show nothing (no source touched); not run, per the dispatch's own
+"reading and test-writing only if any" scoping and since nothing was written.
+
+Files: `BACKLOG.md`, this entry.
+
