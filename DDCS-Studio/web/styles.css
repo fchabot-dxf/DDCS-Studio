@@ -176,7 +176,16 @@ svg [id*="Zfirst_travel"] {
     /* Accent complements — new this turn, not a collapse of anything. */
     --accent-ink: #fff;           /* the text colour that sits ON a filled --accent surface; every skin below overrides it to its own real contrast pairing. */
     --tab-accent: var(--accent);  /* the active-tab glow colour; a skin overrides it only when the glow wants to differ from the flat accent (futuristic does). */
-    --band-bg:    var(--panel);   /* the strip directly under the header — .app-header's own --tab-fill (below) derives from this rather than restating it. */
+    --band-bg:    var(--panel);   /* a secondary BAND tone — Settings' own sub-tab head, Macros/Gateway/Blocks
+       topbars, the generic .tab-strip class — surfaces that want to read as a distinct strip, not merge with
+       the panel. t2253 gave 4 of 5 themes their own real (non-panel) value here for exactly that reason. */
+    --tab-face-active: var(--panel);   /* t2483 — SPLIT from --band-bg (BACKLOG amendment, owner-reported: the
+       active APP tab, in studio, no longer matched the panel below it). One token, --band-bg, was carrying two
+       contradictory claims: the active tab wants to MATCH the panel (this contract, below), Settings' own band
+       wants to be DISTINCT from it (t2253's own fix) — retuning either shade would always half-serve the other
+       consumer. Named for its OWN claim, not its value: "the active app tab's fill." Defaults to --panel (the
+       restored contract) everywhere except organic, which redeclares it to --band-bg in its own theme block —
+       organic deliberately wants the tab AND the band to match (coral/canopy), same as before this split. */
 
     /* t2075 (P4a) — BUTTON MATERIAL: the group all five skins patch independently, the strongest possible
        signal of a missing token. Defaults here match exactly what the base button rule already renders
@@ -456,11 +465,15 @@ html, body { overflow-x: clip; }
    every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
    that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
    through the header's bottom border so there's no separating line. */
-.app-header .tab.active { --tab-fill: var(--band-bg); color: var(--tab-ink, var(--hdr-ink, var(--text-main))); background: var(--tab-fill); margin-bottom: -1px;
+.app-header .tab.active { --tab-fill: var(--tab-face-active); color: var(--tab-ink, var(--hdr-ink, var(--text-main))); background: var(--tab-fill); margin-bottom: -1px;
     box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge), var(--tab-glow, 0 0 0 transparent); }
-/* t2073 — was --tab-fill: var(--panel) directly; now DERIVES from --band-bg (which defaults to var(--panel),
-   so this is byte-identical everywhere except organic, which now sets --band-bg once instead of restating
-   its own tab-fill AND its own five-selector patch separately — see organic's theme block + the patch below. */
+/* t2073 — was --tab-fill: var(--panel) directly; then (briefly) DERIVED from --band-bg so organic's coral could
+   flow through one token. t2253 gave 4 of 5 themes a real, distinct --band-bg value for Settings' own band's
+   sake — which silently detached this rule from --panel too, since both read the same token. Owner-reported
+   (studio, two circled screenshots): the active tab no longer matched the strip below it. t2483 — DERIVES from
+   --tab-face-active instead (see its own :root comment) — byte-identical everywhere except organic (which
+   redeclares --tab-face-active to --band-bg in its own theme block, unchanged behaviour) and the four themes
+   the split now correctly RESTORES to --panel (byte-identical to how this rule rendered before t2253). */
 /* Organic theme: the connecting tab AND the bar below the header are coral (theme accent), kept matching so
    the active tab still merges into the bar. t2071 (human-ruled: "i remember coral was the original color, lets
    try it") — this rule used to paint #studio-app .top-dock-header green too, at (1,2,0) + !important, which
@@ -3405,6 +3418,10 @@ button.primary:hover {
        (.settings-headerrow / .settings-identity) for "a subtle accent-tinted strip" — "something plainer"
        for Clean Modern means reusing that established wash, not inventing a bolder one. */
     --band-bg: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    --tab-face-active: var(--panel);   /* t2483 — re-asserted per-skin (a :root-only alias freezes against
+       <html>'s own default, see the ink/edge/surface family's own comment above); restores the active app
+       tab to matching this theme's own panel, undoing the accidental detachment --band-bg's own t2253 tint
+       caused when both consumers still shared one token. */
 
     /* t2075 (P4a) — button material, relocated from the two selector-based overrides this replaces (below,
        now deleted): a 6px toolbar radius, and hover: deep navy rather than the accent blue — the base hover
@@ -3482,6 +3499,11 @@ button.primary:hover {
        "recessed plate behind the chrome" purpose. Reusing it, not inventing a sixth shade — "studio's own
        ladder" per the dispatch. */
     --band-bg: var(--plate-lo);
+    --tab-face-active: var(--panel);   /* t2483 (owner-reported, two circled screenshots) — the active app tab
+       had followed --band-bg (--plate-lo, #b6b1a5) up to this turn, DARKER than --panel (#cfcabf) — mismatched
+       against the strip it's meant to merge with. Restores the original contract: --panel is LIGHTER than
+       --hdr-bg here, so this also makes the active tab read MORE highlighted than before, not less (the
+       owner's own stated condition), see the :root token comment for the full split rationale. */
 
     /* t2075 (P4a) — button material: relocated from the selector-based rules this replaces (below). Studio's
        "edge" is a GRADIENT (the bevel), which a plain border-color can't hold — the bevel lives in --btn-face's
@@ -3952,6 +3974,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        declared brass-frame colour, distinct from both --bg and --panel — "brass for steampunk" per the
        dispatch, no new hex invented. */
     --band-bg: var(--border);
+    --tab-face-active: var(--panel);   /* t2483 — re-asserted per-skin (:root-only freezes); restores the active
+       app tab to matching --panel (#3d2817) instead of the brass --band-bg (#6b5329), same split as studio. */
 
     /* t2075 (P4a) — button material, relocated from the two selector-based rules this replaces (below, now
        deleted). ⚠ CORRECTION to this comment's own first draft: "resolve correctly through the :root
@@ -4055,6 +4079,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        — distinctly lighter/bluer than both --bg and --panel, part of the surface/surface-raised/edge ladder
        already declared for this skin. "its own cyan-black" per the dispatch, no new hex invented. */
     --band-bg: var(--surface-raised);
+    --tab-face-active: var(--panel);   /* t2483 — re-asserted per-skin (:root-only freezes); restores the active
+       app tab to matching --panel (#0e1626) instead of the raised --band-bg (#16243c), same split as studio. */
 
     /* t2075 (P4a) — button material, relocated from the selector-based rules this replaces (below). Futuristic
        uses a genuine colour change on hover (not a filter) — its OWN general button hover, unlike the
@@ -4278,6 +4304,11 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        OVERRIDE of the t2071 ruling recorded below (not a bug fix — the human has now seen this green band
        rendered and chosen it deliberately). Warm on purpose: hue ~90° (moss); an earlier draft at 135° read as
        "too teal/blue" and was rejected — stay at or below ~95° if this is ever adjusted again. */
+    --tab-face-active: var(--band-bg);   /* t2483 — organic is the ONE theme that redeclares this to --band-bg,
+       not --panel: it deliberately wants the active tab AND the band to match (the canopy stripe), unchanged
+       from before this split. Also keeps the tab's own flare-corner pseudo-elements (::before/::after, which
+       inherit --tab-fill from this rule) consistent with the coral/green override below rather than falling
+       back to --panel — those corners aren't reachable by the !important override, only by this token. */
 
     /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);

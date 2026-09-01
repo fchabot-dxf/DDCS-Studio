@@ -67266,3 +67266,67 @@ remote. Did not attempt to revert or force-push over already-pushed, tested, gre
 literally undoing a real fix on a shared branch seemed like the wrong failure mode to invent under a timing
 gap, not something the amendment itself asked for. Flagged plainly in the pass-back for the advisor to
 reconcile; no further edits made this turn once this was found.
+
+## t2483 — ONE THING: the studio active-tab colour fix, owner-reported with two circled phone screenshots
+
+Per Amendment 2's own explicit scope: this turn, nothing else. Spec: `scratchpad/t2479-amend-studio-tab-colour.md`.
+
+**MEASURE FIRST**, per the spec's own explicit instruction (the advisor had been wrong twice reading this file
+alone). Wrote a scratch spec switching `data-theme` live across all 5 themes and reading `getComputedStyle` on
+the header, the active tab, and the root `--panel`/`--band-bg` tokens. First pass showed steampunk/futuristic
+apparently "stuck" on the previous theme's colour — traced to a measurement artifact (read too soon after the
+attribute switch, before the browser's next style/paint pass; +300ms settled every theme to its own correct
+value) — noted here because it looked like a real bug for a few minutes and wasn't one; the CSS token wiring
+itself was already fully correct going in. Confirmed the spec's own inferred numbers exactly: studio
+`--hdr-bg`/`--band-bg` = `--plate-lo` #b6b1a5 (dark), `--panel` = #cfcabf (lighter) — and same LIGHTER-panel
+relationship holds in every other non-organic theme too (`--panel` > header in lightness for normal/steampunk/
+futuristic as well), confirming the fix makes every theme's active tab MORE highlighted, never less.
+
+**Root, confirmed live**: `.app-header .tab.active` (`styles.css`) read `--tab-fill: var(--band-bg)`. `--band-bg`
+carries TWO contradictory claims — the active tab wants to MATCH `--panel` (the strip below, restoring the
+original contract), while Settings' own band (`#settings-app .settings-head`, t2253's own fix) wants to be
+DISTINCT from panel. t2253 gave 4 of 5 themes a real, non-panel `--band-bg` value for the Settings band's own
+sake, which silently detached the active tab from `--panel` too, since both consumers shared the one token —
+studio's own case is the most visible (dark plate-lo vs. the lighter panel), but the same mechanism was live
+for normal (an 8% accent tint, subtler) and steampunk/futuristic too.
+
+**Fix**: split into two declarations, per the spec's own explicit instruction ("name them for their claims, not
+their current values") — a new token `--tab-face-active` (mirrors the existing `--btn-face-active` naming
+precedent already in this file: group=tab, part=face, state=active). Declared at `:root` AND re-asserted on
+each theme's own block (a `:root`-only alias freezes against `<html>`'s base value, not `<body>`'s theme
+override — this file's own documented, hard-won gotcha, see the ink/edge/surface family's comment) — `var(--panel)`
+for normal/studio/steampunk/futuristic (restoring the original contract), `var(--band-bg)` for organic
+specifically, which deliberately wants the tab AND the band to match (the canopy stripe) — unchanged from
+before this split, and necessary to keep the tab's own flare-corner pseudo-elements (`::before`/`::after`,
+which inherit `--tab-fill` from the parent rule) consistent with the coral/green `!important` override that
+sets the tab's main `background` directly but never touches `--tab-fill`. `.app-header .tab.active` now reads
+`--tab-fill: var(--tab-face-active)` instead of `var(--band-bg)`. `--band-bg` itself, and every OTHER consumer
+of it (Settings' own band, `.tab-strip`, Macros/Gateway/Blocks topbars), is completely untouched.
+
+**Confirmed live, all 5 themes, +300ms settle**: active-tab background now byte-matches `--panel` for normal
+(#fff), studio (#cfcabf, was #b6b1a5), steampunk (#3d2817, was #6b5329), futuristic (#0e1626, was #16243c);
+organic unchanged (#25301a, matches `--band-bg`, flare corners intact). Settings' own band re-checked
+separately (studio): still `rgb(182,177,165)` = `--plate-lo`, distinct from the panel body below it — t2253's
+own fix NOT reintroduced/regressed.
+
+**Screenshots** (before/after via a temporary `git checkout HEAD -- styles.css` / restore-from-scratch-copy,
+confirmed byte-identical restore via `diff`, never touching the shared repo's stash — this repo's own "no git
+stash" rule): `verification/t2483-studio-tabs-before.png` / `-after.png` (header + toolbar strip together — the
+active tab visibly changes from matching the dark header to matching the lighter toolbar row below, the exact
+"browser tab merges with the body" read the contract describes), `verification/t2483-studio-settings-band.png`
+(the UI/Controller/Hardware/Workspace band still reads as a distinct strip), `verification/t2483-organic-tabs-
+unchanged.png` (organic's coral/green match-both design, unaffected).
+
+Tier: `styles.css` `:root` tokens read by 5 themes — rule 1b, full suite before concluding.
+
+### VERIFY
+
+`test:changed`: 0 tests (Playwright's changed-file detection can't map a bare CSS token change to spec files —
+expected, not a gap; this is exactly why rule 1b mandates the full suite for this class of change). `test:node`:
+238/238 passed. Full suite `--workers=4` BEFORE concluding: **3017 passed, 1 failed, 12 flaky, 26 skipped** (3056
+total) — the one failure is the same pre-existing `sf-pos-snapback` load-contention timeout documented since
+t2465, unrelated (zero test files touched this turn, only `styles.css`). `git status --porcelain`: confirmed
+clean of every file this turn didn't intend to touch (the pre-existing modified verification PNGs / untracked
+root files from before this session are untouched, not staged). `handoff.py amendments --role worker` polled
+clean before the full-suite run (no new amendments). `proc_health.py watch`: clean. Scratch `_live-check.spec.js`
+(rewritten repeatedly for the measurement/screenshot passes) deleted, never committed.
