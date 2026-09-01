@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { dragHandleRenderTruth, assertDragRenderFaithful } from './support/dragRenderTruth.js';
 import { checkAffordancesPresent } from './support/affordancePresence.js';
+import { checkAffordancesReachable } from './support/affordanceReachability.js';
 import { PREVIEW_MUTATIONS } from './support/previewMutations.js';
 
 /**
@@ -53,6 +54,26 @@ async function bootPocketRect(page) {
         const framed = _framed('user_pocket_data', params);
         const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
         const op = makeOp('user_pocket_data', params, bare);
+        const stack = [framed.find((b) => b && b.type === 'progstart'), op, framed.find((b) => b && b.type === 'progend')].filter(Boolean);
+        window.ddcsLoadBlockStack(stack);
+    });
+    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length > 5);
+    await page.waitForTimeout(400);
+}
+
+/** t2481 (BACKLOG #61 / L3) — boot drill at its own DEFAULTS, mirroring `bootPocketRect`'s own convention
+ *  (`_framed`+`makeOp`+`ddcsLoadBlockStack`) rather than the `stackToWorkspace` boot BACKLOG #67/#68's own
+ *  diagnosis used — confirmed live that both boot methods show the identical reachability result, so this
+ *  keeps the manifest's own runner internally consistent rather than introducing a second boot convention. */
+async function bootDrillPattern(page) {
+    await page.goto('/?debug=feat');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp, null, { timeout: 60000 });
+    await page.evaluate(() => window.showApp('blocks'));
+    await page.evaluate(async () => {
+        const { _framed, makeOp } = await import('/blocks/opBuilders.js');
+        const framed = _framed('user_drill_data', {});
+        const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+        const op = makeOp('user_drill_data', {}, bare);
         const stack = [framed.find((b) => b && b.type === 'progstart'), op, framed.find((b) => b && b.type === 'progend')].filter(Boolean);
         window.ddcsLoadBlockStack(stack);
     });
@@ -176,6 +197,13 @@ async function probePresence(page, entry) {
     return checkAffordancesPresent(page, entry.affordance);
 }
 
+/** t2481 (BACKLOG #61 / L3) — the reachability probe: boot drill, then check the declared affordance selectors
+ *  under `entry.affordance` via `checkAffordancesReachable`. Mirrors `probePresence`'s own shape exactly. */
+async function probeReachability(page, entry) {
+    await bootDrillPattern(page);
+    return checkAffordancesReachable(page, entry.affordance);
+}
+
 const DRAG_PROBES = {
     pocket: (page, seed) => probeDrag(page, bootPocketRect, 'pk_size', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
     surfacing: (page, seed) => probeDrag(page, bootSurfacing, 'sf_pos', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
@@ -189,6 +217,7 @@ const DRAG_PROBES = {
  *  longer pick the right probe. */
 function probeFor(entry) {
     if (entry.kind === 'presence') return (page) => probePresence(page, entry);
+    if (entry.kind === 'reachability') return (page) => probeReachability(page, entry);
     return (page, seed) => DRAG_PROBES[entry.op](page, seed);
 }
 

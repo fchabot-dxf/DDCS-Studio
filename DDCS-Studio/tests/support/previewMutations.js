@@ -67,6 +67,10 @@ const T2423_STYLES_CONTAINMENT = {
 // leaving the 12 rules unconditional again exactly as they were pre-t2423).
 const T2423_STYLES_UNWRAP = {
     path: '/styles.css',
+    // t2481 — extended to also carry BACKLOG #68's own rules (added inside this SAME @container block, right
+    // after .wiz-viz3d), so unwrapping the block still matches the on-disk file exactly once. This mutation's
+    // own claim (pane-sizes-from-window, BACKLOG #58) is unaffected either way — it exercises .wiz-2pane, not
+    // .ui-split-horiz — the #68 lines just have to ride along so the find-string stays a byte-exact match.
     find: `@container (max-width: 860px) {
     #blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
     #blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
@@ -80,6 +84,15 @@ const T2423_STYLES_UNWRAP = {
     #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
     #blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
     #blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+    /* t2481 (BACKLOG #68) — a DECLARED horizontal split (drill's own \`split_horizontal\`, t2341) had only the
+       ≤860px @media stacking rule above (line ~2702-2704, keyed to the WINDOW), never this @container one —
+       so a narrow #blk-formpane inside a wide window left \`.ui-split-pane1\`'s fixed 360px column wider than
+       its own narrow flex container, starving \`.ui-split-pane2\` (flex-basis:0, nothing left to grow into) to
+       a genuine computed width:0. Same fix shape as t2423's own #blk_wiz_user .wiz-2pane rules just above,
+       mirroring the ALREADY-STACKED @media version verbatim — the SAME 860px figure, now asked of the pane. */
+    #blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
 }`,
     replace: `#blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
 #blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
@@ -92,7 +105,10 @@ const T2423_STYLES_UNWRAP = {
 #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
 #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
 #blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
-#blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }`,
+#blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+#blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }`,
 };
 
 // ── Entry 3 — the flyout-lands-in-a-corner defect class. NO fix commit exists to derive this from (checked:
@@ -123,6 +139,21 @@ const T2465_POCKET_SIZE_HANDLE_REMOVED = {
     path: '/blocks/dataOps/pocketData.js',
     find: `        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });`,
     replace: `        /* t2465 mutation: pk_size intentionally not pushed */`,
+};
+
+// ── Entry 6 — t2481 (BACKLOG #61 / L3, THE REACHABILITY PRIMITIVE's own acceptance seed; also BACKLOG #68's
+// permanent guard). Reverts the @container fix in-flight (web/styles.css) so drill's own tree-rendered
+// `.ui-split-horiz` split goes back to computing `.ui-split-pane2` at width:0 inside a narrow #blk-formpane —
+// landing the `dr_pos` handle past the viewport edge with no scroll mechanism to reach it (document.scrollWidth
+// === window.innerWidth). Unlike every entry above, this ALSO reproduces RED against the CURRENT, unmutated
+// tree with no route at all before the fix landed — this seed additionally proves the guard catches the SAME
+// regression class if the @container rules are ever deleted/renamed. ──────────────────────────────────────────
+const T2481_STYLES_DRILL_SPLIT_UNFIX = {
+    path: '/styles.css',
+    find: `    #blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }`,
+    replace: ``,
 };
 
 export const PREVIEW_MUTATIONS = [
@@ -166,5 +197,14 @@ export const PREVIEW_MUTATIONS = [
         seed: { type: 'pocket', shape: 'rect' },
         affordance: { containerSelector: 'svg.feature-canvas', selectors: ['.fc-handle[data-hid="pk_pos"]', '.fc-handle[data-hid="pk_size"]'] },
         proven: 'the presence primitive\'s own acceptance test — proves L2 by breaking it, exactly as L1 required',
+    },
+    {
+        id: 'drill-split-pane-unreachable',
+        kind: 'reachability',
+        defect: 'drill\'s tree-rendered .ui-split-horiz split starves .ui-split-pane2 to width:0 inside a narrow #blk-formpane, landing dr_pos past the viewport edge — BACKLOG #68, fix (t2481, @container rules mirroring t2423)',
+        files: [T2481_STYLES_DRILL_SPLIT_UNFIX],
+        op: 'drill',
+        affordance: { containerSelector: '#blk_wiz_user', selectors: ['.fc-handle[data-hid="dr_pos"]'] },
+        proven: 'the reachability primitive\'s own acceptance test — proves L3 by reverting BACKLOG #68\'s own fix, exactly as L1/L2 required',
     },
 ];

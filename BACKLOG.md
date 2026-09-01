@@ -5389,13 +5389,14 @@ error this session's own discipline exists to catch before it becomes a wrong ta
 - **CAN'T-RUN (10)**: `atc_warmup`/`atc_length`/`atc_check`/`atc_test`/`atc_change`/`atc_table` (6 — no
   geometry canvas at all, expected: housekeeping ops with nothing to drag), `wcs`/`comm`/`io_step`/
   `pause_confirm` (4 — same, logic/selection ops, no drag affordance).
-- **RED-VALID (1)**: `drill` — was CAN'T-RUN (its canvas never mounted at all, see below); FIXED at t2477
-  (BACKLOG #67), the canvas now mounts and renders real content, confirmed by screenshot. Re-ran the drag gate
-  on its own primary handle: RED — and t2479's own direct measurement settled the fourth-bucket question this
-  entry originally parked as inconclusive: the inner tree-rendered `.wiz-visual` pane can compute a genuine
-  `width:0`, landing `dr_pos` past the viewport edge with `document.scrollWidth === window.innerWidth` (no
-  scroll mechanism of any kind reaches it). **Not a Playwright hit-test artifact — a real reachability defect**,
-  filed as its own entry, BACKLOG #68. 18+3+10+1 = 32.
+- **RED-VALID (1), corrected a second time this turn**: `drill` — was CAN'T-RUN (canvas never mounted, see
+  below); FIXED at t2477 (BACKLOG #67), canvas mounts and renders real content. The gate then went RED on
+  `dr_pos` for a real reachability reason (BACKLOG #68 — the inner `.wiz-visual` pane computing `width:0`,
+  landing the handle past the viewport edge with no scroll mechanism to reach it), settled by t2479 and
+  **⭐ FIXED at t2481** (the missing `@container` narrow-pane treatment, mirroring t2423's own pattern; now
+  permanently guarded by BACKLOG #61's own L3 primitive). Reachable now — but a SECOND, different RED surfaced
+  once it was: the handle no longer tracks the pointer during the drag itself, an unrelated defect, filed as
+  BACKLOG #69, not fixed. 18+3+10+1 = 32.
 
 ⭐ **`drill`'s CAN'T-RUN is NOT "no affordance by design"** — its own rendered form copy reads *"Drag the
 handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it"* — the
@@ -5442,6 +5443,26 @@ progress line and the axis-diagnosis runs: WORK-LOG t2471.
 **STILL REAL IF**: any of `tests/support/dragRenderTruth.js`'s own two exports change shape, OR the SEED_BUILDERS
 registry count moves away from 32 (`grep -c "DataDef" web/app.js`'s own `SEED_BUILDERS` array literal) — either
 would mean this table needs re-running, not just re-reading.
+
+### ⭐⭐ t2481 — L3 UN-PARKED AND SHIPPED: THE REACHABILITY PRIMITIVE, proven against a live, unfixed defect
+
+L3 (`affordanceReachability.js`) was previously closed as "partial, on purpose" — no forcing case existed to
+prove it against (BACKLOG #62's own mobile drawer couldn't be reproduced in this harness; headless Chromium has
+no dynamic toolbar to hide/show, t2469's own finding). BACKLOG #68 provided one: LIVE and UNFIXED at the time
+L3 was built, directly measurable in this harness (no mutation needed to manufacture the RED case — the
+opposite of L1/L2's own acceptance pattern, whose guarded defects were already fixed by the time their
+primitives were built).
+
+`tests/support/affordanceReachability.js` mirrors `affordancePresence.js`'s own shape exactly: checks whether a
+declared affordance is present, correctly sized, AND within the current viewport or a genuinely scrollable range
+that could bring it into view — the sibling claim to L2's "does it exist," not "can it be reached." Same
+anti-rot property carried over unchanged: throws only if the declared CONTAINER never rendered (a stale
+selector or boot failure); a per-selector "unreachable" is the expected, correct signal a real defect produces,
+never the throw condition.
+
+Seeded into the L1 mutation manifest as its own acceptance test (`drill-split-pane-unreachable`,
+`tests/support/previewMutations.js`) — reverts BACKLOG #68's own fix in-flight, proven RED under the revert and
+GREEN against current code, same runner/same convention as every other entry. Full account: WORK-LOG t2481.
 
 ---
 
@@ -6068,13 +6089,39 @@ handle itself.
 
 ---
 
-### 68. `drill`'s Blocks-tab visual pane can render with ZERO computed width, positioning its own handles PAST
-the viewport edge with no scroll mechanism to reach them — a REAL reachability defect, distinct from BACKLOG
-#67's own namespace fix. REPORT ONLY, not fixed
+### 68. [✅ FIXED t2481 — the missing `@container` treatment for drill's tree-rendered `.ui-split-horiz` split,
+mirroring t2423's own already-proven pattern; guarded permanently by BACKLOG #61's own L3 primitive] `drill`'s
+Blocks-tab visual pane can render with ZERO computed width, positioning its own handles PAST the viewport edge
+with no scroll mechanism to reach them — a REAL reachability defect, distinct from BACKLOG #67's own namespace
+fix
 
 *(filed t2479, small item — characterizing BACKLOG #67's own L4 gate-RED finding on `drill`. Bounded to the
 narrow question the dispatch asked: instrumentation artifact, or a real overlay/reachability issue a user
 would also hit? Answer: the latter — filed, not left as a characterization note.)*
+
+**⭐ FIXED t2481.** Root: drill's own tree-rendered horizontal split (`.ui-split-horiz`, introduced at t2341) was
+never given the `@container (max-width: 860px)` narrow-pane stacking treatment that `.wiz-2pane`/`.wiz-controls`/
+`.wiz-visual` already received at t1760/t2423 (BACKLOG #58) — only the older `@media`-keyed (WINDOW-width) rule,
+which never fires when the window is wide even though the PANE itself (`#blk-formpane`) is narrow. With the
+window wide but the pane narrow (349px, the Blocks tab's own default), `.ui-split-pane1`'s fixed `flex: 0 0
+360px` column overflowed its own narrow flex container, starving `.ui-split-pane2` (`flex: 1 1 0`, nothing left
+to grow into) to a genuine computed `width:0` — landing `dr_pos` off-screen with no scroll mechanism to reach it
+(exactly t2479's own measurement). Fix, `web/styles.css` inside the EXISTING `@container` block (mirroring
+t2423's own `.wiz-2pane` rules just above, verbatim same 860px figure, now asked of the pane instead of the
+window):
+```css
+#blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
+```
+Confirmed live both directions (screenshot: `verification/t2481-drill-visualization-fixed.png`) and against 3
+other scenarios (wide-pane drill, pocket, standalone modal) — all clean. **Permanently guarded**: this is BACKLOG
+#61's own L3 primitive's forcing case (`tests/support/affordanceReachability.js`, new this turn) — seeded into
+the L1 mutation manifest as `drill-split-pane-unreachable` (`tests/support/previewMutations.js`), proven RED
+under an in-flight revert of the fix and GREEN against current code. Full account: WORK-LOG t2481.
+
+⚠ **Fixing this surfaced a SECOND, different RED** once `dr_pos` became reachable at all — drag doesn't track
+the pointer. Not the same defect; filed separately as BACKLOG #69, not fixed.
 
 **OBSERVED, a clean single measurement** (`user_drill_data`, default params, `stackToWorkspace` boot — the
 same real toolbox-drag simulation BACKLOG #67's own A/B used, 1400×1000 viewport, the SAME viewport L4's own
@@ -6119,3 +6166,38 @@ genuinely different, valid RED.
 `document.documentElement.scrollWidth === window.innerWidth` (no scroll mechanism exists to reach the
 escaped content).
 
+
+---
+
+### 69. `drill`'s `dr_pos` handle no longer tracks the pointer during a drag — surfaced ONLY once BACKLOG #68's
+reachability fix landed; a different, unrelated defect. REPORT ONLY, one candidate tried and reverted, not fixed
+
+*(filed t2481, discovered as a side effect of fixing #68 — explicitly sanctioned by that turn's own dispatch:
+"It may come back RED — that is a FINDING not a failure of the fix." Fixing reachability finally let L4's own
+drag-render-truth gate reach `dr_pos` for the first time; it came back RED, for a genuinely different reason
+than #68.)*
+
+**OBSERVED, live**: once `dr_pos` is on-screen (post-#68-fix), a real pointer-drag gesture (`mouse.down` at the
+handle's own center → `mouse.move` in steps → `mouse.up`) does not move the handle. Hit-testing at the drag's
+own start coordinate via `document.elementFromPoint(x, y)` returns `DIV.wiz-controls`, not the SVG handle —
+**even though the coordinate is geometrically within the SVG's own `getBoundingClientRect()`.** Confirmed via a
+direct rect check that `.ui-split-pane1` (the controls column, `x:651–1493`) and `.ui-split-pane2` (the visual
+column, `x:148–635`) do NOT overlap — the two panes are cleanly separated, so this is not a simple z-order/
+overlap bug in the obvious sense.
+
+**ONE candidate tried, empirically REFUTED, reverted** — per this arc's own guardrail discipline (test a
+candidate directly; if it has zero measurable effect, revert rather than leave unproven speculative code in a
+shared render path): added `position: sticky; top: 0; z-index: 3; background: var(--panel);` to
+`.ui-split-pane2` in `web/styles.css`, mirroring the WORKING sibling pattern already on `.wiz-2pane >
+.wiz-visual`. Verified via `getComputedStyle` that the sticky/z-index rules DID apply as written
+(`position:sticky, zIndex:3, top:0px`, confirmed) — the hit-test result was UNCHANGED regardless
+(`elementFromPoint` still returned `.wiz-controls`). Reverted; `web/styles.css` carries only BACKLOG #68's own
+minimal 3-line fix, no sticky/z-index addition.
+
+⛔ **Root cause NOT understood.** Not chased further this turn — a genuinely open mystery, not a guessed-at
+fix. Concrete next step for whoever picks this up: trace WHY `elementFromPoint` resolves to `.wiz-controls`
+despite the rects not overlapping — check for a stacking-context/transform on an ancestor, or whether
+`.wiz-controls` has its own invisible overflow/pointer-events reach beyond its own visible rect.
+
+**STILL REAL IF**: dragging `dr_pos` on a live `user_drill_data` boot (Blocks tab, narrow pane, post-#68-fix)
+still shows `movedMid`/`movedAfter` near zero despite the handle being on-screen and hit-testable in principle.

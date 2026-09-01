@@ -67173,3 +67173,85 @@ still read the old, unresolved framing; corrected the bucket label and its prose
 `width:0` inner-pane mechanism and cross-linking #68, matching the count (18+3+10+1 = 32, unchanged).
 
 Tier: doc-only — no test/product code touched for this half.
+
+## t2481 — L3 UN-PARKED AND SHIPPED (BACKLOG #61), using BACKLOG #68 as its forcing case; #68 FIXED; a second,
+different RED (#69) surfaced once reachability was fixed, reported not fixed
+
+Genuine scope change mid-turn: dispatched initially as the studio-tab-colour fix (the t2479 deferred amendment).
+Investigation began (read the spec in full, confirmed `--plate-lo` against source, started mapping `--band-bg`
+across all 5 themes) — no edits made. A live, ad-hoc user message ("amended") arrived mid-task; polling
+`handoff.py amendments --role worker` surfaced the owner's own direct instruction (relayed by the advisor):
+defer studio-tab-colour entirely, untouched, and replace the main item with L3, using BACKLOG #68 as its
+forcing case. Abandoned the tab-colour work immediately (clean state, nothing to revert) and pivoted.
+
+**BACKLOG #68, FIXED.** Root: drill's own tree-rendered `.ui-split-horiz` split (t2341) never got the
+`@container (max-width: 860px)` narrow-PANE treatment `.wiz-2pane`/`.wiz-controls`/`.wiz-visual` already have
+(t1760/t2423, BACKLOG #58) — only the older `@media` (WINDOW-width) rule, which never fires when the window is
+wide even though `#blk-formpane` itself is narrow (349px, the Blocks tab's own default). Traced the full parent
+chain's `getBoundingClientRect()`/`getComputedStyle()` down to the exact collapse point: `.ui-split-pane1`'s
+fixed `flex: 0 0 360px` column overflows its own 349px-wide flex container, starving `.ui-split-pane2` (`flex:
+1 1 0`) to a genuine computed `width:0`. Fix (`web/styles.css`, inside the EXISTING `@container` block, mirroring
+t2423's own already-proven `.wiz-2pane` rules verbatim — same 860px figure, now asked of the pane):
+```css
+#blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+#blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
+```
+Confirmed live both directions; screenshot `verification/t2481-drill-visualization-fixed.png` (full
+VISUALIZATION section, 3D+2D stacked, `dr_pos` handle visible). Regression-checked against 3 other scenarios
+(wide-pane drill, pocket, standalone modal) — all clean, no shared-file collateral.
+
+**L3, THE REACHABILITY PRIMITIVE — un-parked and built.** `tests/support/affordanceReachability.js` (new),
+mirroring `affordancePresence.js`'s own exact shape: `readAffordanceReachability` (self-contained
+`page.evaluate` function) checks each declared selector for presence, non-zero size, AND reachability (within
+the current viewport, or within a genuinely larger scrollable document that could bring it into view — #68's
+own case needs only the simpler viewport check, since `document.scrollWidth === window.innerWidth` means no
+scroll mechanism exists at all). `checkAffordancesReachable` throws only if the declared CONTAINER never
+rendered (stale selector / boot failure) — same anti-rot property L1/L2 already earned, carried over unchanged:
+a per-selector "unreachable" is the expected, correct signal a real defect produces, never the throw condition.
+
+⭐ **The proof pattern inverts from L1/L2, deliberately**: their own guarded defects were already fixed by the
+time their primitives were built, needing an in-flight mutation to manufacture a synthetic RED case. #68 was
+LIVE AND UNFIXED when L3 was built — proven RED against the CURRENT, unmutated tree first (no mutation, no
+manifest entry), confirmed directly: `ok:false`, `detail:"outside viewport, no scroll mechanism reaches it"`.
+Only after the fix landed was a mutation entry added, reverting the fix in-flight to keep the guard permanent
+going forward (matching L1/L2's own convention) — `drill-split-pane-unreachable` in
+`tests/support/previewMutations.js`, wired into `tests/preview-mutation-manifest-2463.spec.js` via a new
+`bootDrillPattern` (mirrors `bootPocketRect`'s own `_framed`+`makeOp`+`ddcsLoadBlockStack` convention — confirmed
+live that this boots identically to the `stackToWorkspace` method the original #67/#68 diagnosis used, so kept
+the manifest runner internally consistent rather than introducing a second boot convention) and a new
+`probeReachability` (mirrors `probePresence`'s own shape), dispatched via a new `kind === 'reachability'` branch
+in `probeFor`. Ran the new entry solo: RED under the mutation, GREEN once removed. Extending the fix's OWN
+`@container` block also broke the EXISTING `pane-sizes-from-window` (BACKLOG #58/#61) manifest entry's own
+find-string (T2423_STYLES_UNWRAP expected the block to end right after `.wiz-viz3d`, but #68's new rules now
+sit between that and the closing `}`) — caught by the disk-cleanliness check (0 hits, not 1), fixed by extending
+that entry's own find/replace to carry the new lines through (unwrap still applies to both rule sets together;
+the claim `pane-sizes-from-window` makes is unaffected, it exercises `.wiz-2pane` not `.ui-split-horiz`).
+
+**BACKLOG #69, NEW, filed — reported, not fixed.** Fixing reachability let L4's own drag-render-truth gate reach
+`dr_pos` for the FIRST TIME — it came back RED for a different reason than #68: a real pointer-drag gesture
+doesn't move the handle. `elementFromPoint` at the drag's own start coordinate resolves to `.wiz-controls`, NOT
+the SVG handle, even though the coordinate is geometrically inside the SVG's own rect and the two panes'
+`getBoundingClientRect()`s confirmed NOT overlapping (`pane2:148–635`, `pane1:651–1493`). ONE candidate tried
+(mirroring the working `.wiz-2pane > .wiz-visual` sticky pattern: `position:sticky; top:0; z-index:3;
+background:var(--panel);` on `.ui-split-pane2`) — verified via `getComputedStyle` that it DID apply, but the
+hit-test result was UNCHANGED. Reverted per this arc's own guardrail discipline (zero measurable effect →
+revert, don't leave unproven speculative code in a shared render path). Root cause NOT understood — reported
+honestly as an open mystery, explicitly sanctioned by the amendment's own "may come back RED — that is a
+FINDING not a failure of the fix."
+
+Tier: L3 primitive + manifest wiring + product fix — `test:changed`/`test:node` first, then the full suite per
+rule 1b (a shared file, `styles.css`, read by 5 themes).
+
+### VERIFY
+
+`test:changed`: covers the touched files. `test:node`: 238/238 passed. New manifest entry run solo (2 tests):
+both passed (RED-under-mutation, GREEN-clean). Full manifest spec (8 tests, all entries + the two disk-check
+tests): 8/8 passed after fixing the `pane-sizes-from-window` find-string collision. Full suite `--workers=4`
+BEFORE concluding: **3013 passed, 1 failed, 16 flaky, 26 skipped** (3056 total). The one failure is the same
+pre-existing `sf-pos-snapback` load-contention timeout documented since t2465 — unrelated (that spec itself
+passed clean when run in isolation above; this is load-contention under the full 4-worker run, not a regression
+from anything touched this turn). `git status --porcelain`: confirmed clean of every source file the manifests
+name. `handoff.py amendments --role worker` polled clean at this checkpoint (no new amendments).
+`tests/_live-check.spec.js` (scratch) deleted, never committed. `proc_health.py watch`: clean, no lingering
+ephemeral processes.

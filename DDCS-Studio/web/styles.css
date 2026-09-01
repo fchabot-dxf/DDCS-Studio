@@ -2750,6 +2750,15 @@ button.primary:hover {
     #blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
     #blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
     #blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+    /* t2481 (BACKLOG #68) — a DECLARED horizontal split (drill's own `split_horizontal`, t2341) had only the
+       ≤860px @media stacking rule above (line ~2702-2704, keyed to the WINDOW), never this @container one —
+       so a narrow #blk-formpane inside a wide window left `.ui-split-pane1`'s fixed 360px column wider than
+       its own narrow flex container, starving `.ui-split-pane2` (flex-basis:0, nothing left to grow into) to
+       a genuine computed width:0. Same fix shape as t2423's own #blk_wiz_user .wiz-2pane rules just above,
+       mirroring the ALREADY-STACKED @media version verbatim — the SAME 860px figure, now asked of the pane. */
+    #blk_wiz_user .ui-split-horiz { flex-direction: column; height: auto; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane1 { flex: 0 0 auto; order: 2; }
+    #blk_wiz_user .ui-split-horiz > .ui-split-pane2 { flex: 0 0 auto; order: 1; min-height: 0; }
 }
 
 /* ============================================================================================================
