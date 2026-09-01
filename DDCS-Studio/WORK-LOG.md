@@ -67799,3 +67799,58 @@ green when run solo, same load-contention pattern as every other cross-turn flak
 --porcelain`: confirmed exactly the intended file set, staged BY PATH. `handoff.py amendments --role worker`
 polled clean at the start of this turn and again before the full-suite run. `proc_health.py watch`: clean.
 Scratch `_live-check.spec.js` and the source-file scratch backup deleted, never committed.
+
+## t2495a — the fieldH/onEdit gap closed: `canvasWidgets.js`'s generic `onEdit` now resolves a `rect` handle's
+own two-field ambiguity, proven inert BEFORE any declaration used it
+
+The count reached three honestly (odTurn's shoulder t2489, odProbe t2491, parting's own floor t2493) — this
+project's own rule-of-three, earned over four separate turns rather than argued for in one.
+
+**THE PROBLEM, precisely**: `onEdit(id, val)` receives ONE scalar. `rect` can drive TWO fields (`field` on X,
+`fieldH` on Y) from one handle — nothing in a plain `{field, fieldH}` declaration says which one a click-to-
+edit's own typed number represents.
+
+**THE DESIGN, chosen from the three real cases in hand, not a hypothesis**: measured all three before deciding
+anything —
+- **`odProbe` / `partFloor`**: only `fieldH` is EVER declared on these (no `field`, no `sx` either) — the
+  destination is DERIVABLE by construction, no new declaration needed at all.
+- **`odTurn`'s own shoulder**: BOTH `field` (depth) AND `fieldH` (a diameter) are genuinely active — nothing
+  about the shape alone says which one the handle's own displayed `value` represents, so THIS is the one case
+  that actually needs to be told — a new optional `valueField` ('field' or 'fieldH') naming which key holds the
+  real answer.
+- Confirmed this covers ALL THREE real cases (not designed in the abstract) by re-reading each of the three
+  hand-written `onEditFromMap` implementations directly before writing a line of the new mechanism.
+
+**THE MECHANISM** (`web/viz/canvasWidgets.js`'s own `onEdit`): `targetField = d.valueField ? d[d.valueField] :
+(d.field != null ? d.field : d.fieldH)`. `field` wins whenever it's set AND `valueField` is absent — BYTE-
+IDENTICAL to the pre-t2495 `d.field`-only version for every OTHER existing caller in the app, which was
+confirmed by grepping every `type:'rect'` declaration across the whole tree (11 call sites outside this lathe
+file: pocket/drill/contour/surfacing's own fused W×H handles, a generic mill decl in `panelTypes.js:429` that
+DOES set `value` alongside both `field`+`fieldH` — the one case genuinely at risk of a silent behaviour change,
+confirmed it still resolves to `field` exactly as before since it declares no `valueField`) — none of them
+declare `valueField`, so all fall straight through to the unchanged default path.
+
+**PROVEN INERT BEFORE USE, in the exact order t2489's own clamp completion established as the pattern for a
+shared-mechanism change** ("prove the mechanism zero-diff through the snapshot gate before any declaration uses
+it"): ran `test:node` (the 32-twin × 2-state snapshot gate, which captures every declared handle across the
+WHOLE app) immediately after adding the mechanism, before touching odTurn/odProbe/parting's own declarations —
+238/238, ZERO diff. The gate's own `<fn/arity>` encoding for `onEdit` stayed `<fn/2>` (unchanged signature), and
+no handle's own rendered output moved, because nothing anywhere had opted in yet.
+
+**Unit-tested directly**, not just proven inert by absence: added a new test to `tests/canvas-widgets.spec.js`
+covering exactly the three cases above (derived-from-fieldH-only, declared-via-valueField, and the UNCHANGED
+default-to-field negative case a pre-existing test in the same file already exercised — restated here as its
+own explicit positive assertion, not assumed from that one). 7/7 tests in that file passed, including the new
+one and every pre-existing one (incl. `rect.onEdit('size', -3)`'s own ambiguous-but-unopted-in case, still
+resolving to `d_w`).
+
+Tier: `viz/canvasWidgets.js` is a shared registry consumed by every mill wizard's own handles — rule 1b, full
+suite deferred to the end of this turn (covering both this commit and the retrofits together, per the
+dispatch's own "full suite once, at the end").
+
+### VERIFY (this half)
+
+Mechanism proven inert before use: `test:node` 238/238, zero snapshot diff, run BEFORE any declaration used
+`valueField`. New unit test (`tests/canvas-widgets.spec.js`) proves the mechanism does what's intended, in
+isolation, for all three real shapes. Existing `rect.onEdit` ambiguous-case test unchanged and still green.
+Full suite deferred to the combined end-of-turn run — see the retrofit half's own VERIFY section.

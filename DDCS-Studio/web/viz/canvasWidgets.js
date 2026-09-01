@@ -242,10 +242,27 @@ export function buildCanvasWidgets(widgets, setFields) {
         const commit = commitNow;
         if (updates) setFields(updates, commit ? undefined : { preview: true });
     };
+    // t2495 (BACKLOG #61 / L5) — WHICH declared field the displayed `value` writes back to, when a gesture can
+    // drive TWO (`rect`'s own `field`+`fieldH`). Reached rule-of-three honestly: three real ops (odTurn's own
+    // shoulder, odProbe, parting's own floor) all needed this, counted one at a time across three separate
+    // turns rather than argued for in one — see BACKLOG #61's own t2489/t2491/t2493 entries for the count.
+    //   - DERIVED, no declaration needed, for the single-axis-active case (odProbe / parting's own floor): only
+    //     ONE of `field`/`fieldH` is ever set on these decls (the other axis's own divisor, `sx`/`sy`, is
+    //     omitted too) — so "whichever one exists" is unambiguous BY CONSTRUCTION, not a guess.
+    //   - DECLARED via `valueField` ('field' or 'fieldH'), only where BOTH are genuinely active (odTurn's own
+    //     shoulder: X writes depth, Y writes a diameter, and the handle's own displayed number is the diameter,
+    //     not the depth — nothing about the declaration alone says which, so it has to be said).
+    // DEFAULTS TO TODAY'S BEHAVIOUR, unconditionally: `field` wins whenever it's set and `valueField` is absent
+    // — byte-identical to the pre-t2495 `d.field`-only version for every one of this registry's OTHER existing
+    // callers (pocket/drill/contour/surfacing's own fused W×H handles, panelTypes.js's own generic W/H decl,
+    // this file's own `rect.onEdit` unit test) — confirmed inert via the snapshot gate BEFORE any declaration
+    // anywhere in the app set `valueField` for real.
     const onEdit = (id, value) => {   // click-to-type a dimension's value (FeatureCanvas inline editor) — a single
         // discrete action, not a drag stream — commits immediately, unchanged.
-        const d = byId[id]; if (!(d && d.field != null && Number.isFinite(value))) return;
-        setFields({ [d.field]: d.editMin != null ? Math.max(d.editMin, value) : value });
+        const d = byId[id]; if (!d || !Number.isFinite(value)) return;
+        const targetField = d.valueField ? d[d.valueField] : (d.field != null ? d.field : d.fieldH);
+        if (targetField == null) return;
+        setFields({ [targetField]: d.editMin != null ? Math.max(d.editMin, value) : value });
     };
     return { handles, onDrag, onEdit };
 }

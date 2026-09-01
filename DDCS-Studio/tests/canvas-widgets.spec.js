@@ -99,6 +99,36 @@ test('canvasWidgets registry: rect + radial gestures place + drag byte-identical
   expect(r.line1Drag.d_angle).toBeCloseTo(45, 6);
 });
 
+test('canvasWidgets registry: onEdit resolves valueField — derived when only one of field/fieldH is set, declared when both are', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+    const mk = (decls) => { const cap = {}; const w = buildCanvasWidgets(decls, (m) => Object.assign(cap, m)); return { ...w, cap }; };
+    const out = {};
+
+    // DERIVED — only fieldH is set (odProbe's/parting's floor own shape): no valueField declared, still resolves.
+    const yOnly = mk([{ type: 'rect', id: 'floor', fieldH: 'caliperDiameter', ax: 0, ay: 0, ex: 0, ey: 10, sy: 0.5, minh: 0, value: 20 }]);
+    yOnly.onEdit('floor', 27); out.derivedFieldH = { ...yOnly.cap };
+
+    // DECLARED — both field AND fieldH are active (odTurn's own shoulder shape): valueField says which one the
+    // displayed value represents; the OTHER axis's own field is untouched by an edit (an edit is one scalar).
+    const fused = mk([{ type: 'rect', id: 'shoulder', field: 'depth', fieldH: 'endDiameter', valueField: 'fieldH',
+      ax: 0, ay: 0, ex: -5, ey: 10, sx: -1, sy: 0.5, minh: 0, value: 20 }]);
+    fused.onEdit('shoulder', 33); out.declaredFieldH = { ...fused.cap };
+
+    // UNCHANGED — both set, no valueField: still resolves to `field`, byte-identical to every pre-t2495 caller
+    // (the existing W×H-style rect.onEdit test above already covers this; repeated here as the explicit
+    // negative case this test is specifically about, not assumed from that one).
+    const noOverride = mk([{ type: 'rect', id: 'wh', field: 'w', fieldH: 'h', ax: 0, ay: 0, ex: 10, ey: 10, sx: 1, sy: 1, value: 10 }]);
+    noOverride.onEdit('wh', 15); out.defaultsToField = { ...noOverride.cap };
+    return out;
+  });
+  expect(r.derivedFieldH, 'only fieldH is declared, so onEdit resolves to it with no valueField needed').toEqual({ caliperDiameter: 27 });
+  expect(r.declaredFieldH, 'valueField:\'fieldH\' routes the edit there and ONLY there — depth is untouched').toEqual({ endDiameter: 33 });
+  expect(r.defaultsToField, 'no valueField + both set → field wins, matching every existing caller').toEqual({ w: 15 });
+});
+
 test('canvasWidgets registry: pocket gesture params (ellipse half-extent rect + radius-only radial) match the old formulas', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
