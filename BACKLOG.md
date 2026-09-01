@@ -5389,12 +5389,13 @@ error this session's own discipline exists to catch before it becomes a wrong ta
 - **CAN'T-RUN (10)**: `atc_warmup`/`atc_length`/`atc_check`/`atc_test`/`atc_change`/`atc_table` (6 — no
   geometry canvas at all, expected: housekeeping ops with nothing to drag), `wcs`/`comm`/`io_step`/
   `pause_confirm` (4 — same, logic/selection ops, no drag affordance).
-- **MOUNTS NOW, GATE RESULT INCONCLUSIVE (1)**: `drill` — was CAN'T-RUN (its canvas never mounted at all,
-  see below); FIXED at t2477 (BACKLOG #67), the canvas now mounts and renders real content, confirmed by
-  screenshot. Re-ran the drag gate on its own primary handle: RED, but the observed cause is an unrelated
-  DOM-overlap (`elementFromPoint` returns `.blk-formpane`, not the handle) that was NOT resolved either way
-  this turn — neither a confirmed defect (like #64/#65/#66) nor a clean GREEN. A genuinely new, fourth bucket,
-  not force-fit into either existing one. 18+3+10+1 = 32.
+- **RED-VALID (1)**: `drill` — was CAN'T-RUN (its canvas never mounted at all, see below); FIXED at t2477
+  (BACKLOG #67), the canvas now mounts and renders real content, confirmed by screenshot. Re-ran the drag gate
+  on its own primary handle: RED — and t2479's own direct measurement settled the fourth-bucket question this
+  entry originally parked as inconclusive: the inner tree-rendered `.wiz-visual` pane can compute a genuine
+  `width:0`, landing `dr_pos` past the viewport edge with `document.scrollWidth === window.innerWidth` (no
+  scroll mechanism of any kind reaches it). **Not a Playwright hit-test artifact — a real reachability defect**,
+  filed as its own entry, BACKLOG #68. 18+3+10+1 = 32.
 
 ⭐ **`drill`'s CAN'T-RUN is NOT "no affordance by design"** — its own rendered form copy reads *"Drag the
 handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it"* — the

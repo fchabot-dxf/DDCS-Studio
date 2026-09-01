@@ -67161,3 +67161,15 @@ partWidth/partFloor still working, seeding into L1's manifest) don't apply — n
 BEFORE concluding: **3014 passed, 1 failed, 14 flaky, 26 skipped.** The one failure is the same pre-existing
 `sf-pos-snapback` load-contention timeout documented since t2465 — unrelated (zero product/test code touched
 this turn). `git status --porcelain`: confirmed clean of every source file the manifests name.
+
+## t2481 (SMALL ITEM, own commit per rule 4) — BACKLOG #61's own L4 table: correct drill's fourth bucket from
+"inconclusive" to RED-valid, cross-linked to #68
+
+Per the amendment's own explicit scope for this half (separate from the L3 main item below): t2479's own small
+item already settled the open question the L4 sweep (t2471) parked as a genuinely new, unresolved fourth
+bucket ("MOUNTS NOW, GATE RESULT INCONCLUSIVE") — the RED on `drill` is not a Playwright hit-test artifact, it
+is a real reachability defect (BACKLOG #68). `BACKLOG.md`'s own L4 table (§61, the honest 32/32 accounting)
+still read the old, unresolved framing; corrected the bucket label and its prose to RED-valid, naming the
+`width:0` inner-pane mechanism and cross-linking #68, matching the count (18+3+10+1 = 32, unchanged).
+
+Tier: doc-only — no test/product code touched for this half.
