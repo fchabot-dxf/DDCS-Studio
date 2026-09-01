@@ -66600,6 +66600,67 @@ files touched). `test:node`: 238/238 passed.
 Files: `BACKLOG.md` (#57 cross-linked, #62 corrected, #63 cross-linked), `verification/t2467-1-drawer-closed-
 default-state.png` (new), `verification/t2467-2-drawer-open-sizer-reachable.png` (new).
 
+## t2469 — BACKLOG #62 round 4: FOUND AND FIXED the mechanism three Playwright rounds structurally could not
+reach — `vh` vs the real visible viewport. Empirically confirmed the fix is unverifiable by rendered geometry
+in this harness, and built the achievable guard instead of forcing the stronger one
+
+### THE CLAIM — OBSERVED, settled by direct measurement, not left as inference
+
+Reused t2467's own reproduction (corner op, mobile drawer genuinely opened, `#blk-formpane` scrolled to true
+max): sizer sits at `top:822.5 / bottom:828.5` of an 844px viewport — the last **~22px**. `#blocks-app .right`
+(the drawer) is `position:fixed; bottom:0; height:min(62vh,520px)` — `vh` resolves against the LARGE viewport
+(URL bar retracted); on a real phone with the URL bar showing, that last ~22px is where a bottom browser-chrome
+bar would sit. **Directly confirmed the instrument gap, not just inferred it**: rendered a probe element at
+`min(62vh,520px)` / `min(62dvh,520px)` / `min(62svh,520px)` / `min(62lvh,520px)` at the same 390×844 viewport —
+all four resolve to the IDENTICAL 520px in headless Chromium (no dynamic toolbar exists to simulate). This is
+the exact same "wrong instrument" limitation that hid the bug from t2423/t2465/t2467, now confirmed directly.
+
+### THE FIX — narrow, matches established precedent already in this file
+
+`styles.css:6770-6777` — `vh` → `dvh`, declared AFTER the old `vh` line (dvh-unaware browsers keep the old
+behaviour), the SAME remedy already applied at t782 (§3234) and t2081 (§2024) for this identical class of bug.
+`env(safe-area-inset-bottom)` for the home indicator was ALREADY present (line 6776) — nothing to add there.
+Confirmed via the global `* { box-sizing: border-box }` rule that the padding correctly reserves space inside
+the (now-correct) box rather than extending past it.
+
+### ⚠ THE VERIFICATION GAP — reported plainly, not papered over
+
+Cannot prove this fix by rendered geometry: since `vh`/`dvh` render identically in headless Chromium, no
+`page.route()` mutation can make the fix show a different pixel position than the bug did. Built instead:
+`tests/mobile-drawer-dvh-2469.spec.js` — a DECLARATION guard (the served CSS uses `dvh`, not bare `vh`),
+explicitly weaker than L1 (`dragRenderTruth.js`)/L2 (`affordancePresence.js`)'s rendered-effect guarantee and
+labeled as such. Proven non-vacuous: an in-flight (never disk) revert to the original `vh`-only text makes the
+same check correctly report 0 occurrences where the GREEN check expects 1 — the check can genuinely fail, not
+decoration. This is what an honest L3 looks like for a defect this harness cannot fully reach: a narrower,
+correctly-labeled guarantee instead of a forced fit into the stronger pattern the dispatch's own step 3 asked
+for by default.
+
+### Desktop — re-confirmed live, not just reasoned about the media query
+
+Narrow pane sizer: 349×6px, byte-identical to t2465's own baseline. Widened pane sizer: 496×6px (renders
+correctly, two-pane layout active) — a different exact figure than t2465's 574×6px, from this turn's own
+cruder width-forcing technique (`element.style.width` vs whatever t2465 did), NOT a regression: the `dvh`
+change sits entirely inside `@media (max-width:860px)`, which a 1400px desktop viewport never enters, by
+construction.
+
+### Screenshot
+
+`verification/t2469-sizer-vs-visible-band.png` — the corner op's mobile drawer opened and scrolled to max, with
+a red marker line + label drawn at the assumed real-visible-band edge (~750px of 844px, approximating a phone
+with the URL bar showing). The sizer (blue bar) sits visibly BELOW the line — the finding, illustrated, since
+no real device screenshot is available to this harness.
+
+### BACKLOG #62 — round 4 appended, header updated to FIXED
+
+Three prior rounds (t2423 selector/zero-size, t2465 reachability-via-scroll, t2467 drawer-open methodology) all
+confirmed sound — this is a genuinely separate, fourth mechanism, not a re-litigation of any of them.
+
+### Tier
+
+`styles.css` is a shared render path (rule 1b) — full suite run before believing the fix, see VERIFY below.
+New test file: `tests/mobile-drawer-dvh-2469.spec.js` (2 tests, both passing). `git status` confirms only
+`styles.css`, `tests/mobile-drawer-dvh-2469.spec.js`, `BACKLOG.md`, `WORK-LOG.md`, one new `verification/*.png`.
+
 ## t2469 (SMALL ITEM, own commit per rule 4) — BACKLOG #60: `facing`/`centerDrill` equivalence tests shipped —
 and `facing` turned out NOT as straightforward as the entry's own header claimed, corrected rather than forced
 

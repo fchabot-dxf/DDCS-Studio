@@ -5338,11 +5338,12 @@ re-verify before acting on this entry's own conclusion — rule 8b applies to th
 
 ---
 
-### 62. [✅ RESOLVED t2467 — three investigation rounds (t2423/t2465/t2467), THREE hypotheses each ruled out
-(selector-miss, zero-size, unreachable-via-scroll); the sizer's own mechanism is confirmed WORKING correctly
-on both desktop AND mobile — t2465's own "third reproduction" was a TEST-METHODOLOGY ARTIFACT (the mobile
-drawer was never opened), corrected honestly] THE WIZARD VIEW PANE'S BOTTOM DRAG SIZER GOES MISSING — reported
-twice, three rounds of investigation, never a genuine reproduction that survived rigorous re-testing
+### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
+resolves against the LARGE (chrome-hidden) viewport, so the sizer's last ~22px sit under a real phone's URL
+bar when it's showing — invisible, exactly as reported. Fixed via the SAME `vh`→`dvh` remedy already used
+elsewhere in this file (t782, t2081). Reachability (t2467) and selector/zero-size (t2423) both confirmed
+sound — this is a FOURTH, orthogonal mechanism, not a re-litigation of either] THE WIZARD VIEW PANE'S BOTTOM
+DRAG SIZER GOES MISSING — reported twice, four rounds of investigation, root found and fixed
 
 *(filed t2463, per that turn's own explicit instruction: this defect has been living inside BACKLOG #61's own
 prose — one of the owner's "5 real defects this week" cited when ARC A's gate was scoped — and, separately,
@@ -5461,7 +5462,51 @@ established — worth asking the owner directly rather than a fourth investigati
 
 **STILL REAL IF**: a NEW report describes the symptom AFTER confirming the mobile drawer was opened via
 `#blkDrawerHandle` (or its real-device equivalent) — that is the one condition none of the three rounds so far
-have actually tested against a genuine "opened, still unreachable" case.
+have actually tested against a genuine "opened, still unreachable" case. ⚠ Superseded in part by round 4
+below — a NEW report after the `dvh` fix ships should be checked against round 4's own finding first.
+
+### ⭐⭐⭐⭐ t2469, round 4 — FIXED: `vh` vs the real visible viewport, the mechanism invisible to all three prior
+rounds BY CONSTRUCTION (Playwright's Chromium has no browser chrome to hide/show)
+
+**OBSERVED** (`styles.css:6770-6774` before this turn): `#blocks-app .right { height:min(62vh,520px); … }`.
+**OBSERVED** (t2467's own measurement, reused): with the drawer genuinely opened and scrolled to max, the
+sizer sits at `top:822.5 / bottom:828.5` of an 844px viewport — inside the last **~22px**. `vh` resolves
+against the LARGE viewport (URL bar retracted); on a real phone with the URL bar showing, that last ~22px is
+exactly the zone a bottom browser chrome bar occupies. **CONFIRMED by direct measurement** (not assumed):
+rendered a probe element at `min(62vh,520px)` vs `min(62dvh,520px)` vs `min(62svh,520px)` vs `min(62lvh,520px)`
+at the same 390×844 viewport — all four resolved to the identical 520px in headless Chromium (no dynamic
+toolbar to simulate). This is the SAME instrument limitation that hid the original bug from t2423/t2465/t2467
+— now confirmed directly rather than only inferred, and it explains exactly why three rigorous rounds each
+came back clean: none of them could have seen this by construction, no matter how carefully they measured.
+
+**FIX, narrow** (`styles.css:6770-6777`): `vh` → `dvh`, declared AFTER the old `vh` line (dvh-unaware browsers
+keep the old behaviour) — the IDENTICAL remedy this file already applies at t782 (§3234) and t2081 (§2024) for
+the same class of bug, both with near-identical "dvh tracks what's ACTUALLY visible" comments. Not a new
+pattern invented for this fix — the one spot in the mobile drawer family that had been missed.
+`env(safe-area-inset-bottom)` for the home indicator was ALREADY present (line 6776, pre-existing) — nothing
+to add there.
+
+⚠ **Cannot be verified by rendered geometry, and that gap is reported plainly rather than papered over**: since
+`vh`/`dvh` render identically in headless Chromium, no `page.route()` mutation can make the FIX show a
+different pixel position than the bug did — the same "wrong instrument" problem that hid the bug also blocks
+proving the fix by the L1/L2 rendered-truth pattern. Built instead: `tests/mobile-drawer-dvh-2469.spec.js`, a
+DECLARATION guard (the served CSS uses `dvh`, not bare `vh`) — weaker than L1/L2's rendered-effect guarantee,
+labeled as such, proven non-vacuous by an in-flight (never disk) revert to the original `vh`-only text, which
+the same check correctly fails against. This is what an honest L3 looks like for a defect this test harness
+cannot fully reach — a narrower, correctly-labeled guarantee, not a forced fit into the stronger pattern.
+
+Desktop unregressed (re-confirmed live, not just reasoned about the media query): narrow pane sizer 349×6px,
+byte-identical to t2465's own baseline; widened pane sizer still renders correctly (496×6px — a different
+exact figure than t2465's 574×6px, from this turn's own cruder width-forcing technique, not a regression: the
+`dvh` change sits entirely inside `@media (max-width:860px)`, which a 1400px desktop viewport never enters).
+Full suite: see WORK-LOG t2469 (3012 passed, 2 failed, 14 flaky — both failures pre-existing/explained, neither
+a regression, see WORK-LOG's own VERIFY section for the full account). Screenshot:
+`verification/t2469-sizer-vs-visible-band.png` — the sizer visible below a marked line approximating a real
+phone's visible-band edge with the URL bar showing.
+
+**STILL REAL IF**: after this fix ships, a NEW report describes the symptom on a real device with the mobile
+drawer genuinely opened — that would mean `dvh` alone isn't sufficient (a further toolbar-height/safe-area
+edge case), not that this fix did nothing.
 
 ---
 

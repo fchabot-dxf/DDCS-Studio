@@ -6767,10 +6767,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 @media (max-width: 860px) {
     #blocks-app { grid-template-columns:1fr; }                 /* canvas spans the tab; drawers overlay it */
 
-    /* ── Preview = bottom drawer (height is drag-resizable via --blk-pv-h; default 62vh) ── */
+    /* ── Preview = bottom drawer (height is drag-resizable via --blk-pv-h; default 62dvh) ──
+       t2469 (BACKLOG 62) — was 62vh (the LARGE viewport, as if a phone's URL bar were always hidden), same
+       vh->dvh reasoning as the t782/t2081 sites above: dvh tracks what's ACTUALLY visible, so a bottom-anchored
+       fixed drawer sized off it stays inside the visible band instead of extending its last ~20-100px under
+       the browser chrome. Declared after vh so dvh-unaware browsers keep the old behaviour untouched. */
     #blocks-app .right {
         position:fixed; left:0; right:0; bottom:0; top:auto;
-        height:var(--blk-pv-h, min(62vh, 520px));
+        height:var(--blk-pv-h, min(62vh, 520px)); height:var(--blk-pv-h, min(62dvh, 520px));
         transform:translateY(calc(100% + 12px)); transition:transform .25s ease;
         z-index:80; border-left:none; border-top:1px solid var(--line);   /* above Blockly toolbox (z 70) → covers the palette when both open */
         box-shadow:0 -8px 22px #0009; padding-bottom:env(safe-area-inset-bottom);
