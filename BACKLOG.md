@@ -5590,6 +5590,29 @@ different — unassessed). Both are their own future turns.
 
 Full account: WORK-LOG t2491a/b/c (one entry per op, three separate commits per rule 4).
 
+### ⭐⭐⭐⭐ t2493 — L5: `parting` ported. `partWidth`/`partFloor` byte-identical; `partPos` (BACKLOG #66)
+confirmed STILL DEAD, unchanged — the fieldH/onEdit mismatch's THIRD occurrence
+
+Three handles, three already-proven registry shapes: `partPos` is `length` with no clamp at all (its own
+hand-written code never bounded it either — an accurate declaration, not a gap). `partWidth` is `rect`'s
+`sx:-1` sign-flip technique (odTurn's/centerDrill's own), anchored at `zFace` rather than 0 — the first case
+proving that technique generalizes to a non-zero anchor. `partFloor` is `odProfileSpec`'s own diameter shape
+again (`rect` Y-only, `sy:0.5` + the t2489 `maxh` clamp), its own two-sided clamp expression confirmed
+byte-identical in shape to the shoulder's before porting either.
+
+`onEdit` kept hand-written for the whole spec — `partFloor`'s sole field lives on `fieldH`. **This is the THIRD
+occurrence** of the mismatch the advisor is counting toward the rule-of-three decision after `polygon` (odTurn,
+odProbe, now parting) — reported as the count, not acted on, per explicit instruction either way.
+
+`partPos` verified LIVE, both directions, before AND after the port: `movedMid:0.000, movedAfter:0.000` in
+both cases, unchanged. Confirms BACKLOG #66's own diagnosis (the deadness lives in rendering, not in this
+function's own declared math) — the port changes only how the math is EXPRESSED, and the symptom tracked
+exactly, neither newly broken nor accidentally fixed.
+
+Gate numbers for `partWidth`/`partFloor`: byte-identical, four seeds. 32 existing tests (`lathe-world-1283`,
+`lathe-feel-1321`, `lathe-part-drill-1275`) passed unedited. Snapshot diff enumerated by direction (7 lines,
+parting's own only). Full account: WORK-LOG t2493.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
@@ -6074,6 +6097,18 @@ real, valuable narrowing — a fifth, UNTESTED guess would not be. Full account:
 **STILL REAL IF**: unchanged — see the entry's own existing `STILL REAL IF` above; the width-threshold finding
 adds a SECOND, sharper reproduction recipe: `partPos` fails at `width:15`, succeeds at `width:20`, using the
 SAME `_framed('user_lathe_parting', {width})` boot this turn used.
+
+**t2489, no action**: the advisor checked whether the L5 clamp-vocabulary work explains this — it does not.
+`partPos`'s own drag writes `zFace` straight from `world.x` with NO bounding at all, clamp-shaped or otherwise.
+Every clamp-shaped theory for this entry is eliminated, not just the max-clamp one.
+
+**t2493, no action, reconfirmed**: `partProfileSpec` ported onto `canvasWidgets.js`'s registry (BACKLOG #61 /
+L5) — `partPos`'s own place/drag math is now expressed via the `length` gesture (unclamped, matching the old
+hand-written shape exactly) rather than hand-rolled. Verified LIVE, both directions, before AND after the
+port: `movedMid:0.000, movedAfter:0.000` in every trial, unchanged either side. This further narrows the
+search: the deadness survives a COMPLETE rewrite of the declaration's own expression, which is strong evidence
+the root sits somewhere in FeatureCanvas's own render path (as this entry's own diagnosis already concluded),
+not in anything specific to how `partProfileSpec` itself declares the handle.
 
 ---
 

@@ -650,25 +650,25 @@ user_lathe_odturn @offdefaults .onEdit "<fn/2>"
 user_lathe_odturn @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_parting @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_parting @defaults .handles <3 entries>
-user_lathe_parting @defaults .handles[0] {"axis":"x","emits":true,"id":"partPos","kind":"size","label":"face","value":-10,"x":-10,"y":10}
-user_lathe_parting @defaults .handles[1] {"axis":"x","emits":true,"id":"partWidth","kind":"size","label":"blade","value":3,"x":-13,"y":10}
-user_lathe_parting @defaults .handles[2] {"axis":"y","emits":true,"id":"partFloor","kind":"size","label":"stop Ø","value":12,"x":-13,"y":6}
+user_lathe_parting @defaults .handles[0] {"color":"<undefined>","emits":true,"id":"partPos","kind":"size","label":"face","manual":"<undefined>","noSnap":"<undefined>","value":-10,"x":-10,"y":10}
+user_lathe_parting @defaults .handles[1] {"color":"<undefined>","emits":true,"id":"partWidth","kind":"size","label":"blade","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":3,"x":-13,"y":10}
+user_lathe_parting @defaults .handles[2] {"color":"<undefined>","emits":true,"id":"partFloor","kind":"size","label":"stop Ø","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":12,"x":-13,"y":6}
 user_lathe_parting @defaults .items <3 entries>
 user_lathe_parting @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_parting @defaults .items[1] {"cls":"fc-feature-pocket","h":4,"kind":"rect","w":3,"x":-13,"y":6}
 user_lathe_parting @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
-user_lathe_parting @defaults .onDrag "<fn/2>"
+user_lathe_parting @defaults .onDrag "<fn/3>"
 user_lathe_parting @defaults .onEdit "<fn/2>"
 user_lathe_parting @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_parting @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
 user_lathe_parting @offdefaults .handles <2 entries>
-user_lathe_parting @offdefaults .handles[0] {"axis":"x","emits":true,"id":"partPos","kind":"size","label":"face","value":-3,"x":-3,"y":10}
-user_lathe_parting @offdefaults .handles[1] {"axis":"x","emits":true,"id":"partWidth","kind":"size","label":"blade","value":10,"x":-13,"y":10}
+user_lathe_parting @offdefaults .handles[0] {"color":"<undefined>","emits":true,"id":"partPos","kind":"size","label":"face","manual":"<undefined>","noSnap":"<undefined>","value":-3,"x":-3,"y":10}
+user_lathe_parting @offdefaults .handles[1] {"color":"<undefined>","emits":true,"id":"partWidth","kind":"size","label":"blade","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","value":10,"x":-13,"y":10}
 user_lathe_parting @offdefaults .items <3 entries>
 user_lathe_parting @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
 user_lathe_parting @offdefaults .items[1] {"cls":"fc-feature-pocket","h":0.5,"kind":"rect","w":10,"x":-13,"y":9.5}
 user_lathe_parting @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
-user_lathe_parting @offdefaults .onDrag "<fn/2>"
+user_lathe_parting @offdefaults .onDrag "<fn/3>"
 user_lathe_parting @offdefaults .onEdit "<fn/2>"
 user_lathe_parting @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_lathe_polygon @defaults .panel {"keys":["handles","items","onDrag","onEdit","paths","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}

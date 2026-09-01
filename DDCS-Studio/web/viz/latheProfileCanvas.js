@@ -300,6 +300,27 @@ export const DRILL_DEPTH_HANDLE_ID = 'drillDepth';
  * each on the thing it names: the FACE (drag along Z → where the feature sits) and the FLOOR corner (drag in radius →
  * the diameter it stops at). A part-off has no floor to drag: it stops at the centre, and a handle that only ever
  * reports zero is a control pretending to be a choice.
+ *
+ * t2493 (BACKLOG #61 / L5) — DECLARED through the registry: `partPos` is `length` with no clamp at all (its own
+ * onDrag never bounded `world.x`, so `min`/`max` are both simply omitted — a genuinely unclamped 1D distance,
+ * not a gap in the port). `partWidth` needed a sign-flipped anchor — its own field DECREASES as `world.x`
+ * increases, anchored at `zFace` rather than 0 — `rect`'s `sx:-1` with `ax:zFace` (the SAME divisor technique
+ * `odProfileSpec`'s own depth field and `centerDrill`'s own depth field already proved, just anchored somewhere
+ * other than 0 this time). `partFloor` is `odProbeSpec`'s own diameter shape again (`rect` Y-only, `sy:0.5`,
+ * the two-sided `maxh` clamp t2489 added — `PART_FLOOR_HANDLE_ID`'s own clamp was BYTE-IDENTICAL in shape to
+ * `odProfileSpec`'s shoulder before this port, confirmed by inspection, not assumed).
+ *
+ * `onEdit` KEPT HAND-WRITTEN for the WHOLE spec (not split per-handle) — `partFloor`'s sole field lives on
+ * `fieldH`, the SAME `buildCanvasWidgets`-can't-reach-it shape as `odProfileSpec`'s shoulder and `odProbeSpec`.
+ * This is the THIRD occurrence of that mismatch (odTurn, odProbe, now parting) — reported as a count, per the
+ * advisor's own explicit instruction, not acted on: still not building a `valueField` concept this turn.
+ *
+ * `partPos` IS BACKLOG #66's own known-dead handle (never tracks the pointer, root not pinned) — this port
+ * changes ONLY how its place/drag math is EXPRESSED (`length`, no clamp), not what it computes, and the
+ * deadness itself lives in rendering, not in this function's own math (confirmed by BACKLOG #66's own
+ * diagnosis: the handle IS hit-testable and DOES receive the drag, it simply never updates its RENDERED
+ * position — a render-path symptom `dragHandleRenderTruth` catches, unrelated to which JS expresses the
+ * math). Verified LIVE, not assumed, that the port leaves it exactly as dead as before — see WORK-LOG.
  */
 export function partProfileSpec(bar, part, onChange) {
     const b = normalizeBar(bar);
@@ -319,6 +340,25 @@ export function partProfileSpec(bar, part, onChange) {
     // t2030 — DELIBERATE BEHAVIOUR CHANGE, not silent: the OLD code hardcoded floorR=0 for every part-off, so a
     // declared spigot (floorDiameter > 0 while parting) never appeared in the drawing at all — partFloorRadius
     // handles both kinds correctly, so a part-off spigot now draws where the operator actually typed it.
+    const maxDia = 2 * (barR - 0.001);   // the SAME two-sided diameter bound odProfileSpec's own shoulder uses
+
+    const { handles, onDrag } = buildCanvasWidgets([
+        { type: 'length', id: PART_POS_HANDLE_ID, field: 'zFace', ax: 0, ay: barR, axis: 'x',
+          emits: true, label: 'face', value: zFace },
+        // …the FAR WALL is the blade's width: drag it and the kerf widens. It sits at the same Z as the stop-Ø
+        // handle but up on the bar's surface, so the two never fight for the same grab.
+        // t1321/t2493 — the width is the distance from the FACE to this wall (anchored at zFace, not 0 —
+        // sx:-1 makes it DECREASE as the cursor moves away from the face, HANDLES ARE INDEPENDENT: this writes
+        // the blade width alone and never the face, so widening the kerf does not walk the slot along the bar.
+        // Clamped to a real blade: a zero-width parting tool is not a tool.
+        { type: 'rect', id: PART_WIDTH_HANDLE_ID, field: 'width', ax: zFace, ay: barR, ex: zBlade - zFace, ey: 0,
+          sx: -1, minw: 0.2, emits: true, label: 'blade', value: r3(width) },
+        // …clamped INSIDE the bar and at the centre: a groove wider than the bar is not a groove, and one that
+        // passes the centreline is a part-off wearing a groove's name.
+        ...(groove ? [{ type: 'rect', id: PART_FLOOR_HANDLE_ID, fieldH: 'floorDiameter', ax: zBlade, ay: 0,
+                        ex: 0, ey: floorR, sy: 0.5, minh: 0, maxh: maxDia, emits: true, label: 'stop Ø',
+                        value: o.floorDiameter }] : []),
+    ], (m) => { if (typeof onChange === 'function') onChange(m); });
 
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
@@ -328,26 +368,8 @@ export function partProfileSpec(bar, part, onChange) {
             { kind: 'rect', x: zToCanvas(zBlade), y: floorR, w: width, h: Math.max(0, barR - floorR), cls: 'fc-feature-pocket' },
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
-        handles: [
-            { id: PART_POS_HANDLE_ID, x: zToCanvas(zFace), y: barR, kind: 'size', axis: 'x', emits: true, label: 'face', value: zFace },
-            // …the FAR WALL is the blade's width: drag it and the kerf widens. It sits at the same Z as the stop-Ø
-            // handle but up on the bar's surface, so the two never fight for the same grab.
-            { id: PART_WIDTH_HANDLE_ID, x: zToCanvas(zBlade), y: barR, kind: 'size', axis: 'x', emits: true,
-              label: 'blade', value: r3(width) },
-            ...(groove ? [{ id: PART_FLOOR_HANDLE_ID, x: zToCanvas(zBlade), y: floorR, kind: 'size', axis: 'y', emits: true,
-                            label: 'stop Ø', value: o.floorDiameter }] : []),
-        ],
-        onDrag: (id, world) => {
-            if (typeof onChange !== 'function') return;
-            if (id === PART_POS_HANDLE_ID) { onChange({ zFace: r3(canvasToZ(world.x)) }); return; }
-            // t1321 — the width is the distance from the FACE to this wall. HANDLES ARE INDEPENDENT: this writes the
-            // blade width alone and never the face, so widening the kerf does not walk the slot along the bar.
-            // Clamped to a real blade: a zero-width parting tool is not a tool.
-            if (id === PART_WIDTH_HANDLE_ID) { onChange({ width: r3(Math.max(0.2, zFace - canvasToZ(world.x))) }); return; }
-            // …clamped INSIDE the bar and at the centre: a groove wider than the bar is not a groove, and one that
-            // passes the centreline is a part-off wearing a groove's name.
-            if (id === PART_FLOOR_HANDLE_ID) onChange({ floorDiameter: r3(diameterOf(Math.min(Math.max(0, world.y), barR - 0.001))) });
-        },
+        handles,
+        onDrag,
         onEdit: onEditFromMap({ [PART_POS_HANDLE_ID]: 'zFace', [PART_WIDTH_HANDLE_ID]: 'width', [PART_FLOOR_HANDLE_ID]: 'floorDiameter' }, onChange),
     };
 }

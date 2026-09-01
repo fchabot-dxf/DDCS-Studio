@@ -67716,3 +67716,86 @@ each, none of the pre-existing unrelated verification PNGs touched in any of the
 centerDrill and faceProbe -- a real gap against the protocol's own "poll at each checkpoint" instruction,
 worth naming rather than glossing over (no amendment was waiting either time it WAS checked, so nothing was
 missed in practice, but the discipline itself slipped for one boundary).
+
+## t2493 — L5: `parting` ported onto the registry. partWidth/partFloor byte-identical, partPos confirmed
+STILL DEAD (unchanged, not newly broken) -- the fieldH/onEdit mismatch's THIRD occurrence, counted as asked,
+not acted on
+
+Three handles, three different registry shapes, all already-proven techniques -- none required a stop:
+
+- **`partPos`** (BACKLOG #66's own known-dead handle): `length`, NO clamp at all (`min`/`max` both simply
+  omitted) -- its own hand-written `onDrag` never bounded `world.x` either, so this isn't a gap in the port,
+  it's an accurate declaration of a genuinely unclamped 1D distance.
+- **`partWidth`**: `rect`, X-only, `sx:-1` -- but anchored at `zFace` (not 0) this time, since the field
+  DECREASES as `world.x` increases away from the face. Same divisor technique as `odProfileSpec`'s own depth
+  field and `centerDrill`'s, just the FIRST case anchored somewhere other than the origin -- worth naming since
+  it confirms the technique generalizes to an arbitrary anchor, not just zero.
+- **`partFloor`**: `rect`, Y-only, `sy:0.5` + the t2489 `maxh` clamp -- `odProfileSpec`'s own diameter shape
+  again, byte-identical in clamp shape to the shoulder handle (confirmed by direct comparison of the two
+  `Math.min(Math.max(0, world.y), barR-0.001)` expressions before porting either).
+
+**`onEdit` kept hand-written for the WHOLE spec** (not split per-handle) — `partFloor`'s sole field lives on
+`fieldH`, the same `buildCanvasWidgets`-can't-reach-it shape as `odProfileSpec`'s shoulder and `odProbeSpec`.
+**THIS IS THE THIRD OCCURRENCE** (odTurn, odProbe, now parting) of the exact mismatch the advisor is tracking
+toward a rule-of-three decision after `polygon`. Reported as the count the advisor explicitly asked for, not
+acted on — no `valueField` concept built this turn, per the advisor's own explicit instruction either way.
+
+**`partPos` verified LIVE, both directions, both before and after — confirmed STILL DEAD, unchanged, not newly
+broken**, exactly as the advisor asked to be stated explicitly rather than left ambiguous:
+```
+                                    BEFORE                          AFTER
+partPos pos-diag  (dx50,dy-20):  movedMid=0.000 movedAfter=0.000   movedMid=0.000 movedAfter=0.000  -- SAME
+partPos pos-pureY (dx0,dy60):    movedMid=0.000 movedAfter=0.000   movedMid=0.000 movedAfter=0.000  -- SAME
+```
+The port changes only how the place/drag MATH is expressed (`length`, unclamped) — BACKLOG #66's own diagnosis
+already established the deadness lives in RENDERING (the handle IS hit-testable and DOES receive the drag, it
+simply never updates its rendered position), not in this function's own math, so an unchanged symptom is the
+EXPECTED, correct result here — not a coincidence, and not something this turn attempted to fix (per the
+advisor's own explicit "do NOT try to fix it as part of this port").
+
+**Gate numbers, `partWidth`/`partFloor`, before vs. after — byte-identical, four seeds**:
+```
+                                        BEFORE                                          AFTER
+partWidth width-diag  (dx-40,dy15): movedMid=39.999 movedAfter=39.999              -- SAME before and after.
+partWidth width-pureX (dx60,dy0):   movedMid=9.120  movedAfter=9.120  (clamped     -- SAME before and after.
+                                     short of 60px by the minw:0.2 floor, expected
+                                     and unchanged either side of the port)
+partFloor floor-diag  (dx15,dy-45): movedMid=13.026 movedAfter=13.026              -- SAME before and after.
+partFloor floor-pureY (dx0,dy55):   movedMid=19.544 movedAfter=19.544              -- SAME before and after.
+```
+No digit moved in any of the twelve coordinates (six drags total, including the two `partPos` confirmations
+above) × before/after.
+
+**32 existing tests re-run, unedited**: `lathe-world-1283.spec.js` (13), `lathe-feel-1321.spec.js` (8, incl.
+"THE BLADE WIDTH IS DRAGGABLE — the far wall writes the field, and the emit follows (t1321 user)"),
+`lathe-part-drill-1275.spec.js` (11, incl. "THE GROOVE HANDLES move the EMIT — the face along Z, the floor
+corner in diameter"). All 32 passed.
+
+Snapshot diff, ENUMERATED BY DIRECTION, parting's own 7 lines only (confirmed via `git diff --stat`, `14
++7/-7` lines changed, nothing else in the 32-twin fixture moved):
+- **ADDED**: `color`/`manual`/`noSnap` on all three handles (generic wrapper). `labelDir` ADDITIONALLY on
+  `partWidth`/`partFloor` only (both `rect`-built) — NOT on `partPos` (`length`-built, matching the established
+  length-vs-rect pattern from every prior port this arc).
+- **REMOVED**: `axis:"x"` (`partPos`), `axis:"x"` (`partWidth`), `axis:"y"` (`partFloor`) — all three, confirmed
+  inert by the same standing reasoning (`featureCanvas.js` never reads a handle's own `.axis`).
+- **ALTERED**: `onDrag` `<fn/2>` → `<fn/3>`, both param states (never populated in practice).
+- **UNCHANGED**: `onEdit` stays `<fn/2>`, STILL the hand-written implementation (not generic, since `partFloor`
+  forces the whole spec onto the hand-written path). `emits` still `true` on all three. `x`/`y`/`value`/`kind`/
+  `label`/`id` identical on every line — the actual geometry, unmoved.
+
+Tier: `viz/canvasWidgets.js` unchanged this turn (no registry edits); `viz/latheProfileCanvas.js` shared file,
+other ops untouched — rule 1b, full suite before concluding.
+
+### VERIFY
+
+`partWidth`/`partFloor` gate numbers before/after: IDENTICAL, stated side by side above. `partPos` confirmed
+UNCHANGED — still dead, not newly broken, not newly fixed — stated explicitly per the advisor's own request.
+32 existing lathe tests passed unedited. `test:node`: 238/238 after the reviewed, direction-enumerated snapshot
+regeneration. Full suite `--workers=4` BEFORE concluding: **3020 passed, 2 failed, 8 flaky, 26 skipped** (3056
+total) -- the two failures are `sf-pos-snapback` (the same pre-existing flake documented since t2465) and
+`probe-port-gate-1880.spec.js`'s "every one of the 6 probe ops gates its own Port field" test -- a NEW flake
+this run, unrelated by content (grepped: no lathe/parting/canvasWidgets reference at all) and re-confirmed 3/3
+green when run solo, same load-contention pattern as every other cross-turn flake this session. `git status
+--porcelain`: confirmed exactly the intended file set, staged BY PATH. `handoff.py amendments --role worker`
+polled clean at the start of this turn and again before the full-suite run. `proc_health.py watch`: clean.
+Scratch `_live-check.spec.js` and the source-file scratch backup deleted, never committed.
