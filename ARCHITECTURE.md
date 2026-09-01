@@ -371,29 +371,39 @@ built and then explicitly ruled out the same turn: no old-save audience exists f
 (`wcsView.js`) is unrelated and still survives (one of the 14 that remain) — it draws nothing on either path, so
 it never carried divergence risk and was out of scope for this deletion.
 
-### The wizard-shape-block vocabulary: one working consumer, one structural container, two deleted (t1734)
+### The wizard-shape-block vocabulary: one working consumer, three container blocks, ALL THREE now deleted (t1734/t2507)
 
 `wizards/ops/vizBlocks.js` (t1627) declares the four SHAPE primitives — `shape_rect`/`shape_circle`/`shape_line`/
-`shape_marker` (`SHAPE_2D_TYPES`) — plus ONE container, `layout_2d_canvas` (`kind:'uibox'`, `mouth:'DO'`). The four
-shapes have a real, working consumer: `panelTypes.js:329` flattens `def.template` (walking BOTH `uiChildren` and
-`children` — mouth-agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero
-extra code needed by a twin that has content to declare. `layout_2d_canvas` is wired too, but GENERICALLY — bridge.js
-(`else for (const m of mouthsOf(def)) addMouth(m.name, m.label)`) gives any def carrying a `.mouth` (or the plural
-`.mouths`, t2333 — a kind needing MULTIPLE independently-named mouths, e.g. `split_horizontal`'s LEFT/RIGHT) a
-Blockly mouth regardless of type, so grepping the literal string `layout_2d_canvas` outside its own declaration
-finds nothing even though the round-trip is live: the shape vocabulary nests inside it via that generic mechanism.
-(The advisor twice reported all three ORIGINAL container blocks dead by that grep; corrected by the worker at t1726
-for this one.)
+`shape_marker` (`SHAPE_2D_TYPES`) — which have a real, working consumer: `panelTypes.js`'s own `layoutSpecFromOp`
+flattens `def.template` (walking BOTH `uiChildren` and `children` — mouth-agnostic) and draws every `shape_*`
+block it finds as a Layout-pane item, already wired, zero extra code needed by a twin that has content to
+declare. This is UNCHANGED and remains fully live.
 
-Two more container blocks were declared alongside it — `sim_3d_box` and `code_preview_panel` — and neither carried a
-`.mouth` (so the generic mechanism above never applied to them) nor any other consumer. Traced live (cycle 856 ACT
-3, t1724, attempting to finish corner's deferred "per-view rig blocks"): `rg -n "layout_2d_canvas|sim_3d_box|
-code_preview_panel" web --include='*.js'` outside `vizBlocks.js` itself returned nothing for any of the three at the
-time — only `layout_2d_canvas` turned out to have the generic-mouth exception once traced further. The other two's
-`minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields were genuinely inert — a FIFTH instance of this
-project's own "declared but unread" defect class (`emits`/`modalPre`/`noSnap`/`mouth` are the first four). **Deleted
-at t1734** (GAMEPLAN STEP 3, alongside the Blocks-tab right column's face-switch predicate and the Projected G-code
-pane they would have backed) — see WORK-LOG t1734.
+Three CONTAINER blocks were declared alongside them at various points — `layout_2d_canvas` (`kind:'uibox'`,
+`mouth:'DO'`), `sim_3d_box`, `code_preview_panel` — and **all three are now deleted**. `sim_3d_box`/
+`code_preview_panel` never carried a `.mouth` (so bridge.js's generic mouth mechanism, below, never applied to
+them) and had no other consumer either; traced live (cycle 856 ACT 3, t1724) and **deleted at t1734** (GAMEPLAN
+STEP 3, alongside the Blocks-tab right column's face-switch predicate and the Projected G-code pane they would
+have backed) — see WORK-LOG t1734.
+
+`layout_2d_canvas` was different, and worth recording precisely because two READINGS of "is it dead" were both
+correct at once, about two different questions. Its Blockly ROUND-TRIP genuinely WAS wired — GENERICALLY, via
+bridge.js's own `else for (const m of mouthsOf(def)) addMouth(m.name, m.label)` (gives any def carrying a
+`.mouth`, or the plural `.mouths` t2333, a Blockly mouth regardless of type) — so grepping the literal string
+`layout_2d_canvas` outside its own declaration found nothing even though a user really could drag one into a
+workspace and its shape-primitive children really would round-trip correctly. The advisor twice reported all
+three ORIGINAL container blocks dead by that grep; the worker corrected it at t1726 for this one, on exactly
+that mechanical basis — and that correction was RIGHT, not superseded.
+
+What t1726 did NOT establish, and what BACKLOG #61's own finding (2026-09-01) traced further and found FALSE:
+that being mechanically wired made the block USEFUL. Nothing ever read `layout_2d_canvas`'s own existence or
+its `minHeight`/`showRuler` fields — the actual 2D feature canvas was, and is, rendered entirely by the
+SEPARATE `panel` node (`formWidgets.js:1478`), completely independent of whether a `layout_2d_canvas` sat
+anywhere in the tree; `layout_2d_canvas`'s own `emit: () => []` confirms it contributed nothing to it either.
+It was a THIRD way to say something `panel`/`sim`/`code_preview`/the split/section/tab containers already say —
+wired, but never useful. **Owner ruling 2026-09-01, deleted at t2507** (BACKLOG #61 L7) — see WORK-LOG t2507.
+Both findings stand: t1726's "the round-trip is live" and t2507's "and it was never worth using" are the same
+block seen from two different, non-contradicting questions.
 
 ### The one-sources every renderer already shares — do not re-derive these
 

@@ -58,7 +58,9 @@ test('FOUR role groups on the category axis — three populated (membership from
     // sanity on the ruled shape: the named anchors sit where the ruling put them
     expect(r.inputs).toEqual(expect.arrayContaining(['formfield', 'param', 'form_dropdown', 'coordlist', 'slider_field', 'param_field', 'param_group']));
     // (opunit also declares Wizard Layout but is palette-hidden by design — created programmatically at fork/load-wrap)
-    expect(r.layout).toEqual(expect.arrayContaining(['user_root', 'section', 'group_box', 'split_horizontal', 'layoutwidget', 'layout_2d_canvas']));
+    expect(r.layout).toEqual(expect.arrayContaining(['user_root', 'section', 'group_box', 'split_horizontal', 'layoutwidget']));
+    // t2507 — layout_2d_canvas deleted (BACKLOG #61 L7: wired but never useful, see ARCHITECTURE.md's own
+    // corrected finding); layout's anchor set shrinks with it, same registry-derived membership check either way.
     // t1734 — sim_3d_box / code_preview_panel deleted (dead containers, zero readers); previews' anchor set shrinks
     // with them, same membership-from-the-registry check either way.
     expect(r.previews).toEqual(expect.arrayContaining(['sim', 'simstart', 'panel', 'form_diagram']));

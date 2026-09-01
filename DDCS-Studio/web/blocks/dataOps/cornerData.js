@@ -246,11 +246,15 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     //     primitives are deliberately non-interactive static drawing (vizBlocks.js's own doc: "no transform blocks");
     //     corner draws no static shape at all, so there is nothing to port, not an unfinished port.
     //   - `layout_2d_canvas`/`sim_3d_box`/`code_preview_panel` (the CONTAINER blocks this follow-up would have used)
-    //     are THEMSELVES unfinished, independent of corner: grep confirms zero readers anywhere in the app — their
-    //     `minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields are inert, `kind:'uibox'` only wires the
-    //     Blockly round-trip, never the real rendered panel. Placing one here would misrepresent inert machinery as
-    //     functional — exactly the declared-but-unread shape this project already named four times (`emits`/
-    //     `modalPre`/`noSnap`/`mouth`) and the fifth this act's trace found.
+    //     were THEMSELVES unfinished, independent of corner: grep confirmed zero readers anywhere in the app — their
+    //     `minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields were inert, `kind:'uibox'` only wired the
+    //     Blockly round-trip, never the real rendered panel. Placing one here would have misrepresented inert
+    //     machinery as functional — exactly the declared-but-unread shape this project already named four times
+    //     (`emits`/`modalPre`/`noSnap`/`mouth`) and the fifth this act's trace found.
+    //     ALL THREE now DELETED — sim_3d_box/code_preview_panel at t1734, layout_2d_canvas at t2507 (BACKLOG #61
+    //     L7) — so this whole paragraph is now history, not a live constraint: there is nothing left to place here
+    //     even in principle. Left as-written (past tense) rather than erased, since it still explains WHY corner
+    //     never grew a static shape.
     // Reported, not invented: no new block, no placeholder block. See WORK-LOG t1724.
     const uiChildren = [
         sec('FORM', '#d946ef', [paramGroup]),                  // form input — magenta (panel removed, t2301 — see the const `sim`'s own comment above)

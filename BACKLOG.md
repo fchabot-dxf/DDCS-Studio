@@ -5263,6 +5263,12 @@ probe family). The ROADMAP is describing dead code as if it still runs.
    ⇒ **OWNER RULING, 2026-09-01: DELETE it**, same as its two siblings — wiring it would create a competing
    duplicate of a working mechanism, which is the exact duplication this arc exists to remove. Queued as L7.
 
+   **✅ DONE t2507**: deleted from `vizBlocks.js`/`index.js`'s own PALETTE; the two real consuming tests
+   (`palette-by-role-1623.spec.js`, `wizard-shapes-1627.spec.js`) updated rather than deleted — their own
+   assertion that the block EXISTS was removed, but the shape-round-trip/spec-builder coverage they were also
+   carrying was kept, re-hosted on `section` (a real, wired `mouth:'DO'` container `layoutSpecFromOp`'s own
+   mouth-agnostic shape scan never actually required `layout_2d_canvas` specifically). See WORK-LOG t2507.
+
 ### THE GATE — ROADMAP.md's own stated make-or-break condition, ASSESSED: BUILDABLE, not hypothetical
 
 `tests/commit-on-release-2429.spec.js` (this session) already reuses `web/debug/featProbe.js` DIRECTLY inside

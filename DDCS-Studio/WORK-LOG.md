@@ -68415,3 +68415,98 @@ own t2501 guard, `lathe-handle-hit-2501.spec.js`) -- all pass, `--workers=4`. Fo
 **DONE in 36m30s -- 3031 passed, 1 failed, 13 flaky, 26 skipped.** The 1 failure is the SAME pre-existing
 `sf-pos-snapback` flake as t2501's/t2503's own runs (`preview-mutation-manifest-2463.spec.js`, t2447's own
 `sf_pos` fix, unrelated to lathe/panelTypes/Blockly) -- not a regression from this turn's change.
+
+## t2507 — L7: `layout_2d_canvas` deleted (BACKLOG #61's own corrected finding 3, owner-ruled 2026-09-01) --
+wired but never useful; the two real consuming tests re-hosted on `section` rather than deleted, since the
+shape-round-trip/spec-builder coverage they also carried is still worth keeping
+
+### CONSUMERS GREPPED FIRST, per the dispatch's own rule 5 -- enumerated, not trusted from the advisor's list
+
+`rg -n "layout_2d_canvas|layout2dCanvasBlock" DDCS-Studio` (excluding WORK-LOG.md, historical/append-only, and
+HANDOFF.md, machine-generated) found SIX real hits, checked one at a time:
+
+1. `web/wizards/ops/vizBlocks.js` -- the declaration itself (`layout2dCanvasBlock`). Deleted.
+2. `web/wizards/ops/index.js` -- the import + `PALETTE` registration. Both removed; the trailing category
+   comment (which named "LAYOUT-2D preview box" among the Wizard UI group) updated too.
+3. `web/blocks/dataOps/cornerData.js` -- a HISTORICAL COMMENT (t1724) explaining why corner never adopted this
+   block as a static-shape container. Not a functional dependency -- updated to past tense with a one-line
+   pointer to the t2507 deletion, left otherwise as-written (it still explains a real historical decision).
+4. `tests/palette-by-role-1623.spec.js` -- a REAL test, line 61: `expect(r.layout).toEqual(expect.
+   arrayContaining([...,'layout_2d_canvas']))`. This asserted the block EXISTS -- per the dispatch's own rule,
+   that assertion goes. Removed from the list, mirroring the EXACT precedent already sitting two lines below it
+   in the same file for `sim_3d_box`/`code_preview_panel`'s own t1734 deletion (a comment, not a guess at the
+   right pattern). The file's OWN real anti-drift check (line 56, `expect(r.layout).toEqual(r.byCat.layout)` --
+   registry-derived, not a fixed list) needed no edit at all: it shrinks automatically once the registry does.
+5. `tests/wizard-shapes-1627.spec.js` -- a REAL test, THREE occurrences (the `HAND_BUILT` fixture + two inline
+   templates), using `layout_2d_canvas` purely as a MOUTH-HOLDING WRAPPER for the four shape blocks under test.
+   This file's own real subject is the SHAPE PRIMITIVES (declared -> drawn, expressions over live params, error
+   tolerance) -- not `layout_2d_canvas` itself. Traced `panelTypes.js`'s own consumer (`layoutSpecFromOp`,
+   `flattenBlocks(def.template).filter((b) => SHAPE_2D_TYPES.has(b.type))`) before deciding how to adjust: it
+   is GLOBAL and MOUTH-AGNOSTIC -- it never required the shapes to sit under `layout_2d_canvas` specifically, or
+   under ANY particular container at all. Re-hosted all three occurrences on `section` (`kind:'section',
+   mouth:'DO'`, a real, live, already-wired `uiChildren` container, same `category:'Wizard Layout'`) instead of
+   deleting the file's own coverage. Chosen deliberately for the FIRST test, which additionally exercises the
+   Blockly DO-mouth ROUND-TRIP mechanism itself (the t1595 childless-discard trap) -- `kind:'uibox'` turned out
+   to be UNIQUE to `layout_2d_canvas` (confirmed: grepped `'uibox'`/`"uibox"` across `web/`, only the
+   declaration + its own comments matched, zero conditional branches keyed to the literal string anywhere --
+   `bridge.js`'s own mouth mechanism is genuinely generic, reading `.mouth` off any def dynamically, so nothing
+   in `bridge.js` becomes dead code either) -- `section` (`mouth:'DO'`, a real, live def) exercises the exact
+   same generic round-trip property honestly, through a container that continues to exist.
+6. `ARCHITECTURE.md` -- a real, substantial section ("The wizard-shape-block vocabulary...") documenting BOTH
+   `layout_2d_canvas`'s own t1726 finding (the Blockly round-trip genuinely IS wired, mechanically, via bridge.js's
+   generic mouth mechanism -- the worker corrected the advisor's own dead-code claim on exactly this basis, back
+   then) AND now BACKLOG #61's own newer finding (wired ≠ useful -- nothing ever read the block's own fields;
+   the real feature canvas comes entirely from the SEPARATE `panel` node). Rewrote the section to state BOTH
+   findings as non-contradicting (mechanically wired, and never worth using, about two different questions) and
+   record the t2507 deletion -- per the worker's own "fix the map when your act proves it stale, in the same
+   act" duty, not a separate task.
+
+**NOT a consumer, verified not assumed**: `tests/ui-tree-unwired-1561.spec.js`, named in the advisor's own list
+but checked directly -- it uses ONLY synthetic block types (`form_dropdown`, `slider_field`,
+`future_viz_box_type`) for exactly the reason its own header comment states: it already learned, from the
+`code_preview_panel` deletion at t1734, to never depend on a real block staying real. No edit needed there.
+
+### THE OWNERSHIP-vs-SHARING CHECK, before deleting (the worker skill's own gate for any deletion)
+
+The four shape primitives (`shape_rect`/`shape_circle`/`shape_line`/`shape_marker`) are declared in the SAME
+FILE and were described in `layout_2d_canvas`'s own doc comment as nesting "in its DO mouth" -- worth checking
+carefully whether deleting the container orphans them. Traced their real consumer directly
+(`panelTypes.js:407`, `flattenBlocks(def.template).filter((b) => SHAPE_2D_TYPES.has(b.type))`): it scans the
+WHOLE flattened template globally, with NO dependency on what (if anything) nests them -- confirmed they have
+their own, completely independent, already-live reader, unrelated to `layout_2d_canvas`'s own existence. Not
+touched; nothing to extract; they were never owned by the block being deleted.
+
+### VERIFY
+
+Syntax-checked every edited code file. The two real consuming test files re-run: 7/7 pass (both files,
+including the one Blockly-interactive round-trip test, now on `section`). Adjacent palette/registry/unwired-type
+sweep re-run for a sanity check beyond just the two directly-touched files (`palette-sufficient-1591.spec.js`,
+`comment-nesting-guard-2305.spec.js`, `ui-tree-unwired-1561.spec.js`) -- 9/9 pass; checked their own
+`PALETTE.length`/`paletteCount` uses for a hardcoded exact-count assertion that might need adjusting -- both are
+loose sanity thresholds (`toBeGreaterThan(50)`) or unasserted diagnostic data, neither needed a change.
+`test:node`: 238/238, zero snapshot diff (`layout_2d_canvas` was never emitted into any preview-spec twin, so
+its removal touches nothing the gate captures). BACKLOG.md's own L7 finding (already fully written by the
+advisor) checked `git diff` clean before touching -- per the advisor's own new resolution from t2505's own
+collision -- then marked DONE with a small, targeted addition, not rewritten. Full suite `--workers=4` BEFORE
+concluding (rule 1b -- `vizBlocks.js`/`index.js` are shared registry files read by the whole app's palette):
+**DONE in 36m4s -- 3032 passed, 2 failed, 11 flaky, 26 skipped** on the first run. One failure is the SAME
+pre-existing `sf-pos-snapback` flake every run this session has shown. The OTHER, `open-as-modal-1625.spec.js ›
+A REAL OPEN AFTER A PREVIEW gets its INSERT back`, had NOT appeared in any of this session's three prior
+full-suite runs (t2501/t2503/t2505, each exactly 1 failure) -- investigated rather than assumed either a
+regression or a flake:
+- `grep -n "layout_2d_canvas\|section" tests/open-as-modal-1625.spec.js` -- zero matches. The file references
+  nothing this turn touched.
+- Re-ran it in isolation, `--workers=1`: 3/3 pass, including the one that failed under `--workers=4`.
+- Re-ran the FULL suite a second time (per this session's own "believe it's a flake -> RE-RUN it, don't argue"
+  discipline): failed AGAIN, same test, same place -- `3031 passed, 2 failed, 12 flaky, 26 skipped`, 38m5s.
+- Read the failing test's own header comment (lines 40-45): it ALREADY documents this exact failure mode as a
+  KNOWN, load-dependent, PRE-EXISTING characteristic -- "under real load, [the Wizard-view preview's own
+  ongoing auto-play repaint] is what destabilizes `#blkOpenModal`'s own actionability check... reproduced under
+  a ~209-file/6-worker batch: 2/2 open-as-modal tests failed" -- with a partial mitigation (`stopLiveSim`)
+  already built in, evidently not sufficient to fully close this specific 4-worker configuration.
+
+**Conclusion**: a pre-existing, documented, worker-load-sensitive test characteristic, NOT a regression from
+this turn's own L7 deletion -- the file touches nothing changed, reproduces reliably at `--workers=4` and
+reliably passes at `--workers=1`, and the mechanism was already named, in writing, before this turn started.
+Not chased further (out of scope for an L7 deletion turn); flagged plainly in the pass-back for the advisor's
+own call on whether it needs a dedicated turn, same posture as BACKLOG #70's own report-first handling.
