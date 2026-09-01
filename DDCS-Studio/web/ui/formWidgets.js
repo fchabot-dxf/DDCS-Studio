@@ -1323,8 +1323,14 @@ function paneFlexCss(token) {
 // only when a caller opts in. Omitted (every other current use), the rendered <pre> carries no id at all, so
 // it can never collide with the static shell's own #wiz_user_code sibling — see the 'code_preview' branch's
 // own comment for why reusing that id directly would be unsafe for an op whose in-place route is already live.
-export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = null) {
+export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = null, ns = null) {
     const readers = [];
+    // t2477 (BACKLOG #67) — the tree's own `sim`/`panel` viz ids need the SAME caller namespace
+    // `userOpView.js`'s own `id()`/`elNS()` already apply when LOOKING these ids up (`ns_base` for a
+    // namespaced host like the Blocks-tab pane, bare `base` for the un-namespaced standalone modal,
+    // `createUserOpView(null)`). Mirrors that exact convention — `ns=null` (the default, and every
+    // existing call site before this turn) stays byte-identical.
+    const nsId = (base) => (ns ? `${ns}_${base}` : base);
 
     function traverse(nodes, container) {
         if (!nodes || !Array.isArray(nodes)) return;
@@ -1450,20 +1456,20 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 simBox.innerHTML = want2d ? `
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container" id="userViz3dBox_tree" data-viz-pane="preview3d" style="display:none">
-                        <div id="userViz3dStatus_tree" class="viz-status"></div>
-                        <div id="userViz3dContainer_tree" class="viz-canvas"></div>
+                    <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d" style="display:none">
+                        <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
+                        <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
                     </div>
                     <div class="viz-container" data-viz-pane="layout2d">
-                        <div id="userVizStatus_tree" class="viz-status"></div>
-                        <div id="userVizContainer_tree" class="viz-canvas"></div>
+                        <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
+                        <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
                     </div>
                 </div>` : `
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container" id="userViz3dBox_tree" data-viz-pane="preview3d">
-                        <div id="userViz3dStatus_tree" class="viz-status"></div>
-                        <div id="userViz3dContainer_tree" class="viz-canvas"></div>
+                    <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d">
+                        <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
+                        <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
                     </div>
                 </div>`;
 
@@ -1481,8 +1487,8 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 <span class="section-label">FEATURE CANVAS</span>
                 <div class="viz-split">
                     <div class="viz-container" data-viz-pane="layout2d">
-                        <div id="userVizStatus_tree" class="viz-status"></div>
-                        <div id="userVizContainer_tree" class="viz-canvas"></div>
+                        <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
+                        <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
                     </div>
                 </div>`;
                 container.appendChild(pnlBox);

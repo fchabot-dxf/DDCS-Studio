@@ -66987,3 +66987,85 @@ pre-existing `sf-pos-snapback` load-contention timeout documented since t2465 �
 code changed this turn; the one edit made was tested, refuted, and reverted). `git status --porcelain`:
 confirmed clean — `userOpView.js` reverted byte-identical to HEAD, no other product file touched.
 
+## t2477 — BACKLOG #67: FOUND AND FIXED drill's blank Blocks-tab preview panel. A genuine namespace mismatch,
+NOT the tree-migration link everyone (including the advisor, who checked and correctly killed it first)
+suspected
+
+### KILLING THE OBVIOUS THEORY, and the NEXT theory, before trusting either
+
+The dispatch's own pre-check (`applyPanel()` never reads `hasTreeLayout`) was confirmed directly — not
+re-derived, just verified the claim held. The dispatch's own "silent-falsy seam" lead (`_def`/`panel`
+resolving silently to hidden) was tested next and ALSO ruled out: `panelType('form3d+2d')` resolves
+`{viz:true, mode:'3d2d'}` for drill correctly, measured via a direct call, no ambiguity.
+
+### THE REAL MECHANISM — found by reading render()'s own isTree branch, then correcting my OWN diagnostic tool
+
+`render()`'s `isTree` branch (`userOpView.js:426-428`) DOES hide the outer, always-present `.wiz-visual` shell
+— but this is BY DESIGN: drill's own tree already declares a SECOND, nested visual pane (a `sim` node inside
+its `split_horizontal`'s `RIGHT` mouth), meant to replace the outer one, not duplicate it. My FIRST deep-DOM
+dump of this inner pane showed it as empty — but that was my OWN diagnostic script's bug, a `depth > 6` cutoff
+that hid everything past that point. Caught it, raised the depth limit, re-dumped: the inner pane's FULL shell
+exists (`#userViz3dBox_tree`, `#userViz3dContainer_tree`, `#userVizContainer_tree`, correctly structured) —
+but every one has ZERO children. The shell renders; nothing draws into it.
+
+### THE ROOT — a namespace mismatch, pinned precisely
+
+`userOpView.js`'s own `vid()`/`vel()` resolvers (t2323 — a PRIOR fix for exactly this defect class, "found
+gating drill's flip at t2321") correctly prefix every viz id with the CALLER's own namespace
+(`createUserOpView(ns)`: `ns='blk'` for the Blocks-tab pane, `ns=null` for the standalone modal) before
+looking anything up. But `formWidgets.js`'s own `sim`/`panel` tree-node handlers — the code that BUILDS these
+elements — hardcode them with NO namespace prefix at all, always bare `userViz3dContainer_tree`. For `ns=null`
+(the modal) both sides happen to agree — exactly why the modal has always worked and this bug stayed hidden.
+For `ns='blk'` they diverge: the lookup wants `blk_userViz3dContainer_tree`, the build made
+`userViz3dContainer_tree` — `mgr.preview3D()` and the 2D feature-canvas mount could never find their own
+target container, so nothing ever drew into it.
+
+### THE FIX — narrow, both sides confirmed
+
+`web/ui/formWidgets.js`: `renderUiTree` gains an optional 6th param `ns = null` and a local `nsId(base) = ns ?
+\`${ns}_${base}\` : base` helper, mirroring `userOpView.js`'s own `id()` exactly. Every hardcoded `_tree`
+id in the `sim`/`panel` branches (8 occurrences) now routes through `nsId(...)`. `ns=null` (the default, and
+every OTHER call — there is exactly ONE call site in the whole codebase) is byte-identical to before this
+turn. `web/wizards/views/userOpView.js`: the one call site now passes its own closure `ns` through.
+
+Confirmed live: drill's Blocks-tab pane shows a real, populated 3D scene and a real 2D layout view with a
+genuine draggable `pos` handle. Regression-checked: pocket (flat mode, `ns='blk'` too, unaffected — `nsId` is
+a no-op for every non-`sim`/`panel` node type) unchanged; drill via the standalone modal (`ns=null`) unchanged.
+Targeted pre-check before the full suite: every test t2341's own migration comment names (8 files) plus
+`twin-form-completeness-1581` (the full 32-op sweep) — 19/19. The preview mutation manifest — 7/7. Screenshots:
+`verification/t2477-drill-visual-pane-fixed.png` (full pane, real content visible), `verification/t2477-drill-
+visual-pane-fixed-closeup.png` (the populated canvas itself, close up).
+
+### L4 RE-SWEEP on drill — honest, inconclusive, reported not chased
+
+Re-ran the drag-render-truth gate on drill's own `dr_pos` handle now that the canvas mounts (VERIFY item 4).
+Result: RED, `movedMid:0, movedAfter:0`. Before trusting it: `document.elementFromPoint()` at the handle's own
+center returns `.blk-formpane` — an unrelated, overlapping element, not the handle. Tried 3 viewport widths
+(1400/1800/2400px) and an explicit `scrollIntoViewIfNeeded()`; identical overlap every time. Not resolved
+either way this turn — per the dispatch's own explicit allowance ("it may come back RED, that is a finding
+not a failure of the fix, report don't fix"). BACKLOG #61's own L4 table updated: drill moves out of CAN'T-RUN
+into a new, honestly-labeled fourth bucket (mounts now, gate result inconclusive) rather than being force-fit
+into GREEN or RED.
+
+### Tier
+
+`formWidgets.js`/`userOpView.js` are both shared render-path files (rule 1b) — targeted regression suite run
+BEFORE the full suite (26 tests, all passing), full suite result below. Screenshots + BACKLOG updates.
+
+### VERIFY (both halves)
+
+Root established by measurement, OBSERVED throughout (both killed theories and the real one — see above).
+Fixed, confirmed both directions (Blocks-tab pane populated, standalone modal unregressed). Screenshot in
+`verification/`. L4 re-run on drill's own handle — reported (RED, cause named, not chased). Targeted
+regression suite (26 tests, t2341's own 8 referenced files + twin-form-completeness-1581 + the mutation
+manifest) BEFORE the full suite: 26/26 passed. `test:node`: 238/238 passed. Full suite `--workers=4`, BEFORE
+concluding: **3019 passed, 3 failed, 7 flaky, 26 skipped.** All three explained, none a regression from
+`formWidgets.js`/`userOpView.js`: (1) the same pre-existing `sf-pos-snapback` load-contention timeout
+documented since t2465; (2) `undo-reproject-echo.spec.js`'s own already-documented BACKLOG #57 solo flake; (3)
+`undo-blind-writes-2427.spec.js`'s own already-documented BACKLOG #63 solo flake — neither #57 nor #63 touches
+`formWidgets.js`/`userOpView.js`/the undo-reproject machinery this turn's own changes live nowhere near, and
+both entries' own `STILL REAL IF` criteria require exactly that kind of unrelated-file touch to reopen, which
+this turn does not meet. Re-ran both isolated (`--workers=1`) rather than the full 35-minute suite again: 3
+passed outright, 4 flaky-then-passed-on-retry — consistent with their own established flake rate across
+multiple prior turns, not a new or worsened symptom. `git status --porcelain`: confirmed clean of every source
+file the manifests name.

@@ -437,7 +437,14 @@ export function createUserOpView(ns, opts) {
                 byParam[inp.dataset.param] = { row, read: readers[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
             });
 
-            _readers = renderUiTree(host, userRoot ? userRoot.uiChildren : [], _def.bindings || [], byParam);
+            // t2477 (BACKLOG #67) — pass THIS instance's own `ns` through, so the tree's own `sim`/`panel`
+            // viz ids (formWidgets.js's own nsId helper) match the SAME namespace `vid()`/`elNS()` below
+            // already look them up with. Was unset: a namespaced host (the Blocks-tab pane, ns='blk') built
+            // bare `userViz3dContainer_tree`-style ids while everything reading them looked for
+            // `blk_userViz3dContainer_tree` — the tree's own visual shell built but never found, drill's
+            // entire preview panel staying empty. `ns=null` (the standalone modal) is unaffected: nsId(base)
+            // returns `base` unchanged, byte-identical to before this turn.
+            _readers = renderUiTree(host, userRoot ? userRoot.uiChildren : [], _def.bindings || [], byParam, null, ns);
         } else {
             if (vis) vis.style.display = panelType(_def && _def.panel).viz ? '' : 'none';
             if (controls) { controls.style.flex = ''; controls.style.maxWidth = ''; }

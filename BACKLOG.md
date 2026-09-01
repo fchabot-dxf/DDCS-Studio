@@ -5386,10 +5386,15 @@ error this session's own discipline exists to catch before it becomes a wrong ta
   holds — tracks the pointer, no snap-back.
 - **RED (3)**: `rotaryClock`, `alignment`, `parting` — see the three new BACKLOG entries below (#64/#65/#66).
   Real, reproduced defects, none fixed this turn.
-- **CAN'T-RUN (11)**: `atc_warmup`/`atc_length`/`atc_check`/`atc_test`/`atc_change`/`atc_table` (6 — no
+- **CAN'T-RUN (10)**: `atc_warmup`/`atc_length`/`atc_check`/`atc_test`/`atc_change`/`atc_table` (6 — no
   geometry canvas at all, expected: housekeeping ops with nothing to drag), `wcs`/`comm`/`io_step`/
-  `pause_confirm` (4 — same, logic/selection ops, no drag affordance), `drill` (1 — genuinely surprising, see
-  below).
+  `pause_confirm` (4 — same, logic/selection ops, no drag affordance).
+- **MOUNTS NOW, GATE RESULT INCONCLUSIVE (1)**: `drill` — was CAN'T-RUN (its canvas never mounted at all,
+  see below); FIXED at t2477 (BACKLOG #67), the canvas now mounts and renders real content, confirmed by
+  screenshot. Re-ran the drag gate on its own primary handle: RED, but the observed cause is an unrelated
+  DOM-overlap (`elementFromPoint` returns `.blk-formpane`, not the handle) that was NOT resolved either way
+  this turn — neither a confirmed defect (like #64/#65/#66) nor a clean GREEN. A genuinely new, fourth bucket,
+  not force-fit into either existing one. 18+3+10+1 = 32.
 
 ⭐ **`drill`'s CAN'T-RUN is NOT "no affordance by design"** — its own rendered form copy reads *"Drag the
 handles in the 2D layout (left) to set the pattern — round handle sizes it, square handle places it"* — the
@@ -5403,8 +5408,10 @@ whatever makes drill's canvas mount differs from every other op this sweep drove
 legacy modal) mounts the canvas correctly; the Blocks-tab pane (the surface every other one of the 31 tested
 ops actually uses) does not — `#blk_wiz_user .wiz-visual` renders `display:none` for drill specifically,
 confirmed via a real toolbox-drag simulation (`stackToWorkspace`), not just the synthetic boot. Filed as its
-own entry, BACKLOG #67, with the precise mechanism and a likely root (`applyPanel()`'s visibility toggle
-possibly not wired for drill's own tree-render migration, t2341). REPORT ONLY, not fixed. Full account there.
+own entry, BACKLOG #67. **⭐⭐⭐ FIXED at t2477** — a namespace mismatch in `formWidgets.js`'s own tree-render
+`sim`/`panel` handlers (hardcoded, un-namespaced ids vs. `userOpView.js`'s own namespace-aware lookups), NOT
+the `applyPanel()`/tree-migration link this entry's own earlier text speculated about. Confirmed live
+(screenshot), regression-checked (19+7 tests). Full account in #67.
 
 ⭐⭐ **This entry's OWN prediction is falsified, corrected here rather than left standing**: t2465's own passage
 above reads *"the lathe family's six ops are precisely the ones the gate can't drive... if it can't, that IS
@@ -5866,8 +5873,9 @@ ALSO stop responding, the shape of this entry has changed and needs re-diagnosin
 
 ---
 
-### 67. `drill`'s Blocks-tab "Wizard View" pane hides its ENTIRE visual panel (`display:none`) — a REAL product
-defect, NOT a gate/boot limitation. REPORT ONLY, not fixed, per t2475's own explicit scope
+### 67. [✅ FIXED t2477 — a namespace mismatch in formWidgets.js's own tree-render `sim`/`panel` node handlers,
+confirmed live (screenshot) and via a re-run of L4's own gate] `drill`'s Blocks-tab "Wizard View" pane hides
+its ENTIRE visual panel (`display:none`) — a REAL product defect, NOT a gate/boot limitation
 
 *(filed t2475, small item — L4's own CAN'T-RUN outlier for `drill`, BACKLOG #61's own L4 section. Drilling is
 among the most-used ops in the app; this is the significant-find outcome that dispatch anticipated.)*
@@ -5918,3 +5926,82 @@ toggle runs BEFORE or reads from a DIFFERENT value than the tree-render path exp
 **STILL REAL IF**: `stackToWorkspace([op], window.__blkws)` for `user_drill_data` (booted per this entry's own
 method 2 above) still shows `#blk_wiz_user .wiz-visual` computed `display:none` while `window.openWiz('drill')`
 still renders `svg.feature-canvas` correctly — the A/B contrast, not either fact alone, is the claim.
+
+### ⭐⭐⭐⭐ t2477 — FIXED, root pinned precisely, DIFFERENT from the advisor's own predicted "silent-falsy seam"
+
+**The advisor's own theory-to-kill was correctly killed first**: `applyPanel()` never consults `hasTreeLayout`
+— confirmed, matched the dispatch's own pre-emptive check. **The advisor's own "silent-falsy seam" lead
+(`_def`/`panel` resolving silently to hidden) was ALSO not the mechanism** — `panelType('form3d+2d')` resolves
+`{viz:true, mode:'3d2d'}` correctly for drill, measured directly, no ambiguity.
+
+**OBSERVED, the real mechanism, found by reading `render()`'s own `isTree` branch (`userOpView.js:426-428`)**:
+for tree-mode ops, `.wiz-visual`'s OUTER, always-present shell IS deliberately hidden (`vis.style.display =
+'none'`, unconditional) — but this is BY DESIGN, not the bug: drill's own tree ALREADY declares its OWN nested
+visual pane (a `sim` node inside its `split_horizontal`'s `RIGHT` mouth), meant to REPLACE the outer one, not
+duplicate it. **Deep-DOM-dumped the inner, tree-rendered `.wiz-visual` specifically** (my first dump missed it
+entirely — a depth-6 cutoff in my own diagnostic script hid it; corrected and re-dumped deeper): the inner
+pane's full shell EXISTS — `#userViz3dBox_tree`, `#userViz3dContainer_tree`, `#userVizContainer_tree`, all
+present, correctly structured — but EVERY ONE has **zero children**. The shell renders; nothing ever draws
+into it.
+
+**THE ROOT — a genuine namespace mismatch, confirmed precisely**: `userOpView.js`'s own `vid()`/`vel()`
+resolvers (added at t2323, "BACKLOG #21's own next layer, found gating drill's flip at t2321" — a PRIOR fix
+for exactly this defect class) correctly prefix every viz id with the CALLER's own namespace
+(`createUserOpView(ns)` — `ns='blk'` for the Blocks-tab pane, `ns=null` for the standalone modal) before
+looking anything up: `vid('userViz3dContainer')` resolves to `blk_userViz3dContainer_tree` for the Blocks-tab
+context. But `formWidgets.js`'s own `sim`/`panel` tree-node handlers (the code that BUILDS these elements,
+`renderUiTree`) hardcode them with **NO namespace prefix at all** — always the bare `userViz3dContainer_tree`.
+For `ns=null` (the modal) both sides happen to agree (no prefix either way) — which is EXACTLY why the modal
+has always worked and hid this bug. For `ns='blk'` (the Blocks-tab pane) they diverge: the LOOKUP side wants
+`blk_userViz3dContainer_tree`, the BUILD side made `userViz3dContainer_tree` — nothing rendered by `mgr.
+preview3D()` or the 2D feature-canvas mount could ever find its own target container, so nothing ever drew.
+
+**THE FIX, narrow, confirmed both directions**:
+- `web/ui/formWidgets.js` — `renderUiTree` gains an optional 6th parameter, `ns = null`, and a local `nsId(base)
+  = ns ? \`${ns}_${base}\` : base` helper mirroring `userOpView.js`'s own `id()` EXACTLY. Every hardcoded
+  `_tree`-suffixed id in the `sim`/`panel` branches (8 occurrences) now goes through `nsId(...)`. `ns=null` (the
+  default, and every OTHER caller — there is exactly one call site in the whole codebase) is byte-identical to
+  before this turn.
+- `web/wizards/views/userOpView.js` — the ONE call site passes its own closure `ns` through:
+  `renderUiTree(host, ..., null, ns)`.
+
+**Confirmed live, both directions**: drill's Blocks-tab pane now shows a real, populated 3D scene AND a real 2D
+layout view with a genuine draggable `pos` handle (`hasFeatureCanvas:true`, `fcHandleCount:1`,
+`c2dChildren:2`, real SVG grid content). Regression-checked: pocket (flat mode, `ns='blk'` too — unaffected,
+`nsId` is a no-op for every non-tree node type) still renders correctly (`fcHandleCount:2`, unchanged); drill
+via the standalone modal (`ns=null`) still works unchanged. Screenshots: `verification/t2477-drill-visual-
+pane-fixed.png` (the full Blocks-tab pane, real 3D+2D content visible on the right) and `verification/t2477-
+drill-visual-pane-fixed-closeup.png` (the populated 2D canvas itself, close up).
+
+**Regression suite, targeted before the full run**: every test t2341's own migration comment names
+(`no-duplicate-ids-tree-render-2319`, `geometry-seam-tree-mode-2323` — BOTH its tree-mode AND flat-mode
+control cases, `split-node-responsive-2327`, `stack-bridge-multi-mouth-2333`, `form-row-composite-widget-2335`,
+`stock-spill-792`, `roundtrip-whole-program-1319`) plus `twin-form-completeness-1581` (the full 32-op form
+sweep) — **19/19 passed.** The preview mutation manifest (7 tests, incl. the t2471 disk-cleanliness rewrite) —
+**7/7 passed.**
+
+### ⭐ L4 RE-SWEEP on drill — an honest, INCONCLUSIVE secondary finding, reported not chased
+
+Per the dispatch's own VERIFY item 4: re-ran the drag-render-truth gate against drill's own primary handle
+(`dr_pos`) now that the canvas mounts. **Result: RED — `movedMid:0, movedAfter:0`.** Before trusting that as a
+real defect, checked WHY (this session's own established discipline, per the several false-reds L4's own first
+pass produced): `document.elementFromPoint()` at the handle's own reported center returns `.blk-formpane` — an
+UNRELATED, overlapping element — not the handle. **This is either a genuine interaction-blocking overlap bug
+(the visible pixels render correctly per the screenshot, but something else's hit-box sits on top) or a
+test-harness artifact specific to this synthetic boot's own scroll/layout state** — tried 3 viewport widths
+(1400/1800/2400px) and an explicit `scrollIntoViewIfNeeded()`, all show the identical `.blk-formpane` overlap.
+**Not resolved either way this turn** — out of scope per the dispatch's own explicit instruction ("it may come
+back RED, that is a finding not a failure of the fix, report do not fix"). Named honestly as unresolved rather
+than guessed at in either direction. Whoever picks this up: start from `.blk-formpane`'s own computed
+`position`/`z-index`/bounding rect at drill's own handle coordinates, the same OBSERVED-first discipline this
+whole diagnosis used.
+
+**BACKLOG #61's own L4 table**: `drill` moves from CAN'T-RUN (11) to a genuine, if inconclusive, verdict —
+correction filed in that entry directly, not left stale here.
+
+**STILL REAL IF**: `stackToWorkspace([op], window.__blkws)` for `user_drill_data`, booted per this entry's own
+method 2, now shows the OUTER `.wiz-visual` still correctly `display:none` (by design) but the INNER,
+tree-rendered one populated with real children under `#blk_userViz3dContainer_tree`/`#blk_userVizContainer_
+tree` — if either goes empty again, the namespace fix regressed. The `.blk-formpane` overlap finding is
+separately still real if `elementFromPoint` at `dr_pos`'s own coordinates returns anything other than the
+handle itself.
