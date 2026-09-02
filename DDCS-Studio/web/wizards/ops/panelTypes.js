@@ -440,6 +440,19 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         // sniffs below stay as the FALLBACK (untouched) → corner/edge/middle byte-identical (they declare no anchor).
         const anchor = groups[gid].map((b) => b && b.anchor).find(Boolean);
         if (anchor && anchor.kind === 'point') { pos(); continue; }
+        // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
+        // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent
+        // param. Mirrors the byRole.x/y/len branch further down (same MUTE anchor dot + canvasWidgets `length`
+        // gesture), but reached by DECLARATION (a single-binding group) rather than three role-tagged params
+        // sharing a group — the block-authorable shape this pilot proves, not a replacement for that older one.
+        if (anchor && anchor.kind === 'length') {
+            const lenB = groups[gid][0];
+            items.push({ kind: 'hole', x: anchor.ax, y: anchor.ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed, not draggable
+            if (lenB && _writable(lenB.param)) {
+                decls.push({ type: 'length', id: gid + '_len', field: lenB.param, ax: anchor.ax, ay: anchor.ay, axis: anchor.axis || 'y', value: num(params[lenB.param]), min: anchor.min, max: anchor.max, label: anchor.label || 'length' });
+            }
+            continue;
+        }
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;

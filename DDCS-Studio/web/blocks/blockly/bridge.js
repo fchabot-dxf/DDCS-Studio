@@ -327,6 +327,10 @@ const optionsFor = (def, field) => {
     // X|Y"): NARROWED from the generic `SELECTS.axis` (X/Y/Z/A/B/C, shared by many unrelated blocks) to the
     // two values flip actually means — Z/A/B/C were offered and pickable but did nothing coherent.
     if (field === 'axis' && def.type === 'flip') return ['X', 'Y'];
+    // t2517 (BACKLOG #71 pilot) — length_handle: NARROWED the same way flip's axis is, from the generic
+    // SELECTS.axis (X/Y/Z/A/B/C) to the two the `length` canvas gesture actually supports (canvasWidgets.js's
+    // own `d.axis==='x'` check is the ceiling — a 1D drag along one FeatureCanvas plane axis, never Z/A/B/C).
+    if (field === 'axis' && def.type === 'length_handle') return ['X', 'Y'];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
     return SELECTS[field] || null;
 };

@@ -6862,6 +6862,23 @@ that filed it was explicit: diagnose only, do not build anything.
 from-scratch wizard built through the real UI still shows an empty Visualization pane where the built-in shows
 interactive handles.
 
+> **✅ t2517 — PARTIALLY RESOLVED, one gesture of eleven, proven end to end through the real UI (the t2509
+> bar).** A NEW block, `length_handle` (`wizards/ops/lengthHandle.js`), nests inside `feature_canvas`'s own
+> mouth (a new `mouth:'DO'`, owner ruling: a handle belongs to a SPECIFIC canvas, containment not a flat
+> type-filter) and declares ONE socket-less binding — `handleBindingsFromStack`/`ToBlocks` (userOps.js) —
+> carrying `anchor:{kind:'length', axis, ax, ay, min, max, label}`. A new branch in `layoutSpecFromOp`
+> (panelTypes.js) reads it and renders the SAME `length` gesture already proven on lathe facing (t2485) via
+> `canvasWidgets.js`'s existing registry. Built a wizard from an EMPTY canvas through REAL palette drags + real
+> field edits (no `ddcsLoadBlockStack`), saved via the real dialog, reloaded the page for real, and DRAGGED THE
+> RENDERED SVG HANDLE with a real mouse gesture — the bound field's value changed live
+> (`verification/t2517-length-handle-live-drag.png` is the opposite of this entry's own black-rectangle
+> screenshot). **What this does NOT close**: `previewGeometry` itself (the JS-only per-feature VECTOR GEOMETRY
+> hook — text's actual letter outlines, slot/contour's own boundary shapes) is still unauthorable; `length_handle`
+> is a SIMPLE anchor+axis+value handle, not an arbitrary-shape declaration. The other ten `canvasWidgets.js`
+> gestures (point already had a path via `layoutwidget`; scaleX/shear/rect/radial/projLength/diagAim/crossAim/
+> probeVector/translate remain) are template work now that one is proven, not yet built — scoped out this turn
+> deliberately (BACKLOG #61's own corner-precedent: prove one, then let the rest inherit).
+
 ---
 
 ### 72. THE AUTHORABILITY SWEEP — what built-ins do that blocks can't say, and what gets said twice

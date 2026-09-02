@@ -68991,3 +68991,112 @@ intended files -- the pre-existing untracked `ANALYTICS-BOT-DETECTION.md`/`RESTO
 already-modified `verification/*.png` snapshots (present in `git status` since before this turn started, not
 touched by it) are left alone, not staged. `git diff BACKLOG.md` checked before staging (this turn's own edit
 there is a small, contained inline RESOLVED note, not a rewrite -- easy to eyeball for a same-day collision).
+
+---
+
+## t2517 -- BACKLOG #71, THE HANDLE BLOCKS: one gesture (`length`), proven end to end through the real UI
+
+The authoring goal's own stated blocker: no block anywhere could declare an interactive drag handle, even
+though `canvasWidgets.js`'s CANVAS_GESTURES registry (11 gestures) has existed since t2489 and is proven,
+hand-rolled, on lathe facing (t2485). Dispatch scope, explicit: build ONE gesture (`length`, the simplest),
+its block, nested inside `feature_canvas`'s own mouth (a NEW `mouth:'DO'` -- owner ruling, ownership not
+symmetry: a handle belongs to a SPECIFIC canvas), wire the round-trip, and prove it by AUTHORING through the
+real UI -- the t2509 bar, real clicks/drags/saves/reload, no `ddcsLoadBlockStack` in the build itself. Do NOT
+build the other ten gestures, do NOT touch the two form render paths, do NOT fix the formfield widget-key bug
+BACKLOG #72 found.
+
+### THE DESIGN
+
+`wizards/ops/lengthHandle.js` (new): `length_handle`, SELF-CONTAINED like `layoutwidget` (the point-pick
+precedent) -- carries its OWN bound param name (`field`) + default (`value`), so an author drops ONE block and
+gets both a live number binding (a real form row) AND the draggable handle, no separate `formfield` needed.
+`ax`/`ay` are a FIXED literal anchor (not themselves bound/draggable) -- the minimal shape this pilot needs; a
+bound/relative anchor is later work, not attempted. `feature_canvas` (featureCanvas.js) got `mouth: 'DO'` added
+-- the SAME declared mechanism `grid_container`/`param_group`/`section` already use (bridge.js's own
+`mouthsOf`), so nesting round-trips generically with zero new Blockly-shape code.
+
+**The reader/writer** (`userOps.js`, mirroring `layoutBindingsFromStack`/`ToBlocks` exactly):
+`handleBindingsFromStack(children)` walks `flattenBlocks(children)` for `feature_canvas` nodes SPECIFICALLY,
+then walks EACH ONE's own `.children`/`.uiChildren` for `length_handle` blocks -- scoped to the OWNING canvas,
+never a bare stack-wide scan, so a future op with two canvases keeps each one's own handles distinct by
+construction (the exact ownership property the dispatch named). Produces ONE socket-less binding per handle:
+`{param, group, role:'len', anchor:{kind:'length', axis, ax, ay, min, max, label}}` -- no `match`/`blockIndex`,
+so it never reaches the emit (sim/form-only, byte-identical, same shape as layoutwidget's fx/fy).
+`handleBindingsToBlocks` reverses it. Both wired into `resolveBindingsMeta` (registration) and
+`authoredExtraBindings` (the live-as-you-author preview).
+
+**The render**: a new `anchor.kind === 'length'` branch in `layoutSpecFromOp` (panelTypes.js), inserted right
+after the existing `anchor.kind === 'point'` branch (same `continue`-based early-return shape, same MUTE
+anchor-dot convention the byRole.x/y/len fallback further down already uses) -- reads `anchor.ax/ay/axis/min/
+max/label` directly (no live param resolution needed for the FIXED anchor) and pushes a `{type:'length', ...}`
+decl shaped exactly for `canvasWidgets.js`'s own `length` gesture. Additive and gated: no existing binding
+anywhere declares `anchor.kind:'length'`, so this branch is provably inert for all 32 built-ins.
+
+### THE METHOD -- the t2509 bar, worked out fresh this turn (a harder case than t2509's own: MOUTH-nesting,
+not just stacking)
+
+Reused t2509's own documented traps (flyout-block-by-`.type` not DOM order; clear `.blk-search` before every
+field click) and found FOUR more, each real, each fixed:
+
+1. **A flyout block's OWN bounding-rect centre can land on `path.blocklyFlyoutBackground`, not the block** --
+   the fix (t2509 never needed this, since it only ever stacked blocks, never nested): grab by the block's own
+   `text.blocklyText` element specifically, not `getSvgRoot()`'s bbox.
+2. **Dropping INTO a mouth (not stacking) needs the DROP POINT corrected for the DRAG's OWN grab offset** -- a
+   block's `previousConnection.getOffsetInBlock()` (converted flyout-workspace-scale -> screen) gives the
+   mouth's true screen point, but the MOUSE has to release at `mouthPoint + (grabPoint - connectionScreenPoint)`,
+   not at the raw mouth point, or the block visually lands in the notch but never snaps (found live: a
+   dashed-outline, warning-icon floating block, structurally close but NOT connected).
+3. **A field on a block scrolled off-screen (after nesting pushes the canvas around) needs `centerOnBlock(id,
+   true)`** -- the SAME `useCoordinates` flag t2435's own `panAndGlow` uses, for the SAME reason (plain
+   `centerOnBlock(id)` measures the WHOLE connected stack's height, overshooting for anything with a still-
+   attached mouth).
+4. **A stale, WIDE search flyout (a block with 8 fields renders wide) can overlay canvas coordinates far past
+   where a narrow flyout would** -- t2509's own trap, reproduced in a new shape: clearing `.blk-search` before
+   every field interaction (not just before every drag) was the fix.
+
+Two SELF-CAUGHT test-authoring mistakes, reported plainly rather than smoothed over: (a) a fresh-dragged
+`length_handle`'s own `axis` field defaulted to `'X'`, not the block's declared `defaults.axis:'Y'` -- the SAME
+class of gap t2509 found for `progstart`'s empty numeric sockets (a freshly-placed block doesn't fully honour
+`defaults`); the first live-drag attempt dragged the mouse the WRONG axis (vertically) and silently produced no
+field change -- caught by checking the SVG's own cursor style (`'grabbing'`, confirming the handle WAS grabbed)
+before suspecting the gesture math, then fixing the test's own drag direction, not the (correct) product code.
+(b) A def-level test asserted `spec.decls` from `layoutSpecFromOp` -- `decls` is an INTERNAL variable, consumed
+by `buildCanvasWidgets(decls, setFields)` to produce `spec.handles` (the array actually returned and actually
+rendered); `decls` itself never appears in the function's own return shape. Traced via a throwaway debug
+instrumentation (`window.__dbgLength`, `console.error` inline in panelTypes.js, both removed before commit) that
+proved `_writable()` was `true` all along -- the bug was in the TEST's own assumption about the API shape, not
+in the render code. Fixed by reading `spec.handles` (matching `pointpick-block.spec.js`'s own established
+pattern) instead.
+
+### THE PROOF (`length-handle-block.spec.js`, permanent, 4 tests)
+
+1. Round-trip at the function level (block -> `handleBindingsFromStack` -> binding -> `handleBindingsToBlocks`
+   -> block), mirroring `pointpick-block.spec.js`'s own first test exactly.
+2. The `length` gesture's own place/drag math in isolation (rest position, a drag's written value, a
+   below-min drag clamping to the bound) -- `CANVAS_GESTURES.length` exercised directly, no `layoutSpecFromOp`
+   in the loop, matching the established convention for testing gesture math independent of the render path.
+3. A def-level test: `def.bindings` carries the declared anchor; `layoutSpecFromOp` (form open, so the field is
+   writable) renders the handle at the anchor + param-default position; emit BYTE-IDENTICAL between the default
+   and a dragged value (sim/form-only, no socket).
+4. **DRIVE THE APP, the t2509 bar**: `user_root` -> `feature_canvas` -> `length_handle`, all THREE placed by
+   real palette drags (search, grab-by-text, drop-with-connection-offset-correction); `feature_canvas.PANEL` set
+   to `form2d` and `length_handle.FIELD` renamed to `reach` via real field clicks + real typing; saved via the
+   real `.blk-dev-savedlg` dialog; a REAL `page.reload()` (not a soft reset); `openWiz` on the reloaded, freshly
+   re-registered def; the form shows a real `reach` row seeded at `20`; the 2D FeatureCanvas SVG renders exactly
+   one interactive handle; a REAL mouse drag on that rendered SVG circle (not `spec.onDrag()` called
+   programmatically) moves it from `20` to `30.847` -- an independent, non-preselected number, proving the drag
+   math ran for real, not a canned result. Screenshot:
+   `verification/t2517-length-handle-live-drag.png` -- the deliberate OPPOSITE of BACKLOG #71's own
+   black-rectangle screenshot from t2509.
+
+### VERIFY
+
+`test:node` 238/238 green (no product logic lives in the node tier for this change, but nothing broke). Full
+suite run (`--workers=4`) -- this turn's own render-path change (`panelTypes.js`'s `layoutSpecFromOp`,
+`userOps.js`'s binding derivation, both genuinely shared by every wizard's 2D canvas, not just this pilot) meets
+the dispatch's own conditional for a full run; result recorded in the pass-back note once the run completes.
+BACKLOG #71 got an inline RESOLVED note (PARTIAL -- one of eleven gestures, `previewGeometry` itself -- the
+per-feature VECTOR geometry hook, text's own letter outlines -- explicitly named as still unaddressed, not
+conflated with this turn's simpler anchor+axis+value handle). Scratch debug files
+(`tests/_t2517-live-handle.spec.js`, `tests/_t2517-dbg2.spec.js`, assorted `scratchpad/t2517-*` dumps) deleted
+before commit -- their findings are recorded here and in the permanent spec, not left behind as stray files.

@@ -679,20 +679,67 @@ export function layoutBindingsToBlocks(bindings) {
     return out;
 }
 
-/** The LIVE-form extra bindings a stack's authoring blocks declare — formfield VALUE fields + layoutwidget GUI handles.
- *  For devMode.deriveAuthoredDef so a field/handle shows in the form AS YOU AUTHOR IT. Safe (skips on a bad match). */
-export function authoredExtraBindings(children) {
-    return [...formfieldBindings(children), ...layoutBindingsFromStack(children)];
+// ── def.bindings (group/role/anchor) ⇄ `length_handle` blocks (BACKLOG #71 pilot, t2517) — the GUI drag-handle ──
+// A `length_handle` block, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable 1D canvas
+// handle bound to ONE param. It expands to ONE SOCKET-LESS binding {param, group, role:'len', anchor:{kind:
+// 'length', axis, ax, ay, min, max, label}} — form + canvas only (no match/blockIndex → no emit, mirroring
+// layoutwidget's fx/fy exactly). layoutSpecFromOp's own `anchor.kind === 'length'` branch renders the draggable
+// handle (canvasWidgets CANVAS_GESTURES.length); the drag writes `field` (the axis distance from the FIXED
+// literal anchor ax/ay). SCOPED TO feature_canvas'S OWN CHILDREN, never a bare stack-wide scan — a handle
+// belongs to a SPECIFIC canvas (owner ruling), so containment (not a flat type-filter) says which one owns it;
+// a future op with two feature_canvas nodes keeps each one's own handles distinct by construction.
+
+/** The `length_handle` blocks nested inside `feature_canvas` nodes in a stack → SOCKET-LESS layout bindings
+ *  (the group/role/anchor a handle needs). */
+export function handleBindingsFromStack(children) {
+    const out = []; let n = 0;
+    for (const fc of flattenBlocks(children)) {
+        if (!fc || fc.type !== 'feature_canvas') continue;
+        for (const b of [...flattenBlocks(fc.uiChildren || []), ...flattenBlocks(fc.children || [])]) {
+            if (!b || b.type !== 'length_handle') continue;
+            const p = b.params || {};
+            const gid = 'lh' + (++n);
+            const dv = Number(p.value);
+            const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+            const min = (p.min === '' || p.min == null) ? null : Number(p.min);
+            const max = (p.max === '' || p.max == null) ? null : Number(p.max);
+            const anchor = { kind: 'length', axis: String(p.axis || 'Y').toUpperCase() === 'X' ? 'x' : 'y', ax, ay, min, max, label: p.label || 'length' };
+            out.push({ param: String(p.field || 'len'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'len', anchor });
+        }
+    }
+    return out;
 }
 
-/** If the template AUTHORS its bindings as `formfield` (value) / `layoutwidget` (GUI) blocks, derive them. Mirrors
- *  resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there are NONE, so a hand-written-spec def (today's
- *  corner/edge/middle) is UNTOUCHED / byte-identical. Returns { specs, bindings } — specs drive the emit re-derivation
- *  (def.bindingSpecs), bindings drive the form + schema (deriveBindings over the template) + the GUI (group/role/anchor). */
+/** SOCKET-LESS length bindings → `length_handle` block records, nested back inside a `feature_canvas` block (the
+ *  reverse — re-authorable). One binding per handle (unlike layoutwidget's x/y pair). */
+export function handleBindingsToBlocks(bindings) {
+    const handles = (bindings || []).filter((b) => b && b.group && b.anchor && b.anchor.kind === 'length' && b.role === 'len');
+    if (!handles.length) return [];
+    const kids = handles.map((b) => ({ type: 'length_handle', params: {
+        field: b.param, value: b.default != null ? String(b.default) : '',
+        axis: b.anchor.axis === 'x' ? 'X' : 'Y', ax: String(b.anchor.ax || 0), ay: String(b.anchor.ay || 0),
+        min: b.anchor.min != null ? String(b.anchor.min) : '', max: b.anchor.max != null ? String(b.anchor.max) : '',
+        label: b.anchor.label || 'length',
+    } }));
+    return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
+}
+
+/** The LIVE-form extra bindings a stack's authoring blocks declare — formfield VALUE fields + layoutwidget/
+ *  length_handle GUI handles. For devMode.deriveAuthoredDef so a field/handle shows in the form AS YOU AUTHOR
+ *  IT. Safe (skips on a bad match). */
+export function authoredExtraBindings(children) {
+    return [...formfieldBindings(children), ...layoutBindingsFromStack(children), ...handleBindingsFromStack(children)];
+}
+
+/** If the template AUTHORS its bindings as `formfield` (value) / `layoutwidget` (point) / `length_handle`
+ *  (length) blocks, derive them. Mirrors resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there
+ *  are NONE, so a hand-written-spec def (today's corner/edge/middle) is UNTOUCHED / byte-identical. Returns
+ *  { specs, bindings } — specs drive the emit re-derivation (def.bindingSpecs), bindings drive the form +
+ *  schema (deriveBindings over the template) + the GUI (group/role/anchor). */
 function resolveBindingsMeta(def) {
     const template = def && Array.isArray(def.template) ? def.template : [];
     const specs = bindingsFromStack(template);
-    const layout = layoutBindingsFromStack(template);
+    const layout = [...layoutBindingsFromStack(template), ...handleBindingsFromStack(template)];
     if (!specs.length && !layout.length) return null;   // no authoring blocks → keep hand-written def.bindings/bindingSpecs (byte-identical)
     // v1: derive over the UNPRUNED template (an authored op carries no guards yet — a guarded authored op is a later slice).
     const valueBindings = specs.length ? deriveBindings(flattenBlocks(template), specs) : [];
