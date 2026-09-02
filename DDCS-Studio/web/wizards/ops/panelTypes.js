@@ -447,6 +447,18 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         // anchor carries `frame` and no ax/ay (`anchor.ax||0` reads 0 for it, unchanged) — one branch, two
         // authoring surfaces, disambiguated only where it matters (the reverse direction, handleBindingsToBlocks).
         const anchor = groups[gid].map((b) => b && b.anchor).find(Boolean);
+        // t2525 (BACKLOG #71) — a handle whose own declared target param resolved to NOTHING (userOps.js's
+        // `handleBindingsFromStack`/`attach()`: the formfield it named was deleted/renamed, or a hand-authored
+        // stack bypassed the must-match picker) must FAIL VISIBLY, never render as an ordinary-looking handle
+        // that silently writes nowhere — the exact defect this turn closed for the RESOLVED case. Checked
+        // BEFORE the anchor.kind switch below, so it pre-empts every gesture branch uniformly.
+        if (anchor && groups[gid].some((b) => b && b.anchorUnresolved)) {
+            const targetName = (groups[gid].find((b) => b && b.param) || {}).param || '?';
+            const ax = anchor.ax != null ? anchor.ax : (anchor.cx != null ? anchor.cx : 0);
+            const ay = anchor.ay != null ? anchor.ay : (anchor.cy != null ? anchor.cy : 0);
+            decls.push({ type: 'broken', id: gid + '_broken', x: ax, y: ay, color: '#ef4444', label: `⚠ ${anchor.label || 'handle'}: "${targetName}" not declared` });
+            continue;
+        }
         if (anchor && anchor.kind === 'point') { pos(anchor.ax || 0, anchor.ay || 0, anchor.label || 'pos'); continue; }
         // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
         // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent

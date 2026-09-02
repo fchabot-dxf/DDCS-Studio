@@ -38,6 +38,16 @@ const clamp = (v, lo, hi) => {
  *  the view's declaration (the field id(s) + the geometry context). FeatureCanvas renders kind 'move' as a snapping
  *  square and anything else as a circle (with a click-to-edit value label when `value` + spec.onEdit are present). */
 export const CANVAS_GESTURES = {
+    // t2525 (BACKLOG #71) — a handle whose own declared target param resolved to nothing (deleted/renamed
+    // formfield, or a hand-authored stack bypassing the must-match picker) — panelTypes.js pushes this instead
+    // of the normal gesture so it FAILS VISIBLY: a plain (non-'move') circle, coloured red by the decl's own
+    // `color`, with a label naming the missing param. `drag` always returns null (never writes anything, the
+    // established "this gesture is a no-op" contract buildCanvasWidgets.onDrag already honours) and `place`
+    // sets no `value`, so onEdit's click-to-type never triggers either — genuinely inert, not just discouraged.
+    broken: {
+        place: (d) => ({ x: d.x, y: d.y, label: d.label }),
+        drag: () => null,
+    },
     // POSITION → two fields. Square 'move' handle (FeatureCanvas snaps it to stock anchors).
     // Optional anchor ax/ay makes it RELATIVE: the fields hold world − anchor (a delta, e.g. a G91 incremental
     // reposition offset from the previous pass's start). Absent anchor → absolute (back-compat: ax/ay default 0).

@@ -11,9 +11,12 @@
  * t2517 (BACKLOG #71) — given a MOUTH: a handle (`length_handle`, wizards/ops/lengthHandle.js) belongs to a
  * SPECIFIC canvas — it writes one param and renders in one place — so it nests INSIDE this block's own
  * children, structural containment rather than a flat type-filter (owner ruling: "that is not symmetry, it is
- * ownership"). Still emits NOTHING: a handle block emits nothing either, so the mouth's own children never
- * reach G-code regardless of what's nested in it — see `handleBindingsFromStack` (userOps.js), which reads
- * ONLY inside a feature_canvas node's own children, never a bare stack-wide scan.
+ * ownership"). This block itself still emits NOTHING (a metadata-only container, unchanged) — but a nested
+ * handle's own DECLARED TARGET (a param an "Op Param" `formfield` elsewhere in the stack already binds to a
+ * real atom socket) can and does reach G-code once dragged: t2525 (BACKLOG #71) merges the handle's anchor
+ * onto that real binding rather than declaring a parallel, socket-less one — see `handleBindingsFromStack`/
+ * `mergeHandleAnchors` (userOps.js), which reads a handle ONLY inside its own feature_canvas node's children,
+ * never a bare stack-wide scan.
  */
 export const featureCanvasBlock = {
     type: 'feature_canvas', label: 'feature canvas', category: 'Wizard Previews', kind: 'panel', mouth: 'DO',   // t161 — an explicit metadata kind (like section/param_group/structctl) so devMode.isAtom excludes it from the knob kit; kind stays 'panel' (t2515 — not part of the rename, see its own header note); t2517 — mouth added for length_handle (and future handle blocks) to nest in

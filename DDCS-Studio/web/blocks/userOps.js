@@ -679,19 +679,38 @@ export function layoutBindingsToBlocks(bindings) {
     return out;
 }
 
-// ── def.bindings (group/role/anchor) ⇄ handle blocks nested in `feature_canvas` (BACKLOG #71, t2517/t2521) ──
-// A handle block, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable canvas gesture
-// bound to one or more params — form + canvas only (no match/blockIndex → no emit, mirroring layoutwidget's
-// fx/fy exactly). layoutSpecFromOp's own `anchor.kind` switch renders the matching CANVAS_GESTURES entry; the
-// drag writes the declared field(s). SCOPED TO feature_canvas'S OWN CHILDREN, never a bare stack-wide scan — a
-// handle belongs to a SPECIFIC canvas (owner ruling), so containment (not a flat type-filter) says which one
-// owns it; a future op with two feature_canvas nodes keeps each one's own handles distinct by construction.
-// `length_handle` (t2517) is the pilot; `point_handle` (t2521) is the second gesture, same shape — see its own
-// header for exactly how it differs (reuses the EXISTING `anchor.kind === 'point'` branch rather than a new one).
+// ── def.bindings (group/role/anchor) ⇄ handle blocks nested in `feature_canvas` (BACKLOG #71, t2517/t2521/t2525) ──
+// A handle block, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable canvas gesture that
+// drives an EXISTING, already emit-real param — one an ordinary `formfield` block already binds via bindMode/
+// atomType/key (t2525: the handle's own field/fx/fy NAME that param, must-match-picker authored, bridge.js's
+// HANDLE_ANCHOR_FIELDS — same discipline atomType already used). `attach()` below LOOKS UP that param among
+// the stack's own REAL (match/key-carrying) bindings and MERGES the anchor onto it — `deriveBindings.js` line
+// 98 already carries `.anchor` through untouched, so `layoutSpecFromOp` needs no change for the resolved case:
+// it already builds `groups` from `def.bindings` generically, whatever produced them. A target that resolves
+// to NOTHING (the formfield was deleted/renamed after the handle was authored, or a hand-authored/legacy stack
+// bypassed the picker) must FAIL VISIBLY, not silently vanish or render a dead handle that looks live — it
+// comes back `anchorUnresolved: true` instead, which panelTypes.js renders as an obviously-broken red marker
+// (never a normal handle) and `handleTargetReport` (below) surfaces at save time, mirroring
+// `formfieldMatchReport`'s own established backstop for the identical class of problem (a picker prevents a
+// TYPO, not a target later deleted elsewhere in the stack).
+//
+// Before t2525 this list was itself socket-less (no match/blockIndex → never reached emit, by construction) —
+// BACKLOG #71's own central finding: two real, draggable handles that changed nothing on drag. SCOPED TO
+// feature_canvas'S OWN CHILDREN, never a bare stack-wide scan — a handle belongs to a SPECIFIC canvas (owner
+// ruling), so containment (not a flat type-filter) says which one owns it.
 
 /** The handle blocks (`length_handle`, `point_handle`, …) nested inside `feature_canvas` nodes in a stack →
- *  SOCKET-LESS layout bindings (the group/role/anchor a handle needs). */
-export function handleBindingsFromStack(children) {
+ *  bindings carrying the group/role/anchor a handle needs, MERGED onto whichever REAL (match/key-carrying)
+ *  binding in `realBindings` the handle's own field names — or `{anchorUnresolved:true}` if none does. */
+export function handleBindingsFromStack(children, realBindings) {
+    const byParam = new Map((realBindings || []).filter((b) => b && b.param).map((b) => [b.param, b]));
+    const attach = (targetParam, group, role, anchor) => {
+        const real = byParam.get(targetParam);
+        // an unresolved stub still needs `type` -- registerUserOp (a pre-existing, unrelated guard, audit #6)
+        // refuses ANY binding lacking one, which would make a wizard with a broken handle target fail to even
+        // REGISTER/reopen at all, hiding the broken-marker render behind a hard crash instead of showing it.
+        return real ? { ...real, group, role, anchor } : { param: targetParam, type: 'number', group, role, anchor, anchorUnresolved: true };
+    };
     const out = []; let n = 0;
     for (const fc of flattenBlocks(children)) {
         if (!fc || fc.type !== 'feature_canvas') continue;
@@ -700,22 +719,19 @@ export function handleBindingsFromStack(children) {
             const p = b.params || {};
             if (b.type === 'length_handle') {
                 const gid = 'lh' + (++n);
-                const dv = Number(p.value);
                 const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
                 const min = (p.min === '' || p.min == null) ? null : Number(p.min);
                 const max = (p.max === '' || p.max == null) ? null : Number(p.max);
                 const anchor = { kind: 'length', axis: String(p.axis || 'Y').toUpperCase() === 'X' ? 'x' : 'y', ax, ay, min, max, label: p.label || 'length' };
-                out.push({ param: String(p.field || 'len'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'len', anchor });
+                out.push(attach(String(p.field || 'len'), gid, 'len', anchor));
             } else if (b.type === 'point_handle') {
                 const gid = 'ph' + (++n);
-                const xv = Number(p.x), yv = Number(p.y);
                 const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
                 const anchor = { kind: 'point', ax, ay, label: p.label || 'pos' };
-                out.push({ param: String(p.fx || 'x'), type: 'number', default: Number.isFinite(xv) ? xv : 0, group: gid, role: 'x', anchor });
-                out.push({ param: String(p.fy || 'y'), type: 'number', default: Number.isFinite(yv) ? yv : 0, group: gid, role: 'y', anchor });
+                out.push(attach(String(p.fx || 'x'), gid, 'x', anchor));
+                out.push(attach(String(p.fy || 'y'), gid, 'y', anchor));
             } else if (b.type === 'rect_handle') {
                 const gid = 'rh' + (++n);
-                const wv = Number(p.value), hv = Number(p.valueH);
                 const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
                 const sx = p.sx === '' || p.sx == null ? 1 : Number(p.sx);
                 const sy = p.sy === '' || p.sy == null ? 1 : Number(p.sy);
@@ -725,21 +741,42 @@ export function handleBindingsFromStack(children) {
                     minw: numOrNull(p.minw), maxw: numOrNull(p.maxw), minh: numOrNull(p.minh), maxh: numOrNull(p.maxh),
                     valueField: p.valueField === 'fieldH' ? 'fieldH' : 'field', label: p.label || 'W×H',
                 };
-                out.push({ param: String(p.field || 'w'), type: 'number', default: Number.isFinite(wv) ? wv : 0, group: gid, role: 'w', anchor });
-                out.push({ param: String(p.fieldH || 'h'), type: 'number', default: Number.isFinite(hv) ? hv : 0, group: gid, role: 'h', anchor });
+                out.push(attach(String(p.field || 'w'), gid, 'w', anchor));
+                out.push(attach(String(p.fieldH || 'h'), gid, 'h', anchor));
             } else if (b.type === 'radial_handle') {
                 const gid = 'rdh' + (++n);
-                const dv = Number(p.value);
                 const cx = Number(p.cx) || 0, cy = Number(p.cy) || 0;
                 const a = Number(p.a) || 0;
                 const rScale = p.rScale === '' || p.rScale == null ? 2 : Number(p.rScale);
                 const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
                 const anchor = { kind: 'radial', cx, cy, a, rScale, minR: numOrNull(p.minR), maxR: numOrNull(p.maxR), label: p.label || 'Ø' };
-                out.push({ param: String(p.field || 'dia'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'r', anchor });
+                out.push(attach(String(p.field || 'dia'), gid, 'r', anchor));
             }
         }
     }
     return out;
+}
+
+/** Merge `handleAnchors` (handleBindingsFromStack's own output) onto `valueBindings`: a RESOLVED anchor
+ *  (carries match/key, having found its target) REPLACES the plain copy of that same param — one entry per
+ *  param, never two — while an UNRESOLVED one (anchorUnresolved:true) is kept standalone so it still reaches
+ *  `def.bindings` and can render as an obviously-broken handle, not silently vanish. */
+export function mergeHandleAnchors(valueBindings, handleAnchors) {
+    const resolvedParams = new Set((handleAnchors || []).filter((h) => h && !h.anchorUnresolved).map((h) => h.param));
+    const kept = (valueBindings || []).filter((b) => !resolvedParams.has(b && b.param));
+    return [...kept, ...(handleAnchors || [])];
+}
+
+/** t2525 (BACKLOG #71) — WHICH handle blocks' own declared target param actually resolves to a real (match/
+ *  key-carrying) binding in this stack, and which don't. Mirrors `formfieldMatchReport`'s own shape/role: the
+ *  MUST-MATCH picker (bridge.js HANDLE_ANCHOR_FIELDS) prevents a TYPO at author time, not a target formfield
+ *  later renamed/deleted elsewhere in the stack — this is that backstop, consumed by the save-time guard the
+ *  same way formfieldMatchReport already is, so a handle silently pointing at nothing is reported, not shipped. */
+export function handleTargetReport(children) {
+    const valueBindings = formfieldBindings(children);
+    const handleAnchors = handleBindingsFromStack(children, valueBindings);
+    const unresolved = handleAnchors.filter((h) => h && h.anchorUnresolved).map((h) => ({ param: h.param, kind: h.anchor && h.anchor.kind }));
+    return { total: handleAnchors.length, matched: handleAnchors.length - unresolved.length, unresolved };
 }
 
 /** SOCKET-LESS handle bindings → handle block records, nested back inside a `feature_canvas` block (the
@@ -798,9 +835,13 @@ export function handleBindingsToBlocks(bindings) {
 
 /** The LIVE-form extra bindings a stack's authoring blocks declare — formfield VALUE fields + layoutwidget/
  *  length_handle/point_handle GUI handles. For devMode.deriveAuthoredDef so a field/handle shows in the form
- *  AS YOU AUTHOR IT. Safe (skips on a bad match). */
+ *  AS YOU AUTHOR IT. Safe (skips on a bad match). t2525: a handle's own anchor is MERGED onto the real
+ *  (formfield-declared) binding it names, same as resolveBindingsMeta below — so the live authoring canvas
+ *  shows the same resolved/broken state a save would. */
 export function authoredExtraBindings(children) {
-    return [...formfieldBindings(children), ...layoutBindingsFromStack(children), ...handleBindingsFromStack(children)];
+    const valueBindings = formfieldBindings(children);
+    const handleAnchors = handleBindingsFromStack(children, valueBindings);
+    return [...mergeHandleAnchors(valueBindings, handleAnchors), ...layoutBindingsFromStack(children)];
 }
 
 /** If the template AUTHORS its bindings as `formfield` (value) / `layoutwidget` (point) / `length_handle`
@@ -808,15 +849,18 @@ export function authoredExtraBindings(children) {
  *  resolveSimMeta: ADDITIVE — returns null when there
  *  are NONE, so a hand-written-spec def (today's corner/edge/middle) is UNTOUCHED / byte-identical. Returns
  *  { specs, bindings } — specs drive the emit re-derivation (def.bindingSpecs), bindings drive the form +
- *  schema (deriveBindings over the template) + the GUI (group/role/anchor). */
+ *  schema (deriveBindings over the template) + the GUI (group/role/anchor). t2525: a handle's own anchor is
+ *  MERGED onto the real binding it names (mergeHandleAnchors) rather than added as a second, socket-less
+ *  entry — the handle then reaches emit through the SAME match/key the merged binding already carried. */
 function resolveBindingsMeta(def) {
     const template = def && Array.isArray(def.template) ? def.template : [];
     const specs = bindingsFromStack(template);
-    const layout = [...layoutBindingsFromStack(template), ...handleBindingsFromStack(template)];
-    if (!specs.length && !layout.length) return null;   // no authoring blocks → keep hand-written def.bindings/bindingSpecs (byte-identical)
+    const layoutwidget = layoutBindingsFromStack(template);
     // v1: derive over the UNPRUNED template (an authored op carries no guards yet — a guarded authored op is a later slice).
     const valueBindings = specs.length ? deriveBindings(flattenBlocks(template), specs) : [];
-    return { specs, bindings: [...valueBindings, ...layout] };
+    const handleAnchors = handleBindingsFromStack(template, valueBindings);
+    if (!specs.length && !layoutwidget.length && !handleAnchors.length) return null;   // no authoring blocks → keep hand-written def.bindings/bindingSpecs (byte-identical)
+    return { specs, bindings: [...mergeHandleAnchors(valueBindings, handleAnchors), ...layoutwidget] };
 }
 
 /** The FORM bindings a stack's `formfield` blocks declare (specs → deriveBindings over the stack). For the LIVE Blocks

@@ -69501,3 +69501,156 @@ test itself (never assumed from a screenshot) before the test was allowed to pro
 directly comparable to the two t2509 screenshots already in that directory. The action count (30) is the
 script's own `tick()` counter, summed programmatically, not eyeballed. `git status` clean of anything outside
 BACKLOG.md/WORK-LOG.md/the one verification PNG before staging.
+
+## t2525 — WIRE THE HANDLE TO THE PARAM THAT REACHES THE EMIT: closing the exact gap t2523 named, worked out
+from the code before writing any
+
+### THE ASK
+
+t2523's own central finding: two real, draggable handles now exist on a from-scratch wizard, but dragging one
+produces byte-identical G-code — the affordance is real and the wiring is not. The dispatch named this a design
+question and asked it be treated as one: work the shape out of the code first, then implement, then verify both
+directions live, exactly the discipline t2511's own adjacency-merge account used. Its own hypothesis, offered
+as a read not a measurement: a handle should name a param that must ALREADY EXIST on the op and resolve to it
+by lookup, probably the same must-match-picker pattern `atomType` already uses. ONE explicit requirement: a
+handle pointing at a param that doesn't exist must FAIL VISIBLY, never silently render a dead handle.
+
+### THE SHAPE, traced from the code before writing anything
+
+Read `deriveBindings.js` (the function that turns a `formfield`'s own `bindMode`/`atomType`/`key` declaration
+into a real, emit-reaching binding) end to end first. Two things settled the design immediately:
+
+1. **Line 98 already carries `.anchor` through a REAL binding, untouched, and has since PILOT 2** (`if
+   (s.anchor) b.anchor = s.anchor;`) — the machinery for "a real, match/key-carrying binding that ALSO renders
+   a canvas handle" already existed, built for `layoutwidget`, just never fed by anything socket-less.
+2. **`layoutSpecFromOp` (panelTypes.js) builds its own `groups` object generically from `def.bindings`** (`for
+   (const b of (def.bindings||[])) if (b.group) (groups[b.group]=...).push(b)`) — it does not care, and never
+   checked, whether a binding also carries `match`/`blockIndex`. This meant the RESOLVED case needed ZERO
+   changes to the render path at all — only to what gets INTO `def.bindings` in the first place.
+
+So the fix is a MERGE, not a new render mechanism: `handleBindingsFromStack` (userOps.js) now takes a second
+argument, the stack's own REAL bindings (`formfieldBindings`'s output), and its own `attach()` closure looks up
+each handle field's named target by param, returning a CLONE of the real binding with `group`/`role`/`anchor`
+added (the resolved case) or a `{param, type:'number', anchorUnresolved:true}` stub (the unresolved case) — the
+type field only needed after `registerUserOp`'s own unrelated, pre-existing guard (audit #6: every binding must
+declare a type) refused to even REGISTER an op carrying a typeless stub, caught by the fail-visibly test itself
+before the fix, not assumed. `mergeHandleAnchors` (new, small) then REPLACES the plain copy of any param a
+handle resolved onto in `def.bindings` — one entry per param, never two — while an unresolved stub stays
+standalone so it still reaches the render path. Both `resolveBindingsMeta` (the saved-def path) and
+`authoredExtraBindings` (the live-authoring-preview path, devMode.js) route through the same merge, so the
+canvas shows the same resolved/broken state whether you're mid-authoring or reopening a save.
+
+**The advisor's own hypothesis held exactly**: `fx`/`fy` (point_handle), `field`/`fieldH` (rect_handle), `field`
+(length_handle, radial_handle) are now MUST-MATCH pickers (bridge.js, new `HANDLE_ANCHOR_FIELDS` map, the same
+`(def.type, field) -> picker` declared-table shape `LABEL_TARGET_FIELDS`/`TOOL_TARGET_FIELDS`/etc already use)
+— and they reuse `pickerField.js`'s existing `whenparam` pickKind AS-IS, zero changes to that file: its own
+candidate set, "every OTHER formfield/param_field's own PARAM in this stack," is EXACTLY what a handle needs.
+CLOSED, not forward-authorable (no `allowNew`) — the same rung `flip.setup` already established, for the
+identical reason: a handle naming a param that doesn't exist is a plain authoring defect, never a legitimate
+"I'll declare it later" case the way a goto/tool/pin reference can be.
+
+### THE FAIL-VISIBLY REQUIREMENT, done at both layers the dispatch implied
+
+**Author time**: the picker is must-match, so the bad state is UNREPRESENTABLE through the normal UI — you
+cannot select a param that isn't there.
+
+**The backstop** (a target formfield renamed/deleted after the handle was authored, or a hand-authored/legacy
+stack that bypassed the picker): `handleTargetReport` (userOps.js, new, mirrors `formfieldMatchReport`'s own
+shape exactly) is wired into `devMode.js`'s save gate the same way, in the same place, with the same BLOCKING
+`{ok:false, error}` shape — a dangling handle target refuses the save, named plainly, not the goto family's
+own informational-only toast (that one is legitimately forward-authorable; this one isn't).
+
+**The render path**: `layoutSpecFromOp` checks `groups[gid].some(b => b.anchorUnresolved)` BEFORE the
+`anchor.kind` switch, so it pre-empts every gesture branch uniformly rather than needing a per-gesture guard.
+An unresolved group renders a NEW `'broken'` gesture (canvasWidgets.js, minimal: `place` sets no `value` so
+`onEdit`'s click-to-type never triggers, `drag` always returns `null` so `buildCanvasWidgets`'s own existing
+`if (updates) setFields(...)` guard makes it a no-op by construction, not a new safety check) — coloured red
+(`#ef4444`, via the ALREADY-GENERIC `color` field `buildCanvasWidgets` already threads through from any decl),
+labelled with the missing param's own name so a real author can find and fix it. Confirmed live: a stack with a
+dangling target still opens (the typeless-stub bug above was caught and fixed exactly because this path was
+tested, not assumed to work), shows the red marker, no other handle renders in its place, and dragging it does
+nothing (`tests/handle-target-fails-visibly-2525.spec.js`, `verification/t2525-broken-handle-fails-visibly.png`).
+
+### VERIFIED live, both directions, all four gestures — the exact check that failed at t2523, run the same way
+
+All four permanent spec files (`length-handle-block.spec.js`, `point-handle-block.spec.js`,
+`rect-handle-block.spec.js`, `radial-handle-block.spec.js`) rewritten: each pilot now places a REAL formfield
+(Op Param → `progstart.clearance` / `progend.retractZ`, arbitrary but real atom sockets) BEFORE the handle,
+since the must-match picker needs its target to already exist — an authoring-ORDER fact this turn found live
+(placing the handle first, as the OLD free-text pilots did, now throws "no candidate" from the picker) and
+named rather than routed around. Each file's own three-tier proof:
+
+1. **Round-trip** (function level): `handleBindingsFromStack`+`mergeHandleAnchors` merge a hand-built "real"
+   binding correctly (match/key + the handle's own anchor, one entry not two), AND separately confirm the
+   NO-real-binding case comes back `anchorUnresolved:true` — never silently dropped.
+2. **Def-level**: a real `registerUserOp`'d op's `def.bindings` carries the merged (match/key + anchor) entry;
+   `layoutSpecFromOp` renders the handle UNCHANGED from before this turn (same coordinates, same kind); emit
+   NOW CHANGES when the handle's own param changes — the flip from every one of these tests' own prior
+   `emitByteIdentical: true` assertion, which recorded the BUG this turn fixes, not a design choice to protect.
+3. **Live UI, the full t2509/t2523 bar**: real palette drags placing the formfield(s) first, real field edits
+   INCLUDING the new picker interaction (`.ddcs-picker-row`, distinct from `.blocklyMenuItem` — confirmed live,
+   not assumed from reading pickerField.js), a real save, a real reload, a real mouse drag on the rendered SVG
+   handle — and THEN, the actual t2523-failing check, run again the same way: does the exact before/after field
+   value pair a real drag just produced emit a DIFFERENT program? `emitMapped(builderOf(t)({...base,
+   <param>: <exact live value>}))`, before vs after, strict inequality. All four: **yes, now** (was
+   byte-identical every time before this fix). `#wiz_user_code` (the shell's own live code-preview `<pre>`)
+   turned out not to reliably re-render off a canvas-drag gesture — a separate UI-wiring question, unrelated to
+   whether the BINDING reaches emit (it does, proven the programmatic way above) — noted, not chased further,
+   since the dispatch's own scope was the wiring, not that pane's own refresh trigger.
+
+Screenshots (real drag, real reload, before/after visible on screen):
+`verification/t2525-{length,point,rect,radial}-handle-emit-wired.png`,
+`verification/t2525-broken-handle-fails-visibly.png`. 17 tests across the four gesture files + 3 new tests in
+`handle-target-fails-visibly-2525.spec.js` (the report function, the broken render, the save-gate refusal) —
+all green.
+
+### DOCS UPDATED, not left stale
+
+`wizards/ops/featureCanvas.js` and all four handle block files (`lengthHandle.js`/`pointHandle.js`/
+`rectHandle.js`/`radialHandle.js`) had their own header comments explicitly claiming "sim/form-only," "no
+separate formfield needed," "emits nothing" — all now WRONG for the resolved case. Corrected in place (not
+left for the next reader to discover by tracing the code themselves) rather than only fixed in the mechanism.
+
+### GUARDRAIL CHECK — did this need to become an arc?
+
+No. The fix stayed inside `resolveBindingsMeta`'s own merge step, a new picker-field wiring table (the SAME
+declared shape four other pickers already use), and one new gesture entry — `previewGeometry`'s own separate
+mechanism (the JS-only per-feature vector-geometry hook, `def.previewGeometry = fn`) was never touched, read,
+or needed. The guardrail the dispatch named ("if wiring this needs restructuring previewGeometry... STOP AND
+REPORT") never fired.
+
+### TIER, and the ONE genuinely surprising regression this turn caused and fixed
+
+`panelTypes.js`/`userOps.js`/`bridge.js`/`canvasWidgets.js`/`devMode.js` are all shared render/binding paths —
+full `--workers=4` suite run, per AGENTS.md rule 1b and the dispatch's own explicit tier note. `test:node`:
+238/238 green, EXCEPT one pre-existing snapshot gate (`preview-spec-gate-1688.test.mjs`) — a golden fixture
+that enumerates `CANVAS_GESTURES` generically picked up the new `broken` entry (11→12 gestures), failing on the
+pinned line-count. Regenerated via the test's own documented `UPDATE_PREVIEW_SNAPSHOT=1` mechanism and read the
+resulting `git diff` line by line before accepting it (the test's own explicit instruction: "a KEY that
+disappeared is a declaration a renderer stopped receiving; a NUMBER that moved is geometry") — the diff was
+exactly the count line plus one new gesture-probe row for `broken`, with no `value` key (confirming the
+no-click-to-edit design) and nothing else in the 32-twin, ~1000-line snapshot moved. Accepted as the new
+baseline, not a bug — this IS what the gate is for.
+
+Full `--workers=4` suite: **3052 passed, 1 failed, 9 flaky, 26 skipped (34.5m)**. The one failure,
+`open-as-modal-1625`, is this session's own already-documented contention flake (BACKLOG #56 — seen at t2507,
+t2515, t2517, t2521's own full runs, always at `--workers=4`, never in isolation); re-ran alone at
+`--workers=1`: **3 passed, 0 failed**, matching that pattern exactly, confirmed not a regression. Two of the 9
+flaky entries sat close enough to this turn's own diff to check directly rather than wave through
+(`feature-canvas-pinch-zoom-2371`, `formfield-loud-mismatch-1636`) — both re-ran clean, 6/6, `--workers=1`, no
+retries needed; the other 7 (alignment/g53/pane-scroll/tooltable/undo/workspace-cloud) name no file this turn
+touched. Nothing in this turn's own diff (userOps.js/bridge.js/panelTypes.js/canvasWidgets.js/devMode.js/five
+op files) touches any of their own territory.
+
+### ONE MORE HONEST OBSERVATION, not fixed — a minor form-render side effect of the fail-visibly stub
+
+`verification/t2525-broken-handle-fails-visibly.png` shows the broken-handle mechanism working exactly as
+designed (a red marker naming the missing param) — but the SAME screenshot also shows an unlabeled `ghost` form
+row (raw param name, value `0`) that no real `formfield` ever declared. The `type:'number'` stub `attach()`
+adds to satisfy `registerUserOp`'s own pre-existing type guard (so a broken op can still REGISTER/reopen at all
+— see above) is a member of `def.bindings` like any other, and the form renderer builds a row for every
+declared param regardless of origin — the SAME "form renders whatever's declared" behavior that already made
+handle bindings visible as editable rows before this turn (t2523's own finding). This is a small, honest loose
+end, not silently swallowed: the CANVAS side (the primary signal) is unambiguous and correct; the FORM side
+shows a stray, uninformative row for the same broken state. Not fixed — the dispatch's own scope named the two
+form render paths explicitly off-limits this turn; named here for whoever next touches that code.

@@ -6927,6 +6927,44 @@ interactive handles.
 > for real needs the handle-binding mechanism to write into an EXISTING emit-real param by lookup (the way
 > `previewGeometry` does), not self-declare a new socket-less one — a design question, not evaluated this turn.
 > Full account: WORK-LOG t2523.
+>
+> **✅ t2525 — RESOLVED for real: a handle now writes into the SAME real binding a formfield already declares,
+> not a parallel socket-less one.** The design question t2523 left open, worked out from the code before
+> writing any (mirroring t2511's own adjacency-merge account, per the dispatch's own instruction): each handle
+> block's own field-naming field (`fx`/`fy`, `field`/`fieldH`) is now a MUST-MATCH PICKER (bridge.js
+> `HANDLE_ANCHOR_FIELDS`, reusing `whenparam`'s own existing candidate set — every formfield/param_field's own
+> `PARAM` in the stack — the identical mechanism `atomType` already uses, exactly the shape the dispatch itself
+> predicted). `handleBindingsFromStack`'s own `attach()` (userOps.js) looks up that param among the stack's
+> REAL (match/key-carrying) bindings and MERGES the handle's anchor onto it, REPLACING the plain copy rather
+> than adding a second entry — `deriveBindings.js`'s own `anchor` passthrough (line 98, already existed for
+> `layoutwidget`) and `layoutSpecFromOp`'s own generic `groups` construction needed ZERO changes for the
+> resolved case, since both already treat `def.bindings` uniformly regardless of what produced an entry.
+>
+> **THE ONE THING TO GET RIGHT, done both ways**: a target that resolves to nothing (formfield renamed/deleted
+> after the handle was authored, or a hand-authored stack bypassing the picker) is UNREPRESENTABLE at author
+> time (the picker literally cannot select a nonexistent param) AND fails visibly at the backstop layer —
+> `handleTargetReport` (userOps.js) BLOCKS save the same way `formfieldMatchReport` already does
+> (devMode.js), and `layoutSpecFromOp` renders a red, valueless, unlabeled-for-editing marker
+> (`verification/t2525-broken-handle-fails-visibly.png`) naming the missing param, checked BEFORE any working
+> gesture branch — never silently absent, never a normal-looking handle that writes nowhere.
+>
+> **VERIFIED live, both directions, all four gestures**: authored a formfield FIRST (the picker needs its
+> target to already exist — a real, if minor, authoring-order fact this turn found and named, not assumed),
+> then a handle picking that param, through real palette drags/real field edits/a real save/a real reload, then
+> a real mouse drag on the rendered SVG handle — the exact check that failed at t2523, run the same way:
+> `width`/`height`-equivalent params changing the emitted G-code (true, unchanged) AND the handle's drag
+> ALSO changing it now (`verification/t2525-{length,point,rect,radial}-handle-emit-wired.png` — was
+> byte-identical before this turn). All 17 tests across the four gesture spec files green, plus 3 new tests for
+> the fail-visibly backstop. The 32 built-in twins: unaffected by construction (this mechanism only activates
+> inside a `feature_canvas`'s own handle children); `test:node` 238/238 green, one pre-existing snapshot gate
+> (`preview-spec-gate-1688`) regenerated to include the new `broken` gesture entry, reviewed line-by-line —
+> nothing else in the 32-twin snapshot moved. Full `--workers=4` e2e: **3052 passed, 1 failed (the
+> already-documented `open-as-modal-1625` contention flake, BACKLOG #56 — re-ran alone, 3/3 clean), 9 flaky
+> (2 checked directly against this turn's own diff, clean in isolation; the other 7 touch none of it)**. One
+> honest, unfixed loose end (out of scope — the form render paths): an unresolved handle's own fail-visibly
+> stub also shows a stray, unlabeled form row — the canvas-side signal (the marker) is the correct, primary one.
+>
+> Full account: WORK-LOG t2525.
 
 ---
 

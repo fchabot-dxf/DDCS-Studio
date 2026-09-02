@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * BACKLOG #71, SECOND GESTURE (t2521) — the GUI POINT-HANDLE canvas block. `point_handle`, nested inside a
- * `feature_canvas` block's own mouth (same containment rule as `length_handle`), DECLARES a draggable 2D point
- * handle bound to two params (fx, fy) at a FIXED literal anchor (ax, ay). `handleBindingsFromStack` expands it
- * to TWO socket-less {group, role:x/y, anchor:{kind:'point', ax, ay, label}} bindings.
+ * BACKLOG #71, SECOND GESTURE (t2521), WIRED FOR REAL (t2525) — the GUI POINT-HANDLE canvas block.
+ * `point_handle`, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable 2D point handle at a
+ * FIXED literal anchor (ax, ay), whose `fx`/`fy` NAME two EXISTING params (MUST-MATCH pickers, bridge.js
+ * HANDLE_ANCHOR_FIELDS) two "Op Param" `formfield` blocks elsewhere in the stack already bind to real atom
+ * sockets. `handleBindingsFromStack`/`attach()` (userOps.js) look up each and MERGE this handle's anchor onto
+ * the real bindings, so dragging reaches emit through the SAME match/key the formfields already declared.
  *
  * HOW THIS DIFFERS FROM length_handle: point already had a live render branch (`anchor.kind === 'point'`,
  * panelTypes.js), reached until now only by `layoutwidget` (nested in `param_group`, always anchored at
@@ -24,39 +26,56 @@ const PILOT = `
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'feature_canvas', params: { panel: 'form2d' }, children: [
-                { type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', x: '40', y: '60', ax: '0', ay: '0', label: 'spot' } },
+                { type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', ax: '0', ay: '0', label: 'spot' } },
+            ] },
+            { type: 'param_group', params: { group: 'Test' }, children: [
+                { type: 'formfield', params: { param: 'spotx', label: 'X', dflt: '5', bindMode: 'opparam', atomType: 'progstart', key: 'clearance', type: 'number' } },
+                { type: 'formfield', params: { param: 'spoty', label: 'Y', dflt: '0', bindMode: 'opparam', atomType: 'progend', key: 'retractZ', type: 'number' } },
             ] },
         ],
-        children: [{ type: 'comment', params: { text: 'point handle pilot' } }],
+        children: [
+            { type: 'progstart', params: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5, skim: false } },
+            { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' } },
+        ],
     }];
     U.createUserOp(U.userOpFromStack('${OPTYPE}', 'PH Pilot', template, [], 'form2d'));
 `;
 
-test('round-trip: a point_handle nested in feature_canvas <-> two socket-less {group,role,anchor} bindings (bindingsFrom/ToBlocks)', async ({ page }) => {
+test('round-trip: a point_handle nested in feature_canvas MERGES its anchor onto the two real bindings it names, or fails visibly if either is missing', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => true);
     const r = await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         const fc = { type: 'feature_canvas', params: { panel: 'form2d' }, children: [
-            { type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', x: '40', y: '60', ax: '0', ay: '0', label: 'spot' } },
+            { type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', ax: '0', ay: '0', label: 'spot' } },
         ] };
-        const bindings = U.handleBindingsFromStack([fc]);
-        const back = U.handleBindingsToBlocks(bindings);
-        return { bindings, back0: back[0], nBack: back.length };
+        const real = [
+            { param: 'spotx', type: 'number', match: { type: 'progstart' }, key: 'clearance', default: 5, blockIndex: 0 },
+            { param: 'spoty', type: 'number', match: { type: 'progend' }, key: 'retractZ', default: 0, blockIndex: 1 },
+        ];
+        const anchors = U.handleBindingsFromStack([fc], real);
+        const merged = U.mergeHandleAnchors(real, anchors);
+        const back = U.handleBindingsToBlocks(merged);
+        const unresolvedAnchors = U.handleBindingsFromStack([fc], []);   // neither target exists
+        return { anchors, merged, back0: back[0], nBack: back.length, unresolvedAnchors };
     });
-    expect(r.bindings.length, 'one point_handle -> two socket-less bindings (x, y)').toBe(2);
-    expect(r.bindings.map((b) => b.role)).toEqual(['x', 'y']);
-    expect(r.bindings.map((b) => b.param)).toEqual(['spotx', 'spoty']);
-    expect(r.bindings.map((b) => b.default)).toEqual([40, 60]);
-    expect(r.bindings.every((b) => b.match === undefined && b.blockIndex === undefined), 'socket-less -> no emit (sim/form-only)').toBe(true);
-    expect(r.bindings[0].anchor, 'the anchor is DECLARED {kind:point, ax, ay, label} -- no frame (distinct from layoutwidget)').toEqual({ kind: 'point', ax: 0, ay: 0, label: 'spot' });
-    // reverse round-trip: the two bindings re-nest into a feature_canvas carrying the SAME point_handle
+    expect(r.anchors.length, 'one point_handle -> two anchor entries (x, y)').toBe(2);
+    expect(r.anchors.map((b) => b.role)).toEqual(['x', 'y']);
+    expect(r.anchors.map((b) => b.param)).toEqual(['spotx', 'spoty']);
+    expect(r.anchors.map((b) => b.key), 't2525 -- MERGED from the real bindings, not socket-less').toEqual(['clearance', 'retractZ']);
+    expect(r.anchors.map((b) => b.default), "the REAL bindings' own defaults win").toEqual([5, 0]);
+    expect(r.anchors[0].anchor, 'the anchor is DECLARED {kind:point, ax, ay, label} -- no frame (distinct from layoutwidget)').toEqual({ kind: 'point', ax: 0, ay: 0, label: 'spot' });
+    expect(r.merged.filter((b) => b.param === 'spotx' || b.param === 'spoty').length, 'exactly one entry per param, no duplicates').toBe(2);
+    // reverse round-trip: the two merged bindings still re-nest into a feature_canvas carrying the SAME point_handle
     expect(r.nBack).toBe(1);
     expect(r.back0.type).toBe('feature_canvas');
-    expect(r.back0.children).toEqual([{ type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', x: '40', y: '60', ax: '0', ay: '0', label: 'spot' } }]);
+    expect(r.back0.children).toEqual([{ type: 'point_handle', params: { fx: 'spotx', fy: 'spoty', x: '5', y: '0', ax: '0', ay: '0', label: 'spot' } }]);
+    // FAIL VISIBLY: no matching real bindings -> both anchorUnresolved, never silently dropped
+    expect(r.unresolvedAnchors.length).toBe(2);
+    expect(r.unresolvedAnchors.every((b) => b.anchorUnresolved)).toBe(true);
 });
 
-test('a point-handle op: def.bindings carry the anchor; layoutSpecFromOp renders the handle at anchor+default; emit BYTE-IDENTICAL (sim/form-only, no socket)', async ({ page }) => {
+test('a point-handle op: def.bindings MERGE the anchor onto the real bindings; layoutSpecFromOp still renders the handle; emit CHANGES when dragged (t2525 -- the central fix)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 100, y: 80, z: 20, shape: 'box', show: true } }); });
@@ -71,27 +90,29 @@ test('a point-handle op: def.bindings carry the anchor; layoutSpecFromOp renders
         const { builderOf } = await import('/blocks/opBuilders.js');
         const def = U.listUserOps().find((d) => d.opType === t);
         const params = U.defaultParams(def);
-        const anchored = (def.bindings || []).find((b) => b.anchor);
+        const anchored = (def.bindings || []).filter((b) => b.anchor);
         const spec = layoutSpecFromOp(def, params, null, null, null, {}, () => {}, null);
         const h = (spec.handles || []).find((x) => /_pos$/.test(x.id) && x.kind === 'move');
         const emitDefault = emitMapped(builderOf(t)(U.defaultParams(def))).text;
-        const emitDragged = emitMapped(builderOf(t)({ ...U.defaultParams(def), spotx: 99, spoty: 88 })).text;
+        const emitDragged = emitMapped(builderOf(t)({ ...U.defaultParams(def), spotx: 9, spoty: 3 })).text;
         return {
-            anchorKind: anchored && anchored.anchor && anchored.anchor.kind,
+            anchorKind: anchored[0] && anchored[0].anchor && anchored[0].anchor.kind,
+            hasMatchKey: anchored.length === 2 && anchored.every((b) => b.blockIndex !== undefined && b.key !== undefined),
             hasHandle: !!h, handleX: h && h.x, handleY: h && h.y,
-            emitByteIdentical: emitDefault === emitDragged,
+            emitChanges: emitDefault !== emitDragged,
         };
     }, OPTYPE);
     await page.evaluate((t) => { import('/blocks/userOps.js').then((U) => { try { U.deleteUserOp(t); } catch (_) {} }); localStorage.removeItem('ddcs_user_ops'); }, OPTYPE);
     expect(r.anchorKind, 'the binding carries the DECLARED anchor kind (point)').toBe('point');
-    expect(r.hasHandle, 'layoutSpecFromOp renders a draggable point handle for the anchored binding').toBe(true);
-    expect(r.handleX, 'the handle sits at the param default (physical, anchor 0,0)').toBe(40);
-    expect(r.handleY).toBe(60);
-    expect(r.emitByteIdentical, 'the point handle is sim/form-only -> dragging never changes the emit (byte-identical)').toBe(true);
+    expect(r.hasMatchKey, 't2525 -- BOTH anchor-carrying bindings are now ALSO the real ones').toBe(true);
+    expect(r.hasHandle, 'layoutSpecFromOp renders a draggable point handle for the merged binding, unchanged for the resolved case').toBe(true);
+    expect(r.handleX, 'the handle sits at the param default (physical, anchor 0,0)').toBe(5);
+    expect(r.handleY).toBe(0);
+    expect(r.emitChanges, 't2525 -- the handle now reaches emit: dragging changes the G-code (was byte-identical before this fix)').toBe(true);
 });
 
-test.use({ viewport: { width: 1600, height: 1000 } });
-test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored via REAL palette drags, real field edits, real save, a REAL reload, then a REAL mouse drag on the rendered SVG handle writes the field', async ({ page }) => {
+test.use({ viewport: { width: 2600, height: 1000 } });
+test('DRIVE THE APP, THE t2525 BAR: two formfields placed FIRST (must-match pickers need them to exist), then feature_canvas + point_handle picking both params, real save, a REAL reload, then a REAL mouse drag on the rendered SVG handle changes the fields AND the emitted G-code', async ({ page }) => {
     async function clearSearch() { await page.evaluate(() => { const s = document.querySelector('.blk-search'); if (s) { s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } }); await page.waitForTimeout(100); }
     async function searchFor(text) { await clearSearch(); const s = page.locator('.blk-search'); await s.click(); await s.fill(text); await page.waitForTimeout(250); }
     async function flyoutBlockCenter(type) {
@@ -122,10 +143,10 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
             return { dx: grabPt.x - connScreen.x, dy: grabPt.y - connScreen.y };
         }, type);
     }
-    async function dragFlyoutBlockToMouth(type, mouthPt) {
+    async function dragFlyoutBlockTo(type, targetPt) {
         const grab = await flyoutBlockCenter(type);
         const off = await flyoutDragOffset(type);
-        const dropX = mouthPt.x + off.dx, dropY = mouthPt.y + off.dy;
+        const dropX = targetPt.x + off.dx, dropY = targetPt.y + off.dy;
         await page.mouse.move(grab.x, grab.y);
         await page.mouse.down();
         await page.waitForTimeout(80);
@@ -146,20 +167,33 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
             return { x: rect.left + off.x * ws.scale, y: rect.top + off.y * ws.scale };
         }, { blockType, inputName });
     }
-    async function centerOn(blockType) {
-        await page.evaluate((t) => { const ws = window.__blkws; const blk = ws.getAllBlocks(false).find((b) => b.type === t); if (blk) ws.centerOnBlock(blk.id, true); }, blockType);
+    // a "ref" is either a bare block TYPE (fine while only one exists) or "#<id>" to disambiguate once a
+    // second block of the same type is on the workspace (formfield #2 etc) -- matches t2523's own convention.
+    const RESOLVE_SRC = "(ws,ref)=>ref[0]==='#' ? ws.getAllBlocks(false).find(b=>b.id===ref.slice(1)) : ws.getAllBlocks(false).find(b=>b.type===ref)";
+    async function stackBottomPoint(ref) {
+        return page.evaluate(({ ref, RESOLVE_SRC }) => {
+            const ws = window.__blkws;
+            const blk = eval(RESOLVE_SRC)(ws, ref);
+            const conn = blk.nextConnection;
+            const off = conn.getOffsetInBlock();
+            const rect = blk.getSvgRoot().getBoundingClientRect();
+            return { x: rect.left + off.x * ws.scale, y: rect.top + off.y * ws.scale };
+        }, { ref, RESOLVE_SRC });
+    }
+    async function centerOn(ref) {
+        await page.evaluate(({ ref, RESOLVE_SRC }) => { const ws = window.__blkws; const blk = eval(RESOLVE_SRC)(ws, ref); if (blk) ws.centerOnBlock(blk.id, true); }, { ref, RESOLVE_SRC });
         await page.waitForTimeout(400);
     }
     async function fieldRect(blockType, fieldName) {
-        return page.evaluate(({ blockType, fieldName }) => {
+        return page.evaluate(({ blockType, fieldName, RESOLVE_SRC }) => {
             const ws = window.__blkws;
-            const blk = ws.getAllBlocks(false).find((b) => b.type === blockType);
+            const blk = eval(RESOLVE_SRC)(ws, blockType);
             const f = blk.getField(fieldName);
             const group = f.fieldGroup_ || f.getSvgRoot();
             const el = (group && group.querySelector('text')) || (f.getClickTarget_ && f.getClickTarget_()) || group;
             const r = el.getBoundingClientRect();
             return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-        }, { blockType, fieldName });
+        }, { blockType, fieldName, RESOLVE_SRC });
     }
     async function setDropdownField(blockType, fieldName, optionText) {
         await clearSearch();
@@ -171,6 +205,7 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
         await page.waitForTimeout(150);
     }
     async function setTextField(blockType, fieldName, value) {
+        await clearSearch();
         const rect = await fieldRect(blockType, fieldName);
         await page.mouse.click(rect.x, rect.y);
         await page.waitForTimeout(150);
@@ -179,6 +214,41 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
         await page.keyboard.press('Tab');
         await page.waitForTimeout(150);
     }
+    async function setPickerField(blockType, fieldName, matchText) {
+        await clearSearch();
+        const rect = await fieldRect(blockType, fieldName);
+        await page.mouse.click(rect.x, rect.y);
+        await page.waitForTimeout(250);
+        await page.locator('.ddcs-picker-row', { hasText: matchText }).first().click({ timeout: 3000 });
+        await page.waitForTimeout(150);
+    }
+    async function blockIdOf(type) { return page.evaluate((t) => window.__blkws.getAllBlocks(false).find((b) => b.type === t).id, type); }
+    async function nudgeConnectionTogether(movingRef, movingConnName, targetRef, targetConnName) {
+        const resolve = "(ws,ref)=>ref[0]==='#' ? ws.getAllBlocks(false).find(b=>b.id===ref.slice(1)) : ws.getAllBlocks(false).find(b=>b.type===ref)";
+        await clearSearch();
+        const gap = await page.evaluate(({ movingRef, movingConnName, targetRef, targetConnName, resolve }) => {
+            const ws = window.__blkws;
+            const r = eval(resolve);
+            const mv = r(ws, movingRef), tg = r(ws, targetRef);
+            const mvOff = mv[movingConnName].getOffsetInBlock();
+            const mvRect = mv.getSvgRoot().getBoundingClientRect();
+            const mvScreen = { x: mvRect.left + mvOff.x * ws.scale, y: mvRect.top + mvOff.y * ws.scale };
+            const tgOff = tg[targetConnName].getOffsetInBlock();
+            const tgRect = tg.getSvgRoot().getBoundingClientRect();
+            const tgScreen = { x: tgRect.left + tgOff.x * ws.scale, y: tgRect.top + tgOff.y * ws.scale };
+            const grabEl = mv.getSvgRoot().querySelector('text.blocklyText, .blocklyText') || mv.getSvgRoot();
+            const grabRect = grabEl.getBoundingClientRect();
+            return { dx: tgScreen.x - mvScreen.x, dy: tgScreen.y - mvScreen.y, grabPt: { x: grabRect.x + grabRect.width / 2, y: grabRect.y + grabRect.height / 2 } };
+        }, { movingRef, movingConnName, targetRef, targetConnName, resolve });
+        if (Math.hypot(gap.dx, gap.dy) < 1) return;
+        await page.mouse.move(gap.grabPt.x, gap.grabPt.y);
+        await page.mouse.down();
+        await page.waitForTimeout(60);
+        await page.mouse.move(gap.grabPt.x + gap.dx, gap.grabPt.y + gap.dy, { steps: 10 });
+        await page.waitForTimeout(80);
+        await page.mouse.up();
+        await page.waitForTimeout(250);
+    }
 
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.showApp && window.ddcsStudio);
@@ -186,44 +256,62 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
     await page.waitForFunction(() => window.__blkws);
     await page.waitForTimeout(300);
 
-    // 1) user_root onto the empty canvas
+    // 1) user_root
     await searchFor('Define Custom Wizard');
-    const ur = await flyoutBlockCenter('user_root');
-    await page.mouse.move(ur.x, ur.y);
-    await page.mouse.down();
-    await page.mouse.move(ur.x + 40, ur.y, { steps: 5 });
-    await page.mouse.move(600, 300, { steps: 15 });
-    await page.mouse.move(600, 300, { steps: 2 });
-    await page.mouse.up();
-    await page.waitForTimeout(250);
+    await dragFlyoutBlockTo('user_root', { x: 1900, y: 220 });
 
-    // 2) feature_canvas into user_root's PRESENTATION mouth
+    // 2) progstart + progend into EXECUTION (their own clearance/retractZ fields are the eventual emit targets)
+    const execMouth = await mouthPoint('user_root', 'EXECUTION');
+    await searchFor('program start');
+    await dragFlyoutBlockTo('progstart', execMouth);
+    const psBottom = await stackBottomPoint('progstart');
+    await searchFor('program end');
+    await dragFlyoutBlockTo('progend', psBottom);
+    await nudgeConnectionTogether('progend', 'previousConnection', 'progstart', 'nextConnection');
+
+    // 3) param_group into PRESENTATION, then TWO formfields (Op Param -> progstart.clearance / progend.retractZ)
+    //    -- BEFORE the handle, since its own pickers need both params to already exist.
     const presMouth = await mouthPoint('user_root', 'PRESENTATION');
-    await searchFor('feature canvas');
-    await dragFlyoutBlockToMouth('feature_canvas', presMouth);
-    const fcConnected = await page.evaluate(() => {
-        const ws = window.__blkws;
-        const ur = ws.getAllBlocks(false).find((b) => b.type === 'user_root');
-        return ur.inputList.find((i) => i.name === 'PRESENTATION').connection.targetBlock()?.type === 'feature_canvas';
-    });
-    expect(fcConnected, 'feature_canvas connected into user_root PRESENTATION mouth (a real drag)').toBe(true);
+    await searchFor('parameter group');
+    await dragFlyoutBlockTo('param_group', presMouth);
+    await setTextField('param_group', 'GROUP', 'Test');
 
-    // 3) point_handle into feature_canvas's OWN mouth
+    const pgMouth = await mouthPoint('param_group', 'DO');
+    await searchFor('form field');
+    await dragFlyoutBlockTo('formfield', pgMouth);
+    const ff1 = '#' + await blockIdOf('formfield');
+    await setTextField(ff1, 'PARAM', 'spotx');
+    await setTextField(ff1, 'LABEL', 'X');
+    await setTextField(ff1, 'DFLT', '5');
+    await setDropdownField(ff1, 'BINDMODE', 'Op Param');
+    await setPickerField(ff1, 'ATOMTYPE', 'progstart');
+    await setTextField(ff1, 'KEY', 'clearance');
+
+    const ff1Bottom = await stackBottomPoint(ff1);
+    await searchFor('form field');
+    await dragFlyoutBlockTo('formfield', ff1Bottom);
+    const ff2 = '#' + await page.evaluate((id1) => window.__blkws.getAllBlocks(false).filter((b) => b.type === 'formfield').map((b) => b.id).find((id) => id !== id1), ff1.slice(1));
+    await nudgeConnectionTogether(ff2, 'previousConnection', ff1, 'nextConnection');
+    await setTextField(ff2, 'PARAM', 'spoty');
+    await setTextField(ff2, 'LABEL', 'Y');
+    await setTextField(ff2, 'DFLT', '0');
+    await setDropdownField(ff2, 'BINDMODE', 'Op Param');
+    await setPickerField(ff2, 'ATOMTYPE', 'progend');
+    await setTextField(ff2, 'KEY', 'retractZ');
+
+    // 4) feature_canvas stacked after param_group, then point_handle into ITS OWN mouth, picking BOTH params
+    const pgBottom = await stackBottomPoint('param_group');
+    await searchFor('feature canvas');
+    await dragFlyoutBlockTo('feature_canvas', pgBottom);
+    await nudgeConnectionTogether('feature_canvas', 'previousConnection', 'param_group', 'nextConnection');
+    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('point handle');
-    await dragFlyoutBlockToMouth('point_handle', fcMouth);
-    const phConnected = await page.evaluate(() => {
-        const ws = window.__blkws;
-        const fc = ws.getAllBlocks(false).find((b) => b.type === 'feature_canvas');
-        const inp = fc.inputList.find((i) => i.name === 'DO');
-        return !!(inp.connection.targetBlock() && inp.connection.targetBlock().type === 'point_handle');
-    });
-    expect(phConnected, 'point_handle connected into feature_canvas own DO mouth').toBe(true);
+    await dragFlyoutBlockTo('point_handle', fcMouth);
+    await setPickerField('point_handle', 'FX', 'spotx');
+    await setPickerField('point_handle', 'FY', 'spoty');
 
-    // 4) real field edits: feature_canvas -> form2d; rename fx/fy to something distinctive
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
-    await setTextField('point_handle', 'FX', 'spotx');
-    await setTextField('point_handle', 'FY', 'spoty');
     const fieldsSet = await page.evaluate(() => {
         const ws = window.__blkws;
         return {
@@ -233,13 +321,13 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
         };
     });
     expect(fieldsSet.panel).toBe('form2d');
-    expect(fieldsSet.fx).toBe('spotx');
+    expect(fieldsSet.fx, 't2525 -- the picker committed an EXISTING param name, not free text').toBe('spotx');
     expect(fieldsSet.fy).toBe('spoty');
 
     // 5) save via the real dialog
     await page.click('.blk-dev-savebtn');
     await page.waitForSelector('.blk-dev-savedlg', { timeout: 8000 });
-    await page.fill('.blk-dev-savedlg .blk-dev-opname', 't2521 point handle pilot (live)');
+    await page.fill('.blk-dev-savedlg .blk-dev-opname', 't2525 point handle pilot (live)');
     await page.click('.blk-dev-savedlg .blk-dev-save');
     await page.waitForTimeout(500);
 
@@ -248,7 +336,7 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     const savedOpType = await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
-        const d = U.listUserOps().find((x) => x.label === 't2521 point handle pilot (live)');
+        const d = U.listUserOps().find((x) => x.label === 't2525 point handle pilot (live)');
         return d ? d.opType : null;
     });
     expect(savedOpType, 'the saved wizard survives a REAL reload, found by listUserOps').toBeTruthy();
@@ -263,7 +351,6 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
         const svg = c && c.querySelector('svg');
         return {
             hasFxField: !!f.querySelector('[data-param="spotx"]'), hasFyField: !!f.querySelector('[data-param="spoty"]'),
-            fxVal: (f.querySelector('[data-param="spotx"]') || {}).value, fyVal: (f.querySelector('[data-param="spoty"]') || {}).value,
             svgPresent: !!svg,
             handles: svg ? svg.querySelectorAll('rect.fc-handle, .fc-handle, [data-handle]').length : 0,
         };
@@ -295,12 +382,23 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + point_handle authored
         y: document.querySelector('#wiz_user_form [data-param="spoty"]').value,
     }));
 
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'verification/t2521-point-handle-live-drag.png', clip: _b }); }
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'verification/t2525-point-handle-emit-wired.png', clip: _b }); }
+
+    // t2525's own whole point, verified with the EXACT field values the real drag just produced.
+    const emit = await page.evaluate(async ({ t, before, after }) => {
+        const U = await import('/blocks/userOps.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const def = U.listUserOps().find((d) => d.opType === t);
+        const base = U.defaultParams(def);
+        const emitBefore = emitMapped(builderOf(t)({ ...base, spotx: Number(before.x), spoty: Number(before.y) })).text;
+        const emitAfter = emitMapped(builderOf(t)({ ...base, spotx: Number(after.x), spoty: Number(after.y) })).text;
+        return { emitBefore, emitAfter };
+    }, { t: savedOpType, before, after });
 
     await page.evaluate((t) => { import('/blocks/userOps.js').then((U) => { try { U.deleteUserOp(t); } catch (_) {} }); localStorage.removeItem('ddcs_user_ops'); }, savedOpType);
 
-    expect(before.x, 'the spotx field starts at the authored default').toBe('40');
-    expect(before.y, 'the spoty field starts at the authored default').toBe('60');
     expect(after.x, 'a REAL mouse drag on the SVG handle changed spotx (assert-the-value)').not.toBe(before.x);
     expect(after.y, 'a REAL mouse drag on the SVG handle changed spoty').not.toBe(before.y);
+    expect(emit.emitAfter, 't2525 -- THE central fix, verified live: the exact before/after field values a real drag produced emit DIFFERENT G-code (was byte-identical before this fix)').not.toBe(emit.emitBefore);
 });

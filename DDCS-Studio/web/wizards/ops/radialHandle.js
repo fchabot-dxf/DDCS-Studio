@@ -2,9 +2,11 @@
  * wizards/ops/radialHandle.js — the RADIAL-HANDLE GUI block (t2521, BACKLOG #71's fourth gesture this turn —
  * a POLAR Ø/pitch handle about a fixed centre, the mill family's own drill-ring/hole-diameter handle).
  *
- * Same self-contained shape as `length_handle`/`point_handle`/`rect_handle` (their own headers have the full
- * account): carries its own bound param name + default, nests inside `feature_canvas`'s own mouth, emits
- * nothing. ONE bound param (like length), not two — this pilot builds the RADIUS-ONLY variant (a diameter/
+ * Same shape as `length_handle`/`point_handle`/`rect_handle` (their own headers have the full account,
+ * including the t2525 fix): `field` is a MUST-MATCH PICKER naming an EXISTING param an "Op Param" `formfield`
+ * elsewhere in the stack already binds — `handleBindingsFromStack`/`attach()` merges this handle's anchor onto
+ * the real binding, so dragging reaches emit for real. Nests inside `feature_canvas`'s own mouth. ONE bound
+ * param (like length), not two — this pilot builds the RADIUS-ONLY variant (a diameter/
  * pitch drag at a FIXED bearing — the drill-ring/hole-Ø shape canvasWidgets.js's own header names explicitly),
  * not the fused Ø+angle or angle-only variants the same gesture also supports (`fieldA`/`lockA` — genuinely
  * separate authoring surfaces, out of this pilot's scope).
@@ -19,8 +21,8 @@
  */
 export const radialHandleBlock = {
     type: 'radial_handle', label: 'radial handle', category: 'Wizard Layout', kind: 'radial_handle',
-    help: 'A draggable Ø/pitch (radius-only) handle on the feature canvas, bound to one param, at a fixed centre (cx, cy) and bearing (a, degrees). rScale (2 = diameter from a radius) matches canvasWidgets.js\'s own convention. Nests inside a feature canvas block. Emits nothing (sim/form-only).',
+    help: 'A draggable Ø/pitch (radius-only) handle on the feature canvas, at a fixed centre (cx, cy) and bearing (a, degrees). `field` must name an EXISTING "Op Param" form field elsewhere in the stack — dragging writes it for real (it reaches the emitted G-code). rScale (2 = diameter from a radius) matches canvasWidgets.js\'s own convention.',
     defaults: { field: 'dia', value: '20', cx: '0', cy: '0', a: '0', rScale: '2', minR: '', maxR: '', label: 'Ø' },
     fields: ['field', 'value', 'cx', 'cy', 'a', 'rScale', 'minR', 'maxR', 'label'],
-    emit: () => [],   // metadata only — produces no G-code (read at register/save → a socket-less radial binding)
+    emit: () => [],   // metadata only — the BLOCK produces no G-code itself; the param it names (once resolved) does, via the merged real binding
 };

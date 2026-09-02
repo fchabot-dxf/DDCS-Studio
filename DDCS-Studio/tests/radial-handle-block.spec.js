@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * BACKLOG #71, FOURTH GESTURE THIS TURN (t2521) — the GUI RADIAL-HANDLE canvas block. `radial_handle`, nested
- * inside a `feature_canvas` block's own mouth, DECLARES a draggable Ø/pitch (radius-only) handle bound to ONE
- * param at a FIXED centre (cx, cy) and bearing (a, degrees). `handleBindingsFromStack` expands it to one
- * socket-less {group, role:'r', anchor:{kind:'radial', cx, cy, a, rScale, minR, maxR, label}} binding.
+ * BACKLOG #71, FOURTH GESTURE (t2521), WIRED FOR REAL (t2525) — the GUI RADIAL-HANDLE canvas block.
+ * `radial_handle`, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable Ø/pitch (radius-
+ * only) handle at a FIXED centre (cx, cy) and bearing (a, degrees), whose `field` NAMES an EXISTING param (a
+ * MUST-MATCH picker, bridge.js HANDLE_ANCHOR_FIELDS) an "Op Param" `formfield` elsewhere in the stack already
+ * binds to a real atom socket. `handleBindingsFromStack`/`attach()` (userOps.js) look up that param and MERGE
+ * this handle's anchor onto the real binding, so dragging reaches emit.
  *
  * WHERE IT DIFFERS: needed a NEW `anchor.kind === 'radial'` render branch (no prior declared-anchor path, like
  * rect). The one real translation: canvasWidgets.js's own gesture wants a WORLD RADIUS + RADIANS bearing, while
@@ -22,39 +24,53 @@ const PILOT = `
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'feature_canvas', params: { panel: 'form2d' }, children: [
-                { type: 'radial_handle', params: { field: 'holedia', value: '20', cx: '0', cy: '0', a: '0', rScale: '2', minR: '2', maxR: '', label: 'Ø' } },
+                { type: 'radial_handle', params: { field: 'holedia', cx: '0', cy: '0', a: '0', rScale: '2', minR: '2', maxR: '', label: 'Ø' } },
+            ] },
+            { type: 'param_group', params: { group: 'Test' }, children: [
+                { type: 'formfield', params: { param: 'holedia', label: 'Dia', dflt: '20', bindMode: 'opparam', atomType: 'progstart', key: 'clearance', type: 'number' } },
             ] },
         ],
-        children: [{ type: 'comment', params: { text: 'radial handle pilot' } }],
+        children: [
+            { type: 'progstart', params: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5, skim: false } },
+            { type: 'progend', params: { spindleOff: true, coolantOff: true, retract: true, retractZ: 0, park: false, parkX: 0, parkY: 0, end: 'M30' } },
+        ],
     }];
     U.createUserOp(U.userOpFromStack('${OPTYPE}', 'RDH Pilot', template, [], 'form2d'));
 `;
 
-test('round-trip: a radial_handle nested in feature_canvas <-> one socket-less {group,role,anchor} binding (bindingsFrom/ToBlocks)', async ({ page }) => {
+test('round-trip: a radial_handle nested in feature_canvas MERGES its anchor onto the real binding it names, or fails visibly if none exists', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => true);
     const r = await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         const fc = { type: 'feature_canvas', params: { panel: 'form2d' }, children: [
-            { type: 'radial_handle', params: { field: 'holedia', value: '20', cx: '0', cy: '0', a: '0', rScale: '2', minR: '2', maxR: '', label: 'Ø' } },
+            { type: 'radial_handle', params: { field: 'holedia', cx: '0', cy: '0', a: '0', rScale: '2', minR: '2', maxR: '', label: 'Ø' } },
         ] };
-        const bindings = U.handleBindingsFromStack([fc]);
-        const back = U.handleBindingsToBlocks(bindings);
-        return { bindings, back0: back[0], nBack: back.length };
+        const real = [{ param: 'holedia', type: 'number', match: { type: 'progstart' }, key: 'clearance', default: 20, blockIndex: 0 }];
+        const anchors = U.handleBindingsFromStack([fc], real);
+        const merged = U.mergeHandleAnchors(real, anchors);
+        const back = U.handleBindingsToBlocks(merged);
+        const unresolvedAnchors = U.handleBindingsFromStack([fc], []);
+        return { anchors, merged, back0: back[0], nBack: back.length, unresolvedAnchors };
     });
-    expect(r.bindings.length, 'one radial_handle -> one socket-less binding').toBe(1);
-    expect(r.bindings[0].role).toBe('r');
-    expect(r.bindings[0].param).toBe('holedia');
-    expect(r.bindings[0].default).toBe(20);
-    expect(r.bindings[0].match === undefined && r.bindings[0].blockIndex === undefined, 'socket-less -> no emit (sim/form-only)').toBe(true);
-    expect(r.bindings[0].anchor, 'the anchor is DECLARED {kind:radial, cx, cy, a, rScale, minR, maxR, label}').toEqual({ kind: 'radial', cx: 0, cy: 0, a: 0, rScale: 2, minR: 2, maxR: null, label: 'Ø' });
-    // reverse round-trip: the binding re-nests into a feature_canvas carrying the SAME radial_handle
+    expect(r.anchors.length, 'one radial_handle -> one anchor entry').toBe(1);
+    expect(r.anchors[0].role).toBe('r');
+    expect(r.anchors[0].param).toBe('holedia');
+    expect(r.anchors[0].match, 't2525 -- MERGED from the real binding, not socket-less').toEqual({ type: 'progstart' });
+    expect(r.anchors[0].key).toBe('clearance');
+    expect(r.anchors[0].default, "the REAL binding's own default wins").toBe(20);
+    expect(r.anchors[0].anchor, 'the anchor is DECLARED {kind:radial, cx, cy, a, rScale, minR, maxR, label}').toEqual({ kind: 'radial', cx: 0, cy: 0, a: 0, rScale: 2, minR: 2, maxR: null, label: 'Ø' });
+    expect(r.merged.filter((b) => b.param === 'holedia').length, 'exactly one entry, no duplicates').toBe(1);
+    // reverse round-trip: the merged binding still re-nests into a feature_canvas carrying the SAME radial_handle
     expect(r.nBack).toBe(1);
     expect(r.back0.type).toBe('feature_canvas');
     expect(r.back0.children).toEqual([{ type: 'radial_handle', params: { field: 'holedia', value: '20', cx: '0', cy: '0', a: '0', rScale: '2', minR: '2', maxR: '', label: 'Ø' } }]);
+    // FAIL VISIBLY: no matching real binding -> anchorUnresolved
+    expect(r.unresolvedAnchors.length).toBe(1);
+    expect(r.unresolvedAnchors[0].anchorUnresolved).toBe(true);
 });
 
-test('the RADIAL gesture (radius-only) writes the DRAGGED, rScale-mapped, clamped distance from its fixed centre', async ({ page }) => {
+test('the RADIAL gesture (radius-only) writes the DRAGGED, rScale-mapped, clamped distance from its fixed centre -- gesture math itself is UNCHANGED by t2525', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => true);
     const r = await page.evaluate(async () => {
@@ -70,7 +86,7 @@ test('the RADIAL gesture (radius-only) writes the DRAGGED, rScale-mapped, clampe
     expect(r.dragClamped, 'a drag below the declared minR clamps at the bound').toEqual({ holedia: 2 });
 });
 
-test('a radial-handle op: def.bindings carry the anchor; layoutSpecFromOp renders the handle at centre+radius (value/rScale); emit BYTE-IDENTICAL (sim/form-only, no socket)', async ({ page }) => {
+test('a radial-handle op: def.bindings MERGE the anchor onto the real binding; layoutSpecFromOp still renders the handle at centre+radius (value/rScale); emit CHANGES when dragged (t2525 -- the central fix)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 100, y: 80, z: 20, shape: 'box', show: true } }); });
@@ -89,24 +105,26 @@ test('a radial-handle op: def.bindings carry the anchor; layoutSpecFromOp render
         const spec = layoutSpecFromOp(def, params, null, null, null, {}, () => {}, null);
         const h = (spec.handles || []).find((x) => /_r$/.test(x.id) && x.kind === 'size');
         const emitDefault = emitMapped(builderOf(t)(U.defaultParams(def))).text;
-        const emitDragged = emitMapped(builderOf(t)({ ...U.defaultParams(def), holedia: 40 })).text;
+        const emitDragged = emitMapped(builderOf(t)({ ...U.defaultParams(def), holedia: 8 })).text;
         return {
             anchorKind: anchored && anchored.anchor && anchored.anchor.kind,
+            hasMatchKey: anchored && anchored.blockIndex !== undefined && anchored.key !== undefined,
             hasHandle: !!h, handleX: h && h.x, handleY: h && h.y, handleValue: h && h.value,
-            emitByteIdentical: emitDefault === emitDragged,
+            emitChanges: emitDefault !== emitDragged,
         };
     }, OPTYPE);
     await page.evaluate((t) => { import('/blocks/userOps.js').then((U) => { try { U.deleteUserOp(t); } catch (_) {} }); localStorage.removeItem('ddcs_user_ops'); }, OPTYPE);
     expect(r.anchorKind, 'the binding carries the DECLARED anchor kind (radial)').toBe('radial');
-    expect(r.hasHandle, 'layoutSpecFromOp renders a draggable radial handle for the anchored binding').toBe(true);
-    expect(r.handleX, 'the handle sits at cx + radius(value/rScale=20/2=10) along bearing a=0 (+X)').toBe(10);
+    expect(r.hasMatchKey, 't2525 -- the anchor-carrying binding is now ALSO the real one').toBe(true);
+    expect(r.hasHandle, 'layoutSpecFromOp renders a draggable radial handle for the merged binding, unchanged for the resolved case').toBe(true);
+    expect(r.handleX, 'the handle sits at centre + radius (value/rScale = 20/2 = 10) along bearing 0 (+X)').toBe(10);
     expect(r.handleY).toBe(0);
-    expect(r.handleValue, 'the displayed value is the raw diameter param, not the radius').toBe(20);
-    expect(r.emitByteIdentical, 'the radial handle is sim/form-only -> dragging never changes the emit (byte-identical)').toBe(true);
+    expect(r.handleValue).toBe(20);
+    expect(r.emitChanges, 't2525 -- the handle now reaches emit: dragging changes the G-code (was byte-identical before this fix)').toBe(true);
 });
 
-test.use({ viewport: { width: 1600, height: 1000 } });
-test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authored via REAL palette drags, real field edits, real save, a REAL reload, then a REAL mouse drag on the rendered SVG handle writes the field', async ({ page }) => {
+test.use({ viewport: { width: 2600, height: 1000 } });
+test('DRIVE THE APP, THE t2525 BAR: a formfield placed FIRST (must-match picker needs it to exist), then feature_canvas + radial_handle picking that param, real save, a REAL reload, then a REAL mouse drag on the rendered SVG handle changes the field AND the emitted G-code', async ({ page }) => {
     async function clearSearch() { await page.evaluate(() => { const s = document.querySelector('.blk-search'); if (s) { s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } }); await page.waitForTimeout(100); }
     async function searchFor(text) { await clearSearch(); const s = page.locator('.blk-search'); await s.click(); await s.fill(text); await page.waitForTimeout(250); }
     async function flyoutBlockCenter(type) {
@@ -137,10 +155,10 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
             return { dx: grabPt.x - connScreen.x, dy: grabPt.y - connScreen.y };
         }, type);
     }
-    async function dragFlyoutBlockToMouth(type, mouthPt) {
+    async function dragFlyoutBlockTo(type, targetPt) {
         const grab = await flyoutBlockCenter(type);
         const off = await flyoutDragOffset(type);
-        const dropX = mouthPt.x + off.dx, dropY = mouthPt.y + off.dy;
+        const dropX = targetPt.x + off.dx, dropY = targetPt.y + off.dy;
         await page.mouse.move(grab.x, grab.y);
         await page.mouse.down();
         await page.waitForTimeout(80);
@@ -161,20 +179,31 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
             return { x: rect.left + off.x * ws.scale, y: rect.top + off.y * ws.scale };
         }, { blockType, inputName });
     }
-    async function centerOn(blockType) {
-        await page.evaluate((t) => { const ws = window.__blkws; const blk = ws.getAllBlocks(false).find((b) => b.type === t); if (blk) ws.centerOnBlock(blk.id, true); }, blockType);
+    const RESOLVE_SRC = "(ws,ref)=>ref[0]==='#' ? ws.getAllBlocks(false).find(b=>b.id===ref.slice(1)) : ws.getAllBlocks(false).find(b=>b.type===ref)";
+    async function stackBottomPoint(ref) {
+        return page.evaluate(({ ref, RESOLVE_SRC }) => {
+            const ws = window.__blkws;
+            const blk = eval(RESOLVE_SRC)(ws, ref);
+            const conn = blk.nextConnection;
+            const off = conn.getOffsetInBlock();
+            const rect = blk.getSvgRoot().getBoundingClientRect();
+            return { x: rect.left + off.x * ws.scale, y: rect.top + off.y * ws.scale };
+        }, { ref, RESOLVE_SRC });
+    }
+    async function centerOn(ref) {
+        await page.evaluate(({ ref, RESOLVE_SRC }) => { const ws = window.__blkws; const blk = eval(RESOLVE_SRC)(ws, ref); if (blk) ws.centerOnBlock(blk.id, true); }, { ref, RESOLVE_SRC });
         await page.waitForTimeout(400);
     }
     async function fieldRect(blockType, fieldName) {
-        return page.evaluate(({ blockType, fieldName }) => {
+        return page.evaluate(({ blockType, fieldName, RESOLVE_SRC }) => {
             const ws = window.__blkws;
-            const blk = ws.getAllBlocks(false).find((b) => b.type === blockType);
+            const blk = eval(RESOLVE_SRC)(ws, blockType);
             const f = blk.getField(fieldName);
             const group = f.fieldGroup_ || f.getSvgRoot();
             const el = (group && group.querySelector('text')) || (f.getClickTarget_ && f.getClickTarget_()) || group;
             const r = el.getBoundingClientRect();
             return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-        }, { blockType, fieldName });
+        }, { blockType, fieldName, RESOLVE_SRC });
     }
     async function setDropdownField(blockType, fieldName, optionText) {
         await clearSearch();
@@ -186,12 +215,21 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
         await page.waitForTimeout(150);
     }
     async function setTextField(blockType, fieldName, value) {
+        await clearSearch();
         const rect = await fieldRect(blockType, fieldName);
         await page.mouse.click(rect.x, rect.y);
         await page.waitForTimeout(150);
         await page.keyboard.press('Control+A');
         await page.keyboard.type(String(value));
         await page.keyboard.press('Tab');
+        await page.waitForTimeout(150);
+    }
+    async function setPickerField(blockType, fieldName, matchText) {
+        await clearSearch();
+        const rect = await fieldRect(blockType, fieldName);
+        await page.mouse.click(rect.x, rect.y);
+        await page.waitForTimeout(250);
+        await page.locator('.ddcs-picker-row', { hasText: matchText }).first().click({ timeout: 3000 });
         await page.waitForTimeout(150);
     }
 
@@ -201,43 +239,42 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
     await page.waitForFunction(() => window.__blkws);
     await page.waitForTimeout(300);
 
-    // 1) user_root onto the empty canvas
+    // 1) user_root
     await searchFor('Define Custom Wizard');
-    const ur = await flyoutBlockCenter('user_root');
-    await page.mouse.move(ur.x, ur.y);
-    await page.mouse.down();
-    await page.mouse.move(ur.x + 40, ur.y, { steps: 5 });
-    await page.mouse.move(600, 300, { steps: 15 });
-    await page.mouse.move(600, 300, { steps: 2 });
-    await page.mouse.up();
-    await page.waitForTimeout(250);
+    await dragFlyoutBlockTo('user_root', { x: 1900, y: 220 });
 
-    // 2) feature_canvas into user_root's PRESENTATION mouth
+    // 2) progstart into EXECUTION
+    const execMouth = await mouthPoint('user_root', 'EXECUTION');
+    await searchFor('program start');
+    await dragFlyoutBlockTo('progstart', execMouth);
+
+    // 3) param_group into PRESENTATION, then a formfield (Op Param -> progstart.clearance) -- BEFORE the handle
     const presMouth = await mouthPoint('user_root', 'PRESENTATION');
-    await searchFor('feature canvas');
-    await dragFlyoutBlockToMouth('feature_canvas', presMouth);
-    const fcConnected = await page.evaluate(() => {
-        const ws = window.__blkws;
-        const ur = ws.getAllBlocks(false).find((b) => b.type === 'user_root');
-        return ur.inputList.find((i) => i.name === 'PRESENTATION').connection.targetBlock()?.type === 'feature_canvas';
-    });
-    expect(fcConnected, 'feature_canvas connected into user_root PRESENTATION mouth (a real drag)').toBe(true);
+    await searchFor('parameter group');
+    await dragFlyoutBlockTo('param_group', presMouth);
+    await setTextField('param_group', 'GROUP', 'Test');
 
-    // 3) radial_handle into feature_canvas's OWN mouth
+    const pgMouth = await mouthPoint('param_group', 'DO');
+    await searchFor('form field');
+    await dragFlyoutBlockTo('formfield', pgMouth);
+    await setTextField('formfield', 'PARAM', 'holedia');
+    await setTextField('formfield', 'LABEL', 'Dia');
+    await setTextField('formfield', 'DFLT', '20');
+    await setDropdownField('formfield', 'BINDMODE', 'Op Param');
+    await setPickerField('formfield', 'ATOMTYPE', 'progstart');
+    await setTextField('formfield', 'KEY', 'clearance');
+
+    // 4) feature_canvas stacked after param_group, then radial_handle into ITS OWN mouth, picking 'holedia'
+    const pgBottom = await stackBottomPoint('param_group');
+    await searchFor('feature canvas');
+    await dragFlyoutBlockTo('feature_canvas', pgBottom);
+    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('radial handle');
-    await dragFlyoutBlockToMouth('radial_handle', fcMouth);
-    const rdhConnected = await page.evaluate(() => {
-        const ws = window.__blkws;
-        const fc = ws.getAllBlocks(false).find((b) => b.type === 'feature_canvas');
-        const inp = fc.inputList.find((i) => i.name === 'DO');
-        return !!(inp.connection.targetBlock() && inp.connection.targetBlock().type === 'radial_handle');
-    });
-    expect(rdhConnected, 'radial_handle connected into feature_canvas own DO mouth').toBe(true);
+    await dragFlyoutBlockTo('radial_handle', fcMouth);
+    await setPickerField('radial_handle', 'FIELD', 'holedia');
 
-    // 4) real field edits: feature_canvas -> form2d; rename field to something distinctive
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
-    await setTextField('radial_handle', 'FIELD', 'holedia');
     const fieldsSet = await page.evaluate(() => {
         const ws = window.__blkws;
         return {
@@ -246,21 +283,21 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
         };
     });
     expect(fieldsSet.panel).toBe('form2d');
-    expect(fieldsSet.field).toBe('holedia');
+    expect(fieldsSet.field, 't2525 -- the picker committed an EXISTING param name, not free text').toBe('holedia');
 
     // 5) save via the real dialog
     await page.click('.blk-dev-savebtn');
     await page.waitForSelector('.blk-dev-savedlg', { timeout: 8000 });
-    await page.fill('.blk-dev-savedlg .blk-dev-opname', 't2521 radial handle pilot (live)');
+    await page.fill('.blk-dev-savedlg .blk-dev-opname', 't2525 radial handle pilot (live)');
     await page.click('.blk-dev-savedlg .blk-dev-save');
     await page.waitForTimeout(500);
 
-    // 6) a REAL reload -- the saved op must survive
+    // 6) a REAL reload
     await page.reload();
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     const savedOpType = await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
-        const d = U.listUserOps().find((x) => x.label === 't2521 radial handle pilot (live)');
+        const d = U.listUserOps().find((x) => x.label === 't2525 radial handle pilot (live)');
         return d ? d.opType : null;
     });
     expect(savedOpType, 'the saved wizard survives a REAL reload, found by listUserOps').toBeTruthy();
@@ -275,9 +312,8 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
         const svg = c && c.querySelector('svg');
         return {
             hasField: !!f.querySelector('[data-param="holedia"]'),
-            val: (f.querySelector('[data-param="holedia"]') || {}).value,
             svgPresent: !!svg,
-            handles: svg ? svg.querySelectorAll('circle.fc-handle, rect.fc-handle, .fc-handle, [data-handle]').length : 0,
+            handles: svg ? svg.querySelectorAll('circle.fc-handle, polygon.fc-handle, .fc-handle, [data-handle]').length : 0,
         };
     });
     expect(rendered.hasField, 'the holedia param renders a real form row').toBe(true);
@@ -287,7 +323,7 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
     // 7) THE REAL GESTURE: a mouse drag on the rendered SVG handle
     const handleRect = await page.evaluate(() => {
         const svg = document.getElementById('userVizContainer').querySelector('svg');
-        const h = svg.querySelector('circle.fc-handle, rect.fc-handle, .fc-handle, [data-handle]');
+        const h = svg.querySelector('circle.fc-handle, polygon.fc-handle, .fc-handle, [data-handle]');
         const r = h.getBoundingClientRect();
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     });
@@ -300,10 +336,21 @@ test('DRIVE THE APP, THE t2509/t2517 BAR: feature_canvas + radial_handle authore
     await page.waitForTimeout(300);
     const after = await page.evaluate(() => document.querySelector('#wiz_user_form [data-param="holedia"]').value);
 
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'verification/t2521-radial-handle-live-drag.png', clip: _b }); }
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'verification/t2525-radial-handle-emit-wired.png', clip: _b }); }
+
+    const emit = await page.evaluate(async ({ t, before, after }) => {
+        const U = await import('/blocks/userOps.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const def = U.listUserOps().find((d) => d.opType === t);
+        const base = U.defaultParams(def);
+        const emitBefore = emitMapped(builderOf(t)({ ...base, holedia: Number(before) })).text;
+        const emitAfter = emitMapped(builderOf(t)({ ...base, holedia: Number(after) })).text;
+        return { emitBefore, emitAfter };
+    }, { t: savedOpType, before, after });
 
     await page.evaluate((t) => { import('/blocks/userOps.js').then((U) => { try { U.deleteUserOp(t); } catch (_) {} }); localStorage.removeItem('ddcs_user_ops'); }, savedOpType);
 
-    expect(before, 'holedia starts at the authored default').toBe('20');
-    expect(after, 'a REAL mouse drag on the SVG handle changed holedia (assert-the-value)').not.toBe(before);
+    expect(after, 'a REAL mouse drag on the SVG handle changed the holedia field').not.toBe(before);
+    expect(emit.emitAfter, 't2525 -- THE central fix, verified live: the exact before/after field values a real drag produced emit DIFFERENT G-code (was byte-identical before this fix)').not.toBe(emit.emitBefore);
 });

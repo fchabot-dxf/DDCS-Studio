@@ -79,6 +79,22 @@ const IO_TARGET_FIELDS = { outpin: { field: 'pin', kind: 'output' }, waitinput: 
 // "worst failure mode" (the flip silently never applies, wrong side gets cut) — closing the picker removes
 // that whole class rather than merely warning about it.
 const SETUP_TARGET_FIELDS = { flip: 'setup' };
+// t2525 (BACKLOG #71) — the HANDLE blocks' own PARAM-NAMING fields: which EXISTING formfield/param_field param
+// each handle drives (userOps.js's own `handleBindingsFromStack`/`attach()` looks it up and merges the
+// handle's anchor onto that REAL binding — the fix for the central t2523 finding, a handle that dragged but
+// never reached emit). CLOSED, same rung as `flip.setup` above and for the identical reason: a handle pointing
+// at a param that doesn't exist is a plain authoring defect, never legitimate forward-authoring the way a
+// goto/tool/pin reference can be — so no `allowNew`, reusing pickKind 'whenparam' as-is (pickerField.js's own
+// candidate set is ALREADY "every formfield/param_field's own PARAM in this stack", exactly what a handle
+// needs; the `b.id !== blk.id` self-exclusion it applies is a harmless no-op here since a handle is never
+// itself a formfield/param_field). One block type may name more than one field (point_handle: fx+fy;
+// rect_handle: field+fieldH) — an array, unlike the other TARGET_FIELDS maps above which only ever needed one.
+const HANDLE_ANCHOR_FIELDS = {
+    length_handle: ['field'],
+    point_handle: ['fx', 'fy'],
+    rect_handle: ['field', 'fieldH'],
+    radial_handle: ['field'],
+};
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],
@@ -359,6 +375,7 @@ export function fieldKind(def, field) {
     if (TOOL_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — tool numbers, see TOOL_TARGET_FIELDS' own header
     if (IO_TARGET_FIELDS[def.type] && IO_TARGET_FIELDS[def.type].field === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — I/O pin numbers, see IO_TARGET_FIELDS' own header
     if (SETUP_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 3) — flip.setup, CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
+    if (HANDLE_ANCHOR_FIELDS[def.type] && HANDLE_ANCHOR_FIELDS[def.type].includes(field)) return 'picker';   // t2525 (BACKLOG #71) — see HANDLE_ANCHOR_FIELDS' own header
     // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
     // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
     // scope" — a signal genuinely unique to this pattern (an ordinary numeric Z field defaults to a NUMBER,
@@ -475,6 +492,10 @@ function jsonDef(def) {
         // t2453 (BACKLOG #47 tier 3) — flip.setup: CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
         // for why this is the must-match rung, not the forward-authorable one tool/pin/goto all use.
         else if (k === 'picker' && SETUP_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'setup', tooltip: desc });
+        // t2525 (BACKLOG #71) — handle blocks: CLOSED (no allowNew), pickKind fixed to 'whenparam' regardless of
+        // the field's own name (fx/fy/field/fieldH, none of which pickerField.js's own switch recognises as a
+        // pickKind) — see HANDLE_ANCHOR_FIELDS' own header for why 'whenparam' is the right candidate set to reuse.
+        else if (k === 'picker' && HANDLE_ANCHOR_FIELDS[def.type] && HANDLE_ANCHOR_FIELDS[def.type].includes(f)) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'whenparam', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });

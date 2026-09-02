@@ -1,4 +1,4 @@
-# preview-spec gate 1688 — 32 twins × 2 param states · 11 gestures
+# preview-spec gate 1688 — 32 twins × 2 param states · 12 gestures
 # fixture: stock 200×150 pin=g55 · machine 800×600×-120 · partZeroShift → {"x":300,"y":200}
 # encoding: keys sorted recursively · numbers rounded to 1e-4 (-0→0) · present-but-undefined → "<undefined>" (NEVER dropped) · function → "<fn/arity>"
 #
@@ -1011,6 +1011,7 @@ user_wcs_data @offdefaults .origin {"x":0,"y":0}
 user_wcs_data @offdefaults .paths null
 user_wcs_data @offdefaults .placement {"x":300,"y":200}
 user_wcs_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+gesture broken {"color":"#abcdef","emits":false,"id":"probe","label":"L","manual":true,"noSnap":true,"x":3,"y":5}
 gesture crossAim {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":19,"x":37,"y":20}
 gesture diagAim {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","manual":true,"noSnap":true,"x":17,"y":31}
 gesture length {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":12,"y":2}

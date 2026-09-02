@@ -15,7 +15,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, gotoTargetReport, getUserDef, instantiate, materializeParamGroup, forkInheritance, armBlocks } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2395 — gotoTargetReport: the goto-family backstop, INFORMATIONAL only (never gates, unlike formfieldMatchReport)
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, childrenOf, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, handleTargetReport, gotoTargetReport, getUserDef, instantiate, materializeParamGroup, forkInheritance, armBlocks } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view; t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2395 — gotoTargetReport: the goto-family backstop, INFORMATIONAL only (never gates, unlike formfieldMatchReport)
 import { toast } from '../ui/gateway/util.js';   // t2395 (BACKLOG #47) — the app's existing global toast; gotoTargetReport surfaces through it rather than a new notification path
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
@@ -870,6 +870,22 @@ function prepareCandidate(a, framing) {
                 + `— an Assign Var field must name an assign block's #var that exists in THIS stack; an Op Param field `
                 + `must name an atom type present exactly once in THIS stack. Fix it, or tick "optional" if the field `
                 + `is meant to be absent in some states, then save again.`,
+        };
+    }
+
+    // t2525 (BACKLOG #71) — the handle-block backstop: a `point_handle`/`rect_handle`/etc. whose own field names
+    // a param no `formfield` in this stack actually declares used to save SILENTLY too — a real, draggable
+    // handle that wrote nowhere (the t2523 finding). The must-match picker (bridge.js) prevents a TYPO, not a
+    // target formfield renamed/deleted elsewhere in the stack after the handle was authored — this is that
+    // backstop, same BLOCKING shape as formfieldMatchReport just above (a dangling handle target is a plain
+    // authoring defect, not the goto family's legitimate forward-reference case below).
+    const handleReport = handleTargetReport(a.opRec.children);
+    if (handleReport.unresolved.length) {
+        const list = handleReport.unresolved.map((u) => `${u.param} (${u.kind})`).join(', ');
+        return {
+            ok: false, error: `${handleReport.total} handle field${handleReport.total === 1 ? '' : 's'} declared, ${handleReport.matched} matched: ${list} `
+                + `— a handle's own field must name a param an "Op Param" formfield in THIS stack actually declares. `
+                + `Add that formfield, or point the handle at an existing one, then save again.`,
         };
     }
 
