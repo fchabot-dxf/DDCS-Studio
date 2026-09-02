@@ -69796,3 +69796,114 @@ the one this turn's own test fix resolved, plus none new. No further chase neede
 across both runs traces to one of: this turn's own since-fixed test bug (run 1 only), or one of this session's
 two independently pre-documented flakes (`open-as-modal-1625`/BACKLOG #56, `sf-pos-snapback`/t2463's own
 manifest), or environment noise unconnected to this turn's diff by any plausible mechanism.
+
+## t2529 — UNIFY THE TWO FORM RENDER PATHS: ASSESSED, per AGENTS.md rule 1b's own explicit instruction to
+check the evidence before touching the exact decision that scar names. Conclusion: STOP, not yet safe — with
+a measured cost, not a guess
+
+### THE ASK, and the rule read first as instructed
+
+t2513's own sweep found `isTree` true for exactly 1 of 32 twins (drill) — the other 31 render through a
+completely separate, hand-written flat path, so the layout/grouping node vocabulary (`section`/`group_box`/
+`grid_container`/`tab_group`/`usage_text`/`code_preview`) is dead for them. The dispatch: assess whether it is
+now safe to close that gap, given the instruments built since t2371's own regression (32/32 form ratchet,
+preview gate, emit equivalence). Read AGENTS.md rule 1b first, as instructed — its own scar is this exact
+decision: `hasTreeLayout()` widened, every targeted check passed, 21 tests regressed (blanked preview panes,
+dropped section-grouping for surfacing/contour/slot/text), caught only by the mandatory full-suite run, reverted
+for a narrower fix touching zero lines of the tree/flat decision.
+
+### FIRST, mapped the actual shape of "two paths" before assessing anything — delegated the broad factual
+mapping, kept the judgment
+
+Dispatched an Explore agent to answer four factual questions before forming any opinion: do the 32 built-ins
+even have real `uiChildren` trees, or a separate legacy render path; where else in the app are
+`grid_container`/`tab_group`/`group_box`/`usage_text`/`code_preview` actually declared; which ops declare a real
+`split_horizontal`/`split_vertical` node; how does one built-in (corner) actually get rendered. Confirmed,
+cited file:line: **the 32 built-ins are not a separate system** — every one is a `user_*` op sharing 100% of
+`userOpView.js`'s own `render()`/`hasTreeLayout()` dispatch with a hand-authored custom wizard; the "two paths"
+are two BRANCHES of one function, not two systems. Only `drillData.js:329` declares a real
+`split_horizontal`/`split_vertical` node. Two twins — `pocketData.js` and `atcCheckData.js` — ALREADY declare
+`grid_container`/`usage_text`/`code_preview` nodes in their own `uiChildren` today, entirely unreached, since
+neither has a split ancestor: real, authored data that has never once been rendered, confirmed by
+`drillData.js`'s own comment (lines 340-343) independently naming the same fact.
+
+### THE PILOT — surfacing, chosen over corner for a reason found only by reading corner's own declaration first
+
+Read both dispatch-offered candidates' own `uiChildren` before picking. **Corner** already declares 4 `section`
+nodes (`sec()`, `cornerData.js:259-264`) — but two of them ("LAYOUT-2D", "PROJECTED-GCODE") are declared with
+`children: []`, dead placeholders that would render as visible, empty, collapsible boxes if corner were ever
+tree-rendered as-is — its own declaration is stale/incomplete, not merely unreached. Also confirmed: corner's
+own `section` nodes carry a `color` param the FORM tree renderer never reads at all (`bridge.js`'s own
+`ddcs_seccolor` extension consumes it instead, for the BLOCKS-CANVAS editor's own comment-box colouring — a
+genuinely separate, unrelated consumer of the identical node type). Harmless to the render question (color is
+simply ignored by `renderUiTree`), but it means corner's own sections were never purely "for the form" even
+where declared — a real trap for reading them as tree-readiness evidence. **Surfacing**
+(`surfacingData.js:254-270`) is cleaner: `sim` + `path_anchor` + `param_group` only, no section nodes, no
+placeholder boxes, no dual-purpose ambiguity. Picked it.
+
+### THE METHOD — the safest possible pilot: a pure measurement, zero production code touched
+
+Rather than widen `hasTreeLayout` (even temporarily, even behind a flag) to test surfacing on the real tree
+path, wrote a scratch test that renders `user_surfacing_data`'s own REAL `def` — the exact def every user of
+Surfacing gets — through BOTH `renderOpForm` (the flat path, unmodified, what ships today) and `renderUiTree`
+(called DIRECTLY against surfacing's own real `uiChildren`, in the same live page, off the same bindings) —
+`hasTreeLayout` itself was never called, modified, or bypassed; surfacing's own live behavior was never at any
+point different from what it is today. This is "prove byte-for-byte identical" done the only way that carries
+zero shipping risk while still using REAL data, not a synthetic fixture.
+
+### RESULT — field-level parity confirmed exactly as t2513 found; section-grouping is a TOTAL loss, not a
+partial one
+
+**Row count**: 30 = 30. **Every field-level property** (param, label, tag/type, value) **matched exactly**,
+row for row — confirms t2513's own "field-level props render identically" finding directly, not by inference.
+**Viz-box and path-anchor chrome matched exactly too**, confirmed live: `hasVizSplit`/`has3dPane`/`has2dPane`/
+`hasPathAnchorMount`/`stockAttachRowHidden` identical between the REAL flat-rendered live page and the
+direct-called tree output — `sim`/`path_anchor`'s own tree branches genuinely do reproduce the shell's exact
+markup, as their own code comments (t2511, t2271/t2293) claim.
+
+**But every single one of the 30 rows lost its section.** The flat-rendered page (real, live, what ships)
+groups these 30 rows under 4 labelled, foldable sections — AREA / TOOL / TOOL & STEPOVER / DEPTH & FEED — read
+from each binding's own `.section` string tag via `renderOpForm`'s independent `SECTION_THRESHOLD`/
+`SECTION_RANK` logic. The tree-rendered version (surfacing's own real `uiChildren`, run through the real
+`renderUiTree`) put all 30 in ONE flat, ungrouped list — `section: null` on every row — because
+`renderUiTree`'s own `section`/`group_box` branches build grouping ONLY from explicit `uiChildren` nodes and
+NEVER read a binding's `.section` tag at all. Traced to the exact code, not inferred from the symptom:
+`renderOpForm`'s sectionize logic (`formWidgets.js`) reads `unit[0].section`; `renderUiTree`'s `section`/
+`group_box` branches read `node.params.title`/`node.children` — two mechanisms, zero overlap, confirmed by
+reading both AND by the live diff agreeing with the code.
+
+### CONCLUSION — STOP, and why this is not a code-growth problem the guardrail would refuse, but a
+data-authoring one BACKLOG #72 already named and sized correctly
+
+The guardrail ("if the tree path needs to GROW capability to match the native one... STOP AND REPORT, that
+would mean an arc not a migration") did **not** fire in the code sense — `renderUiTree` is complete and
+correct for what it declares; nothing needs new engineering. What's missing is **31 twins' worth of
+declaration**: each op's own `uiChildren` needs explicit `group_box` nodes authored to REPRODUCE what its
+binding-level `.section` tags currently produce, verified one op at a time with this same before/after pilot
+method, before that op could safely route through the tree path. This is exactly the "migration size (all 31
+tag-using twins)" BACKLOG #72's own t2513 entry already named and explicitly deferred ("record the ruling...
+do NOT start it") — this turn replaces that estimate with a MEASURED instance: for surfacing specifically, the
+cost is 4 new `group_box` nodes wrapping 30 rows in the exact right order, plus the same pilot-level
+verification repeated. Corner would ALSO need its own two dead placeholder sections resolved (removed, or
+finally given real content) before it could be trusted at all.
+
+**Recommendation: stays deferred, unchanged from BACKLOG #72's own ruling — now with real evidence instead of
+an inference.** Widening `hasTreeLayout` before every affected op's own `group_box` replacement exists is the
+exact shape of the t2371 scar rule 1b exists to prevent, demonstrated this turn on a specific op with specific,
+named missing declarations rather than argued about in the abstract. Zero production code changed this turn —
+the scratch pilot test was deleted before this commit, matching this session's own convention for
+investigation-only turns.
+
+### TIER
+
+Full `--workers=4` suite run per the dispatch's own unconditional instruction, despite zero product code
+changing this turn (the tree/flat assessment used a scratch test deleted before commit; the M350 finding is
+documentation-only). `test:node`: 238/238 green. Full e2e: **3052 passed, 1 failed, 14 flaky, 26 skipped
+(35.3m)**. The one failure, `sf-pos-snapback` (`preview-mutation-manifest-2463.spec.js`), is this session's
+own already-documented pre-existing flake — confirmed clean in isolation twice already this session (t2525's
+own turn, t2527's own turn, both this session) and not re-checked a third time: with zero product code in this
+turn's diff, there is no mechanism by which anything here could have caused it. The 14 flaky entries are the
+same story — a higher count than prior runs, read as sustained-load noise from this session's own five
+back-to-back 34-35-minute full-suite runs across t2525/t2527/t2529, not a product signal, since there is no
+product diff for any of them to be a symptom of. `git status` clean; `git diff` checked on BACKLOG.md/
+WORK-LOG.md/FINDINGS.md before staging, same as every turn.

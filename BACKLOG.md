@@ -7088,6 +7088,58 @@ these are the rows that actually stop a person authoring a built-in equivalent f
    green-tests-over-a-dead-path scar, and this is a second, independent instance of it, freshly demonstrated,
    not archival. Owner has already ruled on the direction: **containment (`group_box`) survives, the tag
    (`section:`) goes.** Record the ruling and the migration size (all 31 tag-using twins) — do NOT start it.
+   >
+   > **t2529 — ASSESSED, per the owner's own instruction to check the evidence before touching AGENTS.md rule
+   > 1b's own named decision. STOP — not yet safe, and now with a MEASURED cost, not a guess.** Read
+   > `renderUiTree` (formWidgets.js) end to end and confirmed structurally what this entry already suspected:
+   > `renderUiTree`'s own `section`/`group_box` branches build sections ONLY from explicit `uiChildren` nodes —
+   > they never read a binding's own `.section` string tag at all. The flat path's own grouping (`renderOpForm`'s
+   > `SECTION_THRESHOLD`/`SECTION_RANK` logic) is the exact opposite: it reads ONLY the binding-level tag, never
+   > `uiChildren`. **These are two independent mechanisms with zero overlap, confirmed by a real pilot, not
+   > inferred from reading the code alone**: rendered `user_surfacing_data` (a real, live twin, its own real
+   > `def.bindings`) through BOTH `renderOpForm` (the flat path — what every user of Surfacing sees today) and
+   > `renderUiTree` (called directly against surfacing's own real `uiChildren`, zero production code touched —
+   > `hasTreeLayout` itself was never modified or even called) in the SAME live page, then diffed the two
+   > outputs row for row. Row count matched (30 = 30), every field-level property matched (param/label/tag/
+   > type/value — confirming this entry's OWN "field-level props render identically" finding holds), and the
+   > viz-box/path-anchor chrome matched exactly (`sim`/`path_anchor` DO faithfully reproduce the shell's own
+   > markup, confirmed live: `hasVizSplit`/`has3dPane`/`has2dPane`/`hasPathAnchorMount`/`stockAttachRowHidden`
+   > all identical between the real flat-rendered page and the direct tree call). **But EVERY ONE of the 30
+   > rows lost its section**: the flat-rendered page groups them under 4 labelled, foldable sections (AREA /
+   > TOOL / TOOL & STEPOVER / DEPTH & FEED, from each binding's own `.section` tag); the tree-rendered version
+   > put all 30 in one flat, ungrouped list (`section: null` on every row), because surfacing's own `uiChildren`
+   > declares no `section`/`group_box` node at all — it never needed to, while unreachable. This is the EXACT
+   > silent-blanking shape rule 1b's own scar names, caught by the SAME instrument the rule demands (a real
+   > rendered-output comparison, not a targeted check) — and it is bigger than "some sections might not carry
+   > over": for THIS op, tree-rendering as-is is a TOTAL loss of grouping, not a partial one.
+   >
+   > **The corner check the dispatch also asked for came back with an independent finding of its own**:
+   > corner's own `uiChildren` (unlike surfacing's) ALREADY declares 4 `section` nodes (`sec()`, `cornerData.js`)
+   > — but TWO of them ("LAYOUT-2D", "PROJECTED-GCODE") are DECLARED EMPTY (`[]` children), dead placeholders
+   > that would render as two visible, empty, collapsible boxes with nothing inside if corner were ever
+   > tree-rendered as-is — a SECOND, independent way a naive migration would visibly change corner's own form,
+   > on top of the same section-tag-vs-node gap surfacing has. (Also confirmed directly: corner's own `section`
+   > nodes carry a `color` param the form tree renderer never reads at all — `bridge.js`'s own `ddcs_seccolor`
+   > extension consumes it, for the BLOCKS-CANVAS editor's own comment-box colouring, a genuinely separate,
+   > unrelated consumer of the SAME node type. Harmless to the form-render question — color is simply ignored
+   > there — but it means these `section` nodes were never purely "for the form" even where declared, worth
+   > knowing before reading them as evidence of tree-readiness.)
+   >
+   > **THE ACTUAL COST, now sized, not guessed**: making ONE op's tree-rendering byte-identical to its own
+   > CURRENT flat rendering needs its own `uiChildren` rewritten with explicit `group_box` nodes reproducing
+   > EXACTLY what its binding-level `.section` tags currently produce — for surfacing, 4 new `group_box` nodes
+   > (AREA/TOOL/TOOL & STEPOVER/DEPTH & FEED) wrapping the correct 30 rows in the correct order, then the SAME
+   > pilot method (function-level row diff + live chrome comparison) re-run to confirm zero drift. This is
+   > **per-op DATA AUTHORING, not a `hasTreeLayout` code change** — the guardrail ("if unifying needs the TREE
+   > PATH to grow capability... STOP AND REPORT") did not fire in the CODE sense (renderUiTree's own mechanism
+   > is complete and correct for what it declares); what's missing is 31 twins' worth of DECLARATION, which is
+   > exactly the "migration size (all 31 tag-using twins)" this entry's own t2513 line already named and
+   > deferred — now confirmed to be real, not overstated, by an actual before/after render diff on the
+   > cleanest candidate available. **Recommendation: stays deferred.** Widening `hasTreeLayout` without first
+   > authoring EVERY affected op's own `group_box` replacement is the exact shape of the t2371 scar rule 1b
+   > exists to prevent, now demonstrated on a SPECIFIC op with SPECIFIC missing declarations, not argued in the
+   > abstract. Full account, including the corner empty-section/color findings and the pilot's own method:
+   > WORK-LOG t2529.
 2. ⭐⭐ **`widget:'tool-library'` / `widget:'thread-preset'` — a NAMING MISMATCH bug, found fresh this sweep, not
    seeded.** `formfield`'s own widget picker offers "Tool Library"/"Thread Preset" options that write
    `widget:'tool-library'`/`'thread-preset'` into the binding spec — but `formWidgets.js`'s own render-side map
