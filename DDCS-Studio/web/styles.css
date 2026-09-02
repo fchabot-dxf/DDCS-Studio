@@ -1443,6 +1443,13 @@ html, body { overflow-x: clip; }
    CSS-animation dependency for that half. */
 .ddcs-reveal-glow { animation: editGlow var(--edit-glow-speed, 1.5s) ease-in-out 2; border-radius: 6px; }
 
+/* t2541 (BACKLOG #71) — a form row's label AUTO-DERIVED from its param name (formWidgets.js's own
+   isDerivedLabel/labelFor): never confusable with a label the author actually typed — the distinguishability
+   the owner's own dispatch demanded. Italic + the theme's own dim-ink token; the row's title= tooltip (set
+   alongside this class) names the mechanism and how to override it, so the visual cue and the explanation
+   agree. */
+.ddcs-label-derived { font-style: italic; color: var(--text-dim, #9fb0c0); }
+
 /* Per-theme glow colour (rgb so the halo can take an alpha) + pace. */
 [data-theme="normal"]     { --edit-glow-rgb: 74,144,226;  --edit-glow-speed: 1.9s; }   /* flat, calm blue */
 [data-theme="studio"]     { --edit-glow-rgb: 22,104,255;  --edit-glow-speed: 1.5s; }   /* clean electric-blue */

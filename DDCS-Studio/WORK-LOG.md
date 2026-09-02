@@ -70283,3 +70283,160 @@ temporary control-test file swaps (backup / `git checkout` / restore-from-backup
 neither version was committed yet) left the working tree byte-identical to the intended fix, confirmed via
 `git diff --stat` showing exactly the one intended 11-line insertion before staging.
 
+## t2541 -- THE TWO MEASURED REDUCTIONS: one FAILS its own population check (not shipped), one ships with the
+distinguishability the dispatch demanded
+
+### THE ASK, and the gate built into it
+
+t2537's own top-2 reductions (BINDMODE default, LABEL auto-derive), ~155 to ~115 actions at full parity --
+but the dispatch's own explicit gate: check BOTH against the 32 BUILT-IN twins, not just this session's own
+authored wizards (a biased sample, ~15 formfields, ALL built by the same hand in the same few turns). "Do NOT
+default BINDMODE if the zero-counterexamples claim does not survive." For LABEL: "check it against the real
+labels the 32 twins already use... if the built-ins mostly disagree with the derivation, the derivation is
+wrong" -- plus a distinguishability requirement (an auto-derived label must never be confusable with an
+authored one).
+
+### REDUCTION 1, BINDMODE default to 'opparam' -- FAILS the population check, NOT shipped
+
+Grepped every `match:{...}` binding spec across all 32 twin files in `web/blocks/dataOps/`, counting which
+carry a `var` key (per `bindingsToBlocks`'s own reverse-direction rule, `isOpParam = s.match && !('var' in
+s.match)` -- ANY match object naming a `var`, regardless of its own `type`, renders as Assign Var, not Op
+Param). **106 of 306 total match specs (35%) carry a `var` key** -- Assign Var, not Op Param. **16 of the 32
+twin FILES (50%) use Assign Var for at least one of their own bindings** (`alignmentData`, `atcCheckData`,
+`atcLengthData`, `centerDrillData`, `commData`, `cornerData`, `edgeData`, `faceProbeData`, `facingData`,
+`middleData`, `odProbeData`, `odTurnData`, `partingData`, `polygonData`, `rotaryCenterData`,
+`rotaryClockData`). This session's own 15-or-so authored formfields happened to ALL use Op Param -- not
+because that's the population's own habit, but because every from-scratch build this session drove bound to
+a plain atom param (`progstart.rpm`, `surfaceraster.w`), never to a bare controller variable the way
+`cornerData.js`'s own probe distances or `commData.js`'s own comm slots do. **Zero counterexamples in my own
+sample; 106 real counterexamples in the actual population.** Exactly the check the dispatch demanded, and
+exactly why it demanded checking the REAL population before shipping a default off a biased one. No product
+code touched for this reduction -- reported, not built.
+
+### REDUCTION 2, LABEL auto-derive -- ALSO fails the naive population check (72% mismatch), shipped anyway,
+reframed by what it actually replaces
+
+Programmatic check (not eyeballed): a `camelCase`/`snake_case` → Title Case splitter run against every
+`param:`+`label:` pair with an explicit label across all 32 twin files -- **182 total, 51 exact matches
+(28.0%)**. Built-ins overwhelmingly write MORE SPECIFIC copy than a mechanical split would produce (`dist` →
+real "Max Probe Dist", not "Dist"; `f_fast` → real "Fast Feed", not "F Fast"; `x`/`y`/`z` on `atcChangeData`
+→ real "Change / Park X"/"Change / Park Y"/"Park Z", not bare axis letters). By the dispatch's own stated
+test ("if the built-ins mostly disagree, the derivation is wrong") this ALSO fails on a naive reading.
+
+**The reframe that changes the conclusion**: the comparison the dispatch's own numbers assumed was "derived
+label vs. the author's own eventual choice" -- but `labelFor`'s existing, PRE-EXISTING fallback chain
+(`explicit → SHARED_LABELS → anchor.label → raw param name`) means the REAL baseline for an unlabeled field,
+TODAY, is the bare, unspaced, lowercase param name itself (confirmed by reading `labelFor`'s own last clause,
+`(b && b.param) || ''`). A Title-Cased split is a STRICT improvement over THAT baseline in 100% of cases --
+never worse, since the new tier only ever fires when nothing more reliable (explicit/SHARED_LABELS/anchor)
+already applies -- and it happens to be the exact final label in ~28% of cases even on the toughest, most
+demanding population (built-ins with deliberately-crafted UX copy); a custom author's own simpler naming
+needs may well see a higher real acceptance rate. So: NOT "saves a click most of the time" (it doesn't, by
+the numbers), but "always upgrades the fallback appearance, and additionally saves the click whenever the
+guess happens to land" -- a smaller, honestly-quantified benefit, never a downside, still worth the low
+build cost.
+
+### DISTINGUISHABILITY, the dispatch's own hardest requirement -- solved structurally, not just visually
+
+The design that makes "an author types nothing, sees a plausible label, and cannot tell whether the wizard
+is showing their intent or a guess" (the dispatch's own named risk, the SAME "silent class" this session has
+closed five other times) impossible by construction rather than merely less likely: the derivation runs
+ENTIRELY AT RENDER TIME, inside `labelFor`'s own existing fallback chain (`ui/formWidgets.js`) -- it is
+**never written back into a block's own `label` field**. Inspecting the block itself always shows the truth
+(blank = never set one) regardless of what the form currently displays -- the SAME guarantee an explicit
+label already has, just extended one tier further down the SAME chain. A new `isDerivedLabel(b)` predicate
+answers "did THIS tier decide it," which `labelSpan` (the ONE place every row's label renders, both faces)
+reads to add a `.ddcs-label-derived` CSS class (italic, `--text-dim`) AND a tooltip naming the mechanism and
+how to override it -- appended to, not replacing, any existing `help` tooltip. An explicit label, a
+SHARED_LABELS hit, or a handle's own `anchor.label` are all still rendered completely unstyled, exactly as
+before -- `isDerivedLabel` is `false` for every one of them, confirmed directly, not inferred.
+
+### PERMANENT TESTS, proven non-vacuous
+
+New `tests/label-auto-derive-2541.spec.js` (2 tests): a unit-level pass confirming the fallback ORDER exactly
+(explicit > SHARED_LABELS > anchor.label > derived > raw), that `isDerivedLabel` agrees with `labelFor` at
+every tier, and camelCase/snake_case splitting; a full DRIVE-THE-APP pass building a real op with one
+unlabeled and one explicitly-labeled formfield, opening the real wizard form, and asserting the unlabeled
+row's own rendered text, its `.ddcs-label-derived` class, and its tooltip text -- while the explicit row
+carries none of that. **Proved not vacuous**: backed up `formWidgets.js`+`styles.css`, `git checkout`'d both
+to their pre-fix state, re-ran -- failed 3/3 retries on BOTH tests at the exact expected assertions (the bare
+param name instead of Title Case; a missing class). Restored from backup, re-ran clean, 7/7 (both new tests
+plus the 5 pre-existing `handle-form-render-fixes-2527.spec.js` tests in the same run).
+
+TWO pre-existing tests needed a deliberate, ANNOUNCED update, not a silent fix -- both found the SAME way,
+neither guessed at: `handle-form-render-fixes-2527.spec.js`'s own `labelFor` test asserted the bare-param-name
+fallback (`'someUnknownParam'`) for the no-anchor case -- caught by the FIRST targeted regression pass, before
+ever reaching the full suite. `shared-labels-1611.spec.js`'s own dedicated resolver-chain test asserted the
+SAME bare-fallback shape (`'no_such_param_xyz'`) -- this one was NOT caught by the targeted pass (a `labelFor`
+usage this session hadn't grepped for directly) and surfaced only in the mandatory full `--workers=4` run,
+exactly the AGENTS.md rule 1b failure mode the tier exists to catch. Traced properly rather than patched
+blind: grepped `labelFor(` across the WHOLE `tests/` directory afterward (not assumed complete from memory) --
+found exactly 4 files reference it; the 4th (`help-slot-io.spec.js`) turned out to be an unrelated LOCAL
+helper of the same name inside a `page.evaluate` scope, a false positive, confirmed by reading it rather than
+assumed. Both real hits updated to the new, correct expectation (`'No Such Param Xyz'`), each with a comment
+naming why, rather than leaving a red test or quietly rewriting either without explanation. Re-ran the FULL
+suite a second time after the fix, specifically to confirm this was the only gap the first run's own 34-minute
+pass had reason to find -- result in the pass-back note.
+
+### THE FREE ITEM from t2537 (ATOMTYPE ordering), ALREADY shipped in t2539 -- not repeated here
+
+t2539 already wrote the `ATOMTYPE` picker's own empty-state guidance (`pickerField.js`). Nothing further
+this turn.
+
+### THE SMALL ITEM, separate commit -- M350 firmware date reconciliation, recorded not resolved
+
+`bridge/controllers/expert-m350/FINDINGS.md` carried TWO dates for the Modbus slave-mode capability
+(2025-12-11 introduction, 2026-04-10 "current machine, already has it, three-way P279 naming documented
+here"); `M350-LiveG`'s own README adds a THIRD ("Must be 2026-08-03-00 or higher"). Traced §14's own EXISTING
+content first, rather than treating this as three raw, unexplained numbers: §14 ALREADY records that
+`2026-08-03-00`'s own release notes name register 3000 (G-code injection) + an "optimized Modbus memory
+map" -- which is EXACTLY the capability M350-LiveG is built around, so its own stated minimum firmware isn't
+a contradiction of the other two dates, it's a THIRD, LATER milestone on the same timeline (slave mode born
+2025-12-11 → this machine's running firmware 2026-04-10, already has slave mode → register 3000 added
+2026-08-03, which is what M350-LiveG needs). Added §14b laying out all three explicitly, stating the likely
+reconciliation plainly while NOT resolving whether register 3000 already answers on this machine's own
+CURRENTLY RUNNING `2026-04-10` firmware or genuinely requires the later flash -- that needs the owner's own
+controller, exactly as the dispatch specified. Separately confirmed and recorded: M350-LiveG's own stated
+parameter block (`P267`=B115200, `P279`=Slave, `P296`=None, `P297`=1) matches this machine's own captured
+`setting` dump for the SAME four params EXACTLY (FINDINGS.md's own line 750, already on record) --
+independent corroboration, verified by reading the existing file rather than asserted from the dispatch's
+own quote alone.
+
+### TIER, and full account
+
+`bridge.js` untouched this turn (no BINDMODE default shipped, so no bridge.js change was needed at all --
+the block's own default stays whatever it already was). `formWidgets.js` IS touched (`labelFor`/
+`isDerivedLabel`/`labelSpan`) -- named explicitly in AGENTS.md rule 1b's own file list, the silent-failure
+trigger applies without judgment. Targeted regression first: 44 tests across every handle-block spec +
+`handle-form-render-fixes-2527`/`gui-param-grouping`/`form-hidden-handle-1303`/the new
+`label-auto-derive-2541` -- 44/44 green (this pass caught ONE of the two pre-existing test fixes; it did not
+have `shared-labels-1611.spec.js` in scope, which is exactly why rule 1b's own full-suite requirement exists
+rather than trusting a targeted pass alone). `test:node` 238/238, including the 32-twin `preview-spec-
+gate-1688` snapshot -- unchanged, consistent with the built-in population overwhelmingly having explicit
+labels or SHARED_LABELS coverage already (the derived tier structurally cannot fire for a binding that
+already has either).
+
+**Full `--workers=4` suite, run 1: 3069 passed, 1 FAILED (`shared-labels-1611.spec.js`, the second
+pre-existing test needing the same deliberate update above), 13 flaky, 26 skipped.** Fixed the one real
+failure, swept `tests/` for every other real `labelFor(` usage (found and ruled out a same-named-but-unrelated
+local helper), then ran the full suite a SECOND time to confirm clean.
+
+**Run 2: 3069 passed, 3 failed, 11 flaky, 26 skipped.** All three failures are ALREADY-DOCUMENTED, pre-existing
+flakes from earlier this session, not new: `open-as-modal-1625.spec.js` (BACKLOG #56) and
+`preview-mutation-manifest-2463.spec.js` ("sf-pos-snapback") -- both repeatedly confirmed clean in isolation
+across multiple prior turns; `undo-reproject-echo.spec.js` -- the SAME test t2539's own dedicated
+with/without control investigation (this session, one turn ago) already root-caused as environmental
+timing-sensitivity on a basic `waitForFunction` app-boot check, unrelated to any product change. Re-ran all
+three in isolation (`--workers=1`) rather than trust the label alone: `open-as-modal-1625` and
+`preview-mutation-manifest-2463` both passed CLEAN (13/14 passed outright); `undo-reproject-echo`'s own third
+test flaked once more (failed, then passed on retry) -- the FOURTH occurrence of the identical signature this
+session, on a file this turn's own change (`formWidgets.js`/`styles.css`, label rendering) has no plausible
+mechanism to touch. Did not re-run t2539's own full with/without control a second time for the same
+already-investigated flake -- redundant, not more rigorous, given the existing direct evidence.
+`test:node` 238/238 (both before and after the fix).
+
+`git status` clean of anything outside `web/ui/formWidgets.js`, `web/styles.css`, the two new/updated
+permanent test files (`label-auto-derive-2541.spec.js`, `shared-labels-1611.spec.js`),
+`handle-form-render-fixes-2527.spec.js`, `bridge/controllers/expert-m350/FINDINGS.md` (separate commit),
+BACKLOG.md, and this WORK-LOG entry.
+

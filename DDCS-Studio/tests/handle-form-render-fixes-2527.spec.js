@@ -235,7 +235,8 @@ test('labelFor: SHARED_LABELS still wins for a handle-merged w/h param (no regre
             anchorFillsGap: labelFor({ param: 'boxreach', anchor: { kind: 'length', label: 'reach' } }),
             // an explicit label still wins over everything, unchanged
             explicitWins: labelFor({ param: 'w', label: 'Custom', anchor: { kind: 'rect', label: 'W×H' } }),
-            // no anchor at all (every built-in, every plain formfield) -- byte-identical to before this turn
+            // no anchor at all (every built-in, every plain formfield) -- t2541 (BACKLOG #71): the DERIVED tier
+            // now fills this gap too, a Title-Case split of the param name, never the bare identifier anymore
             plainRawFallback: labelFor({ param: 'someUnknownParam' }),
         };
     });
@@ -243,7 +244,7 @@ test('labelFor: SHARED_LABELS still wins for a handle-merged w/h param (no regre
     expect(r.sharedLabelWinsH, 'no regression: the h-row keeps its own correct, DISTINCT "Height" label').toBe('Height');
     expect(r.anchorFillsGap, "the handle's own declared intent now fills the gap instead of a raw, uninformative param name").toBe('reach');
     expect(r.explicitWins).toBe('Custom');
-    expect(r.plainRawFallback).toBe('someUnknownParam');
+    expect(r.plainRawFallback, 't2541 -- the derived tier Title-Cases the bare param name instead of showing it raw').toBe('Some Unknown Param');
 });
 
 test('renderOpForm: an unresolved handle\'s own fail-visibly stub renders NO form row (the canvas red marker stays the sole signal); a normal binding is unaffected', async ({ page }) => {

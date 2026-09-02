@@ -33,11 +33,11 @@ const declared = (page) => page.evaluate(async () => {
     return { map: F.SHARED_LABELS, resolves: [
         F.labelFor({ param: 'stockAttach' }),                          // shared
         F.labelFor({ param: 'stockAttach', label: 'My phrasing' }),    // explicit wins
-        F.labelFor({ param: 'no_such_param_xyz' }),                    // raw fallback
+        F.labelFor({ param: 'no_such_param_xyz' }),                    // t2541 -- Title-Cased derived fallback, not raw
     ] };
 });
 
-test('the resolver chain: explicit label → SHARED_LABELS → raw name', async ({ page }) => {
+test('the resolver chain: explicit label → SHARED_LABELS → derived → raw name', async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto('/', { timeout: 60000 });
     await waitReady(page, () => window.ddcsStudio);
@@ -46,7 +46,9 @@ test('the resolver chain: explicit label → SHARED_LABELS → raw name', async 
     for (const p of PARAMS) expect(d.map[p], `SHARED_LABELS declares ${p}`).toBeTruthy();
     expect(d.resolves[0], 'no explicit label → the shared one').toBe(d.map.stockAttach);
     expect(d.resolves[1], 'an explicit label WINS').toBe('My phrasing');
-    expect(d.resolves[2], 'unknown param → the raw name').toBe('no_such_param_xyz');
+    // t2541 (BACKLOG #71) -- an unknown param, below SHARED_LABELS, now Title-Cases via the DERIVED tier
+    // instead of showing the bare identifier -- see label-auto-derive-2541.spec.js for the mechanism itself.
+    expect(d.resolves[2], 'unknown param → Title-Cased, never the raw identifier').toBe('No Such Param Xyz');
 });
 
 test('the twin Generator Modal renders the friendly names — and an explicit label keeps winning', async ({ page }) => {

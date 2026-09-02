@@ -7094,6 +7094,38 @@ interactive handles.
 > never an ergonomics number to begin with — it was a correctness bug hiding behind five turns of a
 > test-harness workaround that trained everyone, including this session, to stop seeing it. Full account:
 > WORK-LOG t2539.
+>
+> **⚠✅ t2541 — the two measured reductions, checked against the REAL population before shipping either:
+> ONE FAILS its own gate (not shipped), ONE ships with the distinguishability the dispatch demanded.**
+> **BINDMODE default to 'opparam' — FAILS, not built.** Grepped every `match:{...}` binding spec across all
+> 32 built-in twins: 106 of 306 (35%) carry a `var` key (Assign Var, not Op Param), and 16 of the 32 twin
+> FILES (50%) use Assign Var for at least one binding — `cornerData`/`commData`/`centerDrillData`/`middleData`
+> and eleven others. This session's own ~15 authored formfields were a biased sample (every from-scratch
+> build happened to bind atom params, never a bare controller variable) — zero counterexamples there, 106 real
+> ones in the population. Exactly the check the dispatch demanded; exactly why checking the real population
+> mattered.
+>
+> **LABEL auto-derive — ALSO fails the naive check (only 51/182, 28.0%, of built-in labels match a mechanical
+> camelCase/snake_case → Title Case split exactly), shipped anyway on a reframed comparison.** The dispatch's
+> own numbers assumed "derived vs. the author's eventual choice"; the REAL baseline `labelFor` already falls
+> back to today, for ANY unlabeled field, is the bare lowercase param name (`f_fast`, not "F Fast") — a
+> Title-Cased split is a STRICT improvement over THAT in 100% of cases (only ever fires when nothing more
+> reliable applies) and happens to be the exact final choice ~28% of the time even on the built-ins' own
+> deliberately-crafted copy. Smaller, honestly-quantified benefit than first estimated; never a downside.
+>
+> **Distinguishability (the hardest part of the ask) solved structurally**: the guess computes at RENDER
+> TIME only, inside `labelFor`'s own existing fallback chain — never written back into a block's own `label`
+> field, so the block itself always tells the truth regardless of what the form shows. A new
+> `isDerivedLabel(b)` flag drives a distinct `.ddcs-label-derived` style + an explanatory tooltip; an
+> explicit label, SHARED_LABELS, or a handle's own `anchor.label` render completely unstyled, unchanged.
+> Proven non-vacuous (revert/re-run/restore, both new tests failed 3/3 at the exact expected assertions
+> beforehand). One pre-existing test's own assertion updated deliberately (not silently) to the new, correct
+> expectation.
+>
+> Small item, separate commit: `bridge/controllers/expert-m350/FINDINGS.md`'s own three-firmware-dates
+> question (2025-12-11 / 2026-04-10 / M350-LiveG's stated 2026-08-03 minimum) recorded as likely three
+> sequential milestones, not a contradiction — NOT resolved, per the dispatch's own explicit instruction;
+> needs the owner's own controller. Full account: WORK-LOG t2541.
 
 ---
 

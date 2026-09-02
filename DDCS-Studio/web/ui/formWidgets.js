@@ -95,11 +95,18 @@ const hintText = (mm, kind) => {
 
 function labelSpan(b) {
     const span = document.createElement('span');
-    span.textContent = labelFor(b);   // t1611 — the ONE label resolver (explicit → SHARED_LABELS → raw), both faces
+    span.textContent = labelFor(b);   // t1611 — the ONE label resolver (explicit → SHARED_LABELS → derived → raw), both faces
     // DECLARED HELP SLOT (1a): an optional `help` string on the binding renders as a native tooltip on the field
     // label — ONE declaration, every renderOpForm surface (the ported wizard form + the Blocks-tab form pane) shows
     // it for free. Dumb by design (native title=, no positioning framework); fields without `help` are unchanged.
     if (b.help) span.title = b.help;
+    // t2541 — a DERIVED label (labelFor's own weakest tier, see isDerivedLabel's header) renders visually
+    // distinct from an authored one: never confusable, per the dispatch's own distinguishability demand. The
+    // help tooltip (if any) is preserved, with the auto-derived note appended rather than replacing it.
+    if (isDerivedLabel(b)) {
+        span.classList.add('ddcs-label-derived');
+        span.title = (b.help ? b.help + ' — ' : '') + 'auto-derived from the parameter name — set your own Label to override';
+    }
     if (b.units || (b.widgetConfig && b.widgetConfig.units)) {
         const kind = unitKindOf(b);   // t990 — flip the suffix to (in)/(IPM) in inch display mode
         const u = document.createElement('span');
@@ -971,20 +978,52 @@ export const SHARED_LABELS = {
     w: 'Width', h: 'Height',
     toolDia: 'Tool Ø', stepoverPct: 'Stepover %',
 };
+// t2541 (BACKLOG #71, t2537's own reduction 2) — a mechanical camelCase/snake_case → Title Case split, the
+// LAST-resort fallback before the raw param name. MEASURED against the 32 built-ins before shipping (the
+// dispatch's own explicit gate): only 51/182 (28%) of their own real labels match this derivation exactly —
+// built-in authors overwhelmingly write MORE SPECIFIC copy ('dist' → "Max Probe Dist", not "Dist"). That is
+// NOT a reason to withhold this — it is a reason to be precise about what it buys: every param already falls
+// back to the bare, unspaced, lowercase name (`b.param` itself) when nothing else applies, and a Title-Cased
+// split is a STRICT improvement over that in 100% of cases (never worse, since it only ever fills a gap none
+// of the higher-priority sources filled), plus it happens to be the AUTHOR'S OWN final choice in roughly a
+// quarter of cases going by the built-in population — never a claim of "usually right", always "never worse
+// than the raw name it replaces".
+function deriveLabelFromParam(param) {
+    if (!param) return '';
+    const words = String(param).replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().split(/\s+/);
+    return words.filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 /** The label a binding renders under: explicit `label` → SHARED_LABELS → a handle's own declared `anchor.label`
- *  → the raw param name. t2527 (BACKLOG #71) — a handle-merged binding (rect_handle etc, userOps.js's
- *  `attach()`) keeps the REAL formfield's own `.label` when it has one, correctly. When that formfield left
- *  `label` blank AND its own param happens to be one of the handful SHARED_LABELS names (`w`/`h`/...),
- *  SHARED_LABELS still wins — deliberately: for rect_handle specifically it already gives the w/h ROWS their
- *  own DISTINCT, correct labels ("Width"/"Height"), which the handle's own single, group-wide `anchor.label`
- *  ("W×H") cannot — `anchor.label` describes the COMBINED gesture, not either row alone, so promoting it ahead
- *  of SHARED_LABELS would have made the width AND height rows show the SAME ambiguous text, a worse collision
- *  than the one being fixed. `anchor.label` now fills the gap ONE STEP LATER instead: when a handle-merged
- *  binding's own param has NEITHER an explicit label NOR a SHARED_LABELS entry (the length/radial single-
- *  param gestures, whose own param name is never one of the handful SHARED_LABELS knows), it renders the
- *  handle's own declared intent instead of the bare, un-friendly param name. Anchor-less bindings (every
- *  built-in, every plain formfield) are byte-identical either way. */
-export function labelFor(b) { return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.anchor && b.anchor.label) || (b && b.param) || ''; }
+ *  → a DERIVED Title-Case split of the param name → the bare param name. t2527 (BACKLOG #71) — a handle-merged
+ *  binding (rect_handle etc, userOps.js's `attach()`) keeps the REAL formfield's own `.label` when it has one,
+ *  correctly. When that formfield left `label` blank AND its own param happens to be one of the handful
+ *  SHARED_LABELS names (`w`/`h`/...), SHARED_LABELS still wins — deliberately: for rect_handle specifically it
+ *  already gives the w/h ROWS their own DISTINCT, correct labels ("Width"/"Height"), which the handle's own
+ *  single, group-wide `anchor.label` ("W×H") cannot — `anchor.label` describes the COMBINED gesture, not
+ *  either row alone, so promoting it ahead of SHARED_LABELS would have made the width AND height rows show
+ *  the SAME ambiguous text, a worse collision than the one being fixed. `anchor.label` now fills the gap ONE
+ *  STEP LATER instead: when a handle-merged binding's own param has NEITHER an explicit label NOR a
+ *  SHARED_LABELS entry, it renders the handle's own declared intent instead of falling all the way to the
+ *  derived split. Anchor-less bindings (every built-in, every plain formfield) are byte-identical either way.
+ *  t2541 — the DERIVED tier sits below `anchor.label` (a deliberately-authored string outranks a mechanical
+ *  guess) and above the bare param name (a guess still reads better than "f_fast"). `isDerivedLabel` below
+ *  answers "did THIS tier decide it" so the render side can mark it distinctly — see that function's own
+ *  header for why writing the guess into the block's own `label` field would have been the wrong design. */
+export function labelFor(b) {
+    return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.anchor && b.anchor.label) || (b && deriveLabelFromParam(b.param)) || '';
+}
+/** True when `labelFor` fell all the way to the DERIVED tier — i.e. NOTHING more reliable (an explicit label,
+ *  a SHARED_LABELS entry, a handle's own anchor.label) was available, only a mechanical guess. t2541 — this is
+ *  the DISTINGUISHABILITY answer the owner's own dispatch demanded: an auto-derived label must never be
+ *  confusable with one the author actually typed, or a blank LABEL field silently produces a value nobody
+ *  can tell wasn't theirs — the exact "silent class" bug this session has closed five other times (a widget
+ *  that silently became a number box, a handle that silently drove nothing, ...). The guess is computed HERE,
+ *  at RENDER time only — it is never written back into the block's own `label` field, so inspecting the block
+ *  itself always shows the truth (blank = the author never set one) regardless of what the form currently
+ *  displays; `labelSpan` below reads this flag to style the derived case distinctly instead. */
+export function isDerivedLabel(b) {
+    return !!(b && !b.label && !SHARED_LABELS[b.param] && !(b.anchor && b.anchor.label) && b.param);
+}
 
 // t798 P5 — DECLARED FIELD HELP. A binding's `help` is the field tooltip; params that recur across twins with the SAME
 // meaning declare it ONCE here (a binding's explicit `help` always wins). The help title now goes on the WHOLE ROW
