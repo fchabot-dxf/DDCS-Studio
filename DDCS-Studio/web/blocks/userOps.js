@@ -271,11 +271,13 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
     return bindings;
 }
 
-/** Read a DECLARED preview intent from a `sim` block in a stack (the blocks-native twin of the dev-panel "Preview
- *  rig" checkboxes). The block WINS over the dev-panel when present (same precedence as the panel block). Returns:
- *  the intent object, `null` (a sim block declaring nothing), or `undefined` (no sim block → use the checkboxes). */
+/** Read a DECLARED preview intent from a `sim` (or, t2511, its split-out 3D-only half `preview3d`) block in a
+ *  stack (the blocks-native twin of the dev-panel "Preview rig" checkboxes). A migrated op declares ONE of the
+ *  two, never both — this reads whichever is present, same fields either way (see preview3d.js's own header).
+ *  The block WINS over the dev-panel when present (same precedence as the panel block). Returns: the intent
+ *  object, `null` (a sim/preview3d block declaring nothing), or `undefined` (neither present → use the checkboxes). */
 export function simIntentFromStack(children) {
-    const blk = flattenBlocks(children).find((b) => b && b.type === 'sim');
+    const blk = flattenBlocks(children).find((b) => b && (b.type === 'sim' || b.type === 'preview3d'));
     if (!blk || !blk.params) return undefined;
     const s = blk.params, sim = { showRotaryRig: !!s.rotary, forceMachine: !!s.machine, showMagazine: !!s.magazine, toolMachineFrame: !!s.toolMachine, seatAtStart: !!s.seatStart, probesForWcs: !!s.probeWcs };   // t552 — toolMachine: render the live tool in RAW machine coords (homing — no stock-floor shift, t497); t570 — seatStart: seat the trace/engine initial pos at marker A (alignment) WITHOUT the machine-frame render; t1203 — probeWcs: this op probes FOR the WCS, so never render it through the declared WCS table
     return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine || sim.toolMachineFrame || sim.seatAtStart || sim.probesForWcs) ? sim : null;

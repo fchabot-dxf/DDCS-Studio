@@ -58,7 +58,7 @@ const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 // together a twin's form-authoring presentation mouth, which must never be mistaken for "the real first
 // content" ahead of the execution mouth that actually carries it.
 const TRANSPARENT_CONTAINERS = new Set(['param_group', 'guard', 'section', 'setup', 'safetraverse', 'opunit']);
-const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'cam_field', 'sim', 'panel', 'simstart']);
+const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'cam_field', 'sim', 'preview3d', 'panel', 'simstart']);   // t2511 — preview3d: the 3D-only half of the sim/panel split, same metadata-only shape as sim
 /** The first REAL (non-transparent-container, non-metadata-only) leaf block reachable by walking the SAME
  *  structural chain emit() itself walks — so "does this op already open on a hand-pushed title" is answered by
  *  a block's own declared TYPE, never by its position in `.children` (a twin's title can sit two wrappers

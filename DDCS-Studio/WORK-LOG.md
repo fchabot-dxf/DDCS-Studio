@@ -68687,3 +68687,158 @@ run this session has shown -- `open-as-modal-1625` (BACKLOG #56, t2507's own obs
 run, consistent with #56's own documented character (contention-sensitive, not deterministic). Filed BACKLOG
 #71 for the one lasting finding (no real-UI authoring path for an interactive preview handle) -- see that entry
 for the full account; this file carries the complete method and all three comparisons.
+
+## t2511 — split the 3D preview and the 2D feature canvas into two separate blocks (`preview3d` + `panel`),
+migrate ONE pilot op onto them. Pilot corrected mid-turn from surfacing to drill after tracing the code proved
+surfacing never actually reaches the mechanism being changed -- named plainly rather than glossed over
+
+### THE DESIGN QUESTION, answered from the code before writing anything, per the dispatch's own instruction
+
+`sim` (`wizards/ops/sim.js`) has always done two jobs: declare 3D-scene intent (rotary/machine/magazine/
+probeWcs -- read by `simIntentFromStack` into `def.sim`) AND, via `formWidgets.js`'s own `node.type==='sim'`
+branch, build the COMBINED 3D+2D visualization box (both panes as direct siblings inside ONE `.viz-split` div).
+`panel` (`wizards/ops/panel.js`) already stands alone -- a 2D-only box, no splitter, no `makePanesCollapsible`
+call at all (a single pane needs no splitter). The owner wants these split: a wizard should declare its 3D
+preview and 2D canvas as two independent, separately-placeable blocks.
+
+**The real risk, traced not guessed**: `paneAccordion.js`'s own `addPaneSplitter` requires EXACTLY 2
+`[data-viz-pane]` children of ONE `.viz-split` (`if (panes.length !== 2) return;` -- the splitter simply does
+not exist otherwise). Two independent blocks, each building its OWN `.wiz-visual`/`.viz-split` wrapper, would
+each have only ONE pane when placed adjacent -- NO splitter possible between two separate DOM subtrees, no
+matter how close together they sit. This is exactly the risk the dispatch named: "if the adjacent case cannot
+keep its splitter without special-casing, STOP AND REPORT."
+
+**Two more real findings, from reading BEFORE designing**: (1) `panel`'s own doc history (t2301, drillData.js's
+own comment) already names the EXACT hazard a naive split would recreate -- `panel` alone hardcodes the SAME
+DOM ids `sim`'s own 2D pane does (`userVizStatus_tree`/`userVizContainer_tree`), so a bare `panel` node placed
+anywhere `sim` also exists collides. This is not a new problem to solve; it is the SAME problem, and the fix
+has to prevent it, not just avoid triggering it by luck. (2) `panel`'s own `params.panel` field is NEVER read by
+`formWidgets.js` at all (confirmed by reading the branch directly, and independently confirmed by drillData.js's
+own comment saying the same thing) -- purely decorative at this layer.
+
+### THE CHOSEN DESIGN: adjacency-merge, not two independent boxes
+
+`formWidgets.js`'s own `traverse()` loop (was `for...of`, now an indexed loop with a local `__consumed` index
+Set -- never mutating the author's own uiChildren objects, which may be read again elsewhere) now recognises a
+NEW `preview3d` node type. When it finds an ADJACENT `panel` sibling (checked NEXT first, then PREVIOUS, so
+either declared order works -- mirrors `paneAccordion.js`'s own existing "twin = 3D on top, built-in = 2D on
+top" order-agnostic convention), it renders ONE combined box -- byte-identical markup to `sim`'s own
+`want2d:true` shape (same ids, same "VISUALIZATION" label, same pane order, same starting `display:none` on the
+3D pane) -- and marks the panel's own index consumed so it is not rendered a second time. No adjacent panel ->
+a standalone 3D-only box, byte-identical to `sim`'s own `want2d:false` shape (the ATC precedent). A standalone
+`panel` with no adjacent `preview3d` keeps its own pre-existing single-pane "FEATURE CANVAS" shape, completely
+untouched. Extracted the shared HTML-building logic into one `buildVizBox(container, has2d)` closure (used by
+both the `preview3d` branch and a new symmetric check at the top of the `panel` branch, for the reverse-order
+case) so there is exactly ONE place that knows what `sim`'s own two shapes looked like, not two hand-copies that
+could drift apart.
+
+`sim` itself is UNCHANGED -- still the mechanism every non-migrated op uses. `simIntentFromStack` (`userOps.js`)
+now recognises EITHER `sim` OR `preview3d` (`b.type === 'sim' || b.type === 'preview3d'`) -- a migrated op
+declares one, never both, so this is a plain OR, not new machinery. Three more shared-infra type-sets needed
+`preview3d` added alongside `sim`/`panel` (grepped for every co-occurrence, not guessed): `blockEmitter.js`'s
+`METADATA_ONLY_LEAVES` (so it emits nothing, like `sim`/`panel`), `blocksApp.js`'s `REVEAL_META_TYPES` and its
+own `checkLayoutNodes` array, and `pickerField.js`'s `META_TYPES` (so a `formfield`'s own `atomType` picker
+never offers `preview3d` as a bindable "real atom," matching `sim`).
+
+### THE PILOT CORRECTION, found live, reported honestly rather than smoothed over
+
+**First attempt: surfacing.** Migrated `surfacingData.js`'s own template (`{type:'sim'}` -> adjacent
+`{type:'preview3d'}` + `{type:'panel'}`), verified the new code STRUCTURALLY (connection checks, correct pane
+order/ids in isolation) -- all clean. Then ran the actual before/after comparison on the LIVE app and found a
+real, unexplained discrepancy: the migrated version's 3D pane stayed hidden and its 3D content mounted into the
+WRONG pane's own container. Traced it to the root rather than patching around it: `userOpView.js`'s own
+`hasTreeLayout()` only returns `true` when a `split_horizontal`/`split_vertical` node exists ANYWHERE in
+`uiChildren` -- surfacing's own template has none, so `isTree` is `false` for it, and its VISIBLE box comes
+from a completely SEPARATE, hand-written construction in `userOpView.js`'s own `render()` (`vizBase`/`vid`/
+`vel`, bare non-`_tree` ids) -- `formWidgets.js`'s `traverse()` (what I had actually changed) never governs
+surfacing's own live rendering AT ALL. My structural verification was correct in isolation; it was correct
+about the wrong code path. This is exactly why the dispatch asked for the design to be worked out from the code
+and the pilot's own render path confirmed, not assumed from which op "looked cleanest."
+
+**Second attempt: drill.** `drillData.js`'s own header (t2299/t2341) states directly: drill is "the first
+built-in wizard whose live render path is driven by its own declaration instead of the hardcoded shell" --
+wrapped in a real `split_horizontal` specifically so `hasTreeLayout()` routes it onto `renderUiTree`. Confirmed
+this (not assumed) by grepping `split_horizontal`/`split_vertical` across every `dataOps/*.js` file: only
+`drillData.js`, `partingData.js`, `centerDrillData.js`, `edgeData.js` have one at all -- drill is the correct,
+representative pilot for a change to `formWidgets.js`'s own tree-render path; surfacing and corner (both
+checked) are not. Migrated drill's own `RIGHT: [{type:'sim',...}]` (a single-element array, alone inside the
+split's own RIGHT pane) to `RIGHT: [{type:'preview3d',...}, {type:'panel',...}]` -- the exact adjacency shape
+the merge logic exists for.
+
+### VERIFIED, on drill, four ways -- exactly the standard this arc holds itself to
+
+1. **Structural, before/after, byte-for-byte**: captured the STABLE facts of the live rendered box (section
+   label, `data-split-on`, splitter presence, both panes' kind/id/`data-collapsed`/`aria-expanded`/which canvas
+   type mounted where) on the pre-migration code (`git checkout HEAD --`, scratch-copy-restore, this session's
+   own established technique) and on the migrated code. EVERY field matched EXACTLY: `sectionLabel:
+   "VISUALIZATION"`, `splitDataSplitOn:"1"`, `hasSplitter:true`, `preview3d` pane id `blk_userViz3dBox_tree`
+   with the 3D canvas correctly inside it, `layout2d` pane with the 2D feature-canvas SVG correctly inside it,
+   both `data-collapsed:"0"`. (Full raw `outerHTML` diffing was tried first and abandoned -- the live 3D
+   scene's own internals, canvas pixel dimensions, running status text, are genuinely non-deterministic frame to
+   frame, and would show false differences between two runs of IDENTICAL unchanged code; the stable structural
+   facts are the honest thing to diff.)
+2. **Live splitter drag, a real pointer gesture**: `page.mouse.down`/`move`/`up` on the actual rendered
+   splitter element (found by scoping to the ONE visible `.wiz-visual` box on the page -- the page also renders
+   several inert palette/flyout examples sharing the same classes, `.first()` alone is not safe here) --
+   `--pane-ratio` moved from `0.5` to `0.564` on a real drag. The resize genuinely works.
+3. **Live collapse round-trip, a real click**: clicked the actual 3D pane's own collapse chevron button (same
+   scoping) -- `data-collapsed` flipped `"0"->"1"`; clicked again -- `"1"->"0"`. Both directions work.
+4. **Full regression sweep**: the 8 existing tests `drillData.js`'s own header names as the tree-render arc's
+   own coverage (`drill-form-reproduction-2299`, `no-duplicate-ids-tree-render-2319`,
+   `geometry-seam-tree-mode-2323`, `split-node-responsive-2327`, `stack-bridge-multi-mouth-2333`,
+   `form-row-composite-widget-2335`, `stock-spill-792`, `roundtrip-whole-program-1319`) -- 20 tests total, all
+   pass, INCLUDING `roundtrip-whole-program-1319`'s own "IRON RULE" (round-trip text differences may only
+   SHRINK from a known baseline) at `0/0` -- the WHOLE registered op family round-trips unaffected, not just
+   drill. `tests/drill-as-data.spec.js` (the emit-equivalence + cross-dialect sweep): both tests pass --
+   `preview3d`/`panel` are metadata-only, emit nothing, so this was expected but checked, not assumed.
+   `test:node`: 238/238, zero snapshot diff (the gate captures declared HANDLE geometry, unrelated to viz-box
+   DOM structure).
+
+Screenshot: `verification/t2511-drill-migrated-final.png` -- the migrated Drill (data) wizard, both panes live
+(a real 3D stock render top, a real 2D feature-canvas trace with its own drag handle bottom, the splitter
+visible between them).
+
+### THE COST of migrating one op, honestly, for sizing the other 31
+
+**8 files touched, 1 new.** `preview3d.js` (new, ~20 lines, a near-exact copy of `sim.js`'s own shape).
+`formWidgets.js` (the real work: the indexed-loop conversion, the shared `buildVizBox` helper, the new
+`preview3d` branch, the symmetric check in the `panel` branch -- roughly 60 new lines, the ONE file that took
+real design thought). `userOps.js`/`blockEmitter.js`/`blocksApp.js`/`pickerField.js`/`index.js` (one line each,
+additive, mechanical, low-risk). `drillData.js` (the per-op migration itself: one array entry became two, plus
+the comment explaining why).
+
+**This cost is PAID ONCE, not per op.** Every file except the per-op template edit is SHARED infrastructure --
+already built, already proven (structurally + live-interaction + the 8-test regression sweep + the emit
+equivalence + the snapshot gate) against a real pilot. Migrating each of the other 31 is, going forward, a
+ONE-LINE-shaped change per op: replace `{type:'sim', params:{...}}` with `{type:'preview3d', params:{...}},
+{type:'panel', params:{...}}` in its own template, wherever `sim` currently sits. The genuinely OPEN cost per
+future op is verification, not authoring: for an `isTree=true` op (the split-based render path this turn's own
+mechanism governs), the SAME before/after + live-interaction proof this turn ran is the right bar. For an
+`isTree=false` op (surfacing, corner, and -- unconfirmed, not swept this turn -- most of the other 27), THIS
+mechanism is INERT: its own live box is built by `userOpView.js`'s own separate, hand-written `render()` path
+(`vizBase`/`vid`/`vel`), which this turn did not touch and does not yet know about `preview3d` at all. Splitting
+those 27+ genuinely means EITHER teaching that separate native path about the same split (a second, comparable-
+sized piece of work this turn did not scope or attempt), or wrapping each of them in a `split_horizontal` first
+so they route onto the mechanism this turn actually built (a bigger, more visible layout change per op, likely
+not what "split the preview blocks" was asking for on its own). **This is the honest headline number**: ONE op
+(drill) is done; roughly THREE more (`partingData.js`/`centerDrillData.js`/`edgeData.js`) are reachable at the
+SAME low cost this turn just paid; the remaining ~27 need a SECOND piece of work this turn did not build,
+sized and scoped separately.
+
+### VERIFY
+
+Both the abandoned surfacing attempt and the successful drill migration are recorded above, not just the
+successful one -- the mid-turn correction is itself part of the honest account, per this session's own
+established discipline. `preview3d`/`sim`/`panel` type-set additions confirmed via a fresh grep for every
+existing co-occurrence of `'sim'`+`'panel'` across `web/`, not assumed complete from memory. Full suite
+`--workers=4` before concluding (rule 1b in full force -- `formWidgets.js` is the shared render path for every
+wizard with a preview, and every other op's own `sim`-only path was re-verified untouched by the 20-test
+regression sweep above, not merely assumed safe because the diff looked additive): run TWICE per this session's
+own "believe it's a flake -> re-run, don't argue" discipline. **Run 1: 3033 passed, 2 failed, 10 flaky, 26
+skipped (35m29s). Run 2: 3037 passed, 2 failed, 6 flaky, 26 skipped (34m27s).** The SAME two failures both
+times: `preview-mutation-manifest-2463` / `sf-pos-snapback` (the SAME pre-existing flake every run this whole
+session has shown, unrelated to viz-box splitting) and `open-as-modal-1625` (BACKLOG #56, already documented as
+contention-sensitive-not-deterministic, already known to appear at `--workers=4`, per t2507's own entry) --
+checked, not assumed: it references nothing this turn touched (`formWidgets.js`'s own `sim`/`panel`/`preview3d`
+branches, `drillData.js`) and passes 3/3 cleanly in isolation. Neither failure is a regression from this turn's
+own work.

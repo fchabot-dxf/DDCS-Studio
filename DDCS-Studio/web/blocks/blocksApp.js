@@ -830,7 +830,7 @@ async function buildWorkspace() {
   // t2397 (BACKLOG #43) — the meta/wrapper block kinds NEVER themselves own a form param by a bare field name
   // (mirrors pickerField.js's own `META_TYPES` exclusion for the SAME reason, declared independently here —
   // this file's own def-shape check, not that field's candidate list).
-  const REVEAL_META_TYPES = new Set(['formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group', 'panel', 'layout', 'sim', 'simstart', 'user_root', 'op']);
+  const REVEAL_META_TYPES = new Set(['formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group', 'panel', 'layout', 'sim', 'preview3d', 'simstart', 'user_root', 'op']);   // t2511 — preview3d: the 3D-only half of the sim/panel split
   const revealDefByType = {}; PALETTE.forEach((d) => { revealDefByType[d.type] = d; });
   // t2397 (BACKLOG #43) — FORM → BLOCK: given a form row's own `data-param`, find the block that DECLARES it.
   // TWO shapes, checked in order: (1) a `param_field`/`formfield` whose own PARAM field names it — the
@@ -916,7 +916,7 @@ async function buildWorkspace() {
     function checkLayoutNodes(nodes) {
       for (const n of childrenOf(nodes)) {
         if (!n) continue;
-        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'panel'].includes(n.type)) return true;
+        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'preview3d', 'panel'].includes(n.type)) return true;   // t2511 — preview3d joins sim
         if (n.children && checkLayoutNodes(n.children)) return true;
         if (n.uiChildren && checkLayoutNodes(n.uiChildren)) return true;
       }

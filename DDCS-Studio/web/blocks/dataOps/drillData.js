@@ -337,16 +337,22 @@ function drillDataStack(p = DRILL_DEFAULTS) {
                     { type: 'section', params: { title: 'DEPTH & FEED' }, children: [depthFeedGroup] },
                     { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
                 ] }],
-                // t2301 (BACKLOG 20) — 'panel' removed: formWidgets.js's `sim` and `panel` branches hardcode the
-                // SAME DOM ids for their own layout2d pane (userVizStatus_tree/userVizContainer_tree) — a real id
-                // collision wherever both are declared, not just cosmetic redundancy. `sim` renders everything
-                // `panel` did (t2257's own systemic-check comment, atcChangeData.js) PLUS the 3D pane; `panel`
-                // never even reads its own `params.panel` value ('form3d+2d' vs 'form3d' vs 'form' vs 'commscreen'
-                // all render byte-identically — confirmed by reading formWidgets.js's panel branch directly). Left
-                // AS-IS here (no `layout2d:false`): drill has real 2D content (previewGeometry, the hole-pattern
-                // handles), so sim's own default (2D pane included) is what this twin actually needs — unlike ATC,
-                // which had none.
-                RIGHT: [{ type: 'sim', params: { rotary: false, machine: false, magazine: false } }],
+                // t2511 (BACKLOG #61, the sim/panel split, PILOT — moved here from surfacing once t2511 itself
+                // found surfacing is NOT tree-rendered live, `hasTreeLayout()` never true for it, so a
+                // formWidgets.js-level split would have been genuinely inert there; drill IS tree-rendered
+                // (t2299, this file's own header) — the only built-in this mechanism actually reaches today).
+                // Was ONE `{type:'sim'}` node; now the SAME combined box declared as TWO adjacent blocks,
+                // `preview3d` (unchanged context: rotary/machine/magazine all still false) immediately followed
+                // by `panel` — formWidgets.js's own traverse() detects the adjacency and renders the identical
+                // combined box (proven byte-identical, see WORK-LOG t2511). The t2301 id-collision this comment
+                // used to warn about (`panel` alone hardcoding the SAME ids `sim` does) is exactly what the
+                // adjacency merge exists to prevent — it is safe to place them together now because the merge
+                // (not two independent single-pane boxes) is what actually renders, not two competing ones.
+                // `panel`'s own `params.panel` value is still never read by formWidgets.js — confirmed unchanged.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'panel', params: { panel: 'form3d+2d' } },
+                ],
             },
         }],
         children: appendToolSel(appendEntry(guardHolePattern(drillStack(p)))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing); t2415 — guardHolePattern wraps the pattern atom, entry/toolsel stay outside it

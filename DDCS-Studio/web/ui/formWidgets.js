@@ -1332,10 +1332,52 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
     // existing call site before this turn) stays byte-identical.
     const nsId = (base) => (ns ? `${ns}_${base}` : base);
 
+    // t2511 — the SAME `.wiz-visual`/`.viz-split` shape `sim`'s own combined/standalone-3D branches always
+    // built, now shared: `preview3d` (standalone or paired with an adjacent `panel`) calls this, so a migrated
+    // op renders BYTE-IDENTICAL markup to the un-migrated `sim` shape it replaces — same ids, same classes,
+    // same section-label, same pane order, same starting collapsed/visible state. `has2d:true` reproduces
+    // sim's own `want2d:true` shape EXACTLY (the 3D pane starts `display:none`, matching the original — the 2D
+    // pane is what a normal op actually looks at first); `has2d:false` reproduces `want2d:false` (3D pane
+    // visible, no 2D pane at all — the ATC-style 3D-only shape). This is NOT called for a standalone `panel`
+    // with no adjacent `preview3d` — that keeps its own pre-existing "FEATURE CANVAS" single-pane shape,
+    // untouched by this turn.
+    const buildVizBox = (container, has2d) => {
+        const box = document.createElement('div');
+        box.className = 'wiz-visual';
+        box.style.cssText = 'width:100%; display:flex; flex-direction:column; position:relative; flex: 0 1 auto;';
+        box.innerHTML = has2d ? `
+        <span class="section-label">VISUALIZATION</span>
+        <div class="viz-split">
+            <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d" style="display:none">
+                <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
+                <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
+            </div>
+            <div class="viz-container" data-viz-pane="layout2d">
+                <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
+                <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
+            </div>
+        </div>` : `
+        <span class="section-label">VISUALIZATION</span>
+        <div class="viz-split">
+            <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d">
+                <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
+                <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
+            </div>
+        </div>`;
+        container.appendChild(box);
+        import('./paneAccordion.js').then((m) => m.makePanesCollapsible(box)).catch(() => {});
+    };
+
     function traverse(nodes, container) {
         if (!nodes || !Array.isArray(nodes)) return;
-        for (const node of nodes) {
+        // t2511 — an indexed loop (was `for...of`), so the preview3d/panel adjacency-merge branch (below) can
+        // PEEK at the next/previous sibling and SKIP it once consumed — a LOCAL index set, never mutating the
+        // author's own uiChildren objects (those may be read again elsewhere; a flag on the data would leak).
+        const __consumed = new Set();
+        for (let __i = 0; __i < nodes.length; __i++) {
+            const node = nodes[__i];
             if (!node) continue;
+            if (__consumed.has(__i)) continue;   // t2511 — already rendered as part of an adjacent preview3d/panel pair, below
             if (node.type === 'split_horizontal' || node.type === 'split_vertical') {
                 const isHoriz = node.type === 'split_horizontal';
                 // t2327 — a horizontal split now STACKS below 860px (styles.css's own `.ui-split*` rules,
@@ -1398,6 +1440,25 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 if (paramName && byParam[paramName]) {
                     container.appendChild(byParam[paramName].row);
                     readers.push(byParam[paramName].read);
+                }
+            } else if (node.type === 'preview3d') {
+                // t2511 — the 3D-only half of the sim/panel split (preview3d.js's own header). Order-agnostic
+                // on purpose, mirroring paneAccordion.js's own "twin = 3D on top, built-in = 2D on top" note:
+                // an adjacent `panel` sibling — checked NEXT first, then PREVIOUS — merges into ONE combined
+                // box (byte-identical to the un-migrated `sim` shape); no adjacent panel renders 3D-only.
+                const nextIsPanel = nodes[__i + 1] && nodes[__i + 1].type === 'panel';
+                const prevIsPanel = !nextIsPanel && nodes[__i - 1] && nodes[__i - 1].type === 'panel' && !__consumed.has(__i - 1);
+                if (nextIsPanel || prevIsPanel) {
+                    buildVizBox(container, true);
+                    const panelIdx = nextIsPanel ? __i + 1 : __i - 1;
+                    __consumed.add(panelIdx);
+                    const panelNode = nodes[panelIdx];
+                    // t2511 — the merged panel's own nested content (if any) still needs to render, exactly as
+                    // the standalone `panel` branch below already does for it.
+                    if (panelNode.uiChildren) traverse(childrenOf(panelNode.uiChildren), container);
+                    if (panelNode.children) traverse(childrenOf(panelNode.children), container);
+                } else {
+                    buildVizBox(container, false);
                 }
             } else if (node.type === 'sim') {
                 const simBox = document.createElement('div');
@@ -1476,13 +1537,25 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 container.appendChild(simBox);
                 import('./paneAccordion.js').then(m => m.makePanesCollapsible(simBox)).catch(() => {});
             } else if (node.type === 'panel') {
+                // t2511 — the REVERSE of the preview3d branch's own check above: if THIS panel is immediately
+                // followed by a `preview3d` sibling, that pairing merges here instead (the preview3d branch
+                // only looks BACKWARD when it does not find one FORWARD, so whichever of the two the loop
+                // reaches first owns the merge — never both, __consumed prevents the second visit).
+                const nextIsPreview3d = nodes[__i + 1] && nodes[__i + 1].type === 'preview3d';
+                if (nextIsPreview3d) {
+                    buildVizBox(container, true);
+                    __consumed.add(__i + 1);
+                    if (node.uiChildren) traverse(childrenOf(node.uiChildren), container);
+                    if (node.children) traverse(childrenOf(node.children), container);
+                    continue;
+                }
                 const pnlBox = document.createElement('div');
                 pnlBox.className = 'wiz-visual';
                 // t2347 — same fix as simBox just above: no inline min-height (it fought the drag/stylesheet).
                 // t2355 — same fix as simBox's own comment above: no inline height, and flex-grow:0 (not 1) —
                 // a COLUMN parent makes height the main axis, where grow fights an explicit height directly.
                 pnlBox.style.cssText = 'width:100%; display:flex; flex-direction:column; position:relative; flex: 0 1 auto;';
-                
+
                 pnlBox.innerHTML = `
                 <span class="section-label">FEATURE CANVAS</span>
                 <div class="viz-split">

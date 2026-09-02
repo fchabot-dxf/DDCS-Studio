@@ -32,8 +32,8 @@ import { getOutputs, getInputs } from '../../ui/settingsPanel.js';   // t2453 (B
 
 const META_TYPES = new Set([
     'formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group',
-    'panel', 'layout', 'sim', 'simstart', 'user_root', 'op', 'assign',
-]);
+    'panel', 'layout', 'sim', 'preview3d', 'simstart', 'user_root', 'op', 'assign',
+]);   // t2511 — preview3d: the 3D-only half of the sim/panel split
 const isRealAtomType = (t) => typeof t === 'string' && !META_TYPES.has(t) && !t.startsWith('user_') && !t.endsWith('_op');
 
 export function installPickerField(Blockly) {
