@@ -70174,3 +70174,112 @@ never-committed diagnostic spec only, not the project's real suite, and cleared 
 cache` per the documented fix. `git status` clean of anything outside BACKLOG.md/WORK-LOG.md/the one
 verification PNG before staging.
 
+## t2539 -- THE STALE FLYOUT: measured real for a human, then fixed so the failure is IMPOSSIBLE, not rarer
+
+### THE QUESTION FIRST, answered by measurement before touching any product code
+
+t2537's own 4th finding (not ranked among the top 3, since it isn't an action-count reducer): the stale
+search-flyout interception this session has coded around since t2509. The dispatch's own question, matching
+BACKLOG #70's real-vs-harness-artifact call: does it intercept a click for a HUMAN, or only for
+instant-coordinate automation? Built a throwaway diagnostic (`tests/_t2539-flyout-diagnose.spec.js`, then
+`tests/_t2539-flyout-ab.spec.js`, both deleted before this commit) driving the SAME exact post-drag scenario
+two ways: (A) an instant `page.mouse.click(x,y)` teleport, matching this session's own original
+`setTextField`/`setDropdownField`/`setPickerField` helper shape; (B) a click preceded by REALISTIC,
+incremental pointer travel with hover pauses (multiple `.move()` steps, ~100-150ms waits, mimicking an actual
+hand's approach), still landing on the exact same field. **Both A and B reproduced the identical
+interception** -- `document.elementFromPoint` at the target field's own real screen position resolved to
+`path.blocklyFlyoutBackground` in both cases, and neither click opened the field's own text input. Also
+measured: the flyout's own `isVisible()` stayed `true` at +0ms, +500ms, and +1500ms after a fully-settled
+drag -- it does not auto-close on any timer, ever, only when the search box is explicitly cleared. **Real for
+a human, confirmed by direct reproduction, not inferred.**
+
+### ROOT CAUSE, traced before writing a fix
+
+`blocksApp.js`'s own palette search (`runSearch()`) opens the flyout via a raw `fl.show(hits)` call when the
+`.blk-search` box holds text, and only ever calls `fl.hide()` when that box is explicitly cleared (`if (!q) {
+tb.clearSelection(); fl.hide(); }`) -- nothing else in the file closes it. A normal Blockly toolbox-category
+flyout auto-closes when a block is dragged out; this one, opened by a raw JS call rather than the toolbox's
+own category-click path, never inherited that behaviour. Left open, its own background path sits ABOVE the
+canvas and silently swallows the next click landing in its covered area -- no error, no visual signal.
+
+### THE FIX -- made the failure impossible, per the dispatch's own explicit bar ("an overlay that eats clicks
+90% less is not the fix")
+
+`blocksApp.js`'s own existing workspace change-listener (`ws.addChangeListener`, already handling `e.type ===
+'move'` for the block-snap sound) now also handles `e.type === 'create'`: any block landing on the MAIN
+workspace -- whether dragged from the flyout or created any other way -- clears `.blk-search` and re-runs
+`runSearch()` if the box still holds a stale query. This is the EXACT SAME action clicking the search box's
+own ✕ button already performs, now fired automatically on the one gesture that should always end a search:
+placing the block you were searching for. The flyout closes THE INSTANT the block lands, before any
+subsequent click can ever reach it -- not "usually," structurally.
+
+Verified the fix directly reversed the measured failure (re-ran the SAME A/B scenario with the fix in place):
+both the instant-click and realistic-travel clicks now land correctly on the real field
+(`document.elementFromPoint` resolves to `text.blocklyText.blocklyFieldText`, not the flyout), and the field's
+own text input opens.
+
+### PERMANENT REGRESSION TEST (`tests/flyout-autoclose-2539.spec.js`, 2 tests), proven non-vacuous
+
+Test 1 drives the exact real-authoring scenario (search + drag `formfield` out, zero defensive
+`clearSearch()` anywhere) and asserts three things directly: the search box is empty, the flyout reports
+`isVisible()===false`, and a plain click on the just-placed block's own `PARAM` field opens its real text
+input. **Proved not vacuous**: backed up the fix, `git checkout`'d `blocksApp.js` back to its pre-fix state,
+re-ran -- failed 3/3 retries at the exact expected assertion (`searchVal` returned `'form field'`, not `''`),
+confirming the test genuinely exercises the fix rather than passing regardless. Restored the fix from the
+backup (not from HEAD, since it wasn't committed yet), re-ran clean, 2/2.
+
+Two real test-authoring bugs caught and fixed along the way, neither a product issue: forgot
+`test.use({ viewport })` in the new file (unlike every other handle-block spec this session), so the default
+narrow viewport combined with the drop point at x:1900 put the BINDMODE field at a NEGATIVE screen x
+-- a silent off-canvas click, diagnosed by logging the actual computed coordinate rather than guessing; and
+the empty-state assertion targeted the wrong DOM class (`.blocklyWidgetDiv`, which matched an unrelated empty
+widget div first) -- fixed to search by the message's own text content instead of a structural guess.
+
+### THE FREE ITEM, per the dispatch's own instruction ("write it down where an author would actually find it,
+not only in a WORK-LOG")
+
+`pickerField.js`'s own `ATOMTYPE` must-match picker (t2537's reduction 3, the ordering-constraint finding) now
+shows `(place the atom block this field should bind to FIRST, then come back)` as its empty-state message --
+both when NOTHING is on the canvas yet (`candidates.length === 0`) AND when a typed filter matches none of
+the atom types already present (the SAME actionable advice either way, since a filter matching nothing among
+existing atoms overwhelmingly means the wanted one isn't placed yet either -- a bare "no match" would have
+been misleading there, not just less helpful). Test 2 of the new spec drives this exact scenario (a formfield
+authored before any atom exists) and asserts the message text is visible in the real popup.
+
+### TIER, and full account
+
+`blocksApp.js` is a genuinely SHARED file (every op-authoring session runs through its own workspace
+change-listener) -- AGENTS.md rule 1b's own silent-failure trigger applies. Targeted regression first: the
+same 41-test handle-block/canvas-widgets pass from t2533, plus `palette-search.spec.js` and
+`block-canvas-find-2435.spec.js` (the two existing specs that touch `.blk-search` directly) -- all green,
+44/44, no defensive `clearSearch()` call anywhere in the existing suite broke (they're now redundant, not
+wrong -- clearing an already-empty box is a harmless no-op).
+
+**Full `--workers=4` suite: 3071 passed, 0 FAILED, 10 flaky, 26 skipped (34m23s).** Zero failures is itself
+worth stating plainly -- not even the session's own long-standing `open-as-modal-1625` contention flake
+recurred this run.
+
+**The 10 flaky entries investigated properly, not waved through.** Re-ran the 6 distinct spec files behind
+them in isolation (`undo-blind-writes-2427`, `undo-reproject-echo`, `commit-on-release-2429`,
+`federated-registry`, `group-gesture`, `persistence-intentional-save`, `passes-field-1613`) at `--workers=1`:
+2 genuinely FAILED plus 1 flaky, all three in the SAME undo/reproject cluster and all three timing out on a
+`page.waitForFunction` waiting on a BASIC app-boot condition (`window.ddcsStudio && window.showApp`) --
+a signature that reads as environmental, not logical, but reading it that way isn't enough on its own after
+this session's own t2531 lesson (a targeted check missing a real regression). Ran the actual CONTROL: backed
+up the fix, `git checkout`'d `blocksApp.js` back to its unmodified state, re-ran the identical 2 spec files
+at `--workers=1` -- **the SAME 3 tests flaked (0 truly failed that run, but the identical timeout signature on
+the identical basic boot check)**. Restored the fix, ran ONE more clean isolated pass -- 4 passed, the SAME 3
+flaky, 0 failed, matching the control almost exactly. Two data points WITH the fix (2 failed once, 0 failed
+once) bracket the ONE data point WITHOUT it (0 failed) -- the fix does not change WHICH tests are unstable or
+introduce a new failure mode; it's the SAME 3 tests, the SAME timeout, present with or without this turn's
+own change. Pre-existing, environment/timing-sensitive flakiness (very plausibly this session's own
+documented "sustained-load noise" -- this is the THIRD full `--workers=4` run today), not a regression from
+`e.type === 'create'` clearing an empty-by-default search box that these tests never touch in the first place.
+
+`test:node`: 238/238 green throughout (run before AND after the full suite). `git status` clean of anything
+outside `web/blocks/blocksApp.js`, `web/blocks/blockly/pickerField.js`, the one new permanent test file,
+BACKLOG.md, and this WORK-LOG entry -- both scratch diagnostic specs deleted before staging, and both
+temporary control-test file swaps (backup / `git checkout` / restore-from-backup, never from HEAD since
+neither version was committed yet) left the working tree byte-identical to the intended fix, confirmed via
+`git diff --stat` showing exactly the one intended 11-line insertion before staging.
+

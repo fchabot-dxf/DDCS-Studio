@@ -7060,6 +7060,40 @@ interactive handles.
 > is concentrated in exactly 3 named, per-field mechanisms, not spread thin across many small things — which is
 > what makes them worth fixing FIRST rather than a broader ergonomics pass. Screenshot:
 > `verification/t2537-ergonomics-build.png`. Full account: WORK-LOG t2537.
+>
+> **✅ t2539 — THE STALE FLYOUT, t2537's own 4th finding, promoted and CLOSED: measured real for a human,
+> then fixed so the failure is IMPOSSIBLE.** The question first, per the dispatch's own instruction: does the
+> stale search-flyout intercept a click for a human, or only instant automation? Measured directly — an A/B
+> test drove the SAME post-drag scenario with an instant teleport-click AND a click preceded by realistic,
+> incremental pointer travel with hover pauses; BOTH reproduced the identical interception
+> (`document.elementFromPoint` resolved to `path.blocklyFlyoutBackground` either way), and the flyout's own
+> `isVisible()` stayed `true` at +1500ms with no auto-close timer at all. **Real for a human, confirmed by
+> direct reproduction.** Root cause: `blocksApp.js`'s own `runSearch()` opens the flyout via a raw
+> `fl.show(hits)` call (not the toolbox's own category-click path, which auto-closes natively) and only ever
+> hides it when the search box is explicitly cleared — nothing else in the file closes it, so it silently sat
+> above the canvas after every search-driven drag, swallowing whatever click landed in its area next, with no
+> error and no visual signal.
+>
+> **Fix: made it structurally impossible, not merely rarer**, per the dispatch's own explicit bar. The
+> workspace's own existing change-listener now clears the search box (the SAME action its own ✕ button
+> performs) the instant ANY block lands on the main workspace (`e.type==='create'`) — the flyout closes before
+> a subsequent click can ever reach it. Verified the fix reverses the measured failure directly (re-ran the
+> same A/B scenario, both now land on the real field). New permanent test
+> (`tests/flyout-autoclose-2539.spec.js`, 2 tests) proven NOT vacuous: reverted the fix, re-ran, failed 3/3 at
+> the exact expected assertion; restored, re-ran clean.
+>
+> **The free item, done**: t2537's reduction 3 (the `ATOMTYPE` ordering constraint) is now named where an
+> author actually meets it, not only in a WORK-LOG — the picker's own empty-state message reads "place the
+> atom block this field should bind to FIRST, then come back", covering both the truly-empty case and a typed
+> filter matching none of the atoms already present (the same actionable advice either way).
+>
+> Targeted regression: the same 41 handle-block/canvas-widgets tests from t2533 plus `palette-search.spec.js`
+> + `block-canvas-find-2435.spec.js` (the two existing specs touching `.blk-search` directly) — 44/44 green.
+> Full `--workers=4` suite run (a genuinely shared file, `blocksApp.js`, per AGENTS.md rule 1b) — result in
+> WORK-LOG t2539. This closes the loose end t2537 itself named but deliberately didn't rank, since it was
+> never an ergonomics number to begin with — it was a correctness bug hiding behind five turns of a
+> test-harness workaround that trained everyone, including this session, to stop seeing it. Full account:
+> WORK-LOG t2539.
 
 ---
 

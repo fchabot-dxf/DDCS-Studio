@@ -150,8 +150,17 @@ export function installPickerField(Blockly) {
                         const empty = document.createElement('div');
                         const emptyStackMsg = (this.pickKind === 'tool') ? '(no tools in your library yet)'
                             : (this.pickKind === 'pin') ? '(no pins declared yet — see Settings)'
+                            // t2539 (BACKLOG #71) — measured cost: this picker's own target atom not existing
+                            // YET is the single largest reducible chunk of the from-scratch build's own action
+                            // count (t2537). Free fix — no mechanism change, just naming the ordering an author
+                            // hits live, right where they hit it, instead of only in a WORK-LOG nobody authoring
+                            // a wizard will ever open.
+                            : (this.pickKind === 'atomtype') ? '(place the atom block this field should bind to FIRST, then come back)'
                             : '(nothing in this stack yet)';
-                        empty.textContent = candidates.length ? 'no match' : emptyStackMsg;
+                        // atomtype's own "no match" is the SAME actionable advice as "nothing at all" — a
+                        // typed filter matching none of the atom types already on canvas overwhelmingly means
+                        // the specific one wanted isn't placed yet either, not a typo worth a bare "no match".
+                        empty.textContent = (candidates.length && this.pickKind !== 'atomtype') ? 'no match' : emptyStackMsg;
                         empty.style.cssText = 'opacity:.6;padding:4px 6px;'; list.appendChild(empty);
                     }
                     for (const c of shown) {

@@ -1477,6 +1477,17 @@ async function buildWorkspace() {
     // .d.ts, which doesn't cover event shapes): a genuine drag-to-connect fires e.type === 'move' with
     // e.reason including 'connect' — a disconnect/bump carries ['disconnect','bump'], never 'connect' alone.
     if (e.type === 'move' && e.reason && e.reason.includes('connect')) sfx('block.snap');
+    // t2539 — a block dragged out of a SEARCH-triggered flyout (`runSearch`'s own `fl.show(hits)` call, not
+    // the toolbox's own category-click path) does NOT auto-close it, unlike a normal toolbox flyout. Left
+    // open, its own background path sits above the canvas and silently swallows the VERY NEXT click anywhere
+    // it covers — measured live (t2539) to intercept even a realistic, hover-then-click human gesture, not
+    // just instant automation, so this is a real authoring bug, not a test-harness artifact. Fix: any block
+    // landing on the MAIN workspace (`e.type==='create'`, fired once whether dragged from the flyout or
+    // created any other way) clears the search box if it's still holding a stale query — the SAME action
+    // clicking the search box's own ✕ already performs (`runSearch`'s own `!q` branch calls `fl.hide()`) — so
+    // the flyout closes AUTOMATICALLY on the gesture that should always end it, making the failure
+    // IMPOSSIBLE rather than merely rarer.
+    if (e.type === 'create' && search.value) { search.value = ''; runSearch(); }
     if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject */ } }
     // t2415 (BACKLOG #23) — a NATIVE Blockly "Disable Block" on an atom whose OP DEF declares it a SWITCHABLE
     // child (wrapped in a `guard` in the REGISTRY template, e.g. drill's own holecycle pattern — see
