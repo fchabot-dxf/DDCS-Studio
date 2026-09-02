@@ -92,8 +92,13 @@ test('an unresolved handle renders as an obviously-broken marker (red, no value,
 
     // visual confirmation, matching this session's own screenshot convention: open the SAME op for real and
     // capture the red marker as it actually renders, not just the programmatic decl shape asserted above.
+    // t2527 -- waits on the CANVAS, not #wiz_user_form: this pilot has no real formfield at all (only the
+    // broken handle), and #wiz_user_form's own row-skip fix (renderOpForm) now correctly leaves it EMPTY (zero
+    // rows, zero height) for a wizard with no resolved params -- Playwright's own `state:'visible'` requires a
+    // non-empty box, so it would time out on a container that's legitimately, correctly blank. The visualization
+    // pane is what this test actually needs anyway (it's what gets screenshotted).
     await page.evaluate((t) => window.openWiz(t), OPTYPE);
-    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+    await page.waitForSelector('#userVizContainer svg', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(500);
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'verification/t2525-broken-handle-fails-visibly.png', clip: _b }); }
     await page.evaluate((t) => { import('/blocks/userOps.js').then((U) => { try { U.deleteUserOp(t); } catch (_) {} }); localStorage.removeItem('ddcs_user_ops'); }, OPTYPE);

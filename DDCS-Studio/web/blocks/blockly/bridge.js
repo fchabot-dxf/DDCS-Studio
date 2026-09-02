@@ -324,8 +324,18 @@ const optionsFor = (def, field) => {
     // that, or the only way to express "inherit" would be to leave a wrong value in place. [label, value] pair so the
     // empty value still reads as a real choice in the dropdown. Scoped to param_field: formfield has its own reader,
     // which has no inherit semantics, so its vocab is left exactly as it was.
-    if (field === 'widget' && def.type === 'param_field') return [['(from type)', ''], 'number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];
-    if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];   // t1105 — param_field shares formfield's widget/type vocab
+    // t2527 (BACKLOG #71/t2513) — LIVE-CONFIRMED: these two committed 'tool-library'/'thread-preset', but
+    // formWidgets.js's own FORM_WIDGETS registry has ALWAYS keyed them 'toolpick'/'threadpick' (matching
+    // deriveBindings.js's own hand-written TOOL_BINDING_SPECS + pocketData.js/tapData.js's own `widget:
+    // 'threadpick'` bindings, all pre-existing and correct) — every OTHER entry here is hyphenated AND matches
+    // its FORM_WIDGETS key exactly (`plane-suggest`/`declared-io`/`corner-grid`/`region-pick`/`coord-list`);
+    // only these two silently diverged. `resolveFormWidget` (formWidgets.js) falls through to a type-based
+    // default on ANY unrecognized widget string with no warning (the general pattern this bug is one instance
+    // of — see that function's own note) — so a formfield authored with either of these NEVER reached the real
+    // picker widget, degrading silently to a plain number input. [label, value] pairs keep the friendly display
+    // text while fixing the committed value to the string FORM_WIDGETS actually reads.
+    if (field === 'widget' && def.type === 'param_field') return [['(from type)', ''], 'number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', ['tool-library', 'toolpick'], ['thread-preset', 'threadpick'], 'declared-io', 'stepper'];
+    if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', ['tool-library', 'toolpick'], ['thread-preset', 'threadpick'], 'declared-io', 'stepper'];   // t1105 — param_field shares formfield's widget/type vocab
     if (field === 'type' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'int', 'enum', 'bool', 'string', 'list'];
     // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
     if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];

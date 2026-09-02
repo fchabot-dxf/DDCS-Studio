@@ -69654,3 +69654,145 @@ handle bindings visible as editable rows before this turn (t2523's own finding).
 end, not silently swallowed: the CANVAS side (the primary signal) is unambiguous and correct; the FORM side
 shows a stray, uninformative row for the same broken state. Not fixed — the dispatch's own scope named the two
 form render paths explicitly off-limits this turn; named here for whoever next touches that code.
+
+## t2527 — THREE FORM-RENDER BUGS, all found by t2525/t2523, all filed, none fixed until now — plus the
+pattern question the dispatch said outranks the three fixes
+
+### THE ASK
+
+Three named, small form-render defects, all clustered in `web/ui/formWidgets.js` — the t2513 widget-key
+mismatch (formfield's tool-library/thread-preset widgets silently degrade to a plain number input), rect_handle's
+own form row showing a generic SHARED_LABELS text instead of its declared anchor label, and t2525's own
+fail-visibly stub producing a stray unlabeled row beside the canvas's own correct red marker. The dispatch's own
+explicit instruction: don't just fix three strings — ask whether the form render path has a GENERAL not-found
+case that renders something plausible instead of complaining, and if it does, that finding outranks the three
+fixes. Scope: these three plus the pattern question, as a report. No renderer unification, no more gestures.
+
+### BUG 1 — THE WIDGET-KEY MISMATCH, traced to its exact root
+
+`formWidgets.js`'s own `FORM_WIDGETS` registry keys the real tool-picker/thread-picker widgets `toolpick`/
+`threadpick` (matching `deriveBindings.js`'s own hand-written `TOOL_BINDING_SPECS` and `pocketData.js`/
+`tapData.js`'s own `widget:'threadpick'` bindings — all pre-existing, all correct, all working). `bridge.js`'s
+own dropdown vocabulary for formfield/param_field's WIDGET field, though, offered `'tool-library'`/
+`'thread-preset'` — every OTHER entry in that same array is hyphenated AND matches its `FORM_WIDGETS` key
+EXACTLY (`plane-suggest`, `declared-io`, `corner-grid`, `region-pick`, `coord-list`); only these two silently
+diverged. `resolveFormWidget`'s own not-found fallback (see the pattern section below) meant a formfield
+authored with either NEVER reached the real widget — confirmed by directly checking `FORM_WIDGETS['tool-
+library']`/`['thread-preset']`: both `undefined`. Fixed at the SOURCE, not the symptom: `bridge.js`'s own two
+dropdown entries now commit `[label, value]` pairs — `['tool-library', 'toolpick']` / `['thread-preset',
+'threadpick']` — keeping the SAME friendly display text a user sees while fixing the committed value to what
+`FORM_WIDGETS` actually reads. (The other direction — renaming `FORM_WIDGETS`' own keys to match the hyphenated
+convention — was rejected: it would have broken the EXISTING, WORKING, hand-written `TOOL_BINDING_SPECS`/
+`tapData.js` bindings that already correctly use `toolpick`/`threadpick`.)
+
+### BUG 2 — THE LABEL COLLISION, re-examined against t2525's own merge fix, and narrowed to what's actually true now
+
+Read `labelFor` (formWidgets.js): `explicit label -> SHARED_LABELS -> raw param name` — never consulted a
+handle's own declared `anchor.label` at all. Traced the ORIGINAL t2523 report against t2525's own merge
+mechanism (userOps.js, last turn) before assuming the bug is unchanged: post-merge, a rect_handle pointing at
+REAL `width`/`height` formfields produces exactly ONE row per param carrying the REAL formfield's own label —
+the exact TWO-ROW collision t2523 photographed is now structurally unreachable for that primary, intended
+usage. The UNDERLYING gap is still real, though, and still reachable: a handle-merged binding whose real
+formfield left `label` blank AND whose own param has no `SHARED_LABELS` entry (the length/radial single-param
+gestures, whose own param names are never among the handful `SHARED_LABELS` knows) fell all the way to the raw,
+uninformative param name — `anchor.label` (the handle's own explicit, declared intent) is strictly better than
+that. Fixed the gap ONE STEP LATER than the naive read of the bug report would suggest: `SHARED_LABELS -> anchor.
+label -> raw`, not `anchor.label -> SHARED_LABELS -> raw`. Deliberately, and tested for it directly: promoting
+`anchor.label` AHEAD of `SHARED_LABELS` would have made rect_handle's own w-row AND h-row both show the SAME
+group-wide "W×H" text instead of their own already-correct, already-DISTINCT "Width"/"Height" — replacing one
+collision with a worse one. `SHARED_LABELS` wins where it already gives the right, role-specific answer;
+`anchor.label` fills in only where nothing else does.
+
+### BUG 3 — THE STRAY ROW, fixed by skipping it entirely, confirmed safe against the ONE precedent that could
+have forbidden it
+
+`renderOpForm` (formWidgets.js) now skips any `anchorUnresolved` binding outright — a genuine `continue`, not a
+render-but-hide. Checked this against `t1303`'s own documented precedent BEFORE assuming it was safe:
+`formHidden` rows are deliberately kept in the DOM (not removed) because the 2D canvas decides whether a param
+is settable by finding its rendered `[data-param]` field, and WRITES through that same element — hiding it
+would have silently killed a real handle. An unresolved handle is the OPPOSITE case: `panelTypes.js`'s own
+early-`continue` (t2525) already renders the 'broken' marker INSTEAD of any gesture branch that would need a
+bound field — nothing anywhere reads `[data-param="ghost"]` for anything, confirmed by the fail-visibly test's
+own `dragResult` assertion (the 'broken' gesture's own `drag()` always returns `null`, never touching a field).
+So skipping the row entirely has no seam to break, unlike `formHidden`'s own case. Verified live:
+`verification/t2525-broken-handle-fails-visibly.png` (this turn) now shows ONLY the red marker — the stray
+"ghost" row from the SAME op's own earlier (t2525) screenshot is gone.
+
+### THE PATTERN QUESTION — asked, answered yes, and fixed, not just reported
+
+`resolveFormWidget`'s own not-found case: `if (b.widget && FORM_WIDGETS[b.widget]) return ...; return
+<type-based default>;` — ANY declared-but-unrecognized widget string, from ANY source (formfield/param_field
+authoring, or a hand-written data-op spec with a typo'd or renamed key), silently substitutes a plausible-
+looking default with NO signal anywhere. Confirmed GENERAL, not isolated to bug 1's own two strings — the exact
+same fallback is what let 'tool-library'/'thread-preset' go unnoticed since t1105. A `console.warn` now fires
+specifically when a widget WAS declared and doesn't resolve — silent for the normal, legitimate "no widget
+declared" case (falls to the type default correctly, unchanged) and silent for a REAL, recognized key (unchanged).
+Deliberately a console warning, not a thrown error or a blocking UI: this runs on every render of every op form,
+and a stale/renamed widget key on a hand-authored data-op spec must stay USABLE (as a plain number) while the
+warning gets someone's attention — the same "informational, never gates" register `gotoTargetReport` already
+established for its own non-fatal authoring-defect class, not `formfieldMatchReport`'s blocking one (this isn't
+a save-time refusal — it's a render-time developer signal). This closes the GENERAL case, not just the two named
+strings — a future stale widget key anywhere in the app will now say so instead of silently pretending to be a
+plain number.
+
+### VERIFIED, each fix shown live, not just a string diffed
+
+`tests/handle-form-render-fixes-2527.spec.js` (5 tests, new): `FORM_WIDGETS` really does key `toolpick`/
+`threadpick` and bridge.js's own vocabulary now commits those exact values (function level); **DRIVE THE APP**
+— a formfield authored with the "tool-library" dropdown option through the real UI, real save, real reload,
+real reopen renders a REAL `<select>` (not a plain `<input type="number">`) — confirmed by tag name AND a
+populated option list, screenshot `verification/t2527-toolpick-widget-live.png` (shows the actual tool-picker
+`<select>` + its settings gear, exactly `toolPickWidget`'s own signature); `labelFor`'s new three-way ordering
+(SHARED_LABELS still wins for w/h, no regression; `anchor.label` fills the gap only where SHARED_LABELS has
+none; an explicit label always wins; a plain anchor-less binding is byte-identical); `renderOpForm` skips the
+unresolved stub entirely (zero rows) while a normal binding is unaffected; `resolveFormWidget`'s new warning
+fires ONLY for a declared-but-unrecognized widget, confirmed via captured console output, with two explicit
+false-positive checks (no widget declared at all; a real, recognized widget key) both confirmed silent.
+
+Regression risk checked directly, not assumed: grepped every built-in data-op file for an object-shaped
+`anchor:{...}` binding (the only shape `labelFor`'s new `b.anchor.label` read could ever see something) — found
+none; the ONE existing string-shaped `anchor:'frac'` usage (`cornerData.js`, an unrelated reposition-pass
+structure that predates and has nothing to do with `deriveBindings.js`'s own binding-level `anchor`) is
+naturally inert against the new check (`'frac'.label` is `undefined`, falls through correctly). Re-ran the four
+directly-adjacent EXISTING tool/thread-picker spec files (17 tests: `tool-picker-1b-768`, `tap-twin-778`,
+`tool-select-768`, `form-row-composite-widget-2335`) — all green, unaffected.
+
+### A REAL REGRESSION CAUGHT AND FIXED BEFORE IT SHIPPED — in the WORKER's own test, not the product
+
+The full `--workers=4` suite's first run this turn came back with `handle-target-fails-visibly-2525.spec.js`'s
+own broken-marker test FAILING — re-ran in isolation (`--workers=1`) and it reproduced every time, ruling out
+contention. Traced directly rather than assumed: the test's own pilot has NO real formfield at all (only the
+broken handle, deliberately minimal) — bug 3's own fix (skip the unresolved stub's row entirely) means that
+specific pilot's form now renders GENUINELY EMPTY (zero rows, zero height), which is CORRECT — but the test's
+own `page.waitForSelector('#wiz_user_form', {state:'visible'})` requires a non-empty bounding box, so it timed
+out waiting for a container that was legitimately, correctly blank. A test bug surfaced by a correct product
+fix, not a product regression — fixed by waiting on the visualization canvas (`#userVizContainer svg`, which is
+what the test actually needs for its own screenshot) instead of the form container. Confirmed fixed, isolated
+AND re-run.
+
+### TIER, and the honest account of what else moved
+
+`formWidgets.js`/`bridge.js` are shared render paths — full `--workers=4` suite run twice this turn (the first
+catching the real-regression-in-my-own-test above, the second confirming the fix). `test:node`: 238/238 green.
+Full suite (run 1, before the fix above): 3054 passed, 2 failed (the genuine one just described, since fixed;
+`open-as-modal-1625`, re-confirmed the same already-documented BACKLOG #56 contention flake — 3/3 clean in
+isolation), 11 flaky. Spot-checked 20 of the 11 flaky names directly against this turn's own diff (`gui-blocks-
+reauthor`, the `passes-field-1613` stepper-widget tests, `wizard-manager-1617`'s own suite, `collapse-on-
+delete-1948`, `federated-registry`, `group-gesture`, `undo-blind-writes-2427`, `formfield-loud-mismatch-1636`,
+`tooltable-gate-1890`) — all green in isolation; two (`tooltable-gate-1890`'s own third case,
+`undo-blind-writes-2427`'s drag-burst test) flaked AGAIN even at `--workers=1`, but on a basic app-boot
+`waitForFunction` timeout (`window.ddcsStudio && window.showApp`) that has no plausible connection to
+`labelFor`/`renderOpForm`/`resolveFormWidget`/bridge.js's own widget vocabulary — read as sustained-load
+environment noise from this turn's own back-to-back full-suite runs, not a product defect, and both passed on
+their own retry.
+
+**Run 2** (after the test-bug fix above): **3057 passed, 2 failed, 8 flaky, 26 skipped (35.4m)**. Both failures
+re-ran clean in isolation (`--workers=1`, together, 11/11 passed in 2.1m): `open-as-modal-1625` (the same
+BACKLOG #56 contention flake, re-confirmed a third time this session) and `preview-mutation-manifest-2463`'s
+own `sf-pos-snapback` case — this session's OTHER already-documented, named pre-existing flake (its own mutation
+manifest test proved both directions clean: RED under the deliberate mutation, GREEN once removed). The 8 flaky
+entries in run 2 are a subset of run 1's own 11 (same names, same territory, already accounted for above) minus
+the one this turn's own test fix resolved, plus none new. No further chase needed — every failure and flake
+across both runs traces to one of: this turn's own since-fixed test bug (run 1 only), or one of this session's
+two independently pre-documented flakes (`open-as-modal-1625`/BACKLOG #56, `sf-pos-snapback`/t2463's own
+manifest), or environment noise unconnected to this turn's diff by any plausible mechanism.

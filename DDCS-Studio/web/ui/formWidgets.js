@@ -895,9 +895,24 @@ export const MULTI_WIDGETS = new Set(['xy-pad', 'rect']);
 
 const DEFAULT_BY_TYPE = WIDGET_BY_TYPE;   // t2385 — extracted to blocks/userOps.js, shared with paramField.js's own block-face fieldsFor
 
-/** Pick the form widget for a binding: its declared `widget`, else a sensible default for its `type`. */
+/** Pick the form widget for a binding: its declared `widget`, else a sensible default for its `type`.
+ *
+ * t2527 (BACKLOG #71) — THE GENERAL PATTERN, asked for and confirmed: this is the ONE place a binding's
+ * declared `widget` string resolves to an actual renderer, for every source (formfield/param_field authoring,
+ * every hand-written data-op spec). Before this turn, an UNRECOGNIZED string (declared, just not a real key —
+ * exactly what 'tool-library'/'thread-preset' were, bridge.js's own dropdown vocabulary having silently
+ * diverged from this file's real `toolpick`/`threadpick` keys) fell through to the type-based default with
+ * NO signal anywhere — a lying control: the field LOOKS like a plain number, and nothing distinguishes "no
+ * widget declared" (normal, silent, correct) from "a widget WAS declared and doesn't exist" (a real defect).
+ * `console.warn` here, not a thrown error or a UI toast — this runs on every render of every op form, and a
+ * hand-authored data-op spec with a stale/renamed widget key must still be USABLE (as a plain number) while
+ * the warning gets someone's attention in the console, the same "informational, never gates" register
+ * `gotoTargetReport` already established for its own non-fatal class of authoring defect. */
 export function resolveFormWidget(b) {
-    if (b && b.widget && FORM_WIDGETS[b.widget]) return FORM_WIDGETS[b.widget];
+    if (b && b.widget) {
+        if (FORM_WIDGETS[b.widget]) return FORM_WIDGETS[b.widget];
+        console.warn(`resolveFormWidget: unrecognized widget "${b.widget}" for param "${b && b.param}" — falling back to the type default. Check FORM_WIDGETS' own key spelling.`);
+    }
     return FORM_WIDGETS[DEFAULT_BY_TYPE[(b && b.type) || 'number'] || 'number'];
 }
 
@@ -956,8 +971,20 @@ export const SHARED_LABELS = {
     w: 'Width', h: 'Height',
     toolDia: 'Tool Ø', stepoverPct: 'Stepover %',
 };
-/** The label a binding renders under: explicit `label` → SHARED_LABELS → the raw param name. */
-export function labelFor(b) { return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.param) || ''; }
+/** The label a binding renders under: explicit `label` → SHARED_LABELS → a handle's own declared `anchor.label`
+ *  → the raw param name. t2527 (BACKLOG #71) — a handle-merged binding (rect_handle etc, userOps.js's
+ *  `attach()`) keeps the REAL formfield's own `.label` when it has one, correctly. When that formfield left
+ *  `label` blank AND its own param happens to be one of the handful SHARED_LABELS names (`w`/`h`/...),
+ *  SHARED_LABELS still wins — deliberately: for rect_handle specifically it already gives the w/h ROWS their
+ *  own DISTINCT, correct labels ("Width"/"Height"), which the handle's own single, group-wide `anchor.label`
+ *  ("W×H") cannot — `anchor.label` describes the COMBINED gesture, not either row alone, so promoting it ahead
+ *  of SHARED_LABELS would have made the width AND height rows show the SAME ambiguous text, a worse collision
+ *  than the one being fixed. `anchor.label` now fills the gap ONE STEP LATER instead: when a handle-merged
+ *  binding's own param has NEITHER an explicit label NOR a SHARED_LABELS entry (the length/radial single-
+ *  param gestures, whose own param name is never one of the handful SHARED_LABELS knows), it renders the
+ *  handle's own declared intent instead of the bare, un-friendly param name. Anchor-less bindings (every
+ *  built-in, every plain formfield) are byte-identical either way. */
+export function labelFor(b) { return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.anchor && b.anchor.label) || (b && b.param) || ''; }
 
 // t798 P5 — DECLARED FIELD HELP. A binding's `help` is the field tooltip; params that recur across twins with the SAME
 // meaning declare it ONCE here (a binding's explicit `help` always wins). The help title now goes on the WHOLE ROW
@@ -1174,6 +1201,16 @@ export function renderOpForm(host, bindings) {
         // point is that you drag the marker instead of typing the number lost the marker, and typing was gone too.
         // Rendered-but-hidden keeps every seam intact — the reader, the writer, the handle — and shows the user nothing,
         // which is all the flag ever claimed to do.
+        //
+        // t2527 (BACKLOG #71) — an UNRESOLVED handle target (userOps.js's `attach()`: the formfield it named
+        // doesn't exist) is the ONE case that's the OPPOSITE of formHidden's own reasoning above: nothing reads
+        // `[data-param]` for it (the canvas renders panelTypes.js's own 'broken' marker instead, which carries
+        // no field/fx/fy to drag-write — confirmed by that branch's own early-`continue`, reached BEFORE any
+        // gesture that would need a bound field), so there is no handle/canvas seam this row is secretly
+        // load-bearing for. A genuine `continue` (skip entirely, not render-but-hide) is safe here specifically
+        // because it isn't anywhere else — the canvas's own red marker is already the correct, sole signal;
+        // this stray, unlabeled row was pure noise beside it.
+        if (b.anchorUnresolved) continue;
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }

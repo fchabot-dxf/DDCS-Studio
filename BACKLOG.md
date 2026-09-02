@@ -6965,6 +6965,16 @@ interactive handles.
 > stub also shows a stray, unlabeled form row — the canvas-side signal (the marker) is the correct, primary one.
 >
 > Full account: WORK-LOG t2525.
+>
+> **✅ t2527 — the stray row FIXED**, along with the label-collision loose end t2523 itself named further up
+> this entry: `renderOpForm` now skips an `anchorUnresolved` binding outright (safe specifically because nothing
+> reads its `[data-param]` — the canvas already renders the 'broken' marker instead of any field-writing
+> gesture), and `labelFor` now falls back to a handle's own declared `anchor.label` when neither an explicit
+> label nor `SHARED_LABELS` has one — narrower than the original report's own literal reading (t2525's own
+> param-merge already makes the EXACT two-row "Width" collision unreachable for a properly-matched handle;
+> `SHARED_LABELS` still wins over `anchor.label` where it already gives the correct, role-distinct answer, so
+> rect_handle's own w/h rows keep "Width"/"Height" rather than both showing the group-wide "W×H"). Full account:
+> WORK-LOG t2527.
 
 ---
 
@@ -7090,6 +7100,18 @@ these are the rows that actually stop a person authoring a built-in equivalent f
    offered option, not those two twins directly. Confirmed by reading `resolveFormWidget()` and
    `bindingsFromStack`'s own pass-through of `p.widget` unmodified — a real, live, verified defect, not merely
    absent.
+   >
+   > **✅ t2527 — FIXED, at the source.** `bridge.js`'s own dropdown vocabulary now commits `[label, value]`
+   > pairs — `['tool-library', 'toolpick']` / `['thread-preset', 'threadpick']` — keeping the same friendly
+   > display text while fixing the committed VALUE to the string `FORM_WIDGETS` actually reads (the OTHER
+   > direction — renaming `FORM_WIDGETS`' own keys — was rejected: it would have broken `pocketData.js`/
+   > `tapData.js`'s own EXISTING, working `toolpick`/`threadpick` bindings, the two real users this entry's own
+   > count named). Verified live: a formfield authored with the "tool-library" option through the real UI, real
+   > save, real reload, real reopen now renders the REAL `<select>` tool picker (confirmed by tag name, not
+   > just a passing string check) — `verification/t2527-toolpick-widget-live.png`. The GENERAL case this entry's
+   > own root cause names — `resolveFormWidget()`'s silent not-found fallback — is ALSO fixed, not just these
+   > two strings: it now `console.warn`s whenever a widget is declared and doesn't resolve, for any widget
+   > string from any source. Full account: WORK-LOG t2527.
 
 ### BAND 3 — DUPLICATES THAT HAVEN'T BITTEN YET
 
