@@ -6892,6 +6892,25 @@ interactive handles.
 > layoutwidget reverse function) has no `anchor.kind` check at all, so it would also match `point_handle`'s own
 > bindings if it were ever run on a mixed list — not a live bug (neither reverse function is wired into a real
 > reopen-as-blocks flow yet), but real, and left as a named finding rather than silently patched in passing.
+>
+> **✅ t2521 — gestures 3 and 4 (RECT, RADIAL), same turn. Neither found a mismatch either — the dispatch's own
+> "stop at the first one that doesn't fit" never fired.** `rect_handle` (`wizards/ops/rectHandle.js`) is the
+> one the dispatch itself named as the real risk — TWO bound params from one handle, needing the t2495
+> `valueField` routing (a new dropdown: which axis the handle's own displayed number reflects when both are
+> active) — and it *was* real: a genuinely NEW `anchor.kind:'rect'` branch was needed (unlike point, `rect` had
+> no prior declared-anchor path at all). Proven live including the `valueField` dropdown itself, dragging BOTH
+> `boxw`/`boxh` together with the label correctly showing only the routed axis
+> (`verification/t2521-rect-handle-live-drag.png`). `radial_handle` (`wizards/ops/radialHandle.js`) is the
+> RADIUS-ONLY variant (Ø/pitch, no angle-drag) and needed one real unit translation no other gesture did — the
+> gesture wants a world radius + radians, the declared field holds a diameter-scaled value in degrees — divide
+> by `rScale`, convert deg→rad; proven both in isolated gesture-math and live
+> (`verification/t2521-radial-handle-live-drag.png`).
+>
+> **Four of eleven gestures are now block-authorable** (length/point/rect/radial), each proven at the t2509
+> bar, each landed as its own commit. The remaining seven (scaleX/shear/projLength/diagAim/crossAim/
+> probeVector/translate) are UNBUILT — out of this turn's scope, and since none of the four hit a genuine
+> template mismatch this is a reasonable bet to be the same shape of work, but that is stated as an inference
+> from this turn's own pattern, not a claim measured against the other seven specifically.
 
 ---
 

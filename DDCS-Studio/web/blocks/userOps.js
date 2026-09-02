@@ -713,6 +713,29 @@ export function handleBindingsFromStack(children) {
                 const anchor = { kind: 'point', ax, ay, label: p.label || 'pos' };
                 out.push({ param: String(p.fx || 'x'), type: 'number', default: Number.isFinite(xv) ? xv : 0, group: gid, role: 'x', anchor });
                 out.push({ param: String(p.fy || 'y'), type: 'number', default: Number.isFinite(yv) ? yv : 0, group: gid, role: 'y', anchor });
+            } else if (b.type === 'rect_handle') {
+                const gid = 'rh' + (++n);
+                const wv = Number(p.value), hv = Number(p.valueH);
+                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                const sx = p.sx === '' || p.sx == null ? 1 : Number(p.sx);
+                const sy = p.sy === '' || p.sy == null ? 1 : Number(p.sy);
+                const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
+                const anchor = {
+                    kind: 'rect', ax, ay, sx, sy,
+                    minw: numOrNull(p.minw), maxw: numOrNull(p.maxw), minh: numOrNull(p.minh), maxh: numOrNull(p.maxh),
+                    valueField: p.valueField === 'fieldH' ? 'fieldH' : 'field', label: p.label || 'W×H',
+                };
+                out.push({ param: String(p.field || 'w'), type: 'number', default: Number.isFinite(wv) ? wv : 0, group: gid, role: 'w', anchor });
+                out.push({ param: String(p.fieldH || 'h'), type: 'number', default: Number.isFinite(hv) ? hv : 0, group: gid, role: 'h', anchor });
+            } else if (b.type === 'radial_handle') {
+                const gid = 'rdh' + (++n);
+                const dv = Number(p.value);
+                const cx = Number(p.cx) || 0, cy = Number(p.cy) || 0;
+                const a = Number(p.a) || 0;
+                const rScale = p.rScale === '' || p.rScale == null ? 2 : Number(p.rScale);
+                const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
+                const anchor = { kind: 'radial', cx, cy, a, rScale, minR: numOrNull(p.minR), maxR: numOrNull(p.maxR), label: p.label || 'Ø' };
+                out.push({ param: String(p.field || 'dia'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'r', anchor });
             }
         }
     }
@@ -743,7 +766,32 @@ export function handleBindingsToBlocks(bindings) {
             ax: String(x.anchor.ax || 0), ay: String(x.anchor.ay || 0), label: x.anchor.label || 'pos',
         } });
     }
-    const kids = [...lenKids, ...ptKids];
+    // rect_handle: pair each group's own w/h bindings that carry a {kind:'rect'} anchor.
+    const byGroupR = {};
+    for (const b of list) if (b && b.group && b.anchor && b.anchor.kind === 'rect' && (b.role === 'w' || b.role === 'h')) (byGroupR[b.group] = byGroupR[b.group] || {})[b.role] = b;
+    const rectKids = [];
+    for (const g in byGroupR) {
+        const w = byGroupR[g].w, h = byGroupR[g].h;
+        if (!w || !h) continue;
+        const a = w.anchor;
+        rectKids.push({ type: 'rect_handle', params: {
+            field: w.param, fieldH: h.param, value: w.default != null ? String(w.default) : '', valueH: h.default != null ? String(h.default) : '',
+            ax: String(a.ax || 0), ay: String(a.ay || 0), sx: String(a.sx != null ? a.sx : 1), sy: String(a.sy != null ? a.sy : 1),
+            minw: a.minw != null ? String(a.minw) : '', maxw: a.maxw != null ? String(a.maxw) : '',
+            minh: a.minh != null ? String(a.minh) : '', maxh: a.maxh != null ? String(a.maxh) : '',
+            valueField: a.valueField === 'fieldH' ? 'fieldH' : 'field', label: a.label || 'W×H',
+        } });
+    }
+    // radial_handle: one binding per handle (role 'r'), like length_handle.
+    const radials = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'radial' && b.role === 'r');
+    const radKids = radials.map((b) => ({ type: 'radial_handle', params: {
+        field: b.param, value: b.default != null ? String(b.default) : '',
+        cx: String(b.anchor.cx || 0), cy: String(b.anchor.cy || 0), a: String(b.anchor.a || 0),
+        rScale: String(b.anchor.rScale != null ? b.anchor.rScale : 2),
+        minR: b.anchor.minR != null ? String(b.anchor.minR) : '', maxR: b.anchor.maxR != null ? String(b.anchor.maxR) : '',
+        label: b.anchor.label || 'Ø',
+    } }));
+    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids];
     if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }

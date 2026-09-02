@@ -461,6 +461,53 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             }
             continue;
         }
+        // t2521 (BACKLOG #71) — `rect_handle` declares kind 'rect': a FIXED literal anchor (ax/ay, matching
+        // length's own shape) + TWO 2D-extent params (w/h roles, unlike length's one). NEW branch, not a reuse
+        // of the point one above — `rect` had no existing declared-anchor authoring path at all; the byRole.x/
+        // y/w/h fallback further down is role-tagged bindings sharing a group, a genuinely different shape
+        // (four params, not two, and no `valueField` concept since it never fuses two axes onto one handle).
+        // `sx`/`sy` gate which axis is actually writable (0 = that axis's own param is absent/read-only — the
+        // SAME "zero divisor skips that axis" convention canvasWidgets.js's own rect gesture already defines),
+        // so a group missing one param degrades to a single-axis handle rather than a dead one.
+        if (anchor && anchor.kind === 'rect') {
+            const wB = groups[gid].find((b) => b.role === 'w');
+            const hB = groups[gid].find((b) => b.role === 'h');
+            const ex = wB ? num(params[wB.param]) : 0;
+            const ey = hB ? num(params[hB.param]) : 0;
+            items.push({ kind: 'hole', x: anchor.ax, y: anchor.ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed, not draggable
+            const wOk = wB && _writable(wB.param), hOk = hB && _writable(hB.param);
+            if (wOk || hOk) {
+                const value = anchor.valueField === 'fieldH' ? ey : ex;   // t2495's own routing — which axis the displayed number reflects
+                decls.push({
+                    type: 'rect', id: gid + '_size', ax: anchor.ax, ay: anchor.ay, ex, ey,
+                    sx: wOk ? anchor.sx : 0, sy: hOk ? anchor.sy : 0,
+                    field: wOk ? wB.param : undefined, fieldH: hOk ? hB.param : undefined,
+                    minw: anchor.minw, maxw: anchor.maxw, minh: anchor.minh, maxh: anchor.maxh,
+                    valueField: anchor.valueField, value, label: anchor.label || 'W×H',
+                });
+            }
+            continue;
+        }
+        // t2521 (BACKLOG #71) — `radial_handle` declares kind 'radial': a FIXED centre (cx/cy) + a FIXED
+        // bearing (a, degrees) + one Ø/pitch-scaled param — the RADIUS-ONLY variant of this gesture (no
+        // `fieldA`, matching the drill-ring/hole-Ø shape canvasWidgets.js's own header names; a fused Ø+angle
+        // or angle-only handle is a different declared shape, out of this pilot). The one real translation:
+        // canvasWidgets.js's own `place()` wants a WORLD RADIUS + RADIANS, while the declared field holds a
+        // DIAMETER-scaled value (via `rScale`) at a bearing in DEGREES — divide by rScale, convert deg→rad.
+        if (anchor && anchor.kind === 'radial') {
+            const rB = groups[gid][0];
+            items.push({ kind: 'hole', x: anchor.cx, y: anchor.cy, r: Math.max(1, stock.w * 0.012) });   // MUTE centre dot — fixed, not draggable
+            if (rB && _writable(rB.param)) {
+                const val = num(params[rB.param]);
+                const rScale = anchor.rScale || 1;
+                decls.push({
+                    type: 'radial', id: gid + '_r', field: rB.param, cx: anchor.cx, cy: anchor.cy,
+                    a: (anchor.a || 0) * Math.PI / 180, r: val / rScale, rScale,
+                    minR: anchor.minR, maxR: anchor.maxR, value: val, label: anchor.label || 'Ø',
+                });
+            }
+            continue;
+        }
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;

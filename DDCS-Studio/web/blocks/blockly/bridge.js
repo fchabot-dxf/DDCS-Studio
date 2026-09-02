@@ -331,6 +331,10 @@ const optionsFor = (def, field) => {
     // SELECTS.axis (X/Y/Z/A/B/C) to the two the `length` canvas gesture actually supports (canvasWidgets.js's
     // own `d.axis==='x'` check is the ceiling — a 1D drag along one FeatureCanvas plane axis, never Z/A/B/C).
     if (field === 'axis' && def.type === 'length_handle') return ['X', 'Y'];
+    // t2521 (BACKLOG #71) — rect_handle's own valueField: WHICH declared param the handle's displayed number
+    // reflects when both field/fieldH are active (canvasWidgets.js's own t2495 routing) — exactly two legal
+    // values, the block's own two field NAMES, never a free-typed string.
+    if (field === 'valueField' && def.type === 'rect_handle') return [['field (W)', 'field'], ['fieldH (H)', 'fieldH']];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
     return SELECTS[field] || null;
 };

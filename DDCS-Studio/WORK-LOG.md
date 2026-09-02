@@ -69256,3 +69256,80 @@ the SAME 5 untouched call sites three times with no new information between them
 targeted spec plus the structural argument above (defaults reproduce the exact prior literal) already cover
 the change's blast radius. If RECT or RADIAL's own risk profile turns out to need an earlier full run, that
 will be stated when it happens, not assumed away in advance.
+
+---
+
+## t2521 continued -- GESTURES 3 AND 4: RECT and RADIAL. Neither found a genuine mismatch either.
+
+Dispatch's own explicit hope was that a mismatch would surface -- "a genuine mismatch found on the second
+gesture is worth more than three forced blocks." It didn't happen. All three (point, rect, radial) fit the
+`length_handle` template cleanly; the two real differences (point reusing an existing branch, rect/radial each
+needing a genuinely new one) were structural, not template failures.
+
+### RECT -- the one the dispatch flagged as the real risk, and the risk was real but contained
+
+`wizards/ops/rectHandle.js` (`rect_handle`): same self-contained shape, TWO bound params (`field`/`fieldH`) not
+one, fixed anchor, plus `sx`/`sy` (per-axis divisor, 1 = literal), `minw`/`maxw`/`minh`/`maxh` (t2489's own
+clamp pairs, per axis), and `valueField` (a new dropdown, `'field'`/`'fieldH'`, wired into `bridge.js` the same
+way `length_handle`'s `axis` was) -- the exact t2495 routing the dispatch named. This one genuinely needed a
+NEW `anchor.kind === 'rect'` render branch (panelTypes.js) -- `rect` had no prior declared-anchor path at all,
+unlike point. The branch zeroes `sx`/`sy` for whichever axis isn't writable (the SAME "zero divisor skips that
+axis" convention `canvasWidgets.js`'s own rect gesture already defines), so a partially-writable group degrades
+to a single-axis handle rather than a dead one -- not exercised live this turn (both axes were writable in the
+pilot), but structurally the same mechanism the gesture registry already relies on elsewhere, not new
+machinery. `userOps.js`'s `handleBindingsFromStack`/`ToBlocks` extended with a `rect_handle` branch producing
+TWO role-tagged bindings (`w`/`h`) sharing one group and the SAME anchor object.
+
+Proven live, full bar: real drags for the three blocks, real field edits INCLUDING the new `valueField`
+dropdown, real save, a real reload, a real mouse drag on the rendered circular "W×H" handle that moved BOTH
+`boxw` (40→47.2) and `boxh` (30→24.5) together, with the displayed label showing only the W value per
+`valueField:'field'` -- exactly the routing the dispatch was worried about, confirmed correct on the first live
+run. Screenshot `verification/t2521-rect-handle-live-drag.png`. `tests/rect-handle-block.spec.js` (new, 3
+tests, all green first run -- no new automation traps).
+
+### RADIAL -- a Ø/pitch (radius-only) handle; needed one real unit translation, otherwise clean
+
+`wizards/ops/radialHandle.js` (`radial_handle`): one bound param again (like length), fixed centre (`cx`/`cy`)
++ fixed bearing (`a`, degrees) + `rScale` (2 = diameter from a radius, matching the gesture's own convention)
++ `minR`/`maxR`. Deliberately scoped to the RADIUS-ONLY variant of this gesture (no `fieldA`/`lockA` -- a fused
+Ø+angle or angle-only handle is a genuinely separate authoring shape, out of this turn). The one real
+translation this gesture needed that none of the other three did: `canvasWidgets.js`'s own `place()` wants a
+WORLD RADIUS and a RADIANS bearing, while the declared field holds a DIAMETER-scaled value at a bearing in
+DEGREES (this codebase's own convention elsewhere) -- the new `anchor.kind === 'radial'` branch divides by
+`rScale` and converts degrees to radians before building the decl; the gesture's own `drag()` does the inverse
+when it writes the field back. Verified this specific math both in isolation (a direct `CANVAS_GESTURES.radial`
+test: place at radius 10/bearing 0 → (10,0); drag to world (15,0) → field = 15×2 = 30; a below-minR drag
+clamps) and live (the def-level test: value 20 / rScale 2 → handle at radius 10 along +X, displayed value the
+raw 20 not the radius).
+
+Proven live: real drags, real field edit, real save, real reload, a real mouse drag on the rendered "Ø" handle
+moving `holedia` from 20 to 34.4. Screenshot `verification/t2521-radial-handle-live-drag.png`.
+`tests/radial-handle-block.spec.js` (new, 4 tests -- the extra one is the isolated gesture-math check -- all
+green first run).
+
+### THE HONEST HEADLINE FOR THIS WHOLE TURN
+
+Four of eleven `canvasWidgets.js` gestures are now block-authorable (length, point, rect, radial), each proven
+through the real UI at the t2509 bar, none of the three built this turn requiring the STOP-and-report the
+dispatch was watching for. The remaining seven (scaleX, shear, projLength, diagAim, crossAim, probeVector,
+translate) were NOT attempted -- explicitly out of this turn's scope. Given four fit the SAME template cleanly
+(one self-contained block, one anchor kind, a small render branch, a round-trip pair), the remaining seven are
+very likely the same shape of work, not a reason to expect a wall -- but that is an inference from this turn's
+own pattern, not a measurement of the other seven specifically, and is reported as such rather than promised.
+
+### TIER, closing the turn
+
+Full suite (`--workers=4`) run ONCE, covering all three of this turn's own commits (point/rect/radial) plus
+t2517's own length_handle from the prior turn -- result recorded in the pass-back note once the run completes.
+`test:node` 238/238 green throughout (re-run after each gesture, unchanged every time).
+
+### VERIFY
+
+Every one of the 4 permanent spec files (length/point/rect/radial) green, first run, no retries needed for any
+of the three built this turn. Every def-level test confirms the SAME two structural guarantees length_handle's
+own turn established: the binding carries the declared anchor, and dragging never changes the emit (every
+handle is socket-less, sim/form-only, by construction). Round-trip proven at the function level (block→binding
+→block) for all three, matching the exact shape `pointpick-block.spec.js` established as this project's own
+precedent. `git status` clean of anything outside this turn's own intended files. `git diff` checked on
+`BACKLOG.md` before staging each gesture's own commit (three separate checks, one per commit, per the
+dispatch's own repeated instruction).
