@@ -1494,6 +1494,44 @@ envelope, tool table and probe params. Back up at the pendant first.
 four dumps *of firmwares up to 2026-04-10*. A release that reorganises a memory map is exactly the event that
 could break that, and `eng` ships inside the update — so the check costs one pass over the new `eng`.
 
+### 14b. ⚠ THREE FIRMWARE DATES on record for related Modbus capabilities — recorded, deliberately NOT resolved to one
+
+`M350-LiveG`'s own README states: *"Controller Firmware Version: Must be `2026-08-03-00` or higher."* That is
+a THIRD date, on top of the two §14 already carries — worth laying out on one timeline rather than treating
+as a single fact three sources disagree about, because read carefully they may not disagree at all:
+
+```
+2025-12-11-00   P279 SLAVE mode added ([[m350-v1-v2-and-modbus-slave]] / community FLASH-DAY.md)
+2026-04-10-00   THIS MACHINE'S CURRENT firmware — later than 2025-12-11, so it already has Slave mode
+                (§14's own "the running firmware already has slave mode" finding, unchanged by this note)
+2026-08-03-00   M350-LiveG's own STATED MINIMUM — §14's "newest release" notes say THIS is the release that
+                added register 3000 (G-code injection) + "optimized Modbus memory map"
+```
+
+**Likely reconciliation, not yet confirmed on-machine**: these read as three DIFFERENT milestones on one
+timeline, not three conflicting claims about the same capability. P279 Slave (live DRO + virtual keypress,
+registers 7080/7260/10002/6908) is the OLDER, 2025-12-11 capability — already present on this machine's
+2026-04-10 firmware, per §14. Register 3000 (real-time G-code injection) is the NEWER capability, and
+§14's own release notes for `2026-08-03-00` name it explicitly — which is consistent with M350-LiveG (a tool
+built specifically to use register 3000) requiring that later firmware as its floor. **So the "bigger"
+register set M350-LiveG uses may simply not exist yet on this machine's own currently-running 2026-04-10
+firmware** — not a contradiction to resolve, but an UNTESTED boundary: whether register 3000 already answers
+on `2026-04-10-00` (in which case M350-LiveG's own stated minimum is conservative) or genuinely does not (in
+which case it is exact) is unconfirmed either way and reads directly off the machine — the memory map itself
+may differ ("optimized memory map" is the release note's own phrase), so a register that exists on one
+firmware existing at the SAME address on another is not something to assume from a README alone.
+
+⚠ **This is recorded, not resolved.** At least two of the three dates could be doing double duty (documenting
+vs. introducing a capability) or all three could be exactly what they say — settling it needs the owner's own
+controller (confirm whether 3000 responds on the currently-running `2026-04-10-00` before or instead of
+flashing `2026-08-03-00`), not a judgment call made here.
+
+**Confirmed as a match, worth recording plainly**: M350-LiveG's own stated parameter block —
+`P267`=B115200, `P279`=Slave, `P296`=None, `P297`=1 — matches this machine's own captured `setting` values
+for the SAME four params exactly (§ this file's own SYSDISK dump readings, `#267`/`#279`/`#296`/`#297`).
+Independent corroboration of the transport-level config, regardless of which firmware-date question above
+turns out to matter.
+
 ### 15. ⭐⭐⭐ THE Z OFFSET IS THREE ADDITIVE TERMS — measured on the machine `[CONFIRMED 2026-08-25]`
 *(Bench session with the owner at the pendant. Macros V18a-V18e, all motion-free; the only movement was a
 0.01 mm jog. No WCS was written. §9's "unidentified extra row" and §12's hedge are both settled here.)*
