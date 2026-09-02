@@ -68842,3 +68842,66 @@ contention-sensitive-not-deterministic, already known to appear at `--workers=4`
 checked, not assumed: it references nothing this turn touched (`formWidgets.js`'s own `sim`/`panel`/`preview3d`
 branches, `drillData.js`) and passes 3/3 cleanly in isolation. Neither failure is a regression from this turn's
 own work.
+
+---
+
+## t2513 -- THE AUTHORABILITY SWEEP (BACKLOG #72). Measurement only -- no product code touched.
+
+Owner request via the advisor, full spec `DDCS-Studio/scratchpad/t2513-authorability-sweep.md`: sweep every
+built-in for declared details that have no block equivalent, and for concepts said two different ways. Fix
+nothing -- one BACKLOG entry only.
+
+**Method.** Part 1 (authorability) was run by a background research agent against the 32 registered twin files
+plus `formWidgets.js`/`panelTypes.js`/`userOpView.js`; every count it returned was anchored (field-name+colon or
+`def.<name> =`, not bare-word) and spot-checked before use -- three of the agent's own initial bare-word counts
+(`formHidden` 10->9, `postInstantiate` 26->25, `latheTool` 1->0) were corrected downward after re-anchoring,
+each traced to `middleData.js`'s own comments explaining an absence, or a filename string. Part 2 (duplicates)
+was direct investigation: wrote a scratch spec (`tests/_sweep-2513.spec.js`, deleted before this commit) that
+called the live app's own `listUserOps()`/`getUserDef()` plus a copy of `userOpView.js`'s own `hasTreeLayout()`
+against all 32 twins, to get an authoritative isTree true/false list rather than reasoning about it.
+
+**The headline correction, stated plainly.** t2511's own pass-back claimed "roughly three more ops
+(`partingData.js`/`centerDrillData.js`/`edgeData.js`) are reachable at the same low cost" the preview3d/panel
+split just paid for drill -- see the entry immediately above, line 68824. That claim is WRONG. Live measurement
+this turn: those three files' own `split_horizontal`/`split_vertical` mentions are comment text (a
+childrenOf-robustness note), not a declared `uiChildren` node -- `hasTreeLayout()` on all three returns `false`.
+Exactly 1 of 32 twins is `isTree:true`: `user_drill_data`. This is exactly the grep-gives-a-line-not-a-scope
+trap this project already has a standing memory for, caught this time by live measurement rather than
+re-reading the same grep. Correcting it in the record here rather than silently fixing it in the new entry.
+
+**What that measurement then explained.** `formBindings()` runs unconditionally before the isTree branch, and
+both render paths call the same `renderOpForm(host, binds)` underneath -- so every FIELD-level property
+(`widget`, `units`, `tokenEligible`, `formHidden`, `help`, `default`) renders identically either way. Only
+LAYOUT/GROUPING `uiChildren` node types (`section` node, `group_box`, `tab_group`, `grid_container`,
+`usage_text`, `code_preview`) differ -- and for those, the isTree split is a live, silent trap: `cornerData.js`'s
+own five named `sec(...)` sections and `pocketData.js`'s own `grid_container`/`usage_text`/`code_preview` are
+ALL declared, parsed, and dead for the live form, because neither op is isTree. `atcCheckData.js`'s own t2263
+history ("live-content wiring is the reported, not solved, gap") is now explained structurally: it was never
+going to wire live, atc_check is isTree:false. Full writeup, counts, and the two-band duplicate ranking are in
+BACKLOG #72 -- not restated here.
+
+**One new bug found, not seeded.** `formfield`'s own widget picker offers "Tool Library"/"Thread Preset",
+writing `widget:'tool-library'`/`'thread-preset'` -- but `formWidgets.js`'s `FORM_WIDGETS` render map keys the
+real pickers as `toolpick`/`threadpick` (what `pocketData.js`/`tapData.js`'s own hand-JS bindings actually use).
+`resolveFormWidget()` finds no match for the block-authored string and silently falls back to a plain number
+field -- no error, no warning. Confirmed by reading `resolveFormWidget()` and the pass-through in
+`bindingsFromStack`, not inferred.
+
+**Seeds resolved, not just measured.** `panel`: confirmed a pure name collision, zero functional coupling
+(`formWidgets.js`'s own `panel`-node branch never reads `node.params.panel`) -- cheap rename, not a duplicate
+mechanism. `sim`: seed REFUTED -- `def.sim` is derived FROM the block's own raw params via
+`simIntentFromStack`, a normal declare-then-derive pipeline, not two independent sources of truth. `field_ref`/
+`formfield`/`param_field`: genuinely share one placement branch, and the code's own comment names the hazard
+explicitly, but zero twins use the dangerous case today -- filed in the "hasn't bitten yet" band, not with
+`section:` (which has, twice: t2375/t2377, plus this session's own t2511 mis-migration as a third instance of
+the same root).
+
+### VERIFY
+
+Every seed in the dispatch confirmed or refuted individually, in BACKLOG #72. Counts are measured (anchored
+greps + one live-app evaluate), not impressions. `test:node` run after this entry, green, nothing expected to
+change since no product code was touched this turn. `tests/_sweep-2513.spec.js` deleted before commit (scratch
+only, its answer is now recorded as data in BACKLOG #72, not left behind as a stray spec). `git status` clean of
+product files -- only `BACKLOG.md` and this `WORK-LOG.md` entry staged. `git diff BACKLOG.md` checked
+immediately before staging, per the dispatch's own explicit repeat-precaution after today's earlier t2505
+collision with the advisor's own concurrent commit.

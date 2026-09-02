@@ -6861,3 +6861,183 @@ that filed it was explicit: diagnose only, do not build anything.
 `emit`/save-time hook writes a `previewGeometry`-shaped function onto a `def` still finds none, and a fresh
 from-scratch wizard built through the real UI still shows an empty Visualization pane where the built-in shows
 interactive handles.
+
+---
+
+### 72. THE AUTHORABILITY SWEEP — what built-ins do that blocks can't say, and what gets said twice
+
+*(owner request, 2026-09-01, direct quote: "sweep the built in wizard for these small buildable details and see
+if we made them out of blocks? then see if there are more duplicates… just put this in the backlog." Full
+dispatch: `DDCS-Studio/scratchpad/t2513-authorability-sweep.md`. MEASUREMENT ONLY — fix nothing, per that
+dispatch's own explicit instruction; not one line of product code changed this turn. Counts below are grepped
+directly against the 32 registered data-twin files in `web/blocks/dataOps/*.js`, anchored (field-name + colon,
+or `def.<name> =`) not bare-word, and spot-checked — three bare-word false positives were caught and corrected
+in the course of this sweep, named where relevant below.)*
+
+**THE WORKED EXAMPLE that motivated this sweep**: `section:` on a binding groups fields by CONTIGUOUS RUN in the
+array — looks like an order-independent tag, behaves like an order-dependent boundary. That gap already cost
+two corrective turns (t2375 contour/slot, t2377 surfacing — surfacing's own header records that before t2377
+only two of its fields carried `section:` at all, both named `'COORDINATES'`, a section the form does not have,
+rendering silently). This entry is the sweep for more of that CLASS: declared details either unsayable in
+blocks, or sayable two different ways.
+
+---
+
+## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it
+
+**There are TWO, ENTIRELY SEPARATE form render paths, and this turn (t2511) is itself a live incident of the
+trap it creates.** `userOpView.js`'s own `hasTreeLayout()` routes an op to `formWidgets.js`'s `renderUiTree`
+ONLY if a `split_horizontal`/`split_vertical` node exists anywhere in its `uiChildren` — checked directly,
+`hasTreeLayout`'s own code tests exactly those two type strings, nothing else. **Measured directly against the
+live app, not inferred: exactly 1 of the 32 registered twins is `isTree === true` — `user_drill_data`. All
+other 31 are `false`**, including `centerDrillData.js`/`edgeData.js`/`partingData.js`, which merely MENTION
+`split_horizontal` inside a COMMENT (a childrenOf-robustness note, not an actual declared node) — a grep-gives-
+a-line false positive t2511's own pass-back note repeated as fact before this turn's own live measurement
+caught it. **Every other op renders through a completely different, hand-written construction in
+`userOpView.js`'s own `render()` (the `else` branch, `renderOpForm(host, binds)` on the flat `binds` array) that
+never looks at `uiChildren`'s own layout/grouping nodes at all** — confirmed by reading the branch directly: the
+ONLY `uiChildren` node the flat path special-cases is `path_anchor` (`findTopLevelPathAnchor`/
+`mountFlatPathAnchor`, a bespoke lookup independent of the tree renderer).
+
+⭐ **The precise answer to "does any declared detail behave differently between the two paths": YES, but only
+for LAYOUT/GROUPING nodes — never for field-level properties.** `binds = formBindings(_def)` runs
+UNCONDITIONALLY before the `isTree` branch, and BOTH paths ultimately render each field's own row through the
+SAME `renderOpForm(host, binds)` call (the tree path calls it into a detached temp host first, then re-places
+the resulting rows by walking `uiChildren`) — so `widget`/`widgetConfig`/`units`/`help`/`formHidden`/
+`tokenEligible`/etc. are IDENTICAL either way. What differs is PLACEMENT: `section` (the uiChildren NODE type,
+titled/collapsible), `group_box`, `tab_group`, `grid_container`, and (per the same mechanism) `usage_text`/
+`code_preview` are **completely inert outside tree mode** — declared, parsed into the template, visible if the
+op is opened AS BLOCKS in the Blocks-tab canvas, but never reaching the live FORM a machinist actually uses.
+Measured, not guessed: `section` (node) is declared by 3 twins — `cornerData.js`, `drillData.js`,
+`pocketData.js` — of which only `drillData.js` (the one `isTree:true` twin) actually renders it; `corner`'s own
+FIVE named, coloured `sec(...)` sections (VIEW/STRUCTURAL/VARIABLES/FORM/G-CODE) and `pocket`'s own are BOTH
+dead for the live form. `grid_container`: 2 twins (`drillData.js`, `pocketData.js`), only drill renders.
+`usage_text`/`code_preview`: 3 twins (`atcCheckData.js`, `drillData.js`, `pocketData.js`), only drill renders —
+`atc_check`'s own `code_preview` gap was ALREADY named at t2263 as "structure only, proven safe... live-content
+wiring is the reported, not solved, gap," which this sweep now explains structurally: it was never going to
+wire live, because `atc_check` is `isTree:false`.
+
+⇒ **"Author a wizard that looks like a built-in" currently means matching a DIFFERENT renderer than 31 of the
+32 built-ins themselves use.** This is very likely the root the `section:` contiguous-run defect, the
+three-name `field_ref`/`formfield`/`param_field` collision, and this session's own t2511 mis-migration all sit
+downstream of — see PART 2's own numbered entries below for each, and BAND 2 for why this is a "has bitten,"
+not "hasn't yet," finding.
+
+---
+
+## PART 1 — AUTHORABILITY: for every declared detail a built-in uses, is there a block?
+
+Every count is out of 32 twins. **BLOCKS THE AUTHORING GOAL** band, ordered by twin count (highest first) —
+these are the rows that actually stop a person authoring a built-in equivalent from the real UI:
+
+| detail | USED BY | BLOCK? |
+|---|---|---|
+| `postInstantiate` (`def.postInstantiate =`, a `(stack,resolved)=>stack` closure) | **25/32** | **NO** — functions cannot be block data under the current architecture. NOT one missing capability: the 25 uses cover many distinct, per-op transforms (spindle-Head fill, header-comment recompose, structural-control sync, straight-peck application, …) — a genuine escape hatch by nature, not a single fixable gap. |
+| `tokenRefusal` (a binding's own live-token refusal message) | **17/32** | **NO** — absent from `formfield`'s own field list entirely. |
+| `tokenEligible` | **15/32** | **NO** — same; a twin-authoring-time-only concept, measured by hand-audit (t1704's own "32-op / 393-param survey"), fail-closed, no author-facing toggle anywhere. |
+| `simStock` (`def.simStock =`, a `(params,stock)=>{...}` closure) | **11/32** (4 direct + 7 more via the shared `withLatheScene()` helper) | **NO** — function hook. |
+| `tokenDeferrable` | **11/32** | **NO** |
+| `zRuler` (`def.zRuler = {depthParam,stepParam}`, the 2D-plan depth-ruler strip) | **8/32** | **NO** — plain JSON-safe data (not a function!), read only by `userOpView.js:346`, yet still no block/field anywhere sets it. `userOps.js`'s own t1682 header independently names it one of 7 "real, live, generically-read hooks a `.wiz` fork cannot carry as data" — corroborating, not re-derived. |
+| `entryPoint` (`def.entryPoint = ENTRY_POINT`, the draggable program-entry marker) | **8/32** | **PARTIAL** — a real `entryBlock` (`type:'entry'`, fields `entryX`/`entryY`) supplies the VALUE + emit waypoint; but the draggable CANVAS MARKER is gated on `def.entryPoint` being set directly in JS (`userOpView.js:731,798`), never auto-derived from the block's presence. A pure block-author gets the emitted waypoint but not the drag handle. |
+| `previewGeometry` (interactive drag handles) | **7/32** | **NO authoring path at all — BACKLOG #71, cited not restated.** |
+| `latheTool` / `latheProbeAxis` | **0 direct / 7 via the shared `withLatheScene()` helper** | **NO** — not even a per-twin literal; a constructor argument to a shared helper. |
+| `widget:'action'` (opens a Settings sub-panel from a form button) | **3/32** (atcChangeData, atcTableData, homingData) | **NO** — absent from `formfield`'s own authorable widget vocabulary. |
+| `widget:'feedsuggest'` (the Apply-computed-feed button) | **2/32** (drillData, pocketData) | **NO** |
+| `simStartParams` (draggable per-pass sim-start markers) | **2/32** (rotaryClockData, alignmentData) | **NO** |
+| `armGap` (`def.armGap =`, a function) | **2/32** (slotData, pocketData) | **NO** |
+| `normalizeParams` (`def.normalizeParams =`, a function) | **1/32** (surfacingData — stored-stepover recovery) | **NO** |
+| `previewVarSeed` | **1/32** (surfacingData — skim-mode jog seed) | **NO authoring path — BACKLOG #71.** |
+
+**Full parity (checked, not just seeded), for contrast — these are NOT gaps:**
+
+| detail | USED BY | BLOCK? |
+|---|---|---|
+| `section:` (binding-spec string tag) | **31/32** (every twin except `pauseConfirmData.js`, one field, nothing to group) | **YES**, full parity — `formfield`'s own `section` field, read generically off the binding-spec shape regardless of hand-JS or block origin. (Full parity does not mean bug-free: see BAND 2 below — the mechanism itself is the `section:`/PART-2 defect.) |
+| `units` + live conversion readout | **10/32** | **YES**, full parity — `formfield`'s `units` field, read generically by `formWidgets.js`'s `unitsOf()`. |
+| `path_anchor` (dual stock-attach/path-datum corner picker) | **6/32** | **YES** — `pathAnchorBlock`, renders via its own dedicated branch in BOTH render paths independently (tree AND flat each special-case it). Deliberately NOT used by `tapData`/`boreData` (plain dropdown rows instead — no stock-attach geometry for those ops, confirmed correct, not a gap). |
+| `widget`/`widgetConfig` (dropdown, segmented, number min/max/step) | **24 / 25** resp. | **YES for the common cases** — see the NEW bug this sweep found, immediately below, for the two cases that are broken rather than merely absent. |
+| `onEdgePick`/`onCornerPick` | N/A — **not twin-set at all, 0 hits.** Not a JS hook an author would assign: `panelTypes.js`'s own `layoutSpecFromOp` auto-derives a clickable wall/corner picker for ANY twin whose bindings declare an `axis`+`dir` or `corner` enum — already effectively block-authorable today (declare those params via `formfield`). Seed's own "callbacks, not data" framing REFUTED — it's auto-wiring off ordinary enum bindings, a different shape of question than the rest of this table. | — |
+
+---
+
+## PART 2 — DUPLICATES: what can be said two ways?
+
+### BAND 2 — DUPLICATES THAT HAVE BITTEN (ordered by twin count)
+
+1. ⭐⭐⭐ **`section:` string tag vs `section`/`group_box`/`grid_container`/`tab_group`/`usage_text`/`code_preview`
+   uiChildren nodes, gated by the two-render-path split above — 31/32 twins carry `section:`; only 1/32
+   (drill) is on the render path where the NODE vocabulary means anything at all.** TWO confirmed incidents on
+   record: t2375/t2377 (the contiguous-run defect, two corrective turns) and **this session's own t2511** — the
+   worker migrated `surfacingData.js` first, verified it structurally clean in isolation, and only the live
+   before/after comparison exposed that `hasTreeLayout` never routes surfacing to the changed path at all. A
+   structural check passing on a path the op never reaches is this project's own named
+   green-tests-over-a-dead-path scar, and this is a second, independent instance of it, freshly demonstrated,
+   not archival. Owner has already ruled on the direction: **containment (`group_box`) survives, the tag
+   (`section:`) goes.** Record the ruling and the migration size (all 31 tag-using twins) — do NOT start it.
+2. ⭐⭐ **`widget:'tool-library'` / `widget:'thread-preset'` — a NAMING MISMATCH bug, found fresh this sweep, not
+   seeded.** `formfield`'s own widget picker offers "Tool Library"/"Thread Preset" options that write
+   `widget:'tool-library'`/`'thread-preset'` into the binding spec — but `formWidgets.js`'s own render-side map
+   (`FORM_WIDGETS`) keys the real pickers as `toolpick`/`threadpick` (the string EVERY existing hand-JS twin
+   actually uses — `pocketData.js`'s `restTool`, `tapData.js`'s `pitch`). `resolveFormWidget()` does a plain
+   `FORM_WIDGETS[b.widget]` lookup with no match for the block-authored strings, so it silently falls back to
+   the type-default (a plain number field) instead of erroring OR working — an author who picks "Tool Library"
+   in the form-field authoring UI gets a bare number box with no warning. **2/32 twins use the REAL mechanism
+   today** (`pocketData.js`, `tapData.js`); the bug affects any FUTURE author who reaches for the block's own
+   offered option, not those two twins directly. Confirmed by reading `resolveFormWidget()` and
+   `bindingsFromStack`'s own pass-through of `p.widget` unmodified — a real, live, verified defect, not merely
+   absent.
+
+### BAND 3 — DUPLICATES THAT HAVEN'T BITTEN YET
+
+1. **`field_ref` / `formfield` / `param_field`** — `formWidgets.js`'s own tree-placement branch handles all
+   three identically, and its OWN comment names the exact hazard: reusing `formfield`/`param_field` (which
+   ALSO mean "declare a brand-new binding" elsewhere) as a tree-placement reference "silently corrupts
+   `registerUserOp`'s own scan... matched against 0 blocks." `field_ref` (t2299) exists specifically to avoid
+   this. **Zero twins today use the dangerous case** ("nothing shipped used either as a presentation reference
+   before this," the code's own words) — a real, named, self-documented trap with no incident yet, not a
+   collision by accident.
+2. **`panel` — a genuine NAME COLLISION, confirmed NOT a duplicate mechanism, cheap to fix.** `def.panel`
+   (a top-level enum, e.g. `'form3d+2d'`, set via `userOpFromStack`'s own positional arg, selecting whether the
+   outer shell reserves a viz pane AT ALL — read by `panelType(_def.panel).viz`) and the `panel`-type
+   `uiChildren` NODE (renders the 2D box's own content) share one English word but have ZERO functional
+   coupling — confirmed directly: `formWidgets.js`'s own `panel`-node branch never reads `node.params.panel` at
+   all (independently confirmed by `drillData.js`'s own comment saying the same). A rename removes the
+   confusion at zero behavioural cost — this is the CHEAP problem the dispatch's own framing distinguished from
+   a real duplicate mechanism.
+3. **`sim` — seed REFUTED. Not a duplicate; a normal declare→derive pipeline, say so plainly.** The `sim`/
+   `preview3d` block's own raw params (`rotary`/`machine`/`magazine`/`probeWcs`) and `def.sim` (the object
+   `simIntentFromStack` produces) are NOT two independent sources of truth — `def.sim` is COMPUTED FROM the
+   block's own declared params (returns `null` if every flag is false, the object itself otherwise). One
+   mechanism, read at two different moments (raw declaration, then post-processed intent) — the same shape
+   `previewGeometry`/many other declared-property-to-derived-def-field pipelines already use throughout this
+   codebase. The dispatch's own seed asked "are they truly redundant, or a real distinction wearing one name" —
+   here it is cleanly the latter, and cheaper than that: not even two distinct concepts, just two views of one.
+
+### BAND 4 — DECLARED BUT UNUSED (this project's own recurring class — `emits`/`modalPre`/`noSnap`/`mouth`/
+`layout_2d_canvas` are the five already found; these are the sixth and seventh)
+
+1. **`group_box`** — **0/32 twins.** The block is real, registered, and renders correctly if used
+   (`formWidgets.js`'s own `node.type==='group_box'` branch) — the "nobody uses it" side of the authorability
+   coin, distinct from "no block exists." (Bare-word grep found one apparent hit in `drillData.js`; spot-checked
+   and it was a COMMENT — "a `section`/`group_box` node always renders a title" — not a declared node. Zero
+   real usages.)
+2. **`tab_group` / `tab_page`** — **0/32 twins**, same shape as `group_box`: real, wired, rendered, unused.
+
+*(Minor footnote, not a full row: `widget:'select'`, used by 2/32 twins (`faceProbeData.js`/`odProbeData.js`,
+both on `wcs`), is not in `formfield`'s vocabulary OR the `FORM_WIDGETS` render map either — but it happens to
+render correctly anyway, because `resolveFormWidget`'s own type-default folds any unrecognised enum widget to
+`dropdown`. A harmless accidental synonym, not a gap or a bug — named so it isn't mistaken for either.)*
+
+---
+
+## STILL REAL IF
+
+- **The render-path split** (PART 2's own lead finding): `grep -l "type: 'split_horizontal'\|type: 'split_vertical'" web/blocks/dataOps/*.js` still returns exactly `drillData.js`, and a fresh live check (`hasTreeLayout(_def.template)` on every registered twin, via `listUserOps()`+`getUserDef()`, the exact method this sweep used) still returns exactly one `true`.
+- **The `toolpick`/`threadpick` mismatch**: dragging a fresh `formfield` block, setting its own `widget` field to
+  the option labelled "Tool Library" (or "Thread Preset"), saving, and opening the resulting form still shows a
+  plain number input instead of the real picker.
+- **The `group_box`/`tab_group` non-adoption**: `grep -l "type: 'group_box'\|type: 'tab_group'"
+  web/blocks/dataOps/*.js` still returns nothing.
+- **Every other count above**: re-run the SAME anchored greps (field-name + colon, or `def.<name> =`) this sweep
+  used, against the current 32-twin file list — if the twin count for any row has moved, the entry is stale for
+  that row specifically, not necessarily the others.
