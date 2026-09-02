@@ -6975,6 +6975,33 @@ interactive handles.
 > `SHARED_LABELS` still wins over `anchor.label` where it already gives the correct, role-distinct answer, so
 > rect_handle's own w/h rows keep "Width"/"Height" rather than both showing the group-wide "W×H"). Full account:
 > WORK-LOG t2527.
+>
+> **✅ t2533 — three more gestures (SCALE, SHEAR, PROJ-LENGTH), then STOPPED at a genuine mismatch (DIAG-AIM).**
+> `scale_handle`/`shear_handle` (`wizards/ops/scaleHandle.js`/`shearHandle.js`) needed a NEW wrinkle the first
+> four gestures never did: a second, READ-ONLY must-match picker (`baseField`/`hField`) naming a SEPARATE
+> existing param whose CURRENT VALUE positions the handle, never itself made draggable — canvasWidgets.js's own
+> `scaleX`/`shear` gestures need a live "unscaled base width"/"height" that isn't derivable from the dragged
+> field alone. `proj_length_handle` (`wizards/ops/projLengthHandle.js`) came back down to the simple single-
+> picker shape — its own `off` self-derives from `value/scale`. All three pass the full t2517/t2525 bar (real
+> palette author, real save, real reload, real mouse drag, emit confirmed to change) — screenshots
+> `verification/t2533-{scale,shear,proj-length}-handle-emit-wired.png`. Caught and fixed two of my OWN test bugs
+> in the process (not product bugs): `scale_handle`'s UI-drive test needed its two fields set through the real
+> form BEFORE dragging (`scaleX`'s own drag is multiplicative and canvasWidgets.js returns `null` on a
+> ~zero-width span — the t2513 formfield-blank-on-first-paint gap otherwise leaves it permanently stuck);
+> `proj_length_handle`'s own def-level test had a wrong expected number (assumed the atom's live default won
+> over the formfield's own `dflt` — it's the reverse).
+>
+> **STOPPED at gesture 4, `diagAim`, per the dispatch's own instruction** ("stop at the FIRST one that does not
+> fit"): traced its real usage (`panelTypes.js:658-676`) BEFORE writing any block code — its five inputs
+> (`primaryX`, `centreSec`, `sign`, `travel`, `prim`) are ALL derived from Middle's OWN internal geometry model
+> (`middleAxes(params)`, live stock dimensions, `dir1`/`dir2`'s Middle-specific wall-facing sign convention,
+> `featureType==='boss'`), not simple literals or must-match-picked params a generic author could supply.
+> `crossAim` (next in line) carries the identical character plus a dependency on `panelStarts`. This is a
+> CATEGORY difference from every gesture built so far, not a harder version of the same shape — building it
+> would mean embedding Middle's own business logic into a supposedly general block. `probeVector`/`translate`
+> were NOT evaluated (the instruction is to stop at the first mismatch, not catalog the rest), though
+> `translate`'s own `xs`/`ys` variable-length field-list arity is flagged as a likely second mismatch requiring
+> Blockly mutator machinery this pilot's shape never needed. Full account: WORK-LOG t2533.
 
 ---
 
