@@ -68,7 +68,7 @@ test('REAL APP: an Op Param field authored over surfaceraster saves, survives re
         const ff = { type: 'formfield', params: { param: 'width', widget: 'number', label: 'Width', dflt: '100', bindMode: 'opparam', matchvar: '#1', atomType: 'surfaceraster', key: 'w', type: 'number', section: '', help: '', optional: false, readonly: false, readonlyhint: '', whenparam: '', whenis: '', options: '', nmin: '', nmax: '', nstep: '', units: 'mm', derived: '', writes: '' } };
         const stack = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Geometry' }, children: [ff] }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Geometry' }, children: [ff] }],
             children: [{ type: 'surfaceraster', params: raster }],
         }];
         window.ddcsLoadBlockStack(stack);
@@ -152,7 +152,7 @@ test('the t1636 loud refusal still fires in Op Param mode: a dangling atomType, 
         const ff = { type: 'formfield', params: { param: 'w', widget: 'number', label: 'Width', dflt: '', bindMode: 'opparam', matchvar: '#1', atomType: 'no_such_atom_type', key: 'w', type: 'number', section: '', help: '', optional: false, readonly: false, readonlyhint: '', whenparam: '', whenis: '', options: '', nmin: '', nmax: '', nstep: '', units: '', derived: '', writes: '' } };
         const stack = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: [ff] }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: [ff] }],
             children: [{ type: 'surfaceraster', params: raster }],
         }];
         window.ddcsLoadBlockStack(stack);
@@ -176,7 +176,7 @@ test('the t1636 loud refusal still fires in Op Param mode: a dangling atomType, 
         const ff = { type: 'formfield', params: { param: 'w', widget: 'number', label: 'Width', dflt: '', bindMode: 'opparam', matchvar: '#1', atomType: 'surfaceraster', key: 'w', type: 'number', section: '', help: '', optional: false, readonly: false, readonlyhint: '', whenparam: '', whenis: '', options: '', nmin: '', nmax: '', nstep: '', units: '', derived: '', writes: '' } };
         const stack = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: [ff] }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: [ff] }],
             children: [{ type: 'surfaceraster', params: raster }, { type: 'surfaceraster', params: { ...raster, w: 200 } }],
         }];
         window.ddcsLoadBlockStack(stack);

@@ -63,7 +63,7 @@ test('FOUR role groups on the category axis — three populated (membership from
     // corrected finding); layout's anchor set shrinks with it, same registry-derived membership check either way.
     // t1734 — sim_3d_box / code_preview_panel deleted (dead containers, zero readers); previews' anchor set shrinks
     // with them, same membership-from-the-registry check either way.
-    expect(r.previews).toEqual(expect.arrayContaining(['sim', 'simstart', 'panel', 'form_diagram']));
+    expect(r.previews).toEqual(expect.arrayContaining(['sim', 'simstart', 'feature_canvas', 'form_diagram']));   // t2515 — 'panel' renamed 'feature_canvas'
     // t1627 — Wizard Shapes has its CONTENTS now (the four primitives): the group renders, membership from the registry
     expect(r.byCat.shapes, 'the four shape primitives declare the group').toEqual(['shape_circle', 'shape_line', 'shape_marker', 'shape_rect']);
     expect(r.groups, 'the once-empty group now renders — the auto-appear this spec was holding the door for').toContain('Wizard Shapes');

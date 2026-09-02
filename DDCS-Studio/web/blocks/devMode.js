@@ -949,7 +949,7 @@ function prepareCandidate(a, framing) {
 
     // A GUI `panel`/`sim` block in the stack WINS over the dialog choice (a declaration baked into the template) —
     // capture both now so the dialog can prefill with the truth and the commit can honour the override.
-    const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');
+    const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'feature_canvas');   // t2515 — renamed from 'panel'
     const blkPanel = (panelBlk && panelBlk.params && panelBlk.params.panel) || null;
     const blkSim = simIntentFromStack(a.opRec.children);   // undefined = no sim block in the stack
     // t2156 — scoped to THIS candidate: _editingWizard is the single-op "Customize" context (editWizardDef), and

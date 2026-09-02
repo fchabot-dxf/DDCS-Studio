@@ -27,7 +27,7 @@ test('formfield-only authoring: build with zero EXPOSE_ ticks, save, survive a f
     const specs = [{ param: 'dist', type: 'number', default: 30, label: 'Max Probe Dist', section: 'CUT', match: { type: 'assign', var: '#1' }, key: 'value', widgetConfig: { min: 1, max: 200, units: 'mm' } }];
     const stack = [{
       type: 'user_root', params: {},
-      uiChildren: [{ type: 'panel', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
+      uiChildren: [{ type: 'feature_canvas', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
       children: [{ type: 'assign', params: { var: '#1', value: 30 } }],
     }];
     window.ddcsLoadBlockStack(stack);

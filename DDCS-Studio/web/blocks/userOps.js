@@ -346,9 +346,9 @@ function resolveSimMeta(def) {
     return { intent, starts };
 }
 
-/** The `panel` block in a stack → its panel layout parameter. */
+/** The `feature_canvas` block (t2515 — renamed from `panel`, field name unchanged) in a stack → its panel layout parameter. */
 export function panelFromStack(children) {
-    const blk = flattenBlocks(children).find((b) => b && b.type === 'panel');
+    const blk = flattenBlocks(children).find((b) => b && b.type === 'feature_canvas');
     if (!blk || !blk.params) return undefined;
     return typeof blk.params.panel === 'string' ? blk.params.panel : null;
 }

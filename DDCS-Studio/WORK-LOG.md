@@ -68905,3 +68905,89 @@ only, its answer is now recorded as data in BACKLOG #72, not left behind as a st
 product files -- only `BACKLOG.md` and this `WORK-LOG.md` entry staged. `git diff BACKLOG.md` checked
 immediately before staging, per the dispatch's own explicit repeat-precaution after today's earlier t2505
 collision with the advisor's own concurrent commit.
+
+---
+
+## t2515 -- ONE THING: rename the block type `panel` -> `feature_canvas` (owner ruling, hard rename, no alias)
+
+Direct action on BACKLOG #72's own band-3 finding: `panel` was a genuine three-way name collision -- the
+block's own registered type, that SAME string reused as the render-side `uiChildren` layout-node type, and the
+unrelated FIELD on the block (`params.panel`/`def.panel`, holding the panel-layout VALUE: form/form3d/form2d/
+form3d+2d/commscreen). The dispatch was explicit: rename the TYPE only, leave the FIELD alone, no alias --
+older saved wizards using the old string are remakeable (no-legacy-burden), symmetric with `preview3d`
+(t2511, the sibling half of the same split).
+
+**Method: grep first, not from memory.** Searched the whole repo for every literal `type: 'panel'` /
+`.type === 'panel'` / `panelBlock` / `ops/panel.js` occurrence before touching anything -- 15 real code/test
+consumers, plus ~30 `.js` files whose ONLY hits were comments about a DIFFERENT, already-completed removal
+(t2257/t2301, BACKLOG #20 -- the id-collision fix that took the `panel` NODE back out of every twin except
+drill; those comments say "'panel' removed" and are correctly untouched, they describe a block that is no
+longer in the template at all). Re-grepped after every batch of edits to confirm nothing was missed; caught two
+stragglers this way that the first pass skipped: `preview3d.js`'s own header prose (two more mentions) and
+`save-dialog-declared-1615.spec.js:61`, a live `b.type === 'panel'` assertion the first grep pattern's exact
+phrasing didn't catch.
+
+**What moved, what didn't.** `wizards/ops/panel.js` -> `featureCanvas.js` (git mv, history preserved),
+`panelBlock` -> `featureCanvasBlock`, `type: 'panel'` -> `type: 'feature_canvas'`, `label: 'panel'` -> `'feature
+canvas'` (matching the box's own existing on-screen label, `formWidgets.js`'s `<span class="section-label">
+FEATURE CANVAS</span>` -- confirmed live in the code before choosing the new label, not guessed). Every real
+consumer updated: `userOps.js`'s `panelFromStack` (reads the block by type to resolve `def.panel`),
+`blocksApp.js` (the modal-preview panel lookup, `REVEAL_META_TYPES`, `checkLayoutNodes`'s own hasTree check --
+a THIRD, broader tree-detection set than `userOpView.js`'s `hasTreeLayout()`, found live while tracing this,
+not previously known to this session), `blockEmitter.js`'s `METADATA_ONLY_LEAVES`, `devMode.js`'s stack scan,
+`pickerField.js`'s `META_TYPES`, `bridge.js`'s dropdown-options gate (`def.type === 'panel'` -> `'feature_
+canvas'`; `field === 'panel'` on the SAME line correctly left alone -- it's the field check), `formWidgets.js`'s
+own three literal spots (the preview3d branch's adjacency lookahead/lookbehind, and the node's own render
+branch), `drillData.js` (the one built-in that actually places this node). `kind: 'panel'` (a THIRD, separate
+tag -- `devMode.js`'s `isAtom` classification, unrelated to either the type or the field) was deliberately left
+untouched: not named in the dispatch's own "three things," a different axis (authoring-metadata classification,
+shared by `section`/`structctl`/`param_group`/etc, not a 1:1 mirror of type), a judgment call flagged in the
+pass-back rather than assumed. `def.panel`/`params.panel`/`PANEL_TYPES`/`panelType()`/`DEFAULT_PANEL` (all in
+`panelTypes.js`) are the FIELD's own value-space registry -- confirmed by reading the file, untouched, exactly
+as instructed.
+
+**Test fixtures**: every hand-built `{ type: 'panel', params: { panel: '...' } }` synthetic uiChildren tree
+across 11 spec files updated to `feature_canvas` (the field's own value untouched in every case).
+`gui-panel-block.spec.js` (a file entirely ABOUT this one block) renamed to `gui-feature-canvas-block.spec.js`
+and rewritten throughout, matching the source rename rather than leaving a stale filename pointing at
+renamed code.
+
+**Docs**: `ARCHITECTURE.md`'s own L7/`layout_2d_canvas` section named the `panel` node with a stale line number
+even before this turn (drift already existed) -- updated the name AND the line number together, re-verified
+live rather than incremented by guess. `BACKLOG.md` #72's own `panel` seed item got an inline `RESOLVED` note
+(this project's own established convention for closing a live finding in place, not rewriting the entry) --
+the field/type distinction that finding measured is exactly what made this rename safe to do as a pure,
+zero-behavior-change string swap.
+
+### TIER, and why
+
+The dispatch's own framing: presumptively NOT a full-suite change (a type-string rename), UNLESS the grep
+showed it reaching `formWidgets`/`userOpView` in a way that could affect rendering -- in which case run full
+and say why. It does: `formWidgets.js`'s own `traverse()` render branch (built by every synthetic-fixture test
+listed above, and by drill live) and `userOps.js`'s `resolvePanelMeta`/`panelFromStack` (which sets `def.panel`,
+read by `panelType(_def.panel).viz` to decide whether a preview pane exists AT ALL) are both real
+rendering-affecting consumers. Ran the full suite (`--workers=4`) and say so here: **3033 passed, 2 failed, 10
+flaky, 26 skipped (35m45s)**. The 2 failures: `sf-pos-snapback` (the SAME pre-existing flake this whole session
+has shown on every single run, named unrelated in four separate prior turns' own VERIFY sections) and
+`undo-reproject-echo.spec.js`'s own "app-wide undo" test -- NEW to this turn, not previously seen, so checked
+rather than assumed: the file has zero mentions of `panel`/`feature_canvas` anywhere (grepped), its own test
+exercises a plain `move` block's undo/redo with `waitForTimeout(350)`-paced steps, the exact shape of the
+project's own already-documented contention-sensitive-under-`--workers=4` class (`open-as-modal-1625`, BACKLOG
+#56). Re-ran BOTH failures in isolation at `--workers=1`: **10 passed, 0 failed, 1 flaky (retried green)** --
+confirmed contention, not a regression, per this session's "believe it's a flake -> re-run, don't argue"
+discipline.
+
+### VERIFY
+
+Every real consumer found by grep and enumerated above, not assumed -- two stragglers the first pass missed
+were caught by a SECOND grep pass after editing, not left for the suite to find. Round-trip proven both
+directions on drill (the one migrated op, per t2511/BACKLOG #61): `drill-canvas.spec.js` and
+`drill-form-reproduction-2299.spec.js` both green in the full run, live-exercising the renamed
+`feature_canvas`+`preview3d` adjacency merge on the one built-in that actually reaches it (per BACKLOG #72's
+own isTree measurement). A saved-then-reloaded wizard still opens: `save-dialog-declared-1615.spec.js`'s own
+declare-on-canvas -> real-dialog-save -> reload-registered-def round trip (a test this turn edited directly,
+since it asserted `b.type === 'panel'`) passed. `git status` clean of anything outside this turn's own
+intended files -- the pre-existing untracked `ANALYTICS-BOT-DETECTION.md`/`RESTORE-CUSTOM-MACROS.zip` and the
+already-modified `verification/*.png` snapshots (present in `git status` since before this turn started, not
+touched by it) are left alone, not staged. `git diff BACKLOG.md` checked before staging (this turn's own edit
+there is a small, contained inline RESOLVED note, not a rewrite -- easy to eyeball for a same-day collision).

@@ -53,12 +53,13 @@ const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 // transparent-at-emit container types that branch handles elsewhere in this file (user_root's uiChildren-then-
 // children order; the plain-children five), plus two small DECLARED "produces no G-code" leaf families — the
 // generic `emit: () => []` metadata blocks (grep-confirmed: paramField.js/formField.js/layoutWidget.js/
-// camField.js/sim.js/panel.js/simstart.js) and structCtl.js's own `sc_<param>` authoring-only control blocks
+// camField.js/sim.js/featureCanvas.js/simstart.js — t2515: panel.js renamed) and structCtl.js's own
+// `sc_<param>` authoring-only control blocks
 // (isStructCtlType, corner's own struct-param dropdowns — its OWN header calls these out: "EMIT NOTHING") —
 // together a twin's form-authoring presentation mouth, which must never be mistaken for "the real first
 // content" ahead of the execution mouth that actually carries it.
 const TRANSPARENT_CONTAINERS = new Set(['param_group', 'guard', 'section', 'setup', 'safetraverse', 'opunit']);
-const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'cam_field', 'sim', 'preview3d', 'panel', 'simstart']);   // t2511 — preview3d: the 3D-only half of the sim/panel split, same metadata-only shape as sim
+const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'cam_field', 'sim', 'preview3d', 'feature_canvas', 'simstart']);   // t2511 — preview3d: the 3D-only half of the sim/panel split, same metadata-only shape as sim; t2515 — 'panel' renamed 'feature_canvas'
 /** The first REAL (non-transparent-container, non-metadata-only) leaf block reachable by walking the SAME
  *  structural chain emit() itself walks — so "does this op already open on a hand-pushed title" is answered by
  *  a block's own declared TYPE, never by its position in `.children` (a twin's title can sit two wrappers

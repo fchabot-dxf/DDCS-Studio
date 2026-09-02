@@ -18,7 +18,7 @@ const PILOT = `
     const template = [{
         type: 'user_root', params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'feature_canvas', params: { panel: 'form2d' } },
             { type: 'param_group', params: { group: 'Pilot' }, children: [
                 { type: 'layoutwidget', params: { fx: 'px', fy: 'py', anchor: 'point', frame: 'stock-min', xval: '40', yval: '60', label: 'pt' } },
             ] },

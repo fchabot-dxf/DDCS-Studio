@@ -398,9 +398,10 @@ that mechanical basis — and that correction was RIGHT, not superseded.
 What t1726 did NOT establish, and what BACKLOG #61's own finding (2026-09-01) traced further and found FALSE:
 that being mechanically wired made the block USEFUL. Nothing ever read `layout_2d_canvas`'s own existence or
 its `minHeight`/`showRuler` fields — the actual 2D feature canvas was, and is, rendered entirely by the
-SEPARATE `panel` node (`formWidgets.js:1478`), completely independent of whether a `layout_2d_canvas` sat
-anywhere in the tree; `layout_2d_canvas`'s own `emit: () => []` confirms it contributed nothing to it either.
-It was a THIRD way to say something `panel`/`sim`/`code_preview`/the split/section/tab containers already say —
+SEPARATE `feature_canvas` node (`formWidgets.js:1540` — t2515: renamed from `panel`, BACKLOG #72's own rename
+ruling), completely independent of whether a `layout_2d_canvas` sat anywhere in the tree; `layout_2d_canvas`'s
+own `emit: () => []` confirms it contributed nothing to it either.
+It was a THIRD way to say something `feature_canvas`/`sim`/`code_preview`/the split/section/tab containers already say —
 wired, but never useful. **Owner ruling 2026-09-01, deleted at t2507** (BACKLOG #61 L7) — see WORK-LOG t2507.
 Both findings stand: t1726's "the round-trip is live" and t2507's "and it was never worth using" are the same
 block seen from two different, non-contradicting questions.

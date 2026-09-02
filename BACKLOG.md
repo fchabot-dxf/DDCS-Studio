@@ -7004,6 +7004,11 @@ these are the rows that actually stop a person authoring a built-in equivalent f
    all (independently confirmed by `drillData.js`'s own comment saying the same). A rename removes the
    confusion at zero behavioural cost — this is the CHEAP problem the dispatch's own framing distinguished from
    a real duplicate mechanism.
+   > **✅ t2515 — RESOLVED, owner ruling, hard rename no alias.** The block/uiChildren-node TYPE `panel` is now
+   > `feature_canvas` everywhere (`wizards/ops/panel.js` → `featureCanvas.js`, every render/round-trip/palette
+   > consumer, every test fixture). `def.panel`/`params.panel` (the FIELD this item confirmed was a distinct,
+   > uncoupled concept) is UNCHANGED, exactly as this finding said to leave it. No back-compat alias — an older
+   > saved wizard using the string `panel` is remakeable, per this project's own no-legacy-burden rule.
 3. **`sim` — seed REFUTED. Not a duplicate; a normal declare→derive pipeline, say so plainly.** The `sim`/
    `preview3d` block's own raw params (`rotary`/`machine`/`magazine`/`probeWcs`) and `def.sim` (the object
    `simIntentFromStack` produces) are NOT two independent sources of truth — `def.sim` is COMPUTED FROM the

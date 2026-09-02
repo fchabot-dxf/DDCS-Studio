@@ -2,8 +2,9 @@
  * wizards/ops/panelTypes.js — the small registry of PANEL LAYOUTS a custom wizard can use.
  *
  * Every op is a wizard; how its panel looks is one more thing the stack declares (def.panel, default 'form3d').
- * The generic userOpView reads this to show/hide the preview pane and pick 3D vs a 2D layout. The GUI "panel" block
- * (v2 authoring) is just a visual way to set def.panel — same registry.
+ * The generic userOpView reads this to show/hide the preview pane and pick 3D vs a 2D layout. The GUI
+ * "feature_canvas" block (v2 authoring; t2515 — renamed from `panel`, the FIELD it sets is still `def.panel`)
+ * is just a visual way to set def.panel — same registry.
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { childrenOf } from '../../blocks/userOps.js';   // t2317 — the ONE children/uiChildren shape normalization (t2315)

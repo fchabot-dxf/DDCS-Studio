@@ -47,7 +47,7 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
     // own "BARE stack" fixture below, proves that mechanism directly instead of leaning on a twin that no
     // longer has anything to lean on.
     await page.evaluate(() => window.ddcsLoadBlockStack([
-        { type: 'panel', params: { panel: 'form2d' } },
+        { type: 'feature_canvas', params: { panel: 'form2d' } },   // t2515 — renamed from 'panel'
         { type: 'sim', params: { rotary: true, machine: false, magazine: false } },
         { type: 'move', params: { mode: 'cut', x: 10, y: 20, z: -3, feed: 500 } },
     ]));
@@ -58,7 +58,7 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
         const stack = window.ddcsGetBlockProgram() || [];
         const op = stack.find((b) => b && b.type === 'op');
         const flat = U.flattenBlocks(op ? op.children : stack);
-        const panelBlk = flat.find((b) => b && b.type === 'panel');
+        const panelBlk = flat.find((b) => b && b.type === 'feature_canvas');   // t2515 — renamed from 'panel'
         return { panel: panelBlk && panelBlk.params && panelBlk.params.panel, sim: U.simIntentFromStack(op ? op.children : stack) };
     });
     expect(decl.panel, 'the hand-built stack really does declare a panel').toBeTruthy();

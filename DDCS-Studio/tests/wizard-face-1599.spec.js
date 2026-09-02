@@ -242,7 +242,7 @@ test('MID-EDIT — a half-built wizard\'s tab SAYS WHAT IS MISSING, never a blan
     //     forward and start covering a wizard that has something to show.
     await page.evaluate(() => window.ddcsLoadBlockStack([{
         type: 'user_root', params: {},
-        uiChildren: [{ type: 'panel', params: { panel: 'form3d' } }],
+        uiChildren: [{ type: 'feature_canvas', params: { panel: 'form3d' } }],   // t2515 — renamed from 'panel'
         children: [{ type: 'move', params: { x: 0, y: 0, z: 5 } }],
     }]));
     await settle(page);

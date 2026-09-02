@@ -35,7 +35,7 @@ const SHAPES = [
     { type: 'shape_marker', params: { x: '20', y: '80' } },
 ];
 const HAND_BUILT = [{ type: 'user_root', params: {}, uiChildren: [
-    { type: 'panel', params: { panel: 'form2d' } },
+    { type: 'feature_canvas', params: { panel: 'form2d' } },
     { type: 'section', params: { title: 'Shapes' }, children: SHAPES },
 ]}];
 
@@ -90,7 +90,7 @@ test('EXPRESSIONS over LIVE params — through the REAL registered path, and the
         // identity) — bindingsToBlocks writes the block form, bindingsFromStack derives it back (one source).
         const specs = [{ param: 'width', type: 'number', default: 80, label: 'Width', match: { type: 'assign', var: '#1' }, key: 'value' }];
         const tpl = [{ type: 'user_root', params: {}, uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'feature_canvas', params: { panel: 'form2d' } },
             { type: 'param_group', params: { group: 'Demo' }, children: U.bindingsToBlocks(specs) },
             { type: 'section', params: { title: 'Shapes' }, children: [
                 { type: 'shape_circle', params: { cx: 'width / 2', cy: '60', dia: 'width / 4' } },

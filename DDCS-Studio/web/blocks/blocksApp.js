@@ -792,9 +792,10 @@ async function buildWorkspace() {
     const { builderOf } = await import('./opBuilders.js');
     if (!modalDef.opType || !builderOf(modalDef.opType)) modalDef.opType = 'group';
     // …and a hand-built def carries no `panel` either (only the save dialog / registry set it) — read the stack's
-    // own panel block, the SAME read the save path commits (blocks always win). Absent → the form3d default stands.
+    // own feature_canvas block (t2515 — renamed from `panel`; the field it carries is still named `panel`), the
+    // SAME read the save path commits (blocks always win). Absent → the form3d default stands.
     if (!modalDef.panel) {
-        const pb = flattenBlocks(modalDef.template || []).find((x) => x && x.type === 'panel');
+        const pb = flattenBlocks(modalDef.template || []).find((x) => x && x.type === 'feature_canvas');
         if (pb && pb.params && pb.params.panel) modalDef.panel = pb.params.panel;
     }
     // The #wizard overlay is position:fixed but was born INSIDE #studio-app, so from the Blocks tab it opened
@@ -830,7 +831,7 @@ async function buildWorkspace() {
   // t2397 (BACKLOG #43) — the meta/wrapper block kinds NEVER themselves own a form param by a bare field name
   // (mirrors pickerField.js's own `META_TYPES` exclusion for the SAME reason, declared independently here —
   // this file's own def-shape check, not that field's candidate list).
-  const REVEAL_META_TYPES = new Set(['formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group', 'panel', 'layout', 'sim', 'preview3d', 'simstart', 'user_root', 'op']);   // t2511 — preview3d: the 3D-only half of the sim/panel split
+  const REVEAL_META_TYPES = new Set(['formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group', 'feature_canvas', 'layout', 'sim', 'preview3d', 'simstart', 'user_root', 'op']);   // t2511 — preview3d: the 3D-only half of the sim/panel split; t2515 — 'panel' renamed 'feature_canvas'
   const revealDefByType = {}; PALETTE.forEach((d) => { revealDefByType[d.type] = d; });
   // t2397 (BACKLOG #43) — FORM → BLOCK: given a form row's own `data-param`, find the block that DECLARES it.
   // TWO shapes, checked in order: (1) a `param_field`/`formfield` whose own PARAM field names it — the
@@ -916,7 +917,7 @@ async function buildWorkspace() {
     function checkLayoutNodes(nodes) {
       for (const n of childrenOf(nodes)) {
         if (!n) continue;
-        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'preview3d', 'panel'].includes(n.type)) return true;   // t2511 — preview3d joins sim
+        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'preview3d', 'feature_canvas'].includes(n.type)) return true;   // t2511 — preview3d joins sim; t2515 — 'panel' renamed 'feature_canvas'
         if (n.children && checkLayoutNodes(n.children)) return true;
         if (n.uiChildren && checkLayoutNodes(n.uiChildren)) return true;
       }

@@ -1444,10 +1444,11 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             } else if (node.type === 'preview3d') {
                 // t2511 — the 3D-only half of the sim/panel split (preview3d.js's own header). Order-agnostic
                 // on purpose, mirroring paneAccordion.js's own "twin = 3D on top, built-in = 2D on top" note:
-                // an adjacent `panel` sibling — checked NEXT first, then PREVIOUS — merges into ONE combined
-                // box (byte-identical to the un-migrated `sim` shape); no adjacent panel renders 3D-only.
-                const nextIsPanel = nodes[__i + 1] && nodes[__i + 1].type === 'panel';
-                const prevIsPanel = !nextIsPanel && nodes[__i - 1] && nodes[__i - 1].type === 'panel' && !__consumed.has(__i - 1);
+                // an adjacent `feature_canvas` sibling — checked NEXT first, then PREVIOUS — merges into ONE
+                // combined box (byte-identical to the un-migrated `sim` shape); no adjacent one renders 3D-only.
+                // t2515 — this node type was 'panel', renamed; the adjacency MECHANISM is untouched.
+                const nextIsPanel = nodes[__i + 1] && nodes[__i + 1].type === 'feature_canvas';
+                const prevIsPanel = !nextIsPanel && nodes[__i - 1] && nodes[__i - 1].type === 'feature_canvas' && !__consumed.has(__i - 1);
                 if (nextIsPanel || prevIsPanel) {
                     buildVizBox(container, true);
                     const panelIdx = nextIsPanel ? __i + 1 : __i - 1;
@@ -1536,8 +1537,11 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
 
                 container.appendChild(simBox);
                 import('./paneAccordion.js').then(m => m.makePanesCollapsible(simBox)).catch(() => {});
-            } else if (node.type === 'panel') {
-                // t2511 — the REVERSE of the preview3d branch's own check above: if THIS panel is immediately
+            } else if (node.type === 'feature_canvas') {
+                // t2515 — this node type was 'panel', renamed (BACKLOG #72's own sweep named the three-way
+                // name collision — block type, this node's own render-side type, and the unrelated `panel`
+                // FIELD on it — a cheap rename; the field stays `panel`, only the type moved).
+                // t2511 — the REVERSE of the preview3d branch's own check above: if THIS node is immediately
                 // followed by a `preview3d` sibling, that pairing merges here instead (the preview3d branch
                 // only looks BACKWARD when it does not find one FORWARD, so whichever of the two the loop
                 // reaches first owns the merge — never both, __consumed prevents the second visit).

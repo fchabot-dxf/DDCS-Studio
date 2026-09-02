@@ -321,7 +321,7 @@ const optionsFor = (def, field) => {
     // deserialized. Sourced from the SAME table (`panelTypes.js`) every consumer already reads, so a THIRD
     // panel/layout type added there needs no matching edit here — it just works, and can't silently drift out
     // of sync again the way the hand-copied lists did.
-    if (field === 'panel' && def.type === 'panel') return Object.keys(PANEL_TYPES);   // the GUI panel-type declaration
+    if (field === 'panel' && def.type === 'feature_canvas') return Object.keys(PANEL_TYPES);   // the GUI panel-type declaration (t2515 — block type renamed from 'panel'; the field stays 'panel')
     if (field === 'kind' && def.type === 'layout') return Object.keys(LAYOUT_TYPES);
     // t2393 (BACKLOG #48 item 2) — flip is modeled on xform (transform.js's own header: "axis = flip about
     // X|Y"): NARROWED from the generic `SELECTS.axis` (X/Y/Z/A/B/C, shared by many unrelated blocks) to the

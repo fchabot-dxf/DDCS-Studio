@@ -34,7 +34,7 @@ test('a dangling formfield (Match Var names nothing) REFUSES the save and names 
         const specs = [{ param: 'w', type: 'number', default: 100, label: 'Width', section: 'CUT', match: { type: 'assign', var: '#1' }, key: 'value' }];
         const stack = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form3d+2d' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
             children: [{ type: 'surfaceraster', params: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', rowAxis: 'x', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 } }],
         }];
         window.ddcsLoadBlockStack(stack);
@@ -63,7 +63,7 @@ test('a genuinely parameterless stack (no formfield at all) still saves cleanly 
     await page.evaluate(async () => {
         const stack = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form3d+2d' } }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form3d+2d' } }],
             children: [{ type: 'surfaceraster', params: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', rowAxis: 'x', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 } }],
         }];
         window.ddcsLoadBlockStack(stack);

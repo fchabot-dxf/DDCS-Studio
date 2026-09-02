@@ -343,15 +343,16 @@ function drillDataStack(p = DRILL_DEFAULTS) {
                 // (t2299, this file's own header) — the only built-in this mechanism actually reaches today).
                 // Was ONE `{type:'sim'}` node; now the SAME combined box declared as TWO adjacent blocks,
                 // `preview3d` (unchanged context: rotary/machine/magazine all still false) immediately followed
-                // by `panel` — formWidgets.js's own traverse() detects the adjacency and renders the identical
-                // combined box (proven byte-identical, see WORK-LOG t2511). The t2301 id-collision this comment
-                // used to warn about (`panel` alone hardcoding the SAME ids `sim` does) is exactly what the
-                // adjacency merge exists to prevent — it is safe to place them together now because the merge
-                // (not two independent single-pane boxes) is what actually renders, not two competing ones.
-                // `panel`'s own `params.panel` value is still never read by formWidgets.js — confirmed unchanged.
+                // by `feature_canvas` (t2515 — renamed from `panel`) — formWidgets.js's own traverse() detects
+                // the adjacency and renders the identical combined box (proven byte-identical, see WORK-LOG
+                // t2511). The t2301 id-collision this comment used to warn about (`panel` alone hardcoding the
+                // SAME ids `sim` does) is exactly what the adjacency merge exists to prevent — it is safe to
+                // place them together now because the merge (not two independent single-pane boxes) is what
+                // actually renders, not two competing ones. Its own `params.panel` value (the FIELD, unrenamed)
+                // is still never read by formWidgets.js — confirmed unchanged.
                 RIGHT: [
                     { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
-                    { type: 'panel', params: { panel: 'form3d+2d' } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },   // t2515 — renamed from 'panel'; the field stays 'panel'
                 ],
             },
         }],

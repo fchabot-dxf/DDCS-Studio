@@ -66,7 +66,7 @@ test('a formfield-authored op: registerUserOp DERIVES def.bindingSpecs (emit) + 
         const template = [{
             type: 'user_root', params: {},
             uiChildren: [
-                { type: 'panel', params: { panel: 'form' } },
+                { type: 'feature_canvas', params: { panel: 'form' } },
                 { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) },
             ],
             children: [
@@ -137,7 +137,7 @@ test('DRIVE THE APP: a formfield-authored op RENDERS its fields in the live form
         ];
         const template = [{
             type: 'user_root', params: {},
-            uiChildren: [{ type: 'panel', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
+            uiChildren: [{ type: 'feature_canvas', params: { panel: 'form' } }, { type: 'param_group', params: { group: 'Pilot' }, children: U.bindingsToBlocks(specs) }],
             children: [{ type: 'assign', params: { var: '#1', value: 30 } }, { type: 'assign', params: { var: '#2', value: 2 } }],
         }];
         U.createUserOp(U.userOpFromStack(OPTYPE, 'FF Pilot', template, [], 'form'));
