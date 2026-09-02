@@ -7140,6 +7140,27 @@ these are the rows that actually stop a person authoring a built-in equivalent f
    > exists to prevent, now demonstrated on a SPECIFIC op with SPECIFIC missing declarations, not argued in the
    > abstract. Full account, including the corner empty-section/color findings and the pilot's own method:
    > WORK-LOG t2529.
+   >
+   > **⛔ t2531 — attempted, gate passed clean, the MANDATORY full suite caught a real regression the gate
+   > could not see, REVERTED. New blocker for the whole migration, not just surfacing.** `surfacingData.js`'s
+   > `buildSurfacingTwinStack()` nested 4 `group_box` nodes into `param_group.children`; the sizing pilot's own
+   > before/after gate passed with zero adjustments (30=30 rows, section-identical, `hasTreeLayout` confirmed
+   > still `false`, proven non-vacuous). But the full suite found 2 real, non-flaky failures (confirmed at
+   > `--workers=1` too): the Blocks-tab "Customize" flow's own canvas materialization
+   > (`userOps.materializeParamGroup`, called from both `registerUserOp` at boot and `devMode.editWizardDef`)
+   > shares that SAME `param_group.children` array for an entirely different purpose — a FLAT list of literal
+   > `param_field` Blockly block records it places on the canvas for the operator to author directly — gated by
+   > an idempotency check (`children.length > 0` ⇒ "already materialized") that this turn's non-empty-but-
+   > non-`param_field` `group_box` nodes defeat, silently. A tighter guard was tried and traced through: fixing
+   > the check just uncovers that `materializeParamGroup` then OVERWRITES `param_group.children` outright with
+   > its own flat records — destroying the group_box declaration the instant the app boots, trading one failure
+   > for reintroducing the exact bug this migration exists to fix. **`param_group.children` is architecturally
+   > overloaded between two owners (the declarative form-layout tree vs. the canvas materialization target) and
+   > this migration's technique cannot ship for ANY twin until that's resolved — not a surfacing-specific
+   > edge case.** Fully reverted (`surfacingData.js` back to byte-identical HEAD, the new gate test deleted, the
+   > two previously-failing tests re-run in isolation and confirmed green again). `hasTreeLayout` untouched
+   > throughout — this is not a t2371-shaped mistake, it's a genuinely new architectural fact the mandatory
+   > full-suite run was built to catch, and did. Full account: WORK-LOG t2531.
 2. ⭐⭐ **`widget:'tool-library'` / `widget:'thread-preset'` — a NAMING MISMATCH bug, found fresh this sweep, not
    seeded.** `formfield`'s own widget picker offers "Tool Library"/"Thread Preset" options that write
    `widget:'tool-library'`/`'thread-preset'` into the binding spec — but `formWidgets.js`'s own render-side map
