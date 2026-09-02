@@ -25,6 +25,7 @@ delivery mechanism. **Open it now.**
 | [`context/SETUP.md`](context/SETUP.md) | the studio, and home. what is wired to what. ⛔ the safety rules |
 | [`context/CHANNELS.md`](context/CHANNELS.md) | the vendor and the community — what is pending with each |
 | [`context/VERIFICATION.md`](context/VERIFICATION.md) | **which suite to run and what it costs** — the tier policy, where to watch progress, and the two traps that silently disable the tooling |
+| ⭐ [`context/RUNNING-THE-LOOP.md`](context/RUNNING-THE-LOOP.md) | **advisor/worker mechanics that have already cost real time** — never idle the worker on a non-decision · narrow scope at dispatch not mid-turn · `git add <path>` does not protect a shared FILE · name the tier |
 
 ⛔ **These are NOT project documentation.** They are the *operating context* — where the work happens, on what
 hardware, with whom. The project itself is documented in `ROADMAP.md`, `ARCHITECTURE.md`, `BACKLOG.md`, and
