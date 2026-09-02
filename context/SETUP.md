@@ -50,3 +50,14 @@ the two have different networks, different hardware, and different rules.
 - **Read-only is always safe**: file reads over SMB, `eng`/`setting` decoding, ping.
 - ⚠ A **motion-free macro that reports a value** is the right instrument for an offset question — not the
   pendant screen, whose dialog covers the Z row for exactly the window in which a modal offset is live.
+
+## DEPLOYMENT & ANALYTICS — where the web app actually runs, and how usage is measured
+
+- **`ddcs-studio.pages.dev`** serves `web/` raw, no build step, and auto-deploys on every push to `main` via
+  Cloudflare's own GitHub integration — this is **invisible to `gh run list`** (it's not a GitHub Actions run),
+  so don't look there to confirm a deploy landed. See `context/GIT-AND-TOOLING-HAZARDS.md` §15 for the live-site
+  caching gotcha this creates.
+- **Anonymous usage analytics** runs through a **standalone Cloudflare Worker**
+  (`ddcs-analytics.dansemur.workers.dev`), separate from the Pages deployment above, writing to Analytics
+  Engine. Both the web app and the desktop exe send beacons; a dev/own-traffic IP is tagged so the owner's own
+  usage doesn't pollute the real numbers.

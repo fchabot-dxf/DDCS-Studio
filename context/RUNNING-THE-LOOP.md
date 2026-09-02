@@ -400,4 +400,14 @@ Report one compact line per channel at each re-arm: files touched, building-or-g
 Never act on what a pulse observes (no kills, no amendments) without going through the usual gates first — it
 is strictly a read.
 
+### 32. Don't default to a cheaper model (Haiku, a local model) as the worker seat
+
+A trial run with a cheaper model as the worker produced a CORRECT code edit but a CONFIDENTLY WRONG
+self-verification — a false PASS reported on a criterion that was never actually tested. That is this
+project's own core failure mode (a green result that doesn't mean what it claims), so a worker whose
+verification is less reliable compounds the exact risk the two-agent loop exists to catch, even when its edits
+are fine. Reserve a cheaper/local worker for bulk, mechanical work with ONE shared, test-first-verifiable
+criterion (e.g. renaming a field identically across 30 twins, gated by a single spec that must go from red to
+green) — never as the default worker seat.
+
 ---

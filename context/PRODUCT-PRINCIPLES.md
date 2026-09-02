@@ -200,3 +200,27 @@ auto-behaviors, or generated files ship only if explicitly requested or approved
 one, the pass-back SURFACES it as a question with the need stated, never ships it "flagged" as a done deal.
 Every dispatched feature names its own consumer chain (the declared value → who reads it → what actually shows
 on screen), and the pass-back demonstrates that chain live, at the END of the chain, not the middle.
+
+## 17. A traverse/reposition target is always DERIVED from the next probe's own marker — never a free-standing field
+
+Where a wizard needs to know "where does the next move go," that answer comes from the marker the NEXT probe
+already places on the canvas — never a separately-declared, independently-editable form field holding the same
+coordinate. A free-standing field can drift from the marker it's supposed to describe; deriving it means the
+2D canvas, the 3D preview, and the emitted G-code cannot disagree with each other, by construction, because
+there is only one source for the number.
+
+## 18. A wizard's form rows order IDENTITY → GEOMETRY → TOOL/CUT, by declared row order — never per-wizard CSS
+
+`formWidgets.js`'s own row-building code cites this rule by name ("IDENTITY FIRST"). The three-band order is a
+DECLARED convention every wizard's own row order should follow, not something a wizard reaches for
+per-instance CSS to fix if it looks wrong — a form whose rows read out of band order has a declaration bug,
+not a styling one.
+
+## 19. A preview must reuse the SAME function the emit calls — provably, by reference identity — or declare itself independent with a stated reason
+
+There is no silent third option. Either the preview panel calls the exact function reference the real emit
+path calls (so a change to the emit logic is a change to what the preview shows, automatically, with nothing
+to keep in sync), or — when a preview genuinely needs to diverge (e.g. it draws an idealized/simplified path a
+literal emit trace wouldn't show usefully) — that divergence is a DECLARED, stated decision on the preview's
+own definition, not a quietly-forked copy of emit logic that will drift the first time the real emit path
+changes and nobody remembers to update the copy.

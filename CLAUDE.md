@@ -29,6 +29,7 @@ delivery mechanism. **Open it now.**
 | [`context/GIT-AND-TOOLING-HAZARDS.md`](context/GIT-AND-TOOLING-HAZARDS.md) | shell/git/test-runner traps in THIS repo — heredoc escapes, the shared git stash, the mem-server's stale preload, CSS token defaults |
 | [`context/VERIFICATION-DISCIPLINE.md`](context/VERIFICATION-DISCIPLINE.md) | what "green" has to mean here — verify the real symptom not a proxy, assert the value not the change, review the whole surface |
 | [`context/PRODUCT-PRINCIPLES.md`](context/PRODUCT-PRINCIPLES.md) | standing owner rulings on the product itself — nothing is precious, GUI over fields, no unrequested affordances |
+| [`context/DECISION-FRAMEWORK.md`](context/DECISION-FRAMEWORK.md) | the goal is a PERSON authoring, not the app declaring — and the 5-gate sieve a design fork resolves through before it's a subjective call |
 
 ⛔ **These are NOT project documentation.** They are the *operating context* — where the work happens, on what
 hardware, with whom. The project itself is documented in `ROADMAP.md`, `ARCHITECTURE.md`, `BACKLOG.md`, and

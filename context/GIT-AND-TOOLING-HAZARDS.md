@@ -180,3 +180,61 @@ resolution and carries no freezing risk), and put the fallback on the CONSUMING 
 at the element that reads it, which is the actual "resolves per-theme automatically" behavior this needs.
 Verify by measuring computed style across every theme that's supposed to differ — not by assuming correctness
 because the CSS mirrors an earlier pattern that happened to work for unrelated reasons.
+
+## 13. `npx playwright test` with no `cd` in the same command can silently fetch a SECOND Playwright version
+
+Playwright lives in `DDCS-Studio/node_modules`, not the repo root. The Bash tool's cwd persists across calls,
+so a `cd <repo root> && git …` (routine for a commit) leaves the shell there — a LATER `npx playwright test …`
+with no `cd` of its own then runs from the repo root, where there's no local install, so `npx` silently fetches
+a DIFFERENT version. The result is a collection-time error that points at an unrelated line:
+
+```
+Error: Playwright Test did not expect test.use() to be called here.
+"You have two different versions of @playwright/test" … "No tests found."
+```
+
+The file is fine (`npx playwright test --list` still collects it) — this is not a code-structure problem. Tell:
+`ls node_modules/@playwright` fails from the current cwd. Fix: put `cd DDCS-Studio` in the SAME command as
+every `npx playwright` call, never rely on a prior `cd` still being in effect. ⚠ **It can MASK a real failure**
+— if a full-suite run reported a spec as genuinely `failed` and a targeted re-run throws this instead, the
+failure is real; fix the cwd and re-run, don't conclude "spurious."
+
+A second, rarer cause with the SAME symptom (cwd already correct, after rapidly rewriting a spec file with
+several Write/Edit passes in quick succession): a stale transform cache. Fix — delete
+`"$TEMP/playwright-transform-cache"` (NOT `node_modules/.cache`, clearing that does nothing), then run the
+explicit file path (a bare substring filter collects flakier than an exact path).
+
+## 14. `bridge/bridge-app/**` print()/log output must stay pure ASCII — a non-ASCII character kills the whole gateway thread
+
+The gateway's Python console is cp1252, not UTF-8. An uncaught `UnicodeEncodeError` from a `print()`/log call
+inside `run_loop` crashes the entire background thread silently — no traceback surfaces where anyone is
+watching, the gateway just stops responding. Keep every string destined for that console pure ASCII (no
+em-dashes, no curly quotes, no Unicode arrows) — write the plain-ASCII equivalent instead.
+
+⚠ **The same class of bug, from the OTHER direction (2026-09-02):** round-tripping a UTF-8 file THROUGH
+PowerShell 5.1's `Get-Content` then `Set-Content` to patch a typo re-encodes it — em-dashes decode as cp1252
+and a BOM gets added, silently corrupting the file. This is exactly how a release commit message got mangled
+in git history (permanent once pushed — rule 2 forbids force-pushing a shared branch). **Never round-trip a
+UTF-8 text file through PowerShell to fix a small mistake in it — rewrite the file whole with the Write tool
+instead.** The two hazards share one root cause: this machine's default console/PowerShell encoding is cp1252,
+not UTF-8, and anything that reads-then-writes text through it without an explicit `-Encoding utf8` silently
+re-encodes.
+
+## 15. A live Cloudflare Pages deploy can report the new `version.json` while the PAGE still runs cached ES modules
+
+`ddcs-studio.pages.dev` serves `web/` raw with no build step and auto-deploys on push to `main` via
+Cloudflare's own GitHub integration — invisible to `gh run list` (it isn't a GitHub Actions run). A deploy can
+land and `version.json` can report the new version while the browser still executes a cached, OLDER copy of an
+ES module — so "the fix didn't work" reports from a live-site check can be a caching artifact, not a real
+regression. Verify a suspected live-site issue by fetching and grepping the SERVED file directly
+(`curl https://ddcs-studio.pages.dev/path/to/file.js | grep …`) before trusting either a user's report or your
+own browser — and if a deploy is genuinely stuck, an EMPTY commit does not unstick it; push a real content
+change.
+
+## 16. A companion tool exists for turning any website into a captioned tour video — `APPS/tourvid`
+
+Lives **outside** this repo at `C:\Users\danse\APPS\tourvid` (its own `package.json` + Playwright + ffmpeg), so
+it never touches the DDCS git tree. `record-segments.js <tour>` (preferred) records each section as its own
+clip then crossfade-stitches them — no live-navigation stalls, and a crossfade can carry meaning. Needs the
+full `Gyan.FFmpeg` (the Playwright-bundled build lacks h264/mp4/drawtext). First tour spec:
+`ddcs-studio.tour.js`. Re-shoot with one command rather than re-editing when the (fast-moving) site changes.

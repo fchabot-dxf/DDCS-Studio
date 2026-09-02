@@ -1714,3 +1714,86 @@ workflow already use, so the H table stays at zero. `[app-side: Studio must not 
 profile — RENDERRANCHY's call, flagged not built]`
 ⭐ Note Studio does not emit `G43` today: the only occurrence in `web/` is inside the V4.1's *extracted vendor*
 macro, never in an emit path.
+
+## Evidence sources & verification method — where the ground truth actually lives `[method note, migrated from local memory 2026-09-02]`
+
+Ground truth for a DDCS G-code FORM = the **dumps** under `bridge/controllers/`, never the wizard generator
+code or `dialect.js` comments (the code itself marks those "least certain and most likely to change"). Best
+references, ranked:
+
+- `tools/appcode/snippets.nc` — curated **"DDCS Compliant"** op snippets (safe-Z retract is `#99=0` then
+  `G53 Z#99` — variable, never a literal, and NO `G0`; the smart-probe form needs P/L/Q on `G31`).
+- `tools/appcode/words.nc` — word spelling + probe-read (`#51=#1925`) + WCS-register write
+  (`#[#70+1]=#53`/`#[#74]=#883`) idioms.
+- `assets/capture/<ts>/{SYSDISK,CNCDISK}/*.nc` — raw captured macros + real CAM output.
+- The **`eng` file** (each firmware dump ships one) is the param DICTIONARY — every setting-file slot named
+  (`#<idx> -t<type> -s1"<name>" -m<group>…`). **Parse it, never reverse-engineer indices from values, and
+  never trust a code comment claiming a mapping is "unknown" without checking the capture assets first** — a
+  gateway comment once said a register was "not mapped yet" when the dictionary had it the whole time.
+- **Skill vs. dump when they disagree:** the `~/.claude/skills/ddcs-expert/` community corpus (patterns from
+  real user files, a named-author math reference using the same two-operand `ATAN[y]/[x]` form Studio ships)
+  is COMMUNITY-ATTESTED — stronger than pure interpolation, still below a dump. Clean division: **dump = wins
+  on config/addressing/state** (param values, soft limits, WCS/tool tables, and DDCS's numbering rule
+  **Macro # = ENG/Pr param # + 500**); **skill = wins on runtime behavior** a static dump can't show (the
+  variable-priming freeze bug, IF/GOTO syntax) — trust it but verify on-machine where it overlaps a dump.
+  Confirmed variable namespace: probe status `#1920-1922`, probe trigger `#1925-1927`, machine DRO `#880-883`,
+  WCS base `#805+` (stride 5), tool table `#1430+T-1`; HMI `#1505=1(msg)` blocking / `#1505=-5000(msg)` toast.
+
+## How an operator opens the CAM page on the real controller `[CONFIRMED, from the community corpus, migrated 2026-09-02]`
+
+Bind a panel **K-key (K1–K7) to function code 1399** (the K-key parameter sits in the `Pr210–252` range), then
+press it — tap a slot icon → its parameter form → enter values → Start. (Documented path; an additional
+touch/menu route may also exist, unconfirmed.) **A slot only appears after its `CAM/` folder is copied to
+INTERNAL storage** — running a macro straight off the USB silently does nothing, the single most common
+community failure report ("Start does nothing"). Install: FAT32 USB with a root `CAM/` folder → power off →
+insert → power on → **F2 → Program → F1 (U-disk) → cursor on CAM → F4 (copy to local)**. Slot labels/defaults
+come from the `eng`(+`chs`) language file; Studio's own pack ships `eng-additions.txt` to MERGE, never replace.
+Studio-built packs use slots **cam22+** (cam0–9 = factory, cam10–21 = community).
+
+## Rotary probing has NO dumped ground truth — the byte baseline is the wizard's own emit `[TO TEST on-machine]`
+
+No confirmed rotary-probing macro exists anywhere in the DDCS evidence (community corpus, firmware backup,
+example macros, `appcode/snippets.nc` all return zero rotary-probe hits — the only 4th-axis firmware content
+is A-axis homing). So for the rotary port, "byte-identical to ground truth" resolves to **"byte-identical to
+the current wizard emit"** — golden-snapshot the existing output as the baseline rather than chasing a dump
+that doesn't exist. It is still SAFE because every primitive the rotary ops fold to (`G31 ..Q1`, status
+`IF #192x!=2`, DRO `#88x`, stride-5 WCS, G53-with-#var, two-operand `ATAN`) is dump-confirmed elsewhere — what
+is Studio-original / not machine-validated is the rotary SHAPE itself: the 3-point-fit centre solver and the
+A-clock. The A-axis WCS column (`#808 = base+3`) is extrapolated, not directly dumped (only X#805/Y#806 appear
+in the one capture that shows the pattern) — flag it as such if it ever needs re-deriving.
+
+## `#1504` (requested tool) writability is UNCONFIRMED — do not build an inline preamble on it `[TO TEST]`
+
+`#1504` = "requested tool [Tn M6]" and `#1300` = "tool in spindle" — the T.nc generators dispatch on both, but
+**`#1504` appears ONLY in Studio's own generator + tests, never in a real M350 dump or the community-attested
+corpus.** The controller populates it when a `Tn M6` fires; whether user-code can write it directly
+(`#1504 = n`) is unconfirmed. By contrast `#1300` **is** confirmed directly writable (`#1300 = 1` appears in a
+real community multi-tool pattern). Consequence: an inline tool-change fallback cannot reliably set the
+requested tool without a real `Tn M6` — Studio's `atc_change` inline fallback greys the fixed-tool field
+instead of emitting an unconfirmed `#1504=n` preamble. A register NAME appearing in the generator is not
+confirmed usage — verify against a real dump before trusting it, the same caution `machine-facts-vs-macro`
+names for Pr-value facts.
+
+## M350-LiveG's own register 3000 (G-code inject) is already tracked above (§ line ~1466); its OWN keypress register is NOT yet `[EVIDENCE, unattested]`
+
+The OEM's `M350-LiveG` app (github `foinnc/M350-LiveG`) ALSO writes **register 6908** (fn 0x10, 2 registers:
+`keyCode` low 16 bits / `actionState` high 16) as a **virtual KEYPRESS** — X± `0x015e`/`0x015f`, Y±
+`0x0160`/`0x0161`, Z± `0x0162`/`0x0163`, A± `0x0164`/`0x0165`, B± `0x0109`/`0x0166`, START `0x0148`, PAUSE
+`0x0149`, RESET `0x0147`, HF/LF `0x0184`, F1–F6 `0x0600`–`0x0605`. Read off another project's own working
+implementation (`foinnc/M3X-M350-IoT-Bridge`), never bench-verified on this controller — evidence, not
+attestation, same caveat as everything else sourced from that repo. **One write to 6908 can start/pause/reset/
+jog a real machine** — gate any use of it the same way `context/PRODUCT-PRINCIPLES.md` §14 (read-only when the
+owner is not physically at the machine) already requires; do not fold it into the read-only live-DRO work
+(register 7080/7260/10002, already tracked above) as though it were the same risk class.
+
+## M350 hardware V1 vs V2 — a firmware-era split, not a capability split `[researched 2026-07-31, agent report, sources verified]`
+
+This machine (CNC-FAIRY) is **hardware V1**. V1 and V2 run different embedded-OS builds (kernel 2.6.26 vs.
+3.2.0 → a different SoC/board, inferred) and ship different firmware zip families (`V1_*` via `install/`,
+`V2_*` via `psys/`) — a HARDWARE split, not a tier; V1 is not abandoned, every release including 2026-04-10
+ships both. The macro/CAM layer is byte-identical between the two (measured) — Studio's CAM deploy route is
+rev-agnostic, no defect there. **The Modbus SLAVE unlock (P279=Slave, live DRO + virtual keypress) needs
+firmware ≥ 2025-12-11-00 and applies to BOTH V1 and V2 equally** — it was previously mis-suspected as V2-only;
+that is refuted. Serial DB9 5V supply (powers an M3X-style accessory) is present on all V2 units but only SOME
+V1 units — check with a multimeter before assuming it's there, or power any external device from USB-C
+instead.

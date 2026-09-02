@@ -174,3 +174,30 @@ one coherent color. Settled explicitly: the default scheme is ONE color per bloc
 — a block's SECTION (which mouth it lives in — Presentation, Execution, a pendant-field mouth) is conveyed by
 its CONTAINER, never a second color on the block itself. Whatever gets built for section/mouth visualization
 must not muddy or override a block's own accurate type-color.
+
+## 14. A defect where one NAME silently means two different things fails with no error — hunt one layer above the symptom
+
+The tell is that nothing throws, nothing looks wrong at the point where the bug is finally noticed — two
+different code paths (or two different people, two different turns) each use the same identifier believing it
+means the one thing they intend, and the collision is invisible until the two meanings' consequences actually
+diverge. When a defect has this shape, the fix is not at the symptom site — it's one layer up, at whichever
+declaration lets the same name mean two things. And when the fix has two halves (rename one meaning, guard
+the other), verify each half SEPARATELY — a test that only exercises the combined, post-fix state can pass
+even if one half silently didn't take effect.
+
+## 15. Expert-only test evidence is evidence about the MINORITY install base
+
+V4.1/V3-DM500 machines likely outnumber Expert/M350 installs among actual users, yet every spec in this suite
+boots the Expert profile by default (a config choice, not a market signal). So a green suite is direct evidence
+about the Expert config specifically — extending that confidence to "the app works" without at least spot-
+checking the V4.1 profile is extrapolating from the smaller population. A V4.1-only defect is an escalation,
+not a footnote, precisely because it is more likely to be what most users actually hit.
+
+## 16. A test that builds its state programmatically (`ddcsLoadBlockStack`, hand-JSON) can be green while the feature it claims to guard is entirely UNREACHABLE through the real UI
+
+This is a more dangerous shape than rule 1's "a green test asserts the wrong property" — here the test is
+asserting a TRUE property, correctly, about state that a real user's gesture never actually produces. A spec
+claiming to guard a user-reachable feature is not evidence of that unless its own fixture drives the real path
+in — `openWiz`/`insertWiz`/`showApp`/an actual mouse gesture — not just a pure function or emitter, which
+programmatic state-construction IS legitimate evidence for. Before trusting a green spec as proof a feature
+works for a real user, check which kind of evidence it actually is.
