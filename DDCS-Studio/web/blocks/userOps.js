@@ -751,6 +751,36 @@ export function handleBindingsFromStack(children, realBindings) {
                 const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
                 const anchor = { kind: 'radial', cx, cy, a, rScale, minR: numOrNull(p.minR), maxR: numOrNull(p.maxR), label: p.label || 'Ø' };
                 out.push(attach(String(p.field || 'dia'), gid, 'r', anchor));
+            } else if (b.type === 'scale_handle') {
+                const gid = 'sh' + (++n);
+                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
+                const baseField = String(p.baseField || 'w');
+                const anchor = { kind: 'scale', ax, ay, baseField, min: numOrNull(p.min), max: numOrNull(p.max), label: p.label || 'scale' };
+                const entry = attach(String(p.field || 'scale'), gid, 'scale', anchor);
+                // baseField is READ-ONLY context (never merged onto — it may already carry its own, unrelated
+                // handle) but must still resolve, same fail-visibly doctrine as `field` itself.
+                if (!byParam.has(baseField)) entry.anchorUnresolved = true;
+                out.push(entry);
+            } else if (b.type === 'shear_handle') {
+                const gid = 'sr' + (++n);
+                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                const hField = String(p.hField || 'height');
+                const anchor = { kind: 'shear', ax, ay, hField, label: p.label || 'slant°' };
+                const entry = attach(String(p.field || 'slant'), gid, 'slant', anchor);
+                // hField is READ-ONLY context (never merged onto — it may already carry its own, unrelated
+                // handle) but must still resolve, same fail-visibly doctrine as scale_handle's baseField.
+                if (!byParam.has(hField)) entry.anchorUnresolved = true;
+                out.push(entry);
+            } else if (b.type === 'proj_length_handle') {
+                const gid = 'pl' + (++n);
+                const cx = Number(p.cx) || 0, cy = Number(p.cy) || 0;
+                const axisX = String(p.axis || 'X').toUpperCase() === 'X';
+                const scale = p.scale === '' || p.scale == null ? 2 : Number(p.scale);
+                const min = (p.min === '' || p.min == null) ? null : Number(p.min);
+                const max = (p.max === '' || p.max == null) ? null : Number(p.max);
+                const anchor = { kind: 'projLength', cx, cy, nx: axisX ? 1 : 0, ny: axisX ? 0 : 1, scale, min, max, label: p.label || 'width' };
+                out.push(attach(String(p.field || 'width'), gid, 'plen', anchor));
             }
         }
     }
@@ -828,7 +858,32 @@ export function handleBindingsToBlocks(bindings) {
         minR: b.anchor.minR != null ? String(b.anchor.minR) : '', maxR: b.anchor.maxR != null ? String(b.anchor.maxR) : '',
         label: b.anchor.label || 'Ø',
     } }));
-    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids];
+    // scale_handle: one binding per handle (role 'scale'), like length_handle/radial_handle. baseField is read
+    // back off the anchor's own literal string — it is not itself a binding role here (it's read, not merged).
+    const scales = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'scale' && b.role === 'scale');
+    const scaleKids = scales.map((b) => ({ type: 'scale_handle', params: {
+        field: b.param, baseField: b.anchor.baseField || 'w', value: b.default != null ? String(b.default) : '',
+        ax: String(b.anchor.ax || 0), ay: String(b.anchor.ay || 0),
+        min: b.anchor.min != null ? String(b.anchor.min) : '', max: b.anchor.max != null ? String(b.anchor.max) : '',
+        label: b.anchor.label || 'scale',
+    } }));
+    // shear_handle: one binding per handle (role 'slant'), like scale_handle. hField is read back off the
+    // anchor's own literal string — it is not itself a binding role here (it's read, not merged).
+    const shears = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'shear' && b.role === 'slant');
+    const shearKids = shears.map((b) => ({ type: 'shear_handle', params: {
+        field: b.param, hField: b.anchor.hField || 'height', value: b.default != null ? String(b.default) : '',
+        ax: String(b.anchor.ax || 0), ay: String(b.anchor.ay || 0), label: b.anchor.label || 'slant°',
+    } }));
+    // proj_length_handle: one binding per handle (role 'plen'), like length_handle/radial_handle.
+    const projs = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'projLength' && b.role === 'plen');
+    const projKids = projs.map((b) => ({ type: 'proj_length_handle', params: {
+        field: b.param, value: b.default != null ? String(b.default) : '',
+        axis: b.anchor.nx ? 'X' : 'Y', cx: String(b.anchor.cx || 0), cy: String(b.anchor.cy || 0),
+        scale: String(b.anchor.scale != null ? b.anchor.scale : 2),
+        min: b.anchor.min != null ? String(b.anchor.min) : '', max: b.anchor.max != null ? String(b.anchor.max) : '',
+        label: b.anchor.label || 'width',
+    } }));
+    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids];
     if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }

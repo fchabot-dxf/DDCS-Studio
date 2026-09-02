@@ -520,6 +520,60 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             }
             continue;
         }
+        // t2533 (BACKLOG #71) — `scale_handle` declares kind 'scale': a FIXED literal anchor (ax/ay, matching
+        // length's own shape) + ONE bound param (role 'scale', like length/radial) PLUS a second, READ-ONLY
+        // param (`anchor.baseField`) this branch reads live for the current unscaled base width —
+        // canvasWidgets.js's own `scaleX` gesture needs `edgeX` (the CURRENT span, base×factor), not a plain
+        // `ax + value` the way `length`'s field already holds a raw distance.
+        if (anchor && anchor.kind === 'scale') {
+            const scB = groups[gid][0];
+            items.push({ kind: 'hole', x: anchor.ax, y: anchor.ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed, not draggable
+            if (scB && _writable(scB.param)) {
+                const val = num(params[scB.param]);
+                const base = num(params[anchor.baseField]);
+                decls.push({
+                    type: 'scaleX', id: gid + '_scale', field: scB.param, ax: anchor.ax, ay: anchor.ay,
+                    edgeX: anchor.ax + base * val, value: val, min: anchor.min, max: anchor.max, label: anchor.label || 'scale',
+                });
+            }
+            continue;
+        }
+        // t2533 (BACKLOG #71) — `shear_handle` declares kind 'shear': a FIXED literal baseline anchor (ax/ay,
+        // matching length/scale's own shape) + ONE bound param (role 'slant') PLUS a second, READ-ONLY param
+        // (`anchor.hField`) this branch reads live for the current height the slant offset is measured over —
+        // canvasWidgets.js's own `shear` gesture needs `d.h`, the same read-only-companion shape scale_handle's
+        // own `baseField` already proved.
+        if (anchor && anchor.kind === 'shear') {
+            const srB = groups[gid][0];
+            items.push({ kind: 'hole', x: anchor.ax, y: anchor.ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed, not draggable
+            if (srB && _writable(srB.param)) {
+                const val = num(params[srB.param]);
+                const h = num(params[anchor.hField]);
+                decls.push({
+                    type: 'shear', id: gid + '_shear', field: srB.param, ax: anchor.ax, ay: anchor.ay,
+                    h, value: val, label: anchor.label || 'slant°',
+                });
+            }
+            continue;
+        }
+        // t2533 (BACKLOG #71) — `proj_length_handle` declares kind 'projLength': a FIXED centre (cx/cy) + a
+        // CARDINAL axis (nx/ny, 1/0 or 0/1) + ONE bound param (role 'plen'). SIMPLER than scale/shear: the
+        // gesture's own `off` (current half-extent) SELF-DERIVES from this same field's value (`off =
+        // value/scale`, matching slotView.js's/the byRole.width branch's own real usage) — no companion param.
+        if (anchor && anchor.kind === 'projLength') {
+            const plB = groups[gid][0];
+            items.push({ kind: 'hole', x: anchor.cx, y: anchor.cy, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the centre itself is fixed, not draggable
+            if (plB && _writable(plB.param)) {
+                const val = num(params[plB.param]);
+                const scale = anchor.scale || 1;
+                decls.push({
+                    type: 'projLength', id: gid + '_proj', field: plB.param, cx: anchor.cx, cy: anchor.cy,
+                    nx: anchor.nx, ny: anchor.ny, off: val / scale, scale, min: anchor.min, max: anchor.max,
+                    value: val, label: anchor.label || 'width',
+                });
+            }
+            continue;
+        }
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;

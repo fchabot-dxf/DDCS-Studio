@@ -94,6 +94,9 @@ const HANDLE_ANCHOR_FIELDS = {
     point_handle: ['fx', 'fy'],
     rect_handle: ['field', 'fieldH'],
     radial_handle: ['field'],
+    scale_handle: ['field', 'baseField'],   // t2533 — baseField is read-only (never merged onto), but still a must-match picker
+    shear_handle: ['field', 'hField'],   // t2533 — hField is read-only (never merged onto), but still a must-match picker
+    proj_length_handle: ['field'],
 };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
@@ -357,6 +360,10 @@ const optionsFor = (def, field) => {
     // SELECTS.axis (X/Y/Z/A/B/C) to the two the `length` canvas gesture actually supports (canvasWidgets.js's
     // own `d.axis==='x'` check is the ceiling — a 1D drag along one FeatureCanvas plane axis, never Z/A/B/C).
     if (field === 'axis' && def.type === 'length_handle') return ['X', 'Y'];
+    // t2533 (BACKLOG #71) — proj_length_handle's own axis: same narrowing as length_handle's, same ceiling
+    // (canvasWidgets.js's own `projLength` gesture generalizes to any (nx,ny) unit vector, but this block only
+    // ever picks a cardinal one — see its own header for why a free vector pair is the wrong declared shape).
+    if (field === 'axis' && def.type === 'proj_length_handle') return ['X', 'Y'];
     // t2521 (BACKLOG #71) — rect_handle's own valueField: WHICH declared param the handle's displayed number
     // reflects when both field/fieldH are active (canvasWidgets.js's own t2495 routing) — exactly two legal
     // values, the block's own two field NAMES, never a free-typed string.

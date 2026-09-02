@@ -1,0 +1,27 @@
+/**
+ * wizards/ops/scaleHandle.js — the SCALE-HANDLE GUI block (t2533, BACKLOG #71's fifth gesture — a horizontal
+ * SCALE-FACTOR handle from a fixed x-anchor, canvasWidgets.js's own `scaleX` gesture, e.g. text's own width
+ * handle: a 1D drag that writes a FACTOR, not a raw distance).
+ *
+ * Same shape as `length_handle`/`point_handle`/`rect_handle`/`radial_handle` (their own headers have the full
+ * account, including the t2525 fix): `field` is a MUST-MATCH PICKER naming an EXISTING param an "Op Param"
+ * `formfield` elsewhere in the stack already binds — `handleBindingsFromStack`/`attach()` merges this handle's
+ * anchor onto the real binding, so dragging reaches emit for real. Nests inside `feature_canvas`'s own mouth,
+ * fixed literal anchor (ax/ay).
+ *
+ * WHERE IT GENUINELY DIFFERS — `scaleX` is the first gesture here whose OWN rendered position depends on a
+ * SECOND param this handle does not write: canvasWidgets.js's own `edgeX` is the CURRENT (unscaled-base ×
+ * factor) span, not a plain `ax + value` (contrast `length`, where `value` already IS the world distance).
+ * `baseField` is a SECOND must-match picker — an EXISTING param read for its CURRENT VALUE (the unscaled base
+ * width), never itself made draggable by this block. It still has to resolve (fail-visibly, same doctrine as
+ * `field`): `handleBindingsFromStack` marks the whole handle `anchorUnresolved` if EITHER picker's target is
+ * missing, but only `field`'s own binding gets the merged anchor — `baseField` is read, not re-attached, so a
+ * separate handle already anchoring that param (e.g. a `length_handle` on the base width itself) is untouched.
+ */
+export const scaleHandleBlock = {
+    type: 'scale_handle', label: 'scale handle', category: 'Wizard Layout', kind: 'scale_handle',
+    help: 'A draggable horizontal SCALE-FACTOR handle on the feature canvas, from a fixed anchor (ax, ay). `field` must name an EXISTING "Op Param" form field elsewhere in the stack — dragging writes it for real (it reaches the emitted G-code). `baseField` must name a SECOND existing param whose current value is the unscaled base width — read-only, it positions the handle but is never itself written by this block.',
+    defaults: { field: 'scale', baseField: 'w', value: '1', ax: '0', ay: '0', min: '0.1', max: '', label: 'scale' },
+    fields: ['field', 'baseField', 'value', 'ax', 'ay', 'min', 'max', 'label'],
+    emit: () => [],   // metadata only — the BLOCK produces no G-code itself; the param it names (once resolved) does, via the merged real binding
+};
