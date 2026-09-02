@@ -69333,3 +69333,13 @@ handle is socket-less, sim/form-only, by construction). Round-trip proven at the
 precedent. `git status` clean of anything outside this turn's own intended files. `git diff` checked on
 `BACKLOG.md` before staging each gesture's own commit (three separate checks, one per commit, per the
 dispatch's own repeated instruction).
+
+### FULL SUITE RESULT (the one deferred from earlier in this entry)
+
+`--workers=4`: **3051 passed, 1 failed, 7 flaky, 26 skipped (34m16s)**. The one failure,
+`open-as-modal-1625`, is this session's own already-documented contention flake (BACKLOG #56 — seen at t2507,
+t2515, and t2517's own full runs, always at `--workers=4`, never in isolation). Re-ran it alone at
+`--workers=1`: **3 passed, 0 failed** — confirmed contention, not a regression, before concluding. Nothing in
+this turn's own diff (panelTypes.js/userOps.js/blockEmitter.js/bridge.js/wizards/ops/index.js, three new block
+files, three new spec files) touches that test's own territory (a preview-chrome/modal-reopen path,
+unconnected to feature_canvas's mouth or any handle gesture).
