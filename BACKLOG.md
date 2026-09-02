@@ -7002,6 +7002,64 @@ interactive handles.
 > were NOT evaluated (the instruction is to stop at the first mismatch, not catalog the rest), though
 > `translate`'s own `xs`/`ys` variable-length field-list arity is flagged as a likely second mismatch requiring
 > Blockly mutator machinery this pilot's shape never needed. Full account: WORK-LOG t2533.
+>
+> **📏 t2537 — AUTHORING ERGONOMICS MEASURED: 32 real UI actions for 2 params + 1 REAL (emit-wired) handle —
+> up from t2509's 27 (no handle) and t2523's 30 (2 DECORATIVE handles, neither emit-real). 72% of those 32
+> are IRREDUCIBLE; 3 named mechanisms account for the reducible rest, ranked by measured saving. Assessment
+> only — zero product code touched.** Re-drove the exact t2509/t2523 build (width/height, real palette drags,
+> real save, real reload) but wired `rect_handle` for real this time (`FIELD`/`FIELDH` → the width/height
+> formfields, t2525's own current best-practice) and dropped the DECORATIVE `point_handle` t2523 also carried
+> — carrying it forward is no longer even POSSIBLE: t2525's own save-time guard (`handleTargetReport`) now
+> REFUSES to save any stack with an unresolved handle target, confirmed live (a native `alert()`, no dialog
+> handler registered, silently stalled the first attempt until traced). A real, freshly-discovered authoring
+> fact: today there is no "decorative placeholder" middle ground for a handle — wire it to a real param or
+> remove it.
+>
+> **The count, tagged action-by-action as it happened** (not reconstructed after): 23 IRREDUCIBLE, 6 CEREMONY,
+> 3 CEREMONY-TRAP (the deferred-`ATOMTYPE` split + one Blockly drag-snap corrective nudge) = 32. Per-formfield
+> unit cost is 7 actions (place + PARAM + LABEL + DFLT + BINDMODE + KEY + ATOMTYPE) — 5 of those 7 are
+> genuinely irreducible authoring decisions; 2 (LABEL, BINDMODE) are not. Extrapolating this MEASURED per-unit
+> rate to surfacing's own ~20 bindable params (matching t2509's own extrapolation method): **~155 actions** —
+> 15 one-time (root/canvas/panel/handle+its 2 wiring clicks/param_group/group-title/the 4-block execution
+> chain+its 1 dropdown/3 save steps) + 20 × 7 per-field.
+>
+> **TOP 3 reductions, ranked by MEASURED saving, not cleverness:**
+> 1. **`formfield.BINDMODE` defaults to `'opparam'`.** Every single formfield built anywhere this session (t2509
+>    through t2537, ~15 of them across multiple turns) used "Op Param" — zero counterexamples. Saves 1
+>    click/field → **~20 actions at full parity**. Build cost: LOW — a literal default-value change in
+>    `formFieldBlock`'s own `defaults` object, one line.
+> 2. **`formfield.LABEL` auto-derives from `PARAM` (Title-Case) when left empty, still overridable.** Saves 1
+>    click/field for any author who accepts the sensible default → **up to ~20 actions at full parity** (real
+>    uptake depends how often an author wants a different label — a genuine upper bound, not a guaranteed one).
+>    Build cost: LOW-MEDIUM — an on-`PARAM`-change handler that back-fills `LABEL` only while still empty, the
+>    same "never clobber an explicit value" convention `data-op-gated` already establishes elsewhere.
+> 3. **The `ATOMTYPE` ordering constraint (the split this turn tagged CEREMONY-TRAP) is a ZERO-BUILD-COST fix
+>    today, not a product change — sequence execution atoms BEFORE presentation form fields.** This turn's own
+>    build hit the split because it authored formfields BEFORE surfaceraster existed (a natural
+>    "presentation-first" instinct); placing the EXECUTION chain first instead means every `ATOMTYPE` picker
+>    resolves on its FIRST visit, no revisit ever needed — **0 actions removed from the raw count, but up to
+>    ~20 avoided SECOND VISITS at full parity** (a flow/context-switch cost the action count alone
+>    undercounts). Recommended: surface this as in-app guidance (the `ATOMTYPE` picker's own empty-state
+>    message, or the Wizard Form palette category's help text) rather than a mechanism change — the dispatch's
+>    own instinct that this was the highest-value KIND of finding was right, but its cheapest fix is words, not
+>    code.
+>
+> **With reductions 1+2 shipped: per-field cost drops 7→5, full-parity projection drops ~155→~115 (a ~40-action,
+> ~26% cut).** Reduction 3 stacks on top as avoided revisits, a different unit, not simply additive.
+>
+> **A fourth trap, flagged but NOT ranked (it isn't an action-count reducer, it's a SILENT-FAILURE risk)**: the
+> stale-search-flyout interception this session's own test harness has hit and coded around since t2509 —
+> after ANY palette search+drag, the search box must be explicitly cleared or the NEXT click can silently land
+> on the flyout overlay instead of its intended target, with NO error, NO visual signal, nothing. This turn's
+> own harness clears it defensively before every click; a REAL author gets no such help and no warning when it
+> happens to them — their field edit "does nothing" and nothing tells them why. Worth its own look, separate
+> from ergonomics-by-action-count.
+>
+> **Honest answer to the dispatch's own explicit ask**: most of the 32 (72%) — and, extrapolated, most of the
+> ~155 at full parity — ARE irreducible; this is a real, load-bearing finding, not a hedge. The reducible slice
+> is concentrated in exactly 3 named, per-field mechanisms, not spread thin across many small things — which is
+> what makes them worth fixing FIRST rather than a broader ergonomics pass. Screenshot:
+> `verification/t2537-ergonomics-build.png`. Full account: WORK-LOG t2537.
 
 ---
 

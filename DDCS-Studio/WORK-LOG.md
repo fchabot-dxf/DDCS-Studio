@@ -70045,3 +70045,132 @@ DROP (already covered elsewhere, cited): `dataop-live-values-postinstantiate-not
 
 22+23+22+29 = 96, every one of the 96 filenames accounted for exactly once (cross-checked by re-listing against the four buckets above after drafting, same discipline t2519 used). Every claim naming a specific file/function/register/status was checked against the current tree, BACKLOG.md, or `bridge/controllers/expert-m350/FINDINGS.md` before being migrated (the FINDINGS.md cross-check in particular caught that the bulk of two Modbus-register memories was already superseded by that file's own, more current, live-tested content -- migrated only the genuinely new 6908/V1-V2 pieces, not a wholesale re-paste). `test:node` 238/238 green, unchanged -- no product code touched this turn, confirms the dispatch's own stated tier. `git status` clean of product files -- only `CLAUDE.md`, `bridge/controllers/expert-m350/FINDINGS.md`, five existing `context/*.md` files, and one new `context/DECISION-FRAMEWORK.md`, linked from `CLAUDE.md`'s own table. `git diff` checked on `CLAUDE.md` before staging. Local memory originals: file count in `%USERPROFILE%/.claude/projects/.../memory/` confirmed unchanged (183, same as before this turn) -- left untouched per the dispatch's explicit "do not delete," migration first, cleanup is the owner's own later call.
 
+## t2537 -- AUTHORING ERGONOMICS: measure where the actions go. Assessment only, zero product code touched.
+
+### THE ASK
+
+Authoring works (emit byte-identical to a built-in, a form, and now -- since t2525/t2533 -- a handle that
+actually drives the emitted G-code), but t2509 measured 27 real UI actions for 2 of surfacing's ~20 bindable
+params, and t2523 re-measured 30 for the same 2 params plus 2 handles. Full parity extrapolates past 150
+actions. MEASURE it, don't fix it: instrument the from-scratch build, tag every action IRREDUCIBLE vs
+CEREMONY as it happens, then propose the top 3 reductions ranked by MEASURED saving with a rough build cost
+each -- and say plainly if most of it turns out to be irreducible, since that's a legitimate finding too.
+
+### METHOD -- re-drive the exact t2509/t2523 build, but wire the handle for real this turn
+
+Wrote a scratch spec (`tests/_t2537-ergonomics-measure.spec.js`, deleted before this commit, matching t2523's
+own convention) reusing the exact palette-drag/mouth-drop/field-edit harness this session already refined
+across t2509/t2523/t2525/t2533 (`searchFor`/`dragFlyoutBlockTo`/`mouthPoint`/`stackBottomPoint`/
+`setDropdownField`/`setTextField`/`setPickerField`), adding one thing: a `tick(category, label)` counter
+called at the exact moment each real action fires, so the totals are READ OFF THE LOG, never eyeballed or
+reconstructed afterward. Built the SAME surfacing-equivalent (width/height via Op Param -> `surfaceraster`'s
+own w/h) t2509/t2523 built, but wired `rect_handle`'s own `FIELD`/`FIELDH` pickers to `width`/`height` for
+REAL -- t2525's own must-match-picker merge, the current best-practice, unlike t2523's decorative handles
+(neither of which ever reached emit).
+
+**A build choice forced by a mechanism this session itself shipped, not a measurement artifact**: t2523's own
+build also carried a DECORATIVE `point_handle` (`fx:px fy:py`, never wired to a real param). Carrying that
+forward this turn is no longer even POSSIBLE -- t2525's save-time guard (`handleTargetReport`, `devMode.js`'s
+own save gate) now REFUSES to save any stack carrying an unresolved handle target. Confirmed live, the hard
+way: the first attempt's Save button silently did nothing (a native `alert()` fired with no `page.on('dialog',
+...)` handler registered, stalling the whole test on a `waitForSelector` that could never succeed) --
+traced to the guard, not a harness bug, once a dialog handler was added and the alert text read: exactly the
+fail-visibly mechanism working as designed. Dropped `point_handle` from this build for that reason (wiring it
+would need 2 more, unrelated params -- px/py -- outside this measurement's own 2-param frame, and t2509/t2523
+never scoped it that way either). **This is itself a genuine, freshly-discovered authoring fact worth
+recording on its own: today there is no "decorative placeholder" middle ground for a handle -- an author
+either wires it to a real param or removes it, there is no third option that still saves.**
+
+Two harness traps hit and fixed live, same discipline as every prior from-scratch build this session (none a
+product bug): (1) a stale search-box value intercepted the raw `.blk-dev-savebtn` click the same way t2523's
+own header already documents for field edits -- `clearSearch()` was missing before that ONE click, added; (2)
+a search term of `'wcs select'` matched nothing (the block's own label is literally `'WCS'`) -- fixed to match
+the real label.
+
+### THE COUNT -- read off the log, not estimated
+
+```
+23 IRREDUCIBLE, 6 CEREMONY, 3 CEREMONY-TRAP = 32 actions, for 2 params + 1 REAL (emit-wired) handle
+```
+
+Directly comparable to the two prior turns: t2509 = 27 (2 params, no handle at all). t2523 = 30 (2 params, 2
+DECORATIVE handles, neither emit-real). t2537 = 32 (2 params, 1 REAL handle -- dropping the now-impossible
+decorative `point_handle` roughly offset by the 2 new `FIELD`/`FIELDH` wiring clicks the merge mechanism
+needs). **+2 actions bought something t2523's own +3 did NOT: a handle whose drag actually reaches the
+emitted G-code**, closing the gap t2523's own VERDICT named as only a partial close of BACKLOG #71.
+
+Per-formfield unit cost, read directly off the log: 7 actions (place + PARAM + LABEL + DFLT + BINDMODE + KEY +
+ATOMTYPE). 5 of those 7 are genuinely irreducible authoring decisions (which block, which param name, which
+default, which key, which atom); 2 (LABEL, BINDMODE) are not -- see the reduction proposals below.
+
+### THE EXTRAPOLATION, using this turn's own MEASURED per-unit rate (not a fresh guess)
+
+15 one-time actions (root, canvas, panel dropdown, the handle placement + its 2 wiring clicks, param_group,
+its title text, the 4-block execution chain + 1 dropdown, 3 save steps) + 20 fields x 7 per-field = **~155
+actions** for full parity with surfacing's own ~20 bindable params -- consistent with, and now a measured
+refinement of, t2509's own "past 150" estimate.
+
+### TOP 3 REDUCTIONS, ranked by MEASURED saving
+
+1. **`formfield.BINDMODE` defaults to `'opparam'`.** Every formfield built anywhere this session (t2509
+   through this turn, roughly 15 of them across 5 separate turns) used "Op Param" -- zero counterexamples.
+   Saves 1 click/field -> **~20 actions at full parity**. Build cost LOW: a one-line default-value change on
+   `formFieldBlock`'s own `defaults` object.
+2. **`formfield.LABEL` auto-derives from `PARAM` (Title-Case) when left empty, still overridable.** Saves 1
+   click/field for an author who accepts the sensible default -> **up to ~20 actions at full parity** (a real
+   upper bound, not a guarantee -- depends how often an author wants a different label). Build cost
+   LOW-MEDIUM: an on-`PARAM`-change handler that back-fills `LABEL` only while it's still empty, the same
+   never-clobber-an-explicit-value convention `data-op-gated` already establishes elsewhere in this codebase.
+3. **The `ATOMTYPE` ordering constraint is a ZERO-BUILD-COST fix TODAY, not a product change.** This turn's
+   own CEREMONY-TRAP tags on the two `ATOMTYPE` picker clicks flag a SPLIT (author formfields, place atoms
+   later, come BACK to each formfield a second time) caused by this turn's own "presentation-first" build
+   order -- not a forced constraint. Placing the EXECUTION chain (the atoms) BEFORE authoring PRESENTATION
+   form fields that bind to them means every `ATOMTYPE` picker resolves on its first visit, no revisit ever
+   needed. **0 actions removed from the raw count** (the click itself still happens), **but up to ~20 avoided
+   SECOND VISITS at full parity** -- a flow/context-switch cost the raw action count doesn't capture at all.
+   Cheapest fix is words, not code: surface this as in-app guidance (the `ATOMTYPE` picker's own empty-state
+   message, or the Wizard Form palette category's help text).
+
+**With 1+2 shipped: per-field cost drops 7->5, full-parity projection drops ~155->~115 (a ~40-action, ~26%
+cut).** #3 stacks separately (avoided visits, not the same unit, not simply additive onto the 40).
+
+### A FOURTH TRAP, flagged but deliberately NOT ranked -- it isn't an action-count reducer, it's a SILENT-FAILURE risk
+
+The stale-search-flyout interception this session's OWN test harness has hit and silently coded around since
+t2509 (t2523's own header names it too): after ANY palette search+drag, the search box must be explicitly
+cleared or the VERY NEXT click can silently land on the flyout overlay instead of its intended target -- no
+error, no visual signal, nothing. This turn's harness defends against it before every single click; a REAL
+author gets no such help and no warning when it happens to them -- their field edit "does nothing" and
+nothing on screen tells them why. This is exactly the class of finding the dispatch asked to watch for ("if
+YOU had to work around it while driving the real UI, a person hits it too") -- reported plainly, deliberately
+NOT folded into the ranked-by-action-count list above since it isn't measured in the same unit and forcing it
+in would understate how serious a SILENT failure is relative to a merely repetitive one.
+
+### THE HONEST ANSWER, stated plainly per the dispatch's own explicit ask
+
+Most of the 32 (72%) -- and, extrapolated, most of the ~155 projected at full parity -- ARE irreducible. This
+is a real finding, not a hedge: it means no single clever mechanism collapses this cost, because the floor is
+genuinely one-per-field authoring decisions (name it, default it, key it, pick its atom). The reducible slice
+IS real (~26% at full parity from just the top 2 proposals) and it is CONCENTRATED in exactly 3 named,
+per-field mechanisms rather than spread thin across many small things -- which is precisely what makes fixing
+those 3 first the right next move if this arc continues, rather than a diffuse "make authoring nicer" pass.
+
+### TIER, and VERIFY
+
+Zero product files touched this turn -- only the scratch spec (deleted before this commit, per convention),
+BACKLOG.md (t2537 addendum to #71), this WORK-LOG entry, and one verification screenshot. `test:node` run as
+the sole sanity gate (no shared render path touched; recorded below). The action count (32, and every
+category split) is the script's own `tick()` log, summed and printed programmatically -- pasted verbatim into
+this entry's own COUNT section above, not hand-tallied. Structural correctness verified by explicit
+`getFieldValue` checks on every block before the save step was allowed to proceed (never assumed from a
+screenshot) -- `rect_handle.FIELD==='width'`, `FIELDH==='height'`, both formfields' own `ATOMTYPE===
+'surfaceraster'`, matching the same discipline t2509/t2523 established. `verification/t2537-ergonomics-
+build.png` -- the finished build, real screenshot after a real save + real reload + real reopen. One process
+note for the record: hit this session's own newly-documented stale-Playwright-transform-cache trap (rapid
+Write/Edit on the scratch spec itself) AND its own newly-documented forbidden-`--reporter` trap (the custom
+`progressReporter.mjs` misreported "0 tests" for this single-file scratch run for reasons not further
+investigated -- out of scope for a measurement turn) -- used `--reporter=list` for this ONE throwaway,
+never-committed diagnostic spec only, not the project's real suite, and cleared `$TEMP/playwright-transform-
+cache` per the documented fix. `git status` clean of anything outside BACKLOG.md/WORK-LOG.md/the one
+verification PNG before staging.
+
