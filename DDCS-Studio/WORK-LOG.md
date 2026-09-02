@@ -69343,3 +69343,161 @@ t2515, and t2517's own full runs, always at `--workers=4`, never in isolation). 
 this turn's own diff (panelTypes.js/userOps.js/blockEmitter.js/bridge.js/wizards/ops/index.js, three new block
 files, three new spec files) touches that test's own territory (a preview-chrome/modal-reopen path,
 unconnected to feature_canvas's mouth or any handle gesture).
+
+## t2523 — RE-RUN THE FROM-ZERO BUILD, WITH HANDLES: the t2509 thesis-test repeated now that four gestures
+exist. Investigation only — zero product code touched, purely a measurement turn
+
+### THE ASK, and the check-first instruction it opened with
+
+t2509 built a surfacing-equivalent wizard from an empty canvas and measured it honestly: emit byte-identical,
+form matching, PREVIEW A BLACK RECTANGLE with no authoring path at all, cost 27 real UI actions for 2 of
+surfacing's ~20 bindable params. Four gestures (length/point/rect/radial) now exist (t2517/t2521). The dispatch:
+run the SAME build, SAME method, and see what the number is now — but FIRST check which gestures surfacing's
+own handles (`sf_pos`/`sf_size`) actually correspond to, and if either needs a gesture not yet built, report
+that as the finding rather than building it.
+
+Read `surfacingPreviewGeometry` (`surfacingData.js:207-243`) directly: `{type:'point', id:'sf_pos', ...}` +
+`{type:'rect', id:'sf_size', field:'w', fieldH:'h', ...}`. Both gestures — point and rect — are already among
+the four built. No missing gesture; this turn proceeds to the build.
+
+### THE BUILD — same shape as t2509, `feature_canvas` (form2d) carrying `point_handle` + `rect_handle` nested
+in its own mouth, matching `sf_pos`/`sf_size`'s own two gestures
+
+```
+Define Custom Wizard ("t2523 surfacing rebuild")
+  Presentation (UI & Sim)
+    feature_canvas (panel: form2d)
+      point_handle   (defaults accepted -- fx:px fy:py x:40 y:60 ax:0 ay:0 label:pos)
+      rect_handle    (defaults accepted -- field:w fieldH:h value:40 valueH:30 ax:0 ay:0 label:W×H)
+    Parameter Group: "Surfacing"
+      form field  param:width  label:Width  default:100  bindMode:Op Param  atomType:surfaceraster  key:w
+      form field  param:height label:Height default:80   bindMode:Op Param  atomType:surfaceraster  key:h
+  Execution (G-code)
+    Program Start   (defaults accepted)
+    WCS             wcs:active
+    Place on Stock  (defaults accepted)
+      Surface Raster (parametric)   (defaults accepted -- w:100 h:80 are ALREADY its own registry defaults)
+    Program End     (defaults accepted)
+```
+
+Built entirely through real palette drags, real field typing, a real save dialog, a real page reload — the
+t2509 bar, no `ddcsLoadBlockStack` anywhere in the build itself. Every structural connection verified by
+explicit block-ID checks (never assumed from a screenshot), same discipline t2509 established.
+
+### THREE NEW AUTOMATION TRAPS, found live, none a product bug — all in the test harness's own drive code
+
+1. **A search flyout left open from a block's own placement can intercept a LATER field click**, not just a
+   later DRAG drop (t2509/t2521's own already-documented trap). `setTextField`/`setPickerField` never called
+   `clearSearch()` before clicking — only `setDropdownField` did. Result: three of a formfield's six edits
+   (PARAM/LABEL/DFLT) silently landed on `path.blocklyFlyoutBackground` instead of the field, leaving the block
+   at its stock defaults while the OTHER three edits (BINDMODE, which itself calls `clearSearch`, and KEY,
+   coming after) succeeded — a genuinely confusing partial-failure signature until `document.elementFromPoint`
+   at the click coordinate named the real target. Same root cause silently broke a stack-connect nudge (below).
+   Fixed in the harness (`clearSearch()` added to both helpers); not a product finding.
+
+2. **A close-but-not-quite flyout-to-workspace drop (~20-25px short of Blockly's own snap radius) needs a
+   follow-up nudge, and that nudge has the SAME stale-flyout trap as #1.** Stacking two blocks in the same
+   mouth (`rect_handle` after `point_handle`, `formfield` #2 after #1) landed the dragged block close to but not
+   connected to its target — a flyout-scale vs main-workspace-scale residual in the grab-offset math, not a
+   Blockly bug. A corrective same-workspace drag (both blocks now share one scale, no flyout ambiguity) closes
+   the gap reliably — once ITS OWN mousedown also clears the search box first.
+
+3. **`matchvar`/`atomType`/`whenparam` are MUST-MATCH pickers (`pickerField.js`), not free-typed text** — a
+   2026-08-28 owner-directed change (formField.js's own header) superseding the free-text field this session had
+   assumed. Candidates are computed LIVE from the workspace at popup-open time, so `atomType:'surfaceraster'`
+   cannot commit until a `surfaceraster` block actually exists on the canvas — a REAL authoring-order constraint
+   any user hits too, not just this harness: bind the form field to an atom AFTER placing that atom, not before.
+   Deferred both formfields' own ATOMTYPE edit to after `surfaceraster`'s own placement; fixed the harness to
+   drive `.ddcs-picker-row` (the picker's own popup), distinct from `.blocklyMenuItem` (plain dropdowns).
+
+None of the three touched product code — all three are the test-drive script correctly reproducing constraints
+that were always there, just never exercised by a build that stacks two handle blocks or binds an atom before
+it exists.
+
+### THE COST — MEASURED, directly comparable to t2509's own 27-for-2
+
+**30 discrete real UI actions**, tallied by the script's own counter (not estimated), for the SAME 2-of-~20
+bindable params t2509 exposed (width/height). Broken down against t2509's own 27:
+
+- **27, unchanged**: the same 10 placements (user_root/progstart/wcs/placeonstock/surfaceraster/progend/
+  param_group/2 formfields, minus the bare `panel` t2509 used) + the same 14 field edits (param_group's title,
+  wcs's dropdown, 6 fields × 2 formfields) + the same 3 save actions.
+- **+3, new this turn**: 2 handle-block placements (`point_handle`, `rect_handle`, defaults accepted, 0 field
+  edits) + 1 dropdown edit t2509 didn't need (`feature_canvas.PANEL` → `form2d`, required for the 2D pane to
+  render at all — t2509 left `panel` at its bare default since it never needed the canvas to show anything).
+
+**+3 actions bought a real, visible, draggable interactive canvas where t2509 had none** — not a reduction in
+per-field authoring cost (the form side is byte-identical in shape to t2509's own), a genuinely separate axis.
+
+### COMPARISON 1 — EMIT: byte-identical to the built-in; the handle-bound params confirmed NON-emit, both ways
+
+`builderOf(t)({width:100,height:80})` vs `surfacingStack({...SURFACING_DEFAULTS, rpm:12000, width:100,
+height:80})`, through the same `emitMapped` path: **byte-identical**, the same confirmation t2509 made,
+holding under the new build shape too.
+
+Two further checks, both confirming the CENTRAL structural fact this turn set out to establish: emitting with
+`width`/`height` changed (`140`/`130`) produces a DIFFERENT program (`formBindingsAreEmitReal: true` — the
+formfield-bound params are real); emitting with `px`/`py`/`w`/`h` changed (`99`/`88`/`77`/`66` — the HANDLE's
+own bound params, a DIFFERENT namespace from width/height) produces the IDENTICAL program
+(`handleBindingsAreEmitReal: false`). `handleBindingsFromStack` (userOps.js) declares these socket-less by
+construction — this is the mechanism working exactly as designed, not a bug, and it is the reason the
+"interactive preview" and "real geometry parameter" are two separate things in this build, unlike the built-in.
+
+### COMPARISON 2 — FORM: values/defaults match; the known widget-key gap reproduces; one NEW small labeling gap
+
+`width` renders `100` correctly. `height` renders as its widget's empty/placeholder state rather than `80`,
+despite `structCheck` confirming the block's own DFLT field committed `'80'` correctly at author time — this is
+an OBSERVED INSTANCE of the formfield widget-key bug this session's own t2513 audit already found and the
+dispatch explicitly scoped OUT of this turn ("do NOT fix"); not a new finding, reported for the record only.
+
+One genuinely NEW, small labeling gap: `rect_handle`'s own form row (the `w`/`h` handle-bound params, socket-
+less but still form-rendered as live number inputs — visible confirmation these ARE editable independent of
+emit) shows the label `"Width"`, colliding with the real `width` field's own label directly above it, rather
+than the block's own declared `label:'W×H'`. The canvas-side annotation next to the handle DOES show "W×H 40"
+correctly (`verification/t2523-my-wizard-open.png`) — so the two label sources (canvas annotation vs. form row)
+are NOT unified. Not fixed (out of scope — the dispatch named the two form render paths explicitly off-limits);
+named for whoever next touches that form-row rendering.
+
+### COMPARISON 3 — PREVIEW: the central finding. A real, working, draggable handle now exists — but it drives
+a DIFFERENT thing than the geometry the emit actually uses
+
+`typeof def.previewGeometry === 'function'` → still `false`, unchanged from t2509 — this build has NO
+`previewGeometry` hook, by construction (it's built from `feature_canvas` + handle blocks, never JS). But the
+Visualization pane is no longer t2509's flat black rectangle: **two real, distinguishable, labeled handles
+render** — a cyan "pos" square and an orange "W×H 40" dot, on an actual traced rectangle outline
+(`verification/t2523-my-wizard-open.png`, side by side with `verification/t2509-builtin-wizard-open.png` and
+`verification/t2509-my-wizard-open.png` — the built-in and the old black-rectangle baseline).
+
+Dragged the size handle with a real mouse gesture after a real reload + real reopen: **it moved on screen**
+(`handleMoved: true`, its own bounding-rect position shifted ~25px matching the drag delta) — the affordance
+itself is real, not decorative-looking-but-inert. But per COMPARISON 1 above, that same drag does NOT touch
+`width`/`height` (`formFieldChanged: false`) and would never reach emit even if it did (the handle's own bound
+params, `w`/`h`, are a separate socket-less namespace). So the answer to "does the preview gap from BACKLOG #71
+close" is neither yes nor no cleanly: **the INTERACTIVE AFFORDANCE is now real and author-buildable** (this is
+what four turns of gesture-block work bought), **but it is disconnected from the actual emitted geometry** —
+dragging the built-in's own handle changes the G-code; dragging this build's own handle changes nothing that
+reaches G-code. Closing BACKLOG #71 for real (an author's drag actually resizing their own emitted toolpath)
+needs the handle-binding mechanism to write into an EXISTING emit-real param the way `previewGeometry` does by
+DOM lookup, not just self-declare a new decorative one — a design question, not evaluated this turn, matching
+the same "not attempted, named as scope not oversight" framing BACKLOG #71 already carries.
+
+### VERDICT — named plainly, the same discipline t2509 used
+
+TRUE, unchanged: emit is byte-identical. TRUE, unchanged: form values/defaults match, with the same known gap
+(help text authoring cost, plus the formfield widget-key reproduction above). CHANGED, and this is the turn's
+own finding: the preview axis moved from "no authoring path at all" to "a real, working, draggable authoring
+path exists — for a decorative overlay, not the geometry the emit uses." That is progress, honestly a
+PARTIAL close of BACKLOG #71, not a full one — and the cost of that partial close was +3 actions on top of
+t2509's own 27, buying an axis t2509 had zero of, not a reduction anywhere else.
+
+### TIER, and VERIFY
+
+Zero product files touched this turn — only a scratch spec (`tests/_t2523-rebuild.spec.js`, deleted before
+this commit per convention) and its own throwaway debug artifacts (also deleted). `test:node` run as the sole
+sanity gate (no shared render path touched, so AGENTS.md's full-suite trigger doesn't apply); result recorded
+in the pass-back note. Every structural connection in the build verified by explicit block-ID checks inside the
+test itself (never assumed from a screenshot) before the test was allowed to proceed to save/reload.
+`verification/t2523-my-wizard-open.png` is the finished build, screenshot after a REAL reload + real reopen,
+directly comparable to the two t2509 screenshots already in that directory. The action count (30) is the
+script's own `tick()` counter, summed programmatically, not eyeballed. `git status` clean of anything outside
+BACKLOG.md/WORK-LOG.md/the one verification PNG before staging.

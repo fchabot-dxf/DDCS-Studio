@@ -6911,6 +6911,22 @@ interactive handles.
 > probeVector/translate) are UNBUILT — out of this turn's scope, and since none of the four hit a genuine
 > template mismatch this is a reasonable bet to be the same shape of work, but that is stated as an inference
 > from this turn's own pattern, not a claim measured against the other seven specifically.
+>
+> **t2523 — the ORIGINAL thesis-test (t2509) re-run with all four gestures available, to measure what actually
+> changed.** Checked first, per the dispatch's own instruction: surfacing's own two handles (`sf_pos`/`sf_size`)
+> map to `point` and `rect` — both already built, no missing gesture. Rebuilt the identical wizard via
+> `feature_canvas` + `point_handle` + `rect_handle`, real UI only, through a real save + real reload. Result is
+> a genuine PARTIAL close, not a full one: the Visualization pane now shows two real, draggable, labeled handles
+> (`verification/t2523-my-wizard-open.png`) — dragging one moves it on screen, proven with a real mouse gesture
+> after reopening — but the drag reaches neither `width`/`height` (the formfield-bound, emit-real params) nor
+> the emitted G-code at all (checked both ways: changing `width`/`height` changes the program; changing the
+> handle's own `w`/`h`/`px`/`py` does not, byte-identical either way). The interactive AFFORDANCE this arc set
+> out to build now exists and is author-reachable; it drives a decorative overlay, not the geometry the built-in
+> twin's own `previewGeometry` controls. Cost: +3 UI actions over t2509's own 27 (2 handle placements + 1
+> `feature_canvas.PANEL→form2d` edit t2509 never needed), buying an axis t2509 had zero of. Closing this entry
+> for real needs the handle-binding mechanism to write into an EXISTING emit-real param by lookup (the way
+> `previewGeometry` does), not self-declare a new socket-less one — a design question, not evaluated this turn.
+> Full account: WORK-LOG t2523.
 
 ---
 
