@@ -69100,3 +69100,100 @@ per-feature VECTOR geometry hook, text's own letter outlines -- explicitly named
 conflated with this turn's simpler anchor+axis+value handle). Scratch debug files
 (`tests/_t2517-live-handle.spec.js`, `tests/_t2517-dbg2.spec.js`, assorted `scratchpad/t2517-*` dumps) deleted
 before commit -- their findings are recorded here and in the permanent spec, not left behind as stray files.
+
+---
+
+## t2519 -- THE MEMORY MIGRATION: 86 feedback-type local memories triaged into context/. Not product work.
+
+182 local memories sat in `%USERPROFILE%/.claude/projects/c--Users-danse-APPS-ddcs-studio-project/memory/`
+(~537KB), invisible to the other seat and to git. This turn triages the 86 `type: feedback` ones -- the
+loop-and-working-style knowledge the other seat most needs and least has -- per the dispatch's own explicit
+instruction: MIGRATE if still true and useful to another seat, DROP if it duplicates something already in
+ROADMAP/BACKLOG/AGENTS.md/an existing context/ file, STALE if the code no longer matches. No bulk copy; every
+claim naming a file/function/flag was checked against the current tree before being migrated. The remaining
+79 project + 15 reference + 2 user memories are explicitly OUT of scope this turn, per the dispatch.
+
+### METHOD
+
+Read all 86 files in full (`grep -l "type: feedback" *.md`, then catted in three batches, ~2723 lines total,
+averaging ~32 lines each -- small enough to read directly rather than sample). Read the existing homes FIRST,
+to know what NOT to re-migrate: `context/RUNNING-THE-LOOP.md` (already covers 4 of the 86, near-verbatim),
+`AGENTS.md` (rules 1b/6/7 cover three more), `ROADMAP.md`'s own "Conventions / traps" section (explicitly
+cites one of the 86 by name already), and the global `~/.claude/CLAUDE.md` (covers two more -- "Communicate
+Visually" and rule 5 "Declare over Hand-roll" are near-verbatim restatements of two memories). Spot-checked
+every claim naming a specific file/function/constant against the live tree: `web/ui/postGating.js` exists,
+`WRAP_PREFIX_COUNT` still hand-counted in four dataOps files (atcWarmup/contour/tap/text), the `setup`/`flip`
+Blockly blocks still registered, `progressReporter.mjs` still the configured reporter,
+`tests/version-sync-1311.spec.js` and `npm run bump-version` both still present. **Found zero STALE claims**
+among the 86 -- worth stating plainly rather than assumed, since a null result is itself a finding the
+dispatch asked for.
+
+### THE SPLIT -- 9 DROP, 77 MIGRATE, 0 STALE
+
+**DROP (9, duplicate of an existing doc, cited so the reasoning survives):**
+`never-idle-the-worker-on-a-non-decision` / `narrow-scope-at-dispatch-not-mid-turn` /
+`stage-by-path-does-not-protect-shared-files` -- already `RUNNING-THE-LOOP.md` sections 1-3, verbatim in
+substance. `full-suite-when-the-change-is-shared` -- already section 4 there AND `AGENTS.md` rule 1b.
+`plans-are-deletable-once-done` -- already `AGENTS.md` rule 6. `visual-first-communication` -- already the
+global CLAUDE.md's own "Communicate Visually" section, loaded automatically for every seat regardless of
+project. `declare-or-handroll-before-dispatch` -- already the global CLAUDE.md's own rule 5 ("Declare over
+Hand-roll"), which is more thorough than the local memory's own restatement. `restructure-source-not-
+abstraction` -- already `ROADMAP.md`'s "Conventions / traps" section, which cites this exact memory by name.
+`prefer-gui-over-fields` -- substantially covered by ROADMAP's own, more specific "GUI over fields" bullet
+(the spatial-GUI split by param type).
+
+**MIGRATE (77), by destination:**
+- `context/RUNNING-THE-LOOP.md` (EXTENDED, sections 5-31, 27 new sections covering 36 memories -- several
+  combined where they're the same underlying incident or mechanism, e.g. the three `no-stash-in-shared-repo`
+  variants folded into one section, the `never-nest-the-waiter` double-backgrounding cases folded into one).
+  Pure advisor/worker protocol: claiming/signing turns, branch pruning, dispatch clarity, flake escalation,
+  scratchpad paths, stall misdiagnosis, arc-plus-tail dispatching, the retired file split + its real hazard
+  (concurrent git add), cwd/waiter double-backgrounding, restarted-seat deadlock, release cadence/timing/
+  mechanics, skill-file confirmation, two-method advisor review, `npm test`-from-wrong-dir, reading a cross-
+  seat finding sceptically + grep-scope, plan-text provenance, amendment polling at part boundaries, the
+  WORK-LOG staging trap, scratchpad-tab etiquette, not gating on owner app-usage, the explicit-verify-gate
+  rule, pause-when-questioned, the worker's own watcher-arming + pulse-reporting conventions.
+- `context/GIT-AND-TOOLING-HAZARDS.md` (NEW, 12 memories): heredoc backslash escapes, a Windows junction under
+  `rm -rf`, the mem-server's one-time preload (new AND edited files both go stale, differently), VS Code Live
+  Preview's own module cache, focus-dependent keystroke bugs needing real `page.keyboard.type()`, splitting
+  pure functions out before a DOM-heavy merge, never `--reporter` on this repo's own Playwright config,
+  concurrent-suite contention (two full gates, or one gate plus ordinary load), a piped git command losing its
+  exit code, the `WRAP_PREFIX_COUNT` hand-count-drift class of bug, and the two CSS custom-property default-
+  placement traps (`:root`-vs-consumer specificity; a `var()`-of-a-`var()` freezing at its own declaration).
+- `context/VERIFICATION-DISCIPLINE.md` (NEW, 13 memories): `verify-real-symptom-not-just-test` as the anchor
+  (three real instances of a green test asserting the wrong property), assert-the-value-not-just-that-it-
+  changed (four instances from one port, including the cross-view-parity-is-a-shape-check-in-disguise case),
+  default-config tests proving nothing about a real user's config, confirm-the-premise before calling something
+  a regression, confirm-the-exact-referent before dropping something a shared UI label conflates, specifying
+  the real hazard (not a convenient over-broad proxy) in a safety guard, eyeballing the whole wizard surface
+  not just the dispatched acceptance criteria, not stacking features on an unverified core path, a controller
+  register's NAME existing not meaning it's macro-usable, a twin's defaults mirroring the built-in FORM not an
+  internal fallback, wiring every new atom into Blockly for a real round trip, wizard-atom granularity being
+  the owner's call, and Blockly block-color conventions (type=color, section=container, never both).
+- `context/PRODUCT-PRINCIPLES.md` (NEW, 16 memories): the owner's own standing rulings on the product itself
+  -- friendliness-over-perf priority order, nothing-is-precious/delete-freely, GUI-over-fields (+ the later
+  "authoring never chooses a preview" refinement, DERIVED-vs-ADDITIVE preview layers), independent canvas
+  handles, declaring the semantic without declaring away the user's own judgment, not babysitting the user's
+  machine config, never surfacing a hack as a legitimate option, post-field gating (greyed not hidden, tooltip-
+  only), two-sided machining deprioritised (Fusion territory), the one-box-permanent/LAN-provisional/cloud-
+  gated deployment ruling, sound only for states not already visible (sharpened to "was it user-initiated"),
+  custom-op sim intent fully declared never inferred, declaring the sim seam before the GUI that writes to it,
+  read-only near a live controller when the owner is away, proactive modularization, and no-unrequested-
+  affordances-plus-prove-the-wiring.
+
+Linked all three new files from `CLAUDE.md`'s own context table (the only delivery mechanism a repo doc has
+here, per that file's own stated reason for existing) -- one row each, matching the existing terse style.
+
+### VERIFY
+
+Every one of the 86 accounted for exactly once (9 + 36 + 12 + 13 + 16 = 86, cross-checked by re-listing all
+86 filenames against the four destinations plus the drop list after the first drafting pass caught 10 items
+that had been planned but not actually written -- fixed before concluding, not left as a silent gap). Every
+claim naming a specific file/function/constant/script spot-checked against the current tree (listed above);
+none were stale. `test:node` 238/238 green, unchanged, since no product code was touched this turn --
+confirms the tier the dispatch named. `git status` clean of product files -- only `CLAUDE.md`,
+`BACKLOG.md`-adjacent context docs (none of BACKLOG.md itself this turn), the four `context/*.md` files, and
+this WORK-LOG entry. `git diff` checked on `CLAUDE.md` before staging (a shared-ish doc, though not one either
+seat edits mid-turn the way `BACKLOG.md`/`WORK-LOG.md` are). Local memory originals left untouched, per the
+dispatch's explicit "do not delete" -- migration first, cleanup is the owner's separate call once they've seen
+what landed.
