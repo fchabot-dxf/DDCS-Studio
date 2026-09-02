@@ -69894,6 +69894,26 @@ named missing declarations rather than argued about in the abstract. Zero produc
 the scratch pilot test was deleted before this commit, matching this session's own convention for
 investigation-only turns.
 
+### THE SMALL ITEM, filed separately (own commit) — the M350-LiveG Modbus register cross-check
+
+Fetched `github.com/foinnc/M350-LiveG`'s own source (`m350_liveg.py`, 731 lines, via `gh api` — not relayed
+unchecked) at the owner's own request. Filed in `bridge/controllers/expert-m350/FINDINGS.md`, flagged
+explicitly as NOT independent corroboration (same author, `foinnc`, as `M3X-M350-IoT-Bridge`, the source of
+the EXISTING register map) — one source asked twice, not two sources agreeing. Four registers confirmed
+directly from the tool's own UI labels (both its zh and en language tables, identical registers in both):
+`3000` (a live G-code DISPATCH buffer the controller EXECUTES, 246-byte limit — a WRITE, gated, no test plan,
+per the dispatch's own explicit instruction), `15000` (macro variables), `6500` (user parameters, also the
+tool's own default address field), `10000` (status). The dispatch's own claimed contradiction — register
+`10002` is `float32` in LiveG's source vs `int32` in ours — was checked directly and NOT found: searched all
+731 lines of `m350_liveg.py` plus `README.md` for `10002`, zero occurrences in either; the tool itself carries
+no per-address type declarations at all (a generic manual read/write panel, format chosen per-read by a
+human) — so a `10002`-is-float32 finding, if real, came from someone actually RUNNING the tool against a real
+M350, not from anything in the static source. Filed as a real, actionable, UNRESOLVED disagreement — not
+independently confirmed by this worker turn, and said so plainly rather than restating the dispatch's own
+claim as verified fact. A read-only test plan for `15000`/`6500` only is in FINDINGS.md, per the dispatch's own
+scope (`10000` filed, not queued to test; `3000` explicitly excluded — a write that runs G-code on a live
+machine has no safe read-only probe).
+
 ### TIER
 
 Full `--workers=4` suite run per the dispatch's own unconditional instruction, despite zero product code

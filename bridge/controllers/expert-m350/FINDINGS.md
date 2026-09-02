@@ -805,6 +805,70 @@ Enable"* — this is a **V1.1 document predating the 2026-04-10 firmware that in
 10002, from foinnc/M3X-M350-IoT-Bridge) remains the ONLY source and remains unattested. Do not re-open this
 PDF looking for it.
 
+### `M350-LiveG`'s OWN SOURCE, inspected directly (2026-09-02) — four registers our map didn't have,
+one contradiction, and a same-author caveat that matters  `[EVIDENCE, NOT independent corroboration]`
+*(owner asked the advisor to inspect `github.com/foinnc/M350-LiveG` — the same exe already named above as
+the independent-oracle TEST tool — for its own register declarations, not just as a black-box connectivity
+test. Filed by the worker, 2026-09-02, having fetched and read `m350_liveg.py` (731 lines, main + only
+source file) and `README.md` directly via `gh api` rather than relaying the claim unchecked.)*
+
+⚠ **NOT independent corroboration, and this matters.** `M350-LiveG` and `M3X-M350-IoT-Bridge` (the source of
+`master.py`'s own existing register map — `7080`/`7260`/`10002`, [[m350-modbus-register-map]]) share the
+same author, `foinnc`. Two register maps agreeing because the same person wrote both down twice is not two
+sources; it is one source, asked twice. Any error in the original carries forward undetected. This does NOT
+make the new registers below worthless — GitHub user activity across separate repos is still evidence a
+person built two DIFFERENT working tools against the SAME real firmware, which is worth something — it
+means "confirmed by a second source" is the wrong description, and "confirmed by the same source, twice" is
+the right one.
+
+**FOUR REGISTERS our map did not have, all read directly from `m350_liveg.py`'s own UI labels** (lines 93,
+106-107, 148, 161 — both the zh and en language tables, identical registers in both):
+- **`3000` — a live G-code DISPATCH buffer, 246-byte limit, that the controller EXECUTES.** The tool's own
+  label: *"实时代码下发与在线执行区 (地址 3000 / 246字节上限)"* / *"Live G-Code Dispatch Area (Addr 3000 /
+  246-Byte Limit)"*. ⛔ **This is a WRITE that runs G-code on a live machine the instant it lands** — filed
+  here, GATED, no test plan below. Per [[live-cnc-readonly-when-away]]: not even a read-only probe of this
+  one, because the tool's own default example value (`"G01 X50 F3000"`, line 266) shows it is meant to be
+  sent, not merely inspected.
+- **`15000` — macro variables.**
+- **`6500` — user parameters.** (Also the tool's OWN default register-address field value, line 304 — the
+  author's own most-common-use register.)
+- **`10000` — status.**
+
+These are GENERIC registers in the tool's own manual read/write panel (address + count + one of
+16-bit/32-bit-int/32-bit-float/64-bit-double, freely chosen per read — confirmed by reading the format
+selector's own code, lines 10-26 and 511/561) — the source carries NO per-address type declaration for any
+of the four (unlike our existing `master.py` map, which hard-types each register it reads). That is
+structural, not a gap in my own reading: this tool is built to let a HUMAN probe an address and pick a
+format, not to declare one per register.
+
+**THE CONTRADICTION, reported by the dispatch, NOT independently confirmed by this worker in the repo's own
+content.** The dispatch states `10002` (our map: 32-bit int, "state") is `float32` in LiveG's own source.
+Searched `m350_liveg.py` (all 731 lines) and `README.md` for `10002` directly — **zero occurrences in
+either.** Given the tool's own generic, per-read format selector (no hardcoded per-address typing exists
+anywhere in this source), a `10002`-is-float32 finding could only have come from someone actually RUNNING
+the tool against a real M350 and comparing which format decoded to a sensible value — real, valuable
+evidence if that is what happened, but not something the static source substantiates on its own, and not
+something this worker turn ran (no live machine touched). Recorded as a live, actionable disagreement
+between our map and a same-author second tool — worth resolving on the bench — not as a confirmed fact.
+
+**READ-ONLY TEST PLAN — `15000` and `6500` ONLY, per the dispatch's own explicit scope (`10000`/`3000`
+excluded — see below):**
+1. Confirm P279=Slave, P267=115200 (same preconditions [[m350-modbus-register-map]] already requires).
+2. Function 0x03 (Read Holding Registers), address `15000`, a small count (2-4 registers) — record the raw
+   bytes returned, unconverted. Do NOT assume a length or type; the source gives none for this address.
+3. Same for `6500`.
+4. Whatever comes back, log it VERBATIM (hex + each of the four format interpretations the LiveG tool itself
+   offers) rather than picking one representation — exactly the caution the `10002` contradiction above
+   argues for: guessing the type from one read has already produced one disagreement in this same map.
+5. `10000` (status) is named as a new register but NOT included in the dispatch's own test-plan scope —
+   filed for the record, not queued to test this pass.
+
+⛔ **`3000` is excluded from this test plan on purpose, per the dispatch's own explicit instruction — it is a
+WRITE that executes G-code on a live machine.** No read-only probe exists for a dispatch buffer; even a
+"read" of it is not the safe operation the other three are. File it, gate it, do not test it without a
+separate, explicit, owner-present ruling the same way any other live-write capability on this controller
+needs one ([[live-cnc-readonly-when-away]]).
+
 ### ⛔ A SEPARATE, SHIPPED-BLOCKING FINDING — the exe cannot enable polling at all
 `enable_position_poll` is CLI-only (`--position-poll`). It is **absent from `Config._PERSIST_KEYS`**, so the
 Setup UI cannot set it and `config.json` cannot carry it ⇒ **a double-clicked exe can never turn position
