@@ -6815,3 +6815,49 @@ too. Restored the fix from the scratch copies, `diff`-confirmed byte-identical, 
 changed, zero touching any of the other five lathe ops). 101 existing lathe/canvas-widgets/census tests
 (including BACKLOG #66's own t2501 guard) re-run unedited, all pass. Full suite `--workers=4` (rule 1b —
 `panelTypes.js` is shared by every mill AND lathe op with a canvas): see WORK-LOG t2505 for the actual result.
+
+---
+
+### 71. There is NO real-UI authoring path for an INTERACTIVE preview handle (drag-to-resize / drag-to-
+reposition) on a custom wizard built from scratch in the Blocks tab — confirmed by actually building one
+
+*(filed t2509, the arc's own thesis-test turn: build a surfacing-equivalent wizard from an empty canvas, driven
+entirely through the real Blocks UI — real drags, real clicks, real field typing — and compare it three ways
+against the shipped built-in. See WORK-LOG t2509 for the full method, the complete comparison, and the honest
+authoring-cost accounting; this entry records only the one finding with lasting product-shape consequences.)*
+
+**OBSERVED, not guessed**: a from-scratch wizard built and saved through the real UI —
+`typeof def.previewGeometry === 'function'` → `false`. The shipped `user_surfacing_data` twin —
+`typeof def.previewGeometry === 'function'` → `true`, and its own Visualization pane shows a live 2D canvas
+with a real drag handle (a "pos" dot + a size handle on the faced-area rectangle) — confirmed visually,
+screenshots in `verification/t2509-my-wizard-open.png` (empty, black) vs `verification/t2509-builtin-wizard-
+open.png` (populated, interactive).
+
+**THE MECHANISM, traced not assumed**: `previewGeometry` is a property assigned directly onto the `def` object
+in plain JavaScript, AFTER `userOpFromStack` runs (`surfacingData.js`: `def.previewGeometry =
+surfacingPreviewGeometry;`) — ~30 lines of real coordinate math (anchor, w/h, the mode-dependent start-position
+marker). There is no block, no field, no `formfield`-style declaration mechanism anywhere in the current palette
+that lets an AUTHOR (not a developer editing JS) declare this. The four STATIC shape primitives
+(`shape_rect`/`shape_circle`/`shape_line`/`shape_marker`, BACKLOG #61's own finding 3, re-confirmed alive and
+independent at t2507/L7) are a REAL, LESSER capability that DOES exist today — an author could draw a
+non-interactive outline of the faced area — but the DRAG-TO-RESIZE/DRAG-TO-REPOSITION affordance every built-in
+wizard has (the exact mechanism BACKLOG #61's own L5 arc spent nine turns porting to `canvasWidgets.js`'s
+shared, declarative registry) has no author-facing declaration path at all.
+
+**WHY THIS MATTERS, stated plainly**: every other axis this session's own thesis-test turn measured came back
+either matching exactly (EMIT, byte-identical) or matching with a real but bridgeable authoring-cost gap (FORM —
+help text has to be typed by hand, same mechanism as label/default, just more typing). PREVIEW is qualitatively
+different: the mechanism does not exist for an author to reach AT ALL, regardless of effort. A real wizard
+author building a custom facing-style op today gets G-code and a working form, but never an interactive canvas —
+their wizard will always look and feel less finished than a built-in, permanently, until this gap is closed.
+
+**NOT ATTEMPTED, named as scope not oversight**: whether a `formfield`-style declarative handle mechanism
+COULD be built (e.g. a new block type carrying the SAME shape `canvasWidgets.js`'s own gesture declarations
+already use internally — `type/field/ax/ay/...` — surfaced as an authorable block rather than a JS object) is
+a genuine design question, not evaluated this turn. This entry records the GAP, not a proposed fix; the dispatch
+that filed it was explicit: diagnose only, do not build anything.
+
+**STILL REAL IF**: grepping the current palette (`web/wizards/ops/index.js`'s own `PALETTE`) for any block whose
+`emit`/save-time hook writes a `previewGeometry`-shaped function onto a `def` still finds none, and a fresh
+from-scratch wizard built through the real UI still shows an empty Visualization pane where the built-in shows
+interactive handles.

@@ -68510,3 +68510,180 @@ this turn's own L7 deletion -- the file touches nothing changed, reproduces reli
 reliably passes at `--workers=1`, and the mechanism was already named, in writing, before this turn started.
 Not chased further (out of scope for an L7 deletion turn); flagged plainly in the pass-back for the advisor's
 own call on whether it needs a dedicated turn, same posture as BACKLOG #70's own report-first handling.
+
+## t2509 — THE ARC'S OWN THESIS, TESTED: a surfacing-equivalent wizard built from an EMPTY canvas, entirely
+through the REAL Blocks UI (real drags, real clicks, real field typing -- no JS stack injection anywhere in the
+build itself). Three-way comparison against the built-in: EMIT byte-identical; FORM values/defaults match but
+documentation (help text) does not; PREVIEW has NO authoring path at all -- the single most valuable finding
+
+### THE QUESTION, restated precisely
+
+Every prior measurement this whole arc has produced was TWIN-parity (the shipped `user_surfacing_data` def,
+hand-authored in JS, vs the built-in `surfacingWizard.js`) or FORK-parity (starting FROM a built-in and porting
+it). Nobody had ever started from NOTHING and built something via the actual authoring surface a real wizard
+author would use. This turn does exactly that, for surfacing, and reports what happened -- not steered toward
+any of the three possible outcomes the dispatch itself named (works cleanly / works but costly / some piece has
+no path at all).
+
+### METHOD -- the real UI, not a shortcut. Established from scratch, this turn, since nothing in the existing
+test suite drives Blockly drag-and-drop (every existing spec uses `window.ddcsLoadBlockStack`, a JSON-injection
+hook that bypasses the canvas entirely -- exactly the "green-tests-over-a-dead-ui-path" scar this project
+already carries a name for)
+
+Four real-UI mechanisms, worked out empirically against the live app (`?` in this file marks something learned
+by trial, not read from a doc):
+
+1. **Palette drag-and-drop.** The palette has a live filter (`.blk-search`) that shows matching blocks in a
+   real Blockly flyout; placing one on the canvas is a genuine `page.mouse.down`/`move`/`up` sequence, start
+   point on the flyout block, end point on the canvas. **Trap found**: grabbing the flyout block by DOM order
+   (`.first()`) is unsafe -- a search matching several blocks (e.g. "WCS" matches six) produces a WIDE flyout,
+   and a drop coordinate computed for a NARROW one silently lands back inside the flyout instead of the canvas,
+   connecting nothing. Fixed by finding the exact block by its own `.type` inside the flyout's own workspace
+   (`ws.getToolbox().getFlyout().getWorkspace().getAllBlocks()`), not by DOM position.
+2. **Connecting to a mouth/socket.** A block's `nextConnection` (stacking) or a named input's `.connection`
+   (nesting into a C-block's own mouth, e.g. `placeonstock`'s `DO`) each expose `getOffsetInBlock()` -- combined
+   with the parent's own `getSvgRoot().getBoundingClientRect()` and the workspace's own `.scale`, this gives the
+   exact screen pixel to drop onto. **Trap found**: a C-block's own DO-mouth notch needs a MORE generous margin
+   (+15-20px) than a simple stacking connection (+5-10px) to snap reliably -- verified by trial, not derived.
+   **Trap found, the expensive one**: if a search flyout is left OPEN (the `.blk-search` box still holds text
+   from the PREVIOUS drag) when a field-edit click fires next, that click silently lands on the stale flyout
+   overlay instead of the canvas underneath it. Every field edit now clears the search box first.
+3. **Field editing, four distinct widget classes on ONE block type** (`formfield` alone carries all four):
+   plain text/number fields (`PARAM`/`LABEL`/`DFLT`/`KEY`/...) open a real inline `.blocklyHtmlInput` on click;
+   a NUMBER socket with nothing plugged in (progstart's own `rpm`/`spinUp`/`clearance` -- see the finding below)
+   has NO field to click at all -- it needs an actual `math_number` block dragged into the socket first, same
+   drag mechanism as any other block; ENUM dropdowns (`WIDGET`/`BINDMODE`/`TYPE`/`wcs`'s own `WCS`) open a real
+   `.blocklyMenuItem` list -- click the matching row (its DISPLAYED text can differ from the underlying value:
+   `BINDMODE`'s own `'opparam'` value shows as the label "Op Param", found live, not guessed); the MUST-MATCH
+   PICKER (`ATOMTYPE`/`MATCHVAR`/`WHENPARAM`) opens a real filterable popup (`.ddcs-picker-row`) listing only
+   REAL candidates actually present on the canvas right now -- click the row, same as a menu item. A FIFTH class
+   (`UNITS`/`SECTION`, a `FieldCombo`) was found but not exercised this pass -- named as unexplored, not solved.
+4. **Save.** The real persistent `.blk-dev-savebtn` -> `.blk-dev-savedlg` modal -> `.blk-dev-opname` name input
+   -> `.blk-dev-save` confirm, exactly the path a human takes. Verified through an ACTUAL page reload (not a
+   soft in-session reset) -- the saved op survived, with its own bindings intact, read back via `listUserOps`/
+   `getUserDef` the same way any real caller would.
+
+### THE BUILD, exactly what was assembled (`verification/t2509-my-wizard-open.png` -- the finished result, real
+screenshot, real reload, real reopen)
+
+```
+Define Custom Wizard ("Surfacing From Scratch t2509")
+  Presentation (UI & Sim)
+    panel (panel: form)
+    Parameter Group: "Surfacing"
+      form field  param:width  label:Width  default:100  bindMode:Op Param  atomType:surfaceraster  key:w   type:number
+      form field  param:height label:Height default:80   bindMode:Op Param  atomType:surfaceraster  key:h   type:number
+  Execution (G-code)
+    Program Start   rpm:(empty socket) direction:cw spin-up:(empty) clearance:(empty)
+    WCS             wcs:active
+    Place on Stock  stockAttach:(empty) pathDatum:(empty) offX/offY/offZ:(empty)
+      Surface Raster (parametric)   w:100 h:80 [every other field at its own block-registry default]
+    Program End     spindleOff:true coolantOff:true retract:true end:M30
+```
+
+**COST, honestly, per the dispatch's own explicit demand**: 10 real drag-and-drop placements (user_root,
+progstart, wcs, placeonstock, surfaceraster, progend, panel, param_group, 2 formfields) + 14 real field edits
+(1 dropdown on `wcs`, 1 text on the param_group's own title, 6 fields each on the 2 formfields: param/label/
+default/bindMode/atomType/key) + 3 save actions (button, name, confirm) = **27 discrete real UI actions, for a
+form exposing 2 of surfacing's own ~20 bindable params**. Extrapolated (not attempted, honestly labelled as
+extrapolation): reaching FULL parity with the shipped twin's own `SURFACING_BINDING_SPECS` (~20 params) at this
+SAME per-field rate would be roughly 18 more formfield placements + ~130 more field edits -- and that estimate
+is a FLOOR, since several of those 20 (`strategy`/`entry`/`stockAttach`/`pathDatum`/`stockDatum`/`wcs`, all
+ENUM-typed) need the `OPTIONS` `FieldOptionsEditor` widget this pass never exercised, likely costing MORE per
+field than a plain number does, not less.
+
+### FINDING, not assumed, MEASURED: a freshly-dragged `progstart`'s own numeric sockets (`rpm`/`spinUp`/
+`clearance`) are EMPTY -- no shadow block auto-attached -- unlike `window.ddcsLoadBlockStack`'s own JSON
+injection, which always materializes a value. An UNCONNECTED socket resolves, at emit time, to the BLOCK
+DEFINITION's own registry default (`rpm:12000`), not to some external JS-level fallback (`makeStart({})`'s own
+bare-params behaviour, `rpm:0`, is a DIFFERENT number, reachable only through the wizard-JS path, never through
+the Blockly-authored path with an empty socket). `clearance` happened to resolve to 5 either way (registry
+default and `SURFACING_DEFAULTS` agree there by coincidence); `rpm` did not. This is a real authoring-cost fact
+or a real behavioural surprise depending on which persona hits it first, not a bug -- both readings are
+legitimate and it is reported plainly rather than picked for.
+
+### COMPARISON 1 — EMIT: BYTE-IDENTICAL, confirmed programmatically
+
+Built my own op's real builder (`builderOf('user_surfacing_from_scratch_t2509')({width:100,height:80})`) and
+emitted it through the SAME `emitMapped`/`activeDialectOpts` path any real op uses; separately called the
+built-in's own `surfacingStack({...SURFACING_DEFAULTS, rpm:12000})` (the `rpm:12000` correction above) and
+emitted it the same way. `myEmit === builtinEmit` -- **`true`**, a strict string equality on the full G-code
+text (52 lines, spindle/clearance header through the raster loop through the M30 footer), not a length check or
+a spot comparison. This is the cleanest possible confirmation the arc's own thesis is real: the SAME atom code
+(`surfaceraster.js`) runs underneath BOTH the hand-written wizard and a stack a real person assembled by hand
+in the canvas, and produces the identical program.
+
+### COMPARISON 2 — FORM: values and defaults match exactly; documentation (help text) does not
+
+```
+                  TWIN (user_surfacing_data)                    MINE (from-scratch)
+w/width:  label: (none set)  help: "Width of the faced area      label: "Width"   help: (none)
+                  (X). The tool overhangs the edge by its         default: 100
+                  radius."   default: 100
+h/height: label: (none set)  help: "Height of the faced area      label: "Height"  help: (none)
+                  (Y)."   default: 80                             default: 80
+```
+
+Both sides' own DEFAULT values agree exactly (100/80) -- the binding mechanism itself is faithful. The twin
+does NOT set an explicit `label` either (both fall back to something derived, not compared further here) --
+so the label difference is not a real finding. The REAL gap: the twin carries genuine, specific HELP TEXT
+("The tool overhangs the edge by its radius" -- a fact a new user would not otherwise know) that my own build
+has none of, because the `HELP` field exists on `formfield` and was simply never typed into during this pass.
+This is an AUTHORING OMISSION, not a platform gap -- the mechanism to add it exists and works exactly like
+`LABEL`/`DFLT` (same plain-text-field click-and-fill) -- but it is real, additive cost per field, and a real
+person building this wizard for actual use would need to write that documentation themselves, from scratch,
+with no prompt reminding them the built-in already has the words.
+
+### COMPARISON 3 — PREVIEW: NO AUTHORING PATH EXISTS. The single most valuable finding of this turn
+
+`typeof mine.previewGeometry === 'function'` -> **`false`**. `typeof twinDef.previewGeometry === 'function'`
+-> **`true`**. Confirmed visually too (`verification/t2509-my-wizard-open.png` vs
+`verification/t2509-builtin-wizard-open.png`, side by side): the built-in's own Visualization pane shows a live
+3D scene AND a live 2D canvas with actual DRAG HANDLES (a green "pos" dot, a cyan size handle, on a rectangle
+tracing the faced area) -- the exact interactive resize/reposition affordance this whole session's own L5 arc
+(BACKLOG #61) spent nine turns porting to a shared, declarative registry. My own build's Visualization pane is
+**entirely black** -- no shapes, no handles, nothing. Two DISTINCT reasons compound here, both real: (a) my
+`panel` field is set to plain `'form'`, not `'form3d+2d'` like the built-in -- so no 2D/3D area was even
+requested; but (b) EVEN IF it had been, `previewGeometry` (the hook that supplies the actual handle geometry --
+`surfacingPreviewGeometry` in `surfacingData.js`, ~30 lines of real coordinate math) is a property assigned
+directly onto the `def` OBJECT in JavaScript, AFTER `userOpFromStack` runs (`def.previewGeometry =
+surfacingPreviewGeometry;`) -- there is no block, no field, no UI affordance anywhere this session found (and
+this session searched deliberately, given L7's own fresh census of the `Wizard Shapes`/`layout_2d_canvas`
+family literally last turn) that lets a real author declare an INTERACTIVE handle. The four STATIC shape
+primitives (`shape_rect`/`shape_circle`/`shape_line`/`shape_marker`, BACKLOG #61's own census, confirmed alive
+and independent at t2507) would let an author draw a NON-interactive outline of the faced area -- a real, lesser
+capability that exists and was not attempted here for time -- but the DRAG-TO-RESIZE, DRAG-TO-REPOSITION
+behaviour every built-in wizard has is, as far as this turn's own search found, JS-only. This is exactly the
+"no UI path at all" outcome the dispatch named as the most valuable one, and it is not a guess -- `previewGeometry`
+was grepped, traced to its own single declaration in `surfacingData.js`, and confirmed there is no
+`def.<field> = <userAuthoredFn>` equivalent reachable from any block currently in the palette.
+
+### VERDICT -- named plainly, not steered toward the flattering read
+
+The arc's own thesis is TRUE for the part that matters most (emit): a real person, using only the real
+authoring surface, can build something that runs identically to a hand-written built-in. It is TRUE WITH REAL,
+MEASURED COST for the form (documentation has to be typed by hand, and scaling to a full-parity form is
+~150 more actions by this turn's own rate). And it is FALSE, cleanly and completely, for the one property this
+session's own L5 arc spent the most effort building for the built-ins themselves: there is no authoring path
+today for an interactive preview handle. All three outcomes the dispatch named turned out to be true at once,
+each for a different axis of the same wizard -- not the tidy single verdict a less careful pass might have
+reported.
+
+### VERIFY
+
+Every structural step verified by explicit block-ID connection checks (never assumed from a screenshot), not
+just the four `execCheck`/`presCheck` boolean gates -- both asserted `true` on every field, `expect(...).toBe
+(true)` failing the test loudly if any single connection had silently missed, the exact class of failure this
+turn's own two traps (wide-flyout misdrop, stale-flyout field-click) produced before being found and fixed.
+Emit comparison: strict string equality, not a diff heuristic. Reload: a genuine `page.reload()`, not a soft
+reset -- the saved op's own bindings read back via the same `getUserDef`/`listUserOps` calls a real caller uses.
+Screenshots: `verification/t2509-build-after-save.png` (immediately after the real save dialog confirms),
+`verification/t2509-my-wizard-open.png` (after a real reload + real reopen), `verification/t2509-builtin-wizard-
+open.png` (the built-in, for the visual comparison the owner asked for directly). No product code touched this
+turn -- purely an investigation, so `test:node`/the existing suite are unaffected by construction; full suite
+`--workers=4` run anyway per the dispatch's own unconditional VERIFY instruction: **DONE in 35m4s -- 3033
+passed, 1 failed, 11 flaky, 26 skipped.** The 1 failure is the same pre-existing `sf-pos-snapback` flake every
+run this session has shown -- `open-as-modal-1625` (BACKLOG #56, t2507's own observation) did NOT recur this
+run, consistent with #56's own documented character (contention-sensitive, not deterministic). Filed BACKLOG
+#71 for the one lasting finding (no real-UI authoring path for an interactive preview handle) -- see that entry
+for the full account; this file carries the complete method and all three comparisons.
