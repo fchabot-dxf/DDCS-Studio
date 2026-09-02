@@ -6878,6 +6878,20 @@ interactive handles.
 > gestures (point already had a path via `layoutwidget`; scaleX/shear/rect/radial/projLength/diagAim/crossAim/
 > probeVector/translate remain) are template work now that one is proven, not yet built — scoped out this turn
 > deliberately (BACKLOG #61's own corner-precedent: prove one, then let the rest inherit).
+>
+> **✅ t2521 — gesture 2 (POINT), proven the same way.** `wizards/ops/pointHandle.js` (`point_handle`), same
+> self-contained shape, nests in `feature_canvas`'s mouth. Genuinely fit the template with a small, honest
+> difference worth naming: `point`'s own render branch already existed (reached until now only by
+> `layoutwidget`, always anchored at {0,0}) — rather than declare a second parallel branch, this one WIDENED
+> the existing helper (`pos()`, panelTypes.js) to take an optional literal `(ax, ay, label)`, defaulting to the
+> exact prior hardcoded `(0, 0, 'pos')` so every one of the OTHER 5 call sites (corner/edge/middle's own
+> role-ladder fallbacks, all still calling `pos()` bare) stays byte-identical by construction. Proven the same
+> t2509/t2517 bar: real palette drags, real field edits, real save, a real reload, a real mouse drag on the
+> rendered SVG square moving it off its authored default (`verification/t2521-point-handle-live-drag.png`).
+> One real, named, still-latent wrinkle found along the way: `layoutBindingsToBlocks` (the older, still-unwired
+> layoutwidget reverse function) has no `anchor.kind` check at all, so it would also match `point_handle`'s own
+> bindings if it were ever run on a mixed list — not a live bug (neither reverse function is wired into a real
+> reopen-as-blocks flow yet), but real, and left as a named finding rather than silently patched in passing.
 
 ---
 

@@ -69197,3 +69197,62 @@ this WORK-LOG entry. `git diff` checked on `CLAUDE.md` before staging (a shared-
 seat edits mid-turn the way `BACKLOG.md`/`WORK-LOG.md` are). Local memory originals left untouched, per the
 dispatch's explicit "do not delete" -- migration first, cleanup is the owner's separate call once they've seen
 what landed.
+
+---
+
+## t2521 -- BACKLOG #71, GESTURE 2 OF 3 THIS TURN: POINT. Fits the template exactly, one existing branch extended.
+
+Dispatch: build POINT, RECT, RADIAL -- the three the mill family's own built-ins actually use -- one at a time,
+separate commit each, STOP at the first genuine mismatch. This entry covers POINT.
+
+### THE DESIGN, and where it differs from length_handle
+
+`wizards/ops/pointHandle.js` (new): `point_handle`, self-contained like `length_handle` -- own bound param
+names (fx/fy) + defaults (x/y) + a FIXED literal anchor (ax/ay) + label. Nests inside `feature_canvas`'s own
+mouth, same containment rule.
+
+**The one real design question POINT raised, and the answer**: the `point` gesture already had a LIVE render
+branch (`anchor.kind === 'point'`, panelTypes.js) -- reached today only by `layoutwidget` (nested in
+`param_group`, always anchored at {0,0}; its own `frame` field selects a coordinate FRAME, never a literal
+offset). Two options: declare a SECOND, parallel anchor kind (mirroring `length`'s own fresh branch exactly),
+or extend the ONE existing branch to accept an optional literal anchor. Chose the extension: `pos()` (the
+branch's own helper) already took `(ax, ay)`, always called with none -- widened to `(ax=0, ay=0, label='pos')`
+and the branch now reads `anchor.ax`/`anchor.ay`/`anchor.label` when present. The other 5 call sites in the
+same file (corner/edge/middle's own role-ladder fallbacks) all still call `pos()` bare -- their behaviour is
+byte-identical by construction, not by re-verification: the defaults reproduce the exact pre-t2521 literal
+`(0, 0, 'pos')` that was hardcoded before. `layoutwidget`'s own anchor never sets ax/ay/label either, so its
+existing behaviour is unchanged the same way.
+
+**The reverse-direction wrinkle, worth naming plainly**: `layoutBindingsToBlocks` (the existing, still-unwired
+layoutwidget reverse function) filters on `b.anchor && (b.role==='x'||b.role==='y')` with NO kind check at
+all -- it would ALSO match `point_handle`'s own bindings if ever run on a mixed list, since both now share
+`anchor.kind:'point'`. `handleBindingsToBlocks` (this turn's own function) disambiguates on its OWN side by
+checking `anchor.frame === undefined` (point_handle's anchor never carries `frame`; layoutwidget's always
+does). Left `layoutBindingsToBlocks` itself untouched -- neither function is wired into any real "reopen as
+blocks" flow today (confirmed at t2517, still true), so this is a real, named, latent ambiguity rather than a
+live bug, and fixing the OLDER function's own missing kind-check is out of this turn's scope.
+
+`userOps.js`: `handleBindingsFromStack`/`handleBindingsToBlocks` extended (not duplicated) to also recognise
+`point_handle` alongside `length_handle` -- same function, an added `if (b.type === 'point_handle')` branch,
+producing TWO bindings (x/y) sharing one group instead of `length_handle`'s one.
+
+### THE PROOF (`point-handle-block.spec.js`, permanent, 3 tests, all green FIRST run)
+
+Same structure as `length-handle-block.spec.js`: function-level round-trip, a def-level render+emit-parity
+check, and the full live-UI DRIVE THE APP proof (real palette drags for `user_root`/`feature_canvas`/
+`point_handle`, real field edits renaming fx/fy, real save, a real page reload, then a REAL mouse drag on the
+rendered SVG square handle). `verification/t2521-point-handle-live-drag.png` -- the "pos" square handle,
+visibly moved off its authored default, spotx/spoty reading 47.2/54.5 against a 40/60 default. No new
+automation traps found this gesture -- the t2517 drag/mouth/field-edit helpers, copied into this file
+unchanged, worked on the first real run.
+
+### TIER, stated
+
+`panelTypes.js`'s `pos()` helper is genuinely shared (6 call sites, one of them now newly parametrised). The
+dispatch's own silent-failure conditional applies. Ran `test:node` (238/238, unchanged) plus the 3 new
+targeted specs (all green) as the per-gesture gate; the FULL suite will run ONCE covering every gesture this
+turn actually lands (stated here rather than assumed) -- three separate 35-minute full runs would re-verify
+the SAME 5 untouched call sites three times with no new information between them, since each gesture's own
+targeted spec plus the structural argument above (defaults reproduce the exact prior literal) already cover
+the change's blast radius. If RECT or RADIAL's own risk profile turns out to need an earlier full run, that
+will be stated when it happens, not assumed away in advance.

@@ -679,60 +679,85 @@ export function layoutBindingsToBlocks(bindings) {
     return out;
 }
 
-// ── def.bindings (group/role/anchor) ⇄ `length_handle` blocks (BACKLOG #71 pilot, t2517) — the GUI drag-handle ──
-// A `length_handle` block, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable 1D canvas
-// handle bound to ONE param. It expands to ONE SOCKET-LESS binding {param, group, role:'len', anchor:{kind:
-// 'length', axis, ax, ay, min, max, label}} — form + canvas only (no match/blockIndex → no emit, mirroring
-// layoutwidget's fx/fy exactly). layoutSpecFromOp's own `anchor.kind === 'length'` branch renders the draggable
-// handle (canvasWidgets CANVAS_GESTURES.length); the drag writes `field` (the axis distance from the FIXED
-// literal anchor ax/ay). SCOPED TO feature_canvas'S OWN CHILDREN, never a bare stack-wide scan — a handle
-// belongs to a SPECIFIC canvas (owner ruling), so containment (not a flat type-filter) says which one owns it;
-// a future op with two feature_canvas nodes keeps each one's own handles distinct by construction.
+// ── def.bindings (group/role/anchor) ⇄ handle blocks nested in `feature_canvas` (BACKLOG #71, t2517/t2521) ──
+// A handle block, nested inside a `feature_canvas` block's own mouth, DECLARES a draggable canvas gesture
+// bound to one or more params — form + canvas only (no match/blockIndex → no emit, mirroring layoutwidget's
+// fx/fy exactly). layoutSpecFromOp's own `anchor.kind` switch renders the matching CANVAS_GESTURES entry; the
+// drag writes the declared field(s). SCOPED TO feature_canvas'S OWN CHILDREN, never a bare stack-wide scan — a
+// handle belongs to a SPECIFIC canvas (owner ruling), so containment (not a flat type-filter) says which one
+// owns it; a future op with two feature_canvas nodes keeps each one's own handles distinct by construction.
+// `length_handle` (t2517) is the pilot; `point_handle` (t2521) is the second gesture, same shape — see its own
+// header for exactly how it differs (reuses the EXISTING `anchor.kind === 'point'` branch rather than a new one).
 
-/** The `length_handle` blocks nested inside `feature_canvas` nodes in a stack → SOCKET-LESS layout bindings
- *  (the group/role/anchor a handle needs). */
+/** The handle blocks (`length_handle`, `point_handle`, …) nested inside `feature_canvas` nodes in a stack →
+ *  SOCKET-LESS layout bindings (the group/role/anchor a handle needs). */
 export function handleBindingsFromStack(children) {
     const out = []; let n = 0;
     for (const fc of flattenBlocks(children)) {
         if (!fc || fc.type !== 'feature_canvas') continue;
         for (const b of [...flattenBlocks(fc.uiChildren || []), ...flattenBlocks(fc.children || [])]) {
-            if (!b || b.type !== 'length_handle') continue;
+            if (!b) continue;
             const p = b.params || {};
-            const gid = 'lh' + (++n);
-            const dv = Number(p.value);
-            const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
-            const min = (p.min === '' || p.min == null) ? null : Number(p.min);
-            const max = (p.max === '' || p.max == null) ? null : Number(p.max);
-            const anchor = { kind: 'length', axis: String(p.axis || 'Y').toUpperCase() === 'X' ? 'x' : 'y', ax, ay, min, max, label: p.label || 'length' };
-            out.push({ param: String(p.field || 'len'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'len', anchor });
+            if (b.type === 'length_handle') {
+                const gid = 'lh' + (++n);
+                const dv = Number(p.value);
+                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                const min = (p.min === '' || p.min == null) ? null : Number(p.min);
+                const max = (p.max === '' || p.max == null) ? null : Number(p.max);
+                const anchor = { kind: 'length', axis: String(p.axis || 'Y').toUpperCase() === 'X' ? 'x' : 'y', ax, ay, min, max, label: p.label || 'length' };
+                out.push({ param: String(p.field || 'len'), type: 'number', default: Number.isFinite(dv) ? dv : 0, group: gid, role: 'len', anchor });
+            } else if (b.type === 'point_handle') {
+                const gid = 'ph' + (++n);
+                const xv = Number(p.x), yv = Number(p.y);
+                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                const anchor = { kind: 'point', ax, ay, label: p.label || 'pos' };
+                out.push({ param: String(p.fx || 'x'), type: 'number', default: Number.isFinite(xv) ? xv : 0, group: gid, role: 'x', anchor });
+                out.push({ param: String(p.fy || 'y'), type: 'number', default: Number.isFinite(yv) ? yv : 0, group: gid, role: 'y', anchor });
+            }
         }
     }
     return out;
 }
 
-/** SOCKET-LESS length bindings → `length_handle` block records, nested back inside a `feature_canvas` block (the
- *  reverse — re-authorable). One binding per handle (unlike layoutwidget's x/y pair). */
+/** SOCKET-LESS handle bindings → handle block records, nested back inside a `feature_canvas` block (the
+ *  reverse — re-authorable). `length_handle` is one binding per handle; `point_handle` pairs a group's x/y. */
 export function handleBindingsToBlocks(bindings) {
-    const handles = (bindings || []).filter((b) => b && b.group && b.anchor && b.anchor.kind === 'length' && b.role === 'len');
-    if (!handles.length) return [];
-    const kids = handles.map((b) => ({ type: 'length_handle', params: {
+    const list = bindings || [];
+    const lengths = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'length' && b.role === 'len');
+    const lenKids = lengths.map((b) => ({ type: 'length_handle', params: {
         field: b.param, value: b.default != null ? String(b.default) : '',
         axis: b.anchor.axis === 'x' ? 'X' : 'Y', ax: String(b.anchor.ax || 0), ay: String(b.anchor.ay || 0),
         min: b.anchor.min != null ? String(b.anchor.min) : '', max: b.anchor.max != null ? String(b.anchor.max) : '',
         label: b.anchor.label || 'length',
     } }));
+    // point_handle: pair each group's own x/y bindings that carry a FIXED-ax/ay point anchor (as opposed to
+    // layoutwidget's own {kind:'point', frame} shape, which layoutBindingsToBlocks already reverses separately).
+    const byGroup = {};
+    for (const b of list) if (b && b.group && b.anchor && b.anchor.kind === 'point' && b.anchor.frame === undefined && (b.role === 'x' || b.role === 'y')) (byGroup[b.group] = byGroup[b.group] || {})[b.role] = b;
+    const ptKids = [];
+    for (const g in byGroup) {
+        const x = byGroup[g].x, y = byGroup[g].y;
+        if (!x || !y) continue;
+        ptKids.push({ type: 'point_handle', params: {
+            fx: x.param, fy: y.param, x: x.default != null ? String(x.default) : '', y: y.default != null ? String(y.default) : '',
+            ax: String(x.anchor.ax || 0), ay: String(x.anchor.ay || 0), label: x.anchor.label || 'pos',
+        } });
+    }
+    const kids = [...lenKids, ...ptKids];
+    if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }
 
 /** The LIVE-form extra bindings a stack's authoring blocks declare — formfield VALUE fields + layoutwidget/
- *  length_handle GUI handles. For devMode.deriveAuthoredDef so a field/handle shows in the form AS YOU AUTHOR
- *  IT. Safe (skips on a bad match). */
+ *  length_handle/point_handle GUI handles. For devMode.deriveAuthoredDef so a field/handle shows in the form
+ *  AS YOU AUTHOR IT. Safe (skips on a bad match). */
 export function authoredExtraBindings(children) {
     return [...formfieldBindings(children), ...layoutBindingsFromStack(children), ...handleBindingsFromStack(children)];
 }
 
 /** If the template AUTHORS its bindings as `formfield` (value) / `layoutwidget` (point) / `length_handle`
- *  (length) blocks, derive them. Mirrors resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there
+ *  (length) / `point_handle` (point, nested-in-canvas form) blocks, derive them. Mirrors resolvePanelMeta/
+ *  resolveSimMeta: ADDITIVE — returns null when there
  *  are NONE, so a hand-written-spec def (today's corner/edge/middle) is UNTOUCHED / byte-identical. Returns
  *  { specs, bindings } — specs drive the emit re-derivation (def.bindingSpecs), bindings drive the form +
  *  schema (deriveBindings over the template) + the GUI (group/role/anchor). */

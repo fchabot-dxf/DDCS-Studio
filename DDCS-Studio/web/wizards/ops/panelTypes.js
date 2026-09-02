@@ -433,13 +433,21 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         const p = (r) => byRole[r] ? num(params[byRole[r].param]) : undefined;
         const wr = (r) => byRole[r] && _writable(byRole[r].param);   // a role whose param is a settable form field
         // pos handle = a `point` gesture over the x/y params (built only when both are writable — never a dead handle).
-        const pos = (ax = 0, ay = 0) => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), ax, ay, label: 'pos' }); };
+        // t2521 (BACKLOG #71) — ax/ay/label now optional params (was a bare `(ax=0, ay=0)`, label hardcoded
+        // 'pos'): `point_handle`'s own FIXED literal anchor (mirroring length_handle's ax/ay) reuses this SAME
+        // branch rather than a parallel one, so it needed the anchor plumbed through here. Every EXISTING
+        // caller (the corner/edge/middle role-ladder calls below, always `pos()` bare) is byte-identical —
+        // defaults preserve the pre-t2521 (0, 0, 'pos') shape exactly.
+        const pos = (ax = 0, ay = 0, label = 'pos') => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), ax, ay, label }); };
         // composable GUI (PILOT 2) — a binding may DECLARE its anchor kind+frame explicitly (the `layoutwidget` block) instead
         // of the role/param-name sniff → SWITCH on anchor.kind. kind 'point' + frame 'stock-min' = an ABSOLUTE PHYSICAL point
         // (ax=0, the datum model — datum-relative display is a later slice). The role ladder + the corner/edge/② magic-name
         // sniffs below stay as the FALLBACK (untouched) → corner/edge/middle byte-identical (they declare no anchor).
+        // t2521 — `point_handle`'s own anchor carries a literal ax/ay + label (no `frame`); layoutwidget's own
+        // anchor carries `frame` and no ax/ay (`anchor.ax||0` reads 0 for it, unchanged) — one branch, two
+        // authoring surfaces, disambiguated only where it matters (the reverse direction, handleBindingsToBlocks).
         const anchor = groups[gid].map((b) => b && b.anchor).find(Boolean);
-        if (anchor && anchor.kind === 'point') { pos(); continue; }
+        if (anchor && anchor.kind === 'point') { pos(anchor.ax || 0, anchor.ay || 0, anchor.label || 'pos'); continue; }
         // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
         // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent
         // param. Mirrors the byRole.x/y/len branch further down (same MUTE anchor dot + canvasWidgets `length`
