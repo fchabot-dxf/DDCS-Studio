@@ -947,8 +947,13 @@ conversational evidence from the one person who actually knows.
    line counts and byte counts from it and manufactured a bench task out of the result. **The meaning was
    DECLARED by the person who wrote the firmware; re-deriving it from output is exactly what principle 3
    forbids.** Recorded because the advisor had been citing that principle at the worker all session.
-2. **Firmware floor.** Unknown which release added it. `2026-08-03-00`'s own changelog covers register `3000`
-   G-code injection ONLY — see the firmware entry — so `16062` is not from that release and predates it.
+2. ~~**Firmware floor.**~~ ⭐ **ANSWERED, same conversation: `2026.09.02`.** Vendor's own words: *"the system
+   needs to be updated to the 2026.09.02 version"* + *"I will package and upload the new version shortly."*
+   ⇒ ⛔ **It does not POSTDATE our records — it does not exist yet.** Unreleased at the time of writing
+   (2026-09-02). `16062` is a brand-new capability, not something we had been failing to find.
+   ⚠ So the earlier reasoning here was backwards: this was never a register waiting to be discovered on the
+   owner's current firmware. Nothing to test until the release lands. **Watch for it** — recorded in
+   `context/CHANNELS.md` as pending with the vendor.
 3. ⛔ **THE V4.1 WILL NOT GET THIS — owner-stated, 2026-09-02.** Not "unknown", not "unverified": it is not
    coming. ⇒ **The `SYSDISK` byte-offset route above is NOT a fallback, it is the ONLY route for the V4.1**,
    and per [[v41-and-v3-outnumber-expert]] the V4.1 and V3 outnumber the Expert in the field. Anything built
