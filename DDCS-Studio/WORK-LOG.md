@@ -71776,3 +71776,166 @@ reverted: `window.__T2565_DELTA`-gated delta-pan in `_followHandle`, `window.__T
 return, and their own scratch test files, all removed). No product code shipped; no full suite run (nothing to
 gate).
 
+## 🔨 turn 2567 — BUILT: no panning during a noSnap drag. Severity resolved, one honest correction, one honest non-closure
+
+Owner approved the trade at t2565's own dispatch. This turn builds it, per the explicit "one guarded early
+return, scoped as narrowly as the evidence supports."
+
+### THE FIX
+
+`web/viz/featureCanvas.js`: removed `_followHandle()` entirely — its one call site (in the `pointermove`
+handler, right after `onDrag`), its own function body, and the `_followed` flag it set + the `(followed ||
+this._handleInGutter(id))` trigger in `end()` that read it (now just `this._handleInGutter(id)` alone, which
+is sufficient — it checks the marker's CURRENT position at release, regardless of how it got there). Updated
+every comment that referenced `_followHandle` as a live mechanism (the `GUTTER_PX` doc-comment, the
+`pointermove` handler's own new explanation, `_handleInGutter`'s own docblock and its "INCLUSIVE" comment,
+`alignment-canvas-refit-732.spec.js`'s own two references) rather than leaving them stale. Scoped exactly to
+`noSnap` drags (the ONLY context `_followHandle` was ever called from — confirmed at t2561, unchanged).
+
+### ⚠ A CORRECTION MADE ALONG THE WAY: the t2561/t2565 "hang" framing was wrong
+
+Before trusting the dispatch's own "RUN 300, which timed out at 60 seconds before" framing, checked it
+directly: gave the ORIGINAL, pre-fix code a GENEROUS (300s) timeout for the 300-step drag. **It also
+completes** — 133.6s, producing `jogY = -2147.416` (continuing the established super-linear growth pattern,
+not a stall). The FIXED code's own 300-step run takes 139s — the SAME per-step rate. **The "hang" was never
+the bug — it was Playwright/CDP's own linear per-step overhead (~440ms/step in this environment) exceeding a
+60s default test timeout, present identically whether or not the bug is fixed.** The bug was always about the
+WRONG VALUE, at every scale tested, never about non-termination. Corrected the language everywhere it had
+already landed (this turn's own code comment, the manifest's own entries where relevant) rather than let a
+now-known-imprecise claim stand uncorrected in the permanent record.
+
+### VERIFY — the severity harness, the acceptance test the dispatch named
+
+```
+  steps=8:   jogY = +12.493   (exact — matches the naive mouse-px/scale expectation almost perfectly)
+  steps=40:  jogY = +12.493   (identical)
+  steps=100: jogY = +12.493   (identical)
+  steps=300: jogY = +12.493   (identical — 139s wall-clock, matching the pre-fix code's own per-step rate)
+```
+Stable and exact at every event count tested — not merely bounded, actually CORRECT. `jogX` (never triggers
+panning for this drag) stayed at `24.985` throughout, as it always has — confirms the fix is scoped correctly.
+
+### #65's own five-vector table — the residual did NOT close. It MOVED. Reported honestly, not silently absorbed
+
+```
+  original (dx40,dy25):    moved 47.2 mid -> settled 65.7    (0px residual)
+  repeat of the same:      moved 47.2 mid -> settled 65.7    (0px residual)
+  pure +X (dx60,dy0):      moved 60.0 mid -> settled 80.0    (0px residual)
+  pure +Y (dx0,dy60):      moved 60.0 mid -> settled 51.4    (⚠ NEW ~8.6px/14% residual — was 0px before this turn)
+  bigger diagonal (90,60): moved 108.2 mid -> settled 80.5   (⚠ ~27.7px/26% residual — was ~19.7px/22% before this turn)
+```
+
+**Traced the root live, not inferred**: temporarily instrumented `end()`'s own t2563 edge-distance
+reconciliation (`window.__T2567trace`, reverted after) for both residual vectors. Result: `overrode: false` in
+BOTH — t2563's own override, still present in the code, NEVER FIRES for either. The residual comes entirely
+from the NATURAL (un-overridden) roomy refit's own bbox-centroid placement, which is COMPLETELY INDEPENDENT of
+panning: `_fit(..., roomy=true)` places the bbox's own extreme point at roughly `ROOMY_MARGIN_PX`(104px) from
+an edge by construction — a margin, not a trajectory. **Why it spread rather than closed**: WITHOUT the
+mid-drag auto-pan holding a marker at a comfortable 80px margin throughout the drag, MORE drags now end with
+the marker landing DEEPER in the gutter at release (nothing held it back mid-drag) — exposing this same,
+always-present roomy-fit quirk on MORE vectors than before (previously only "bigger diagonal," the single most
+extreme vector, penetrated deep enough to show it; now "pure +Y" does too). This is a REAL, SEPARATE, BOUNDED
+mechanism (not growing with drag distance the way the now-fixed pan compounding did) — closer in kind to
+BACKLOG #73's own declared canvas-scale residual than to #64/#65's own original severe defect. NOT fixed this
+turn — outside the explicit "one guarded early return" scope — reported as a real, scoped follow-on candidate.
+
+**#64's own rotaryClock repro, unaffected**: 47.2 mid → 47.2 after, 0px residual, unchanged.
+
+### t732 — the test the FIRST fix attempt (t2563) broke — re-verified green
+
+`alignment-canvas-refit-732.spec.js`'s own four-consecutive-away-drags scenario: `insets=[104,104,104,104]`
+(identical to the pre-this-turn shipped behaviour — the `>100` requirement holds) and world X still growing
+more negative every drag (`60 → -84.7 → -495.3 → -1355.9 → -3159.7` — MUCH less extreme than the pre-fix
+`-68316.6` by the 4th drag, itself a symptom of the very bug this turn removes). **Not panning during the
+ACTIVE drag costs t732 nothing**, because its own assertions run AFTER release, where t2563's own (unaffected)
+refit-on-drop does the real work — panning-during-drag and refit-on-release turn out to be two separate
+mechanisms serving overlapping goals, and only removing the first was ever in scope.
+
+### The L1 manifest guard — needed a real correction, found by testing it, not assuming it
+
+`tests/support/previewMutations.js`'s `simstart-refit-snapback` entry originally reverted ONLY t2563's own
+reconciliation (`T2563_FEATURECANVAS_REFIT_ON_DROP`). Two further attempts, each TESTED and each found wanting
+before landing the third:
+1. **Revert T2567 alone** (re-insert `_followHandle`'s call site + function, nothing else): MUTATED phase
+   showed `ok=true` — NO residual reproduced. Traced why: t2563's own reconciliation, LEFT ACTIVE, independently
+   compensates for the reintroduced pan on this vector — the two fixes are not independent.
+2. **Revert T2563 + a first cut of T2567** (call site + function, but the call site's own reintroduction
+   dropped `this._followed = true`, and `end()`'s own trigger stayed at the t2567-shipped `_handleInGutter(id)`
+   alone): STILL `ok=true` for every one of BACKLOG #65's own historical vectors, even "bigger diagonal" —
+   confirmed by re-running ALL FOUR through the manifest's own exact boot (`bootAlignment`, 1400×1000):
+   ALL FOUR showed `movedMid === movedAfter` EXACTLY, no snap-back at all, even in this "reverted" state.
+   Traced why: the ORIGINAL code's own `end()` trigger was `followed || this._handleInGutter(id)` — `followed`
+   (set whenever `_followHandle` panned AT LEAST ONCE) is what guaranteed the refit fires even when the
+   marker's own FINAL position, after all that panning, isn't strictly within the gutter band at the exact
+   moment of release. Dropping `followed` (matching the t2567-shipped code, correctly, since it's dead there)
+   while ALSO reverting the pan mechanism left the refit-on-drop's OWN trigger too narrow to fire reliably.
+3. **Shipped**: THREE files-array entries — the call site (WITH `this._followed = true` restored), the
+   function body, AND `end()`'s own trigger (restored to `followed || this._handleInGutter(id)`) — reverted
+   TOGETHER with T2563's own reconciliation. Re-running the SAME four vectors through `bootAlignment` now
+   reproduces BACKLOG #65's own historical numbers almost exactly (`original: 60.7→54.7` vs the documented
+   `60.7→54.7`; `pure+X: 75.4→55.1` vs `75.4→55.3`; `pure+Y: 45.6→54.1` vs `45.6→54.0`, the documented
+   OVERSHOOT outlier; `bigger diagonal: 100.9→55.3` vs `100.9→55.5`) — the genuine historical bug state,
+   finally faithfully reproduced.
+
+Seeded on PURE +X specifically (unchanged choice from t2563): a clean, reliable RED/GREEN signal both ways —
+`75.4px mid → 55.1px after` when mutated, matching BACKLOG's own original number almost exactly; green with
+the shipped fix. Full 9-entry manifest: **9/9 green**, all 6 pre-existing entries unaffected.
+
+### No regression to the sibling drag-mechanics suites
+
+Re-ran alongside: `alignment-handles-independent.spec.js`, `drag-render-truth-gate-2461.spec.js`,
+`lathe-drag-responsive-2505.spec.js`, `lathe-handle-hit-2501.spec.js`, `commit-on-release-2429.spec.js`,
+`alignment-canvas-refit-732.spec.js` — all green (unchanged from t2563's own last full-suite confirmation).
+
+### TIER — the full suite caught three REAL, direct consequences of this fix that the targeted tests above did not
+
+`featureCanvas.js` is a shared render-path file (AGENTS.md 1b) — full suite, unconditional, per the dispatch's
+own instruction, exactly the same reasoning as t2563's own turn (whose first fix attempt passed its own
+acceptance test while breaking a different one). It earned its keep again: **4 failures on the first full run,
+1 confirmed pre-existing flake and 3 real, predictable, DIRECT consequences of removing the auto-pan — each
+investigated and fixed on its own merits, not dismissed.**
+
+1. **`surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test (BACKLOG #73's own declared
+   band)** — a POSITIVE finding, not a regression. `ratioY` measured `1.112`, failing the OLD declared band
+   (1.9-2.5) — because `ratioY` now EQUALS `ratioX` (`1.1121` vs `1.1121`, identical to 4 significant figures).
+   **BACKLOG #73's own "WORSE axis"/~120% residual was NEVER its own defect** — it was THIS turn's bug (the
+   pan compounding) riding along on the exact same drag gesture that test happens to use, inflating jogY (not
+   jogX, which this specific drag never panned) by ~2x on top of #73's OWN genuine, benign, canvas-scale gap.
+   Tightened the test's own declared band to ONE range (1.05-1.20, both axes) matching the now-confirmed
+   reality, and added a correction to BACKLOG #73 itself (its own core diagnosis — `visualMaxHeight()`'s
+   unasked third case — stays correct and unchanged; only the "worse axis" framing and its specific numbers
+   were wrong, now corrected rather than left stale).
+2. **`alignment-handle-visible-exit.spec.js`** — its own header names the EXACT mechanism this turn removes
+   ("the auto-pan must keep the marker VISIBLE in the canvas... hold at the edge → the auto-pan keeps
+   scrolling the handle out"). ONE of its five assertions (`hVisibleInCanvas` must be `true` during the drag)
+   directly encoded the OLD behavior; the other four (marker past the stock on-screen both during and after,
+   the world-value fraction, the 3D sim surface) are UNCHANGED and still pass — confirmed live before touching
+   anything (`during`/`after` values captured via the test's own existing console.log). Surgical fix: that one
+   assertion now asserts the marker legitimately leaves the CONTAINER (not the same as leaving the STOCK, this
+   test's own actual concern, which is untouched) with a comment naming this as the accepted trade, not a bug.
+3. **`undo-blind-writes-2427.spec.js`** — re-ran in isolation: 1/1 green. A pre-existing, load-sensitive flake
+   surfaced under full-suite contention, unrelated to this turn's own change (the burst-write/undo-grouping
+   mechanism it exercises doesn't touch `featureCanvas.js` at all).
+
+Re-ran the full suite a second time with all three fixes applied: **3081 passed, 1 failed, 10 flaky, 26
+skipped.** The one failure — `preview-mutation-manifest-2463.spec.js`'s own `sf-pos-snapback` entry — is the
+SAME already-documented, load-sensitive flake this arc has seen repeatedly (t2557, t2559; a DIFFERENT,
+T2447-targeted mutation, unrelated to `featureCanvas.js`'s own refit-on-drop). Re-ran it in isolation per this
+session's own discipline: **1/1 green**, the identical MUTATED numbers (`38.6px from 180.3px`) as every prior
+sighting — confirmed flake, not a regression. `npm run test:node`: 238/238, both runs.
+
+### BACKLOG
+
+`BACKLOG.md` #64/#65 both updated: headers corrected to credit t2567 (not t2563 alone) as what makes the fix
+reliable, the severity table with the corrected "not a hang" framing, the FULL five-vector re-measurement with
+the residual's move (not closure) declared honestly, the live-traced root (`overrode:false`, the roomy-fit's
+own margin-not-trajectory placement, independent of panning), and the three-attempt account of getting the L1
+manifest's own guard right. `BACKLOG.md` #73 also updated: its own "WORSE axis"/~120% ratioY claim corrected
+(see TIER §1 above) — the core `visualMaxHeight()` diagnosis stays, the specific numbers don't.
+
+`git status`: `web/viz/featureCanvas.js`, `tests/support/previewMutations.js`,
+`tests/alignment-canvas-refit-732.spec.js`, `tests/surfacing-start-position-1648.spec.js`, and
+`tests/alignment-handle-visible-exit.spec.js` are this turn's product changes, staged and committed below.
+Every scratch/debug test file and every temporary in-source `window.__T2567*`-gated experiment was reverted
+before this state — confirmed via `git diff` showing only the intended, permanent changes.
+

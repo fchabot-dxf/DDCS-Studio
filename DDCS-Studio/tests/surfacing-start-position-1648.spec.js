@@ -271,16 +271,22 @@ test('t1650 review fix: the seed shape is ONE-SOURCED — the WIZARD calls the S
     // instead of a real number, and reverted — its own "climb to `.ui-split`" strategy has never been asked
     // to bound a split-nested visual inside an UNCONSTRAINED wide-modal host, a genuinely new combination this
     // arc created, not yet closed; ⭐ owner-ruled t2555: the constant stays, a fifth visit is real work for a
-    // cosmetic gain). The SAME real-world drag distance therefore maps to a DIFFERENT pixel-to-mm ratio on
-    // each face — and NOT uniformly: the canvas's own WIDTH and HEIGHT are bounded by two INDEPENDENT factors
-    // (width by the split's own fixed-plus-flex column allocation; height by the landed chrome-aware bound),
-    // so jogX (~11% off) and jogY (~120% off, the WORSE axis — measured live, not assumed from jogX alone)
-    // diverge by DIFFERENT amounts. DECLARED, not silently tolerated: a named band that passes TODAY but would
-    // fail LOUDLY if the drift ever widened past its own documented ceiling (a real regression) or if someone
-    // closes the gap without also tightening this band (a stale declaration nobody's kept honest).
+    // cosmetic gain). The SAME real-world drag distance therefore maps to a slightly different pixel-to-mm
+    // ratio on each face — the genuine, benign canvas-SIZE part of this gap, unchanged by anything below.
+    //
+    // t2567 — the band BELOW used to be TWO, asymmetric ranges (jogX 1.05-1.20; jogY 1.9-2.5, "the worse axis")
+    // — that asymmetry was NEVER the canvas-size gap above; it was a SEPARATE, SEVERE bug (BACKLOG #64/#65's
+    // own pan-feedback compounding in `featureCanvas.js`'s now-removed `_followHandle`) riding along on the
+    // SAME drag gesture this test happens to use, inflating jogY (but not jogX, since this drag never panned
+    // in X) by up to ~2x on top of the real canvas-size ratio. MEASURED after that bug's removal: ratioX and
+    // ratioY are now 1.1121 and 1.1121 — identical to 4 significant figures — confirming the canvas-size gap
+    // was ALWAYS this small and symmetric, exactly as the paragraph above always described it; the "worse
+    // axis" was an ARTIFACT of the OTHER bug, not a second, independent cause. ONE band now, not two — and per
+    // this comment's own predecessor's own warning ("if someone closes the gap without also tightening this
+    // band"), tightened here rather than left stale now that it has.
     const ratioX = tJogX / wJogX, ratioY = tJogY / wJogY;
-    expect(ratioX, 'twin/wizard jogX ratio stays within the t2551/t2553-documented band (declared, not exact — see comment above)').toBeGreaterThan(1.05);
+    expect(ratioX, 'twin/wizard jogX ratio stays within the documented canvas-size band (declared, not exact — see comment above)').toBeGreaterThan(1.05);
     expect(ratioX, 'jogX ratio upper bound').toBeLessThan(1.20);
-    expect(ratioY, 'twin/wizard jogY ratio stays within its OWN, much wider documented band — the worse of the two axes').toBeGreaterThan(1.9);
-    expect(ratioY, 'jogY ratio upper bound').toBeLessThan(2.5);
+    expect(ratioY, 'twin/wizard jogY ratio now matches jogX\'s own band — the pan-compounding that made this axis look worse is fixed (t2567)').toBeGreaterThan(1.05);
+    expect(ratioY, 'jogY ratio upper bound').toBeLessThan(1.20);
 });

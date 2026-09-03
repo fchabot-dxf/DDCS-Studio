@@ -4,6 +4,15 @@ import { test, expect } from '@playwright/test';
  * t532 — REPRODUCE the human's EXACT symptom: on the REAL alignment 2D canvas, drag a probe handle PAST the stock edge and
  * watch the VISIBLE marker (its SCREEN position vs the drawn stock rect), NOT a param value. Large envelope (600) + small
  * stock (150×100) so reachability is not the limit. Reports what the marker does + asserts it ends VISIBLY outside the rect.
+ *
+ * t2567 (BACKLOG #64/#65) — t532's own mid-drag auto-pan (the mechanism that kept the marker inside the visible
+ * canvas while dragging far) was REMOVED, an owner-approved trade: that pan was ALSO what silently compounded a
+ * small drag into a wildly wrong written value (severe, unbounded, and invisible) — see WORK-LOG t2567. The
+ * marker CAN now genuinely leave the visible container mid-drag; it still lands well past the stock, both
+ * during (screen-pinned at the viewport edge, past the stock, just no longer inside the CONTAINER too) and
+ * after release (t2563's own refit-on-drop, unaffected by this removal, still brings it back into view). Only
+ * the ONE assertion that encoded "stays inside the container while dragging" changed below — everything else
+ * this test's own name claims (exits the stock, both live and settled) is unchanged and still holds.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (not stuck at the edge)', async ({ page }) => {
@@ -70,8 +79,12 @@ test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (
     console.log('DURING drag: ' + JSON.stringify(during) + ' ax=' + axDuring);
     console.log('AFTER up: ' + JSON.stringify(after) + ' | param ax=' + rec);
 
-    // the VISIBLE marker must EXIT the drawn stock rect, and the edge auto-pan must keep it VISIBLE while dragging far out
-    expect(during && during.hVisibleInCanvas, 'DURING the drag the auto-pan keeps the marker VISIBLE in the canvas (not stranded off the frozen viewBox)').toBe(true);
+    // t2567 — the marker is no longer kept inside the container while dragging (the removed auto-pan's own
+    // job); it IS still screen-pinned at the viewport's own edge (`hCx` clamped to the mouse's own clamped
+    // target, not stranded at some arbitrary frozen position) and still genuinely PAST the stock, which is the
+    // property that actually matters (the human's own original complaint was "stuck AT THE STOCK EDGE", not
+    // "stuck at the container edge" — this test's own title).
+    expect(during && during.hVisibleInCanvas === false, 'DURING a drag this far, the marker legitimately leaves the CONTAINER now (t2567, an owner-approved trade — see header) — it is not a bug if this is false').toBe(true);
     expect(during && during.hCx > during.stockRight, 'DURING the drag the marker is PAST the stock right edge on-screen').toBe(true);
     expect(Number(axDuring), 'the handle moved FAR past the stock (fraction ≫ 1) — the pan followed it out, not stuck at the perimeter').toBeGreaterThan(2);
     expect(after && after.outside, 'AFTER the drag the VISIBLE marker sits OUTSIDE the drawn stock rect (2D layout)').toBe(true);

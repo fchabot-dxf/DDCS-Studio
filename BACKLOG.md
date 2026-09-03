@@ -5945,9 +5945,13 @@ common to both, which is not an actionable shared cause. See #57 for the same co
 ### 64. [t2475 — a NARROW candidate fix was built AND TESTED, empirically REFUTED (zero effect on the repro) —
 GUARDRAIL TRIPPED, stopped per the dispatch's own explicit condition, not fixed. t2561 — a SECOND hypothesis
 (the pan-feedback loop) tested via a 4-condition kill-switch and ALSO REFUTED, but the kill-switch isolated the
-REAL root as a byproduct. ✅ FIXED t2563 — the refit-on-drop's own scale recompute relocating the just-released
-handle; permanent guard seeded into the L1 mutation manifest (`simstart-refit-snapback`)] `rotaryClock`'s
-`__simstart0` marker SNAPPED BACK on release — a real drag-render-truth defect, found by L4 (BACKLOG #61)
+REAL root as a byproduct. t2563 — the refit-on-drop's own scale recompute relocating the just-released handle,
+FIXED at the time, but its own reconciliation turned out to be ENTANGLED with the (then still-present) pan
+compounding, not independent of it. ✅ t2567 — the pan compounding ITSELF removed (owner-approved trade, see
+BACKLOG #71's own arc), which is what actually makes t2563's fix reliable — the manifest guard now reverts
+BOTH turns' own changes together (three files-array entries, not t2563's own one) because reverting either
+alone no longer reproduces the historical bug] `rotaryClock`'s `__simstart0` marker SNAPPED BACK on release —
+a real drag-render-truth defect, found by L4 (BACKLOG #61)
 
 *(filed t2471, per L4's own explicit "report, don't fix, each becomes its own turn" scope — see BACKLOG #61's
 own L4 section for the full sweep this was found in.)*
@@ -6081,9 +6085,12 @@ ORIGINAL numbers almost exactly, `75.4px mid → 55.1px after`, versus BACKLOG's
 ---
 
 ### 65. [t2475 — a SECOND hypothesis (the pan-feedback loop) tested via a 4-condition kill-switch, ALSO
-REFUTED — but the kill-switch isolated the REAL root as a byproduct. ✅ FIXED t2563 — see below] `alignment`'s
-`__simstart0` marker SNAPPED/CLAMPED to a near-fixed settle point regardless of drag direction or magnitude —
-a real, REPRODUCED drag-render-truth defect, found by L4
+REFUTED — but the kill-switch isolated the REAL root as a byproduct. t2563 fixed the refit-on-drop's own
+reconciliation; ✅ t2567 removed the pan compounding it was entangled with, which is what makes it reliable —
+see below. ⚠ The five-vector table's own residual did NOT close at t2567 — it MOVED (now 2 of 5 vectors carry
+one, not 1 of 5), a DIFFERENT, unrelated-to-panning mechanism, declared not silently dropped, see below]
+`alignment`'s `__simstart0` marker SNAPPED/CLAMPED to a near-fixed settle point regardless of drag direction or
+magnitude — a real, REPRODUCED drag-render-truth defect, found by L4
 
 *(filed t2471, same L4 sweep as #64 — see BACKLOG #61's own L4 section.)*
 
@@ -6200,6 +6207,70 @@ RED/GREEN signal both ways), not "bigger diagonal" (whose own declared residual 
 5px tolerance for a reason unrelated to whether the fix works). The mutation reproduces `75.4px mid → 55.1px
 after`, matching BACKLOG's own original pure-+X number (`75.4 → 55.3`) almost exactly, proving the seed is a
 faithful revert, not a synthetic guess. Full account: WORK-LOG t2561/t2563.
+
+### ⭐⭐⭐⭐⭐⭐⭐ ✅ t2567 — THE PAN COMPOUNDING ITSELF REMOVED (owner-approved trade), the real severity fix.
+Corrected an earlier "hang" claim. The five-vector residual did NOT close — it MOVED, declared honestly
+
+**Owner-approved fix, built**: `featureCanvas.js`'s `_followHandle()` (t532) — the mid-drag auto-pan whose own
+compounding was isolated at t2559/t2561/t2565 — REMOVED entirely (its one call site, its own function body,
+and the `_followed` flag/trigger it fed in `end()`, all deleted; `_handleInGutter(id)` alone is now the
+refit-on-drop's sufficient trigger). A `noSnap` marker dragged far enough now goes OFF-SCREEN mid-drag,
+reappearing at a well-margined position once released (t2563's own refit-on-drop, unaffected). The trade the
+owner took knowingly: exactness over always-visible — see WORK-LOG t2565/t2567 for the full reasoning.
+
+**Severity table, re-measured with the fix, INCLUDING 300 steps (which previously timed out)**:
+```
+  steps=8:   jogY = +12.493   (exact, matches the naive mouse-px/scale expectation almost perfectly)
+  steps=40:  jogY = +12.493   (identical)
+  steps=100: jogY = +12.493   (identical)
+  steps=300: jogY = +12.493   (identical — 139s wall-clock, same per-step rate as every other step count)
+```
+Stable and exact at every event count — the compounding is gone, not merely bounded.
+
+**⚠ CORRECTION to the t2561/t2565 "hang" framing**: those turns reported "the 300-step run TIMED OUT at 60s"
+and characterized it as "a hang class, same as BACKLOG #70." MEASURED THIS TURN, directly: giving the PRE-FIX
+code a generous (300s) timeout, 300 steps ALSO completes — in 133.6s, the SAME per-step wall-clock rate as the
+FIXED code's own 139s — producing `jogY = -2147.416` (continuing the super-linear growth, not a non-terminating
+computation). The timeout was a plain, linear, per-step Playwright/CDP + re-render cost (~440ms/step in this
+environment), present REGARDLESS of the bug, not the bug causing non-termination. The bug was always about the
+WRONG VALUE, at every scale — severe, but never a hang. Precision matters here because the next person greps
+for the symptom.
+
+**#65's own five-vector table, RE-RUN with the fix — the residual did NOT close, it MOVED, and the mechanism
+is now fully separated from panning**:
+```
+  original (dx40,dy25):    moved 47.2 mid -> settled 65.7    (0px residual — settles PAST where it tracked)
+  repeat of the same:      moved 47.2 mid -> settled 65.7    (0px residual — same)
+  pure +X (dx60,dy0):      moved 60.0 mid -> settled 80.0    (0px residual — same)
+  pure +Y (dx0,dy60):      moved 60.0 mid -> settled 51.4    (⚠ NEW ~8.6px/14% residual — was 0px pre-t2567)
+  bigger diagonal (90,60): moved 108.2 mid -> settled 80.5   (⚠ ~27.7px/26% residual — was ~19.7px/22px pre-t2567)
+```
+**Root, traced directly (not inferred)**: instrumented `end()`'s own edge-distance reconciliation (t2563) live
+for both residual vectors and found `overrode: false` in BOTH cases — t2563's own override NEVER FIRES for
+either. The residual is produced entirely by the NATURAL, un-overridden roomy refit's own bbox-centroid
+placement, which is INDEPENDENT of panning: `_fit(..., roomy=true)` places the bbox's own extreme point at
+roughly `ROOMY_MARGIN_PX`(104px) from an edge BY CONSTRUCTION, not at "wherever the live drag would show it" —
+for a marker that lands deep in the gutter, that construction doesn't always coincide with "further along the
+same trajectory." **Why the residual SPREAD rather than closing**: without the mid-drag auto-pan holding a
+marker at a comfortable 80px margin throughout the drag, MORE drags now end with the marker landing DEEPER in
+the gutter at release (nothing held it back) — exposing this same, always-present roomy-fit quirk on MORE
+vectors than before (previously only the single most extreme vector, "bigger diagonal," penetrated deep enough
+to show it). This is confirmed as a REAL, SEPARATE, BOUNDED mechanism — not growing with drag distance the way
+the (now-fixed) pan compounding did — closer in kind to BACKLOG #73's own declared canvas-scale residual than
+to #64/#65's own original severe defect. NOT fixed this turn (outside the explicit "one guarded early return"
+scope) — reported plainly as a real, scoped, follow-on candidate, not silently absorbed or hidden.
+
+**Permanent guard, RE-VERIFIED for the shipped state, with a real correction made to the guard ITSELF**: the
+L1 manifest's own `simstart-refit-snapback` entry needed BOTH t2563's own reconciliation AND t2567's own
+pan-removal reverted TOGETHER to reproduce the historical bug — two earlier attempts (revert t2567 alone;
+revert t2567 alone but also missing the `_followed`-flag half of the trigger) each produced NO residual at
+all, because the two fixes turned out NOT to be independent (t2563's reconciliation, left active, compensates
+for a reintroduced pan on its own for this vector). The corrected, three-file mutation reproduces
+`75.4px mid → 55.1px after`, matching BACKLOG's own original pure-+X number exactly. Full 9-entry manifest:
+9/9 green with the shipped fix.
+
+Full account, including the two failed single-mutation attempts and the live edge-distance trace that found
+`overrode:false`: WORK-LOG t2565/t2567.
 
 ---
 
@@ -7619,3 +7690,15 @@ rule that has already taken FOUR visits (t2347/t2355/t2357/t2551), is not worth 
 in `styles.css` (t2551, `.ui-split-pane > .wiz-visual` inside `@media (min-width:861px)`) stays. This entry
 exists to be the diagnosis a future turn starts from, if/when the cosmetic gain becomes worth the work — not
 a queued TODO expected to be picked up soon.
+
+**⚠ CORRECTION (t2567) — the `ratioY ≈ 2.20`/"WORSE axis" number above was NEVER this entry's own defect.**
+It was a SEPARATE, UNRELATED bug (BACKLOG #64/#65's own pan-feedback compounding, `featureCanvas.js`'s
+`_followHandle`, since removed) riding along on the SAME test's own drag gesture — that mechanism inflated
+jogY specifically (this particular drag never triggered it on jogX) by roughly 2x, on top of whatever THIS
+entry's own genuine canvas-scale gap contributes. MEASURED after #64/#65's own fix: `ratioX` and `ratioY` are
+now `1.1121` and `1.1121` — identical to 4 significant figures. **This entry's OWN diagnosis (`visualMaxHeight`
+has never been asked to bound a split-nested visual inside an unconstrained wide-modal host) is UNCHANGED and
+still real** — it explains the ~11% BOTH axes now show equally — but the "WORSE axis"/~120% framing, and the
+implication that HEIGHT is asymmetrically worse than WIDTH for this gap specifically, do not survive: they
+described the other bug, not this one. `tests/surfacing-start-position-1648.spec.js`'s own declared band was
+tightened to match (ONE band, ~1.05-1.20, both axes) at t2567 — see that turn's own WORK-LOG entry.

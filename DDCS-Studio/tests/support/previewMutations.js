@@ -156,13 +156,19 @@ const T2481_STYLES_DRILL_SPLIT_UNFIX = {
     replace: ``,
 };
 
-// ── Entry 7 — t2563 (BACKLOG #64/#65's own permanent guard). Reverts the refit-on-drop position-preservation
-// fix: the roomy refit-on-drop (t732) computes a genuinely NEW `scale` to accommodate the full current extent
-// — a scale change alone, applied to the SAME (already-correct, never-stale — measured directly this turn,
-// correcting the OLD comment's own staleness claim) world position, moves its SCREEN position, which is what
-// dragHandleRenderTruth actually measures. The fix solves `cxw`/`cyw` (keeping the new `scale`) so the just-
-// released handle's own screen position is preserved exactly; this mutation strips that correction back to the
-// bare `this._tf = this._fit(...)` call, reproducing #64/#65's own snap-back exactly. ─────────────────────────
+// ── Entry 7 — t2563 (BACKLOG #64/#65's own guard as it stood then). Reverted the refit-on-drop position-
+// preservation fix: the roomy refit-on-drop (t732) computes a genuinely NEW `scale` to accommodate the full
+// current extent — a scale change alone, applied to the SAME (already-correct, never-stale — measured that
+// turn, correcting the OLD comment's own staleness claim) world position, moves its SCREEN position, which is
+// what dragHandleRenderTruth actually measures. t2567 (BACKLOG #64/#65's OWN next turn) removed the mid-drag
+// auto-pan this reconciliation was compensating for — and found this mutation ALONE no longer reproduces a
+// residual for #65's own five vectors once the auto-pan is gone (without panning, a released marker's pre-
+// refit edge distance is always ≤ GUTTER_PX(80), and the roomy fit's own natural margin is always
+// ~ROOMY_MARGIN_PX(104) > 80, so "the natural refit left the marker closer to an edge than before" can no
+// longer happen for a single-marker scene) — BUT ALSO found that reverting ONLY the auto-pan (leaving THIS
+// reconciliation active) reproduces no residual either: t2563's own fix independently compensates for a
+// reintroduced pan on its own. The two fixes are NOT independent; the entry below now reverts BOTH together
+// to recreate the actual historical bug, which is why this constant stays wired in rather than retired. ────
 const T2563_FEATURECANVAS_REFIT_ON_DROP = {
     path: '/viz/featureCanvas.js',
     find: `                const p2 = this._placement || { x: 0, y: 0 };
@@ -182,6 +188,48 @@ const T2563_FEATURECANVAS_REFIT_ON_DROP = {
                 }`,
     replace: `                this._tf = this._fit(this.spec, this._vw, this._vh, true);`,
 };
+
+// ── Entry 7b — t2567 (BACKLOG #64/#65's own real guard now). Reverts the removal of the mid-drag auto-pan
+// (t532, removed t2567): re-inserts the ORIGINAL `_followHandle()` call + its own function body + the
+// `_followed` flag it set (below) + the `end()` trigger that reads it, reproducing the pan-compounding bug
+// this turn actually fixed. THREE files-array entries (call site, function, `end()` trigger) — caught live:
+// an EARLIER two-entry version (call site + function only, `_followed` never set) reproduced NO residual at
+// all, because `end()`'s own CURRENT trigger (`_handleInGutter(id)` alone) checks only the marker's position
+// AT release — the compounding can leave it just outside the strict gutter band by then even though panning
+// fired throughout the drag, which is EXACTLY why the original code needed `followed ||` as a second, OR'd
+// path in. Same pattern T2447_FILES already established for a multi-hunk revert. ─────────────────────────
+const T2567_FEATURECANVAS_CALLSITE = {
+    path: '/viz/featureCanvas.js',
+    find: `                    this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) });`,
+    replace: `                    this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) });
+                    if (this.active.noSnap && this._followHandle()) { this._followed = true; this._draw(this.spec, this._vw, this._vh); }`,
+};
+const T2567_FEATURECANVAS_TRIGGER = {
+    path: '/viz/featureCanvas.js',
+    find: `            if (act && act.noSnap && this.spec && this._handleInGutter(id)) {`,
+    replace: `            const followed = this._followed; this._followed = false;
+            if (act && act.noSnap && this.spec && (followed || this._handleInGutter(id))) {`,
+};
+const T2567_FEATURECANVAS_FUNCTION = {
+    path: '/viz/featureCanvas.js',
+    find: `    _W(sx, sy) { const t = this._tf; return { x: t.cxw + (sx - t.cx) / t.scale, y: t.cyw - (sy - t.cy) / t.scale }; }`,
+    replace: `    _W(sx, sy) { const t = this._tf; return { x: t.cxw + (sx - t.cx) / t.scale, y: t.cyw - (sy - t.cy) / t.scale }; }
+    _followHandle() {
+        const t = this._tf; if (!t || !this.active || !(this._vw > 0) || !(this._vh > 0)) return false;
+        const h = (this.spec.handles || []).find((x) => String(x.id) === String(this.active.id));
+        if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
+        const p = this._placement || { x: 0, y: 0 };
+        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0)), m = GUTTER_PX;
+        let dx = 0, dy = 0;
+        if (s.x < m) dx = s.x - m; else if (s.x > this._vw - m) dx = s.x - (this._vw - m);
+        if (s.y < m) dy = s.y - m; else if (s.y > this._vh - m) dy = s.y - (this._vh - m);
+        if (!dx && !dy) return false;
+        t.cxw += dx / t.scale;
+        t.cyw -= dy / t.scale;
+        return true;
+    }`,
+};
+const T2567_FILES = [T2567_FEATURECANVAS_CALLSITE, T2567_FEATURECANVAS_FUNCTION, T2567_FEATURECANVAS_TRIGGER];
 
 export const PREVIEW_MUTATIONS = [
     {
@@ -236,18 +284,22 @@ export const PREVIEW_MUTATIONS = [
     },
     {
         id: 'simstart-refit-snapback',
-        defect: 'alignment/rotaryClock\'s own noSnap sim-start marker (__simstart0) snaps back on release — BACKLOG #64/#65, fix t2563 (the refit-on-drop\'s own scale change relocating the just-released handle)',
-        files: [T2563_FEATURECANVAS_REFIT_ON_DROP],
+        defect: 'alignment/rotaryClock\'s own noSnap sim-start marker (__simstart0) snaps back on release — BACKLOG #64/#65. Originally attributed SOLELY to t2563\'s own refit-on-drop reconciliation; t2567 (BACKLOG #64/#65\'s own next turn) found the two fixes are NOT independent — reverting either one alone no longer reproduces the historical bug, only reverting BOTH together does (see the comment on `files`, below, and WORK-LOG t2567 for the two failed single-mutation attempts that led here)',
+        // BOTH t2563's own reconciliation AND t2567's auto-pan removal must be reverted TOGETHER to reproduce
+        // the historical bug — caught live: reverting ONLY the auto-pan (T2567_FILES alone) reproduced NO
+        // residual at all for this vector, because t2563's reconciliation (left active) was independently
+        // compensating for the reintroduced pan. The two fixes were never independent; this mutation now
+        // recreates the state before EITHER existed.
+        files: [T2563_FEATURECANVAS_REFIT_ON_DROP, ...T2567_FILES],
         op: 'alignment',
-        // t2563 — pure +X (dx60,dy0), not #65's own "bigger diagonal" (dx90,dy60): BOTH are real bug vectors,
-        // but "bigger diagonal" is the single MOST EXTREME drag in #65's own table, and its own residual after
-        // the fix (~20px, down from ~45px pre-fix — see BACKLOG #65's own t2563 account) is a real, DECLARED,
-        // bounded gap entangled with the separate pan-feedback arc (t2559/t2561, deliberately out of scope this
-        // turn) — NOT within `assertDragRenderFaithful`'s own default 5px tolerance, so it would fail this
-        // runner's CLEAN phase for a reason unrelated to whether THIS fix works. Pure +X shows a clean, strong
-        // signal both ways: BUGGY = a clear ~20px loss (RED, comfortably past the 5px tolerance); FIXED = a
-        // +7.4px margin (GREEN, comfortably past it the other way) — the reliable seed for a permanent gate.
+        // t2567 — pure +X (dx60,dy0), carried over unchanged from t2563's own choice: BOTH the historical
+        // buggy-pan numbers (BACKLOG #65's own "moved 75.4 mid -> settled 55.3") and this fix's own clean
+        // result reproduce on this vector without ambiguity. #65's own worst vector ("bigger diagonal") is
+        // NOT used here for the SAME reason as before — it (and, newly found post-t2567, "pure +Y" too) carry
+        // a real, DECLARED, bounded residual even in the FIXED state (the roomy refit's own margin-not-
+        // trajectory placement, unrelated to panning — see BACKLOG #65's own t2567 account), which would fail
+        // this runner's CLEAN phase for a reason unrelated to whether the auto-pan removal itself works.
         seed: { dx: 60, dy: 0, steps: 10, settleMs: 400 },
-        proven: 'PROVEN RED at t2563 via the same 4-condition kill-switch that isolated the root; 4 of #65\'s own 5 vectors settle at 0px residual once fixed, this one (pure +X) among them — the 5th (bigger diagonal) is DECLARED, not silently dropped, see BACKLOG #65\'s own t2563 account',
+        proven: 'PROVEN RED at t2567 (re-introducing the auto-pan reproduces BACKLOG #65\'s own historical pure-+X numbers almost exactly) and GREEN with it removed (this turn\'s own shipped code) — see WORK-LOG t2567 for the full five-vector re-measurement and the "originally attributed to t2563, re-attributed to t2567" correction',
     },
 ];

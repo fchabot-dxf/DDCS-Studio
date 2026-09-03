@@ -2,11 +2,16 @@ import { test, expect } from '@playwright/test';
 
 /**
  * t732 — the layout canvas ACCOMMODATES a marker dragged to the edge. t730 unclamped the WORLD (the reach no longer pins
- * the value), but a SECOND wall remained: the VIEWPORT. _followHandle (t532) holds a free noSnap sim-start marker at the
- * 80px edge gutter during a drag, and with the frozen viewBox + no refit the marker PINS there — the next drag can't leave
- * the fitted view, so it goes nowhere (the advisor's repro: the handle stuck at exactly 80px inside the canvas rect,
+ * the value), but a SECOND wall remained: the VIEWPORT. `_followHandle` (t532) used to hold a free noSnap sim-start marker
+ * at the 80px edge gutter during a drag, and with the frozen viewBox + no refit the marker PINS there — the next drag can't
+ * leave the fitted view, so it goes nowhere (the advisor's repro: the handle stuck at exactly 80px inside the canvas rect,
  * drags 3-4 moved ZERO px). FIX (featureCanvas, one consumer → all layout canvases inherit): on DROP, if the marker landed
  * in the gutter, REFIT (roomy margin) to include all markers so it sits well inside and the next drag continues.
+ *
+ * t2567 (BACKLOG #64/#65) — `_followHandle` itself was REMOVED (an owner-approved trade: it compounded a small
+ * drag into a wildly wrong written value, super-linear in event count). This test's own concern is untouched —
+ * the refit-on-drop below runs from the marker's RELEASE-time position regardless of how it got there, so a
+ * marker that goes off-screen mid-drag (the new, accepted behaviour) still lands well-margined once released.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -60,8 +65,9 @@ test('MILL TWIN spot-check: the pocket POS handle drags far off-stock with the s
     await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.setView) p.setView('2d'); });
     await page.waitForSelector('#wiz_user svg [data-hid="pk_pos"]', { timeout: 8000 });
     await page.waitForTimeout(200);
-    // the pocket POS handle is a FEATURE move handle (not a _followHandle-held sim marker), so it was never pinned — it
-    // follows the cursor freely. Assert the same freedom: an away-drag moves it far, and the placement grows off-stock.
+    // the pocket POS handle is a FEATURE move handle (not a noSnap sim marker — never gutter-held even before
+    // t2567 removed that mechanism), so it was never pinned — it follows the cursor freely. Assert the same
+    // freedom: an away-drag moves it far, and the placement grows off-stock.
     const posScreen = () => page.evaluate(() => { const el = document.querySelector('#wiz_user svg [data-hid="pk_pos"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
     const before = await posScreen();
     await page.mouse.move(before.x, before.y); await page.mouse.down();

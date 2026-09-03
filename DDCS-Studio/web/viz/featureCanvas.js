@@ -26,11 +26,12 @@ import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared pr
 import { resolveStartGlyph } from './startGlyph.js';   // t1688 — the ONE shape/fill/colour rule for a start/reposition marker, shared with toolpath2d.js + gcodeViz3d.js
 
 /**
- * THE EDGE GUTTER, declared once (t1275). Two places need it and they disagreed: `_followHandle` PARKS a dragged
- * marker at exactly this many px from the edge, and `_handleInGutter` asked whether it was STRICTLY INSIDE that band.
- * At exactly 80 the second answered "no", so refit-on-drop (t732) never fired for the one case it exists for — the
- * marker sat pinned on the gutter after every drop. One constant, and the comparison is inclusive of where the park
- * actually lands.
+ * THE EDGE GUTTER, declared once (t1275). `_handleInGutter` (below) checks whether a released noSnap marker
+ * landed within this many px of the viewport edge, to decide whether the refit-on-drop (t732) needs to run.
+ * t532 used to ALSO auto-pan a marker to exactly this margin while it was being dragged — removed t2567
+ * (BACKLOG #64/#65, an owner-approved trade — see the pointermove handler's own comment for why): that pan
+ * permanently mutated the same frame `_toWorld` uses to compute the value being written, and re-applying its
+ * own correction every frame the cursor stayed in the gutter compounded a small drag into a wildly wrong value.
  */
 const GUTTER_PX = 80;
 /**
@@ -212,16 +213,22 @@ export class FeatureCanvas {
                     if (sn) w = { x: sn.x, y: sn.y };
                     const p = this._placement || { x: 0, y: 0 };
                     this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) });
-                    // t532 — PAN the view to FOLLOW the handle when it nears the viewport edge, so a handle dragged PAST the
-                    // stock stays VISIBLE (the auto-fit is frozen during a drag to avoid swim; without this a handle walks off
-                    // the frozen viewBox = "stuck at the perimeter"). SCOPED to noSnap markers = the FREE-position sim-start
-                    // probe points (alignment/rotary) that are meant to leave the stock — NOT corner/path/ATC handles, whose
-                    // exact drag coords + anti-flicker (the wall holds) must not be perturbed by a pan. Translate only, then redraw.
-                    // …and REMEMBER that it panned. That fact is the reliable signal the drop needs: asking
-                    // afterwards whether the handle LOOKS like it is in the gutter reads `this.spec`, which at
-                    // pointerup still holds the pre-drag position — so the question got answered about where the
-                    // marker WAS, and the refit declined to run.
-                    if (this.active.noSnap && this._followHandle()) { this._followed = true; this._draw(this.spec, this._vw, this._vh); }
+                    // t532 USED TO auto-pan the view here so a noSnap handle dragged past the viewport edge stayed
+                    // visible under the cursor. t2567 (BACKLOG #64/#65) — REMOVED, deliberately, an owner-approved
+                    // trade: that pan permanently mutated `_tf.cxw/cyw`, the SAME frame `_toWorld` (just above)
+                    // reads to compute the value THIS SAME call writes — re-applying its own full correction every
+                    // frame the cursor stayed within the gutter, with no memory of a prior frame's correction,
+                    // compounded a 15px mouse drag into a value 3-700x too large depending on how many pointermove
+                    // events fired for it (measured: super-linear across 8/40/100/300 synthetic steps — t2559/
+                    // t2561/t2565/t2567's own account; a t2565 report calling 300 steps a "60s hang" was
+                    // corrected at t2567 — a generous timeout showed it completes in ~140s either way, the SAME
+                    // rate whether or not the bug is present, a plain per-step CDP/re-render cost, not the bug
+                    // causing non-termination — the bug was always about the WRONG VALUE, never about hanging).
+                    // A marker dragged far enough now goes OFF-SCREEN mid-drag, reappearing at a well-margined
+                    // position once released (`end()`'s own refit-on-drop, t2563, unaffected by this removal —
+                    // it runs from the RELEASE-time position, not a mid-drag pan history). Traded a rare,
+                    // visible, recoverable "I can't see it right now" for eliminating a silent, unbounded,
+                    // unrecoverable wrong value reaching the machine.
                 }
                 e.preventDefault();
             } else if (this.pan) {
@@ -266,13 +273,15 @@ export class FeatureCanvas {
             this._suppressFitOnCommit = true;
             if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
             this._suppressFitOnCommit = false;
-            // t732 — REFIT-ON-DROP so the canvas ACCOMMODATES a marker dragged to the edge. A free (noSnap) sim-start marker
-            // is held at the 80px gutter by _followHandle during the drag; with the frozen viewBox and no refit it would PIN
+            // t732 — REFIT-ON-DROP so the canvas ACCOMMODATES a marker dragged to the edge. A free (noSnap) sim-start
+            // marker dragged past the edge lands in the 80px gutter; with the frozen viewBox and no refit it would PIN
             // there — the next drag can't leave the fitted view, so it goes nowhere (the user's felt symptom). If it landed in
             // the gutter, refit (roomy) to include ALL markers + a generous margin so it sits well inside and the next drag
             // continues; make the roomy view STICK (_userAdjusted) so a field-change re-fit doesn't snap it back to the gutter.
-            const followed = this._followed; this._followed = false;
-            if (act && act.noSnap && this.spec && (followed || this._handleInGutter(id))) {
+            // t2567 — the trigger used to be `followed || this._handleInGutter(id)`, where `followed` recorded
+            // whether the (now-removed) mid-drag auto-pan had fired; `_handleInGutter` alone is the correct,
+            // sufficient check now (did the marker land there, regardless of how it got there).
+            if (act && act.noSnap && this.spec && this._handleInGutter(id)) {
                 this._userAdjusted = true;
                 // t2563 (BACKLOG #64/#65) — the OLD comment here claimed `this.spec` is stale at this point (the
                 // drag's own re-render "has not arrived yet"). MEASURED, this turn, and found FALSE for every
@@ -425,34 +434,18 @@ export class FeatureCanvas {
 
     _S(x, y) { const t = this._tf; return { x: t.cx + (x - t.cxw) * t.scale, y: t.cy - (y - t.cyw) * t.scale }; }
     _W(sx, sy) { const t = this._tf; return { x: t.cxw + (sx - t.cx) / t.scale, y: t.cyw - (sy - t.cy) / t.scale }; }
-    /** t532 — auto-pan the (drag-frozen) viewBox so the ACTIVE handle stays ≥ a margin inside the viewport. Follows the
-     *  handle's ACTUAL rendered position (this.spec.handles, i.e. the CLAMPED value post-onDrag) — NOT the raw cursor world,
-     *  which is unclamped and would run the pan off past the envelope. Translate ONLY (scale fixed → no swim). Returns true
-     *  if it panned. Lets a dragged handle move PAST the stock edge while staying visible (else it strands off the frozen viewBox). */
-    _followHandle() {
-        const t = this._tf; if (!t || !this.active || !(this._vw > 0) || !(this._vh > 0)) return false;
-        const h = (this.spec.handles || []).find((x) => String(x.id) === String(this.active.id));
-        if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
-        const p = this._placement || { x: 0, y: 0 };
-        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0)), m = GUTTER_PX;   // keep the handle ≥ the gutter from every edge
-        let dx = 0, dy = 0;
-        if (s.x < m) dx = s.x - m; else if (s.x > this._vw - m) dx = s.x - (this._vw - m);
-        if (s.y < m) dy = s.y - m; else if (s.y > this._vh - m) dy = s.y - (this._vh - m);
-        if (!dx && !dy) return false;
-        t.cxw += dx / t.scale;   // shift the world-centre so the handle moves back toward the interior
-        t.cyw -= dy / t.scale;   // Y flips (screen-down = world-up)
-        return true;
-    }
-    /** t732 — did the handle `id` land within the edge gutter (the ≤ margin px band where _followHandle holds it)? Drives
-     *  the refit-on-drop: a marker stranded here can't be dragged further until the view accommodates it. */
+    /** t732 — did the handle `id` land within the edge gutter (the ≤ margin px band a mid-drag auto-pan used to
+     *  hold a noSnap marker at — t532, removed t2567, see the pointermove handler's own comment)? Drives the
+     *  refit-on-drop: a marker stranded here can't be dragged further until the view accommodates it. */
     _handleInGutter(id, margin = GUTTER_PX) {
         const t = this._tf; if (!t || !(this._vw > 0) || !(this._vh > 0)) return false;
         const h = (this.spec.handles || []).find((x) => String(x.id) === String(id));
         if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
         const p = this._placement || { x: 0, y: 0 };
         const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0));
-        // INCLUSIVE: _followHandle parks the marker at EXACTLY `margin`, so a strict `<` answered no for the very
-        // position the follow creates — the refit never ran and the marker stayed pinned on the gutter.
+        // INCLUSIVE: a drag can end with the marker sitting at EXACTLY `margin` (the old auto-pan used to park it
+        // there precisely; a manual drag can land there too) — a strict `<` would answer no for that exact
+        // position, and the refit would never run, leaving the marker pinned on the gutter.
         return s.x <= margin || s.x >= this._vw - margin || s.y <= margin || s.y >= this._vh - margin;
     }
     /** World→screen WITH the toolpath placement applied. Pattern items/handles ride the placement (they're authored
