@@ -941,10 +941,12 @@ conversational evidence from the one person who actually knows.
 
 1. ~~**Reset behaviour.**~~ ⭐ **ANSWERED by the vendor, same conversation: IT RESETS at program start.**
    ⇒ Read it directly; `line / total_lines` is the progress fraction. No baseline capture, no subtraction.
-   ⚠ **One thing to reconcile on the bench, NOT a contradiction:** the screenshot read 488–543 against a
-   ~10-line payload, which cannot be a per-program line count. The likely explanation is that **streaming
-   into register `3000` is not a "program start"** the way loading and running a file from disk is — the two
-   paths may count differently. Check both, and do not assume the streamed case behaves like the run case.
+   ⛔ **The 488–543 readings in the screenshot are NOT evidence of anything and were never a puzzle.** It is
+   a vendor demonstrating a tool, not a controlled run — prior activity, a loaded file, repeated clicks, any
+   of it explains the magnitude and none of it needs explaining. ⚠ The advisor spent three exchanges deriving
+   line counts and byte counts from it and manufactured a bench task out of the result. **The meaning was
+   DECLARED by the person who wrote the firmware; re-deriving it from output is exactly what principle 3
+   forbids.** Recorded because the advisor had been citing that principle at the worker all session.
 2. **Firmware floor.** Unknown which release added it. `2026-08-03-00`'s own changelog covers register `3000`
    G-code injection ONLY — see the firmware entry — so `16062` is not from that release and predates it.
 3. **The V4.1.** M350/Expert only as far as anything here shows. ⚠ This is why the `SYSDISK` route above stays
