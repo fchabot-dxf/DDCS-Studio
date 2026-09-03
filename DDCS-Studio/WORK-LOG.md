@@ -70795,3 +70795,54 @@ WORK-LOG entry. No BACKLOG addendum this turn: the remaining scale gap is record
 picks it up next -- not re-filed as a fresh backlog item, since the advisor's own dispatch already made this a
 named, active line of work rather than a queued one.
 
+## t2549 -- ONE BOUNDED QUESTION, answered with evidence: the two regressing tests are CORRECT, not pinned to the bug -- no product code touched
+
+The question: does "WCS arm, TWIN" / "Skim arm, TWIN" (`surfacing-start-position-1648.spec.js`) assert against
+the CORRECT (classic-shell) geometry, or the BUGGY (twin's own shrunken) geometry -- i.e. is their own failure
+under t2547's reverted growth fix a real regression, or evidence the fix was actually right and the tests
+encode the defect?
+
+**OBSERVED first, before touching any code: neither test hardcodes ANY geometry-dependent value at all.**
+`twinMarkerCenter()` (line 73-77) reads the marker's OWN live `getBoundingClientRect()` off the DOM, same
+pattern `wizMarkerCenter()` uses for the classic shell -- no baked-in pixel coordinate, no assumed canvas
+size. Both failing tests are then PURELY SELF-REFERENTIAL: "WCS arm, TWIN" asserts the drag moved `originX` by
+SOME amount greater than 1 (`Math.abs(dOx) > 1`, not a specific number) and that the EMITTED toolpath shifted
+by EXACTLY that SAME amount (`mAfter.maxX - mBefore.maxX` closeTo `dOx`) -- an internal-consistency check
+between two READINGS taken from the SAME drag, never compared against the wizard face or any external number.
+"Skim arm, TWIN" is the same shape: byte-identical emit, `Math.abs(jogX) > 1`. **Neither test's own assertion
+could be "pinned to" a specific geometry, buggy or correct, because neither encodes one** -- git history
+confirms both were authored at t1648 (`c8750b67`), before ANY tree-mode/split_horizontal architecture existed
+for surfacing (which only arrived this session, t2545) -- written to be geometry-agnostic by construction, not
+retrofitted to tolerate a defect.
+
+**So if their own assertions can't be wrong-by-construction, the regression under the growth fix had to be a
+DIFFERENT symptom entirely -- traced directly, not inferred.** Re-applied t2547's own reverted growth rule
+(`flex: 1 1 0` on `.ui-split-pane > .wiz-visual`) in a scratch, uncommitted edit, and measured the marker's
+own real screen position in the test's own exact scenario (`test.use({viewport:{width:1280,height:900}})`,
+the SAME boot sequence "WCS arm, TWIN" uses): `rect.y = 1191.3px` against a **900px-tall viewport** --
+`markerWithinViewport: false`, `document.elementFromPoint()` at the marker's own center returns `null`
+(nothing painted there — genuinely off-page), and a real `page.mouse` drag at that computed position produces
+`delta: 0` -- the drag does NOTHING, because it's not landing on the page at all. `.wiz-visual`'s own measured
+height under the growth fix was 1263px, matching `.ui-split-pane2`'s FULL available height -- which itself
+matches `.wiz-controls`'s own NATURAL CONTENT height (30 rows + 4 group boxes, no cap), not any
+viewport-relative or modal-relative bound. `.wiz-2pane`'s own `align-items: stretch` cross-axis default pulls
+`.wiz-visual` to match whatever height `.wiz-controls` naturally wants -- in the CLASSIC (flat) case this is
+harmless because `.wiz-controls` there keeps its OWN fixed-width, internally-`overflow-y:auto`-scrolling
+shape (`flex: 0 0 360px`); in TREE mode, `render()`'s own JS overrides that to `flex: 1 1 100%`, and the
+growth fix as landed then let `.wiz-visual` inherit THAT unconstrained height too, growing the whole preview
+canvas WAY past any usable size and pushing its own drag marker below the fold.
+
+**ANSWER: the two tests are CORRECT.** They are not pinned to the bug in any sense -- they simply became
+collateral damage of the growth fix's own SHAPE (grow to match the left pane's unconstrained natural content
+height) rather than of a wrong assumption baked into their own assertions. This is the advisor's own SECOND
+named outcome, not the first: **the growth rule needs a shape that does NOT disturb them** -- most likely one
+that grows `.wiz-visual` to a sensible, viewport/modal-relative bound (mirroring how the classic shell's own
+`.wiz-box.two-pane` gives `.wiz-2pane` an explicit `height: min(93dvh, 1000px)`, rather than letting
+`align-items: stretch` hand it whatever the (now full-width, unconstrained) form column happens to need) --
+not a rule that reaches deeper still, and not a reason to leave `flex` unset. This is a real, useful narrowing
+for whoever takes the fix next, not just a "still broken" report.
+
+No product code touched this turn (the scratch CSS edit used to gather evidence was reverted immediately
+after measuring, confirmed byte-identical via `git diff --stat` returning empty before this entry was
+written). `git status` clean.
+
