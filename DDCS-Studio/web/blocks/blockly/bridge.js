@@ -99,8 +99,18 @@ const HANDLE_ANCHOR_FIELDS = {
     proj_length_handle: ['field'],
     probe_vector_handle: ['field', 'fieldAxis', 'fieldDir'],   // t2557 — dist/axis/dir, all three must-match (axis/dir are ENUM string writes, see panelTypes.js's own t2557 guard)
     diag_aim_handle: ['fieldTravel', 'fieldPrimary', 'axisField', 'signField'],   // t2573 — fieldTravel/fieldPrimary are written; axisField/signField are read-only companions (never merged onto), same doctrine as scale_handle's baseField
-    cross_aim_handle: ['field', 'axisField', 'signField'],   // t2583 — field is written; axisField/signField are read-only companions (never merged onto), same doctrine as diag_aim_handle's own; relToRow is a free-text sim-start row id, not a must-match param picker (same shape as formfield's own relToRow)
+    cross_aim_handle: ['field', 'axisField', 'signField'],   // t2583 — field is written; axisField/signField are read-only companions (never merged onto), same doctrine as diag_aim_handle's own; relToRow is a DIFFERENT picker kind (RELTO_TARGET_FIELDS below), a sim-start row id, not a param
 };
+// t2585 (BACKLOG #61 follow-up) — `relToRow`: the `relTo` REFERENCE field, naming an EXISTING `simstart` block's
+// own `id` (must already exist, the SAME closed doctrine HANDLE_ANCHOR_FIELDS established — a relTo pointing at
+// a row that was never declared anywhere is a plain authoring defect, not legitimate forward-authoring; a row
+// legitimately ABSENT under the op's current `when`-gate state at RUNTIME is a separate, already-handled case —
+// see panelTypes.js's own crossAim branch, which falls back gracefully rather than treating that as broken).
+// TWO consumers, genuinely unique field name (grepped): `formfield`'s own pre-existing point-handle relTo socket,
+// and `cross_aim_handle`'s new one (t2583) — both were free text before this turn, meaning `relTo` had NEVER
+// been reachable by a person clicking through the app, only via a literal template (this session's own fourth
+// instance of "a declared seam with no way in" — see simStart.js's own header for the full account).
+const RELTO_TARGET_FIELDS = { formfield: 'relToRow', cross_aim_handle: 'relToRow' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],
@@ -396,6 +406,7 @@ export function fieldKind(def, field) {
     if (IO_TARGET_FIELDS[def.type] && IO_TARGET_FIELDS[def.type].field === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — I/O pin numbers, see IO_TARGET_FIELDS' own header
     if (SETUP_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 3) — flip.setup, CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
     if (HANDLE_ANCHOR_FIELDS[def.type] && HANDLE_ANCHOR_FIELDS[def.type].includes(field)) return 'picker';   // t2525 (BACKLOG #71) — see HANDLE_ANCHOR_FIELDS' own header
+    if (RELTO_TARGET_FIELDS[def.type] === field) return 'picker';   // t2585 — relTo's own reachability fix, see RELTO_TARGET_FIELDS' own header
     // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
     // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
     // scope" — a signal genuinely unique to this pattern (an ordinary numeric Z field defaults to a NUMBER,
@@ -516,6 +527,12 @@ function jsonDef(def) {
         // the field's own name (fx/fy/field/fieldH, none of which pickerField.js's own switch recognises as a
         // pickKind) — see HANDLE_ANCHOR_FIELDS' own header for why 'whenparam' is the right candidate set to reuse.
         else if (k === 'picker' && HANDLE_ANCHOR_FIELDS[def.type] && HANDLE_ANCHOR_FIELDS[def.type].includes(f)) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'whenparam', tooltip: desc });
+        // t2585 (BACKLOG #61 follow-up) — `relToRow`: CLOSED (no allowNew), same must-match rung as the handle
+        // anchor fields just above and for the identical reason (a reference to a row nobody declared is a plain
+        // authoring defect) — its own `pickKind` ('relTo') is a NEW enumeration (pickerField.js), not a reuse of
+        // 'whenparam': the candidate set is every `simstart` block's own `id` field, not a formfield/param_field's
+        // PARAM. See RELTO_TARGET_FIELDS' own header.
+        else if (k === 'picker' && RELTO_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'relTo', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });

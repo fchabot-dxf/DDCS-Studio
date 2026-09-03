@@ -88,6 +88,13 @@ export function installPickerField(Blockly) {
                     .map((b) => b.getFieldValue('PARAM')).filter(Boolean);
                 return [...new Set(params)];
             }
+            // t2585 (BACKLOG #61 follow-up) — `relTo`: every `simstart` block's own declared `id` in this stack
+            // (the row a `relToRow` field may name) — same live-stack-derived, string-candidate shape as
+            // `whenparam` just above (a formfield/param_field's own PARAM), just a different source block type.
+            if (this.pickKind === 'relTo') {
+                const ids = all.filter((b) => b.type === 'simstart').map((b) => b.getFieldValue('ID')).filter(Boolean);
+                return [...new Set(ids)];
+            }
             if (this.pickKind === 'label') {
                 // t2395 — `label.n` is a VALUE SOCKET (a numeric input, `fieldKind()` classifies a numeric
                 // default as 'value'), not a Field on the label block itself — `getFieldValue('N')` on the
@@ -156,6 +163,7 @@ export function installPickerField(Blockly) {
                             // hits live, right where they hit it, instead of only in a WORK-LOG nobody authoring
                             // a wizard will ever open.
                             : (this.pickKind === 'atomtype') ? '(place the atom block this field should bind to FIRST, then come back)'
+                            : (this.pickKind === 'relTo') ? '(place a sim start block and give it an id first)'
                             : '(nothing in this stack yet)';
                         // atomtype's own "no match" is the SAME actionable advice as "nothing at all" — a
                         // typed filter matching none of the atom types already on canvas overwhelmingly means

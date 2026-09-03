@@ -5926,6 +5926,32 @@ correct through the same production code paths a real UI action would call — t
 either and a full end-to-end UI proof is the general `feature_canvas` drag blocker t2579/t2581 already own as
 its own separate, still-open item above. Full account: WORK-LOG t2583.
 
+### ⭐⭐⭐⭐⭐ t2585 — `simstart` GAINS AN `id` FIELD: `relTo` made REACHABLE BY A PERSON, not just a template —
+the fourth "declared seam, no declaring GUI" this session
+
+`relTo` (`resolveRelToIndex`+`panelStarts`) was real, working code — consumed by `formfield`'s own pre-existing
+point-handle socket AND `cross_aim_handle`'s new one (t2583) — that NO PERSON could reach: `simstart` had no
+`id` FIELD, so a row's own stable identifier was only ever set-able via a literal template. Fixed: `simstart`
+gains a plain, author-typed `id` field (matching `formfield`'s own `param` field's shape — the declaration site,
+never itself a picker); `relToRow` (on BOTH `formfield` and `cross_aim_handle`) becomes a MUST-MATCH
+`field_picker` (`pickKind:'relTo'`), mirroring `HANDLE_ANCHOR_FIELDS`' own CLOSED doctrine (t2525) — a `relTo`
+naming an undeclared row is a plain authoring defect, not legitimate forward-authoring, so no `allowNew`.
+
+**Deliberately not built, named not assumed**: no new save-time "dangling relTo" report — the picker already
+closes the typo case; a row deleted later degrades to `panelTypes.js`'s own pre-existing graceful stock-half
+fallback (the same path a `when`-gated absence already uses), not a new failure mode. `field` itself stays on
+the pre-existing, already fail-visible HANDLE_ANCHOR_FIELDS doctrine, untouched.
+
+Three tests (`tests/simstart-relto-reachability.spec.js`) prove REACHABILITY, not existence: bridge.js's REAL
+block generation (a live `FieldPicker` with the right `pickKind`, not the raw data-model object every prior spec
+tested); the picker's own LIVE candidate enumeration (empty → both declared ids, a blank one filtered); and — the
+dispatch's own bar — a real save+reload plus a REAL mouse click on the picker that lists and COMMITS the
+declared id, sidestepping the still-parked general gesture-creation blocker (t2581) via the reload path (t2577's
+own cited proof) rather than re-hitting it. All three vacuity-checked live (reverted to HEAD, confirmed all 3
+fail, restored). Regression: 8 gesture-block specs + this new one, 40/0/2skip; a 10-file simstart/formfield sweep,
+22/22 (one isolated-run-confirmed environmental flake, unrelated — no formfield in that test's own stack at all);
+`test:node` 238/238. Full account: WORK-LOG t2585.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`

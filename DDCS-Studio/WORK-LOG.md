@@ -72664,3 +72664,90 @@ this turn's own new/edited files (`wizards/ops/crossAimHandle.js`, `wizards/ops/
 `blocks/blockly/bridge.js`, `blocks/userOps.js`, `wizards/ops/panelTypes.js`, `blocks/blockEmitter.js`,
 `tests/cross-aim-handle-block.spec.js`) plus this WORK-LOG entry and a BACKLOG #61 addendum.
 
+## 🔨 turn 2585 — `simstart` GAINS AN `id` FIELD: `relTo` made REACHABLE BY A PERSON (the fourth "declared seam,
+no declaring GUI" this session), proven live through the picker's real candidate enumeration AND a real click on
+the reload path
+
+### THE FINDING, restated from the dispatch
+
+`relTo` (`resolveRelToIndex`+`panelStarts`) was a REAL, working mechanism — consumed by `formfield`'s own point-
+handle relTo socket (pre-existing) and `cross_aim_handle`'s new one (t2583) — that NO PERSON could actually
+reach: `simstart`'s own block definition (`wizards/ops/simStart.js`) had no `id` FIELD, so a sim-start row's own
+stable identifier (`params.id`, already read/written end-to-end by `simStartsFromStack`/`simStartsToBlocks`,
+`userOps.js`) could only ever be set by a literal template object, never by clicking through the app. The data
+model was complete; only the way IN was missing — this session's own fourth instance of that exact shape
+(canvasWidgets' eleven un-authorable gestures, the registry's fieldless icon, def.sim's unplaced rig block).
+
+### THE SHAPE CHOSEN, sized honestly per the dispatch's own three options
+
+`id` — plain, author-typed free text on `simstart` (`wizards/ops/simStart.js`), placed first in `fieldsFor`
+(identity before the anchor-kind choice). Matches `formfield`'s own `param` field's shape exactly: the
+DECLARATION site is typed by the author, never itself a picker. Optional (empty = byte-identical to every
+pre-t2585 row); most rows never need one.
+
+`relToRow` (on BOTH `formfield` and `cross_aim_handle`) — converted from plain free text to a MUST-MATCH
+`field_picker` (new `pickKind: 'relTo'`, `pickerField.js`), mirroring `HANDLE_ANCHOR_FIELDS`' own CLOSED doctrine
+(t2525) exactly: a `relTo` naming a row nobody declared is a plain authoring defect, never legitimate forward-
+authoring the way a goto/label reference can be, so `allowNew` stays unset. New `RELTO_TARGET_FIELDS` map
+(`bridge.js`, `{ formfield: 'relToRow', cross_aim_handle: 'relToRow' }`) — the field name is genuinely unique
+(grepped: exactly these two consumers), the same shape `LABEL_TARGET_FIELDS`/`TOOL_TARGET_FIELDS`/
+`SETUP_TARGET_FIELDS` already established for a `(def.type, field)` reference. Candidate enumeration
+(`pickerField.js`'s `_candidates()`, new `'relTo'` branch): every `simstart` block's own declared `id` in the
+SAME workspace, filtered for a truthy value — the identical live-stack-derived shape `'whenparam'` already uses,
+just a different source block type.
+
+**Deliberately NOT built, stated not silently assumed**: no new save-time "dangling relTo" backstop (unlike
+`handleTargetReport`'s own role for HANDLE_ANCHOR_FIELDS). The picker already closes the typo case at author
+time; a row deleted LATER degrades to `panelTypes.js`'s own pre-existing graceful stock-half fallback (t2583) —
+the SAME code path a row legitimately absent under a `when`-gate at runtime already uses, not a new failure mode
+this turn introduces. `field` itself (what a handle actually WRITES) still runs through the pre-existing,
+already fail-visible HANDLE_ANCHOR_FIELDS/`anchorUnresolved` doctrine, completely untouched by this turn.
+
+### VERIFY — three tests, `tests/simstart-relto-reachability.spec.js`, proving REACHABILITY not just existence
+
+1. **bridge.js's REAL block generation**, not the raw data-model object every prior gesture spec already tested:
+   a live `simstart` block instance has a real `ID` field (not a `FieldPicker`); a live `formfield`/
+   `cross_aim_handle` instance has a real `FieldPicker`-typed `RELTOROW` field with `pickKind:'relTo'` and
+   `allowNew:false`.
+2. **The picker's own live candidate enumeration**: a `cross_aim_handle`'s `RELTOROW` field's `_candidates()`
+   starts empty with no `simstart` rows declared; after two `simstart` blocks set `ID` to 'wall1'/'wall2' (a
+   third left blank, correctly filtered out) in the SAME workspace, both show — proving the enumeration is
+   genuinely LIVE, not a cached/stale list.
+3. **REACHABILITY, the dispatch's own bar**: a real op (simstart id='wall1' + a `cross_aim_handle` with
+   `relToRow` starting EMPTY) saved and reloaded through the app's own real save/reload path; the reloaded
+   `simstart` block renders its declared id; a REAL mouse click (not a synthetic value-set) on the reloaded
+   `cross_aim_handle`'s own `RELTOROW` field opens the picker, lists 'wall1' (read live off the SAME reloaded
+   workspace), and clicking that row COMMITS it — the field's own value changes from empty to 'wall1' through a
+   genuine click, not a template.
+
+**How the API-created-block click bug (t2575/t2581) was sidestepped, not re-hit**: used the RELOAD path
+(`window.ddcsLoadBlockStack`, t2577's own cited proof that a reloaded stack's fields respond to real clicks) to
+get the blocks ONTO the canvas, rather than the flyout-drag path this arc's own prior tests already found
+blocked at this stack depth (t2581) — exactly what the dispatch's own instruction anticipated ("if the parked
+gesture-creation blocker stops the full UI drive, prove what you can through the real production paths... park
+the rest with the same reason"). No fresh diagnosis attempted; t2581's own finding is cited, not re-derived.
+
+**A harness snag caught and fixed while building this, not left silent**: the project's default Playwright
+viewport is mobile-sized (412×915); `ws.centerOnBlock()`'s own world-to-screen math then placed the centred
+block's own field WELL off the actual visible viewport (measured live: a field's `getBoundingClientRect()`
+reported `x≈768` against `innerWidth:412`), so a real mouse click at that computed point landed on nothing
+(`elementFromPoint` returned `null`). Fixed by a desktop-sized `test.use({viewport})`, matching `diag_aim_handle`'s
+own t2573 precedent for the identical reason — removes on-screen-scroll/off-canvas as a variable entirely.
+
+**Vacuity checked, not assumed**: reverted all three touched files (`simStart.js`, `bridge.js`, `pickerField.js`)
+to HEAD via `git checkout --`, ran the new spec — all 3 tests failed (the exact ones this turn's own code makes
+pass) — then restored from a scratch backup copy and re-verified green.
+
+Regression: all 8 gesture-block spec files (unaffected — `HANDLE_ANCHOR_FIELDS` untouched) plus this new one:
+40 passed, 0 failed, 2 skipped (the two pre-existing parked UI-drive tests, unchanged). A broader sweep of every
+simstart/formfield-touching spec (`sim-start-block`, `sim-start-decouple`, `sim-starts-data`,
+`op-sim-starts-registry`, `custom-op-sim-starts-precedence`, `formfield-authoring-1610`, `formfield-block`,
+`formfield-loud-mismatch-1636`, `formfield-opparam-1640`, `corner-data-sim-starts`): 22/22 green (one flake in
+`formfield-loud-mismatch-1636`'s own parameterless-stack test — re-ran in isolation, passed cleanly; that test
+has no formfield at all in its own stack, so it cannot be reached by a formfield field-type change — a parallel-
+worker environmental flake, not a regression, matching this project's own documented "serialize gate and worker
+suites" hazard). `npm run test:node`: 238/238, unchanged. `git status`: only this turn's own new/edited files
+(`wizards/ops/simStart.js`, `blocks/blockly/bridge.js`, `blocks/blockly/pickerField.js`,
+`tests/simstart-relto-reachability.spec.js`) plus this WORK-LOG entry and a BACKLOG #61 addendum. The small item
+(the 23 ARCHITECTURE.md candidates from t2535) is its own separate commit, per the dispatch's own instruction.
+
