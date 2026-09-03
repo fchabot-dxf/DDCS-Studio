@@ -72060,3 +72060,119 @@ polygon confirmed reference-quality, the honest per-op case made rather than sev
 `web/wizards/views/userOpView.js` — nine files, all this turn's product changes, staged and committed below.
 The scratch visual-proof spec was deleted after use, confirmed via `git status` showing no trace of it.
 
+## 🔨 turn 2571 — ASSESS ONLY, zero product code: the op-derived anchor question from t2533, answered — a declarative shape EXISTS for both diagAim and crossAim; translate's arity problem is UNRELATED and does not clear rule-of-three on its own
+
+### THE QUESTION, restated precisely
+
+t2533 stopped porting canvasWidgets.js's gestures to block-authorable handles at `diagAim` (Middle's own ②
+handle): its five inputs (`primaryX`, `centreSec`, `sign`, `travel`, `prim`) are ALL derived from Middle's own
+internal geometry model, not literals or must-match-picked params — a CATEGORY difference from the 8 gestures
+already built (point/length/rect/radial/scaleX/shear/projLength — `probeVector` was ported later too, bringing
+the built count to 8; `diagAim`/`crossAim`/`translate` are the 3 unbuilt). This turn's own dispatch asks the
+sharper question t2533 itself didn't answer: is there a shape where the op-derived quantity is ITSELF DECLARED
+— such that a `diagAim`/`crossAim` block would NAME a declared thing rather than INVOKE a computation — or does
+any such attempt just relocate Middle's own business logic one layer sideways, still hidden from an author? And
+does `translate`'s own variable-arity problem (`xs`/`ys`, an unbounded array of `[field,value]` pairs) share a
+mechanism with this, gating whether mutator support clears rule-of-three (one mechanism serving three gestures)
+or serves `translate` alone (which the owner's own stated bar says does not clear it).
+
+### METHOD — traced every one of diagAim/crossAim's inputs to its actual source, not just its call site
+
+Re-read `panelTypes.js:707-757` (the full diagAim + crossAim decl-building code, both branches) and
+`middleWizard.js:49-56` (`middleAxes`) line by line — OBSERVED, not inferred, quoting the live code:
+
+- **`primaryX`** comes from `middleAxes(params).fA==='X'`, which itself reduces to `params.axisOrder` (an
+  `'XY'/'YX'` enum) or `params.axis` (`'X'/'Y'`) — **plain form params**, already the exact shape a must-match
+  enum picker handles today (no different from any existing dropdown-bound field).
+- **`sign`** (`dir2==='pos' ? -1 : 1`) is an enum→number LOOKUP off `params.dir2`. OBSERVED:
+  `canvasWidgets.js`'s own `probeVector` gesture ALREADY does the identical shape internally — `ux = d.axis
+  === 'Y' ? 0 : (d.dir === 'neg' ? -1 : 1)` — an enum-driven sign flip baked into a BUILT, already-ported
+  gesture. This is not a new category; it's an existing internal pattern that was never promoted to a
+  declarable table.
+- **`centreSec`/`centrePrim`** (`stock.h/2` or `stock.w/2`) read the LIVE PHYSICAL STOCK dimensions. OBSERVED:
+  `stock.w`/`stock.h` are read at THIS SAME LAYER (`panelTypes.js`) by literally every other declared
+  `anchor.kind` branch already shipped — drill's pattern dot radius, edge's wall lines, rotary's datum circle,
+  every "MUTE anchor dot" — `stock` is already a universally-available resolution-time context value, not
+  something unique to Middle. What's missing isn't the value's availability, it's an AUTHOR-FACING way to pick
+  it (a "system: stock width/height" source, alongside the existing must-match field picker).
+- **`travel`** is just the dragged field's OWN current value (`num(params.diagTravel, 50)`) — identical in
+  shape to every other gesture's `value`.
+- **`prim`** (`Number.isFinite(pp) ? pp : centrePrim`) is a "numeric field, or a declared fallback when it
+  holds a non-numeric sentinel (`'#53'`, meaning re-centre)" convention — general, not Middle-specific; any
+  field with a "reset to a system default" sentinel could reuse the same shape.
+- **The presence gate** (`featureType==='boss' && (twoAxis||findBoth) && (transAxis||'auto')==='auto'`) is a
+  conjunction of enum/boolean field checks — OBSERVED: the codebase already declares conditional rows with
+  `when` gates elsewhere (`USER_START_ROWS`'s own declared rows) — a reuse, not a new primitive.
+- **`crossAim`'s own EXTRA dependency**, `lineAt`/`lineAt2` (`panelStarts[0]`/`panelStarts[last]`) — the LIVE
+  world position of another pass. OBSERVED: this is the SAME shape the `relTo` mechanism already provides for
+  `point`-kind handles (`panelTypes.js:656-704`, `resolveRelToIndex` + `markerWorldOf` + `panelStarts`) — an
+  EXISTING, already-declared, already-generic "anchor to the op's Nth sim-start" concept. `crossAim` needs the
+  identical live-position read, just feeding a different field (`lineAt` instead of `ax`/`ay`) and driving a
+  non-`point` gesture — an EXTENSION of `relTo`, not a new category.
+
+### THE ANSWER — relocates-the-problem test applied to each piece, not just feasibility
+
+**No piece traced above requires embedding Middle's own business logic into a general block.** Every one
+reduces to either (a) an EXISTING declared/generic mechanism `diagAim`/`crossAim` simply never used
+(`relTo`, `when`-gated rows, an already-internal enum→sign pattern `probeVector` proves is generalizable), or
+(b) a genuinely NEW but small, general, reusable primitive with no Middle-specific content: a "system: stock
+width/height" pickable source, and a "numeric field with a declared fallback" convention. None of these is "a
+block that says ask the op for this value" — each NAMES a declared thing (a formfield, a system source, a
+fallback value, a referenced pass) rather than invoking a hidden computation, which is the dispatch's own bar.
+**Op-specific content collapses to exactly what it already is for every other gesture: which formfields the
+author picks** (their own `axisOrder`/`dir1`/`dir2`/`diagTravel`/`diagPrimary`) — no different in kind from a
+`rect_handle` author picking their own width/height fields.
+
+**`diagAim` — SIZE IT.** Needs three new general primitives (stock-W/H source, declared enum→sign table,
+numeric-with-fallback convention) plus one reused mechanism (`when`-gated presence, already precedented).
+INFERRED estimate, not measured (no code written): comparable to `scale_handle`/`shear_handle`'s own two-picker
+shape (t2533's own measured ~40-60 lines across six touch-point files each) but ×2-3 for the three new
+primitives — a MEDIUM lift, bigger than any single gesture shipped so far, smaller than "a different-shaped,
+much bigger design question" t2533 worried it might be. Each new primitive is independently useful beyond
+Middle (any wizard wanting a stock-centred default, any enum-driven sign, any "reset to default" field).
+
+**`crossAim` — SIZE IT, with one more step.** Everything `diagAim` needs, PLUS extending `relTo` (currently
+wired only for `point`-kind handles) to also drive a `crossAim`-shaped decl's `lineAt`. This is real,
+non-trivial design work — reusing `panelStarts`/`markerWorldOf` for a second gesture shape — but it traces to
+an EXISTING declared mechanism, not an invented escape hatch. Rough estimate: `diagAim`'s own cost plus a
+`relTo`-extension pass.
+
+**Neither is "accept the limit."** t2533's own STOP was correct given its own narrower question (can this be
+built the SAME way as the first 8, unmodified) — the answer to THAT question is still no. But the sharper
+question this turn asks — is there ANY declarative shape, new primitives included — has a real yes, evidenced
+piece by piece, not asserted.
+
+### `translate`'s arity problem — UNRELATED mechanism, does not share a root with diagAim/crossAim
+
+`translate`'s own blocker (`xs`/`ys`, an unbounded array of `[field,value]` pairs one handle drives) is an
+ARITY problem: how many field-pickers a SINGLE block can expose, needing Blockly's own mutator/extendable-input
+machinery so an author can add/remove pairs in the block itself. Every one of `translate`'s own INPUTS, once
+you have as many as you need, is an ORDINARY must-match field pick — no different in kind from any of the 8
+built gestures' own pickers. `diagAim`/`crossAim`'s blocker is the OPPOSITE axis: a FIXED, small number of
+inputs (5 and 6 respectively) whose SOURCE isn't a plain formfield — live stock, an enum-derived sign, a
+referenced pass. **These are orthogonal problems** — arity (how many) vs. source (where from) — and solving
+one does nothing for the other: a mutator lets an author add more `[field,value]` pairs, it doesn't tell a
+`diagAim` block how to read the live stock width. **Combining them to justify mutator support would be
+stacking unrelated uses to manufacture a rule-of-three, not honestly reaching one.** Per the owner's own
+stated bar ("one mechanism serving three gestures satisfies rule-of-three honestly; one serving translate
+alone does not") — the honest count is: mutator machinery would serve `translate` ALONE among the three
+unbuilt gestures. **Recommendation: do not build mutator support on this turn's own evidence.** If `translate`
+has a compelling case on its own separate merits (a real custom wizard needing a shift-the-whole-feature
+handle), that's a distinct decision with its own justification — it gets none of its rule-of-three standing
+borrowed from this turn's diagAim/crossAim finding.
+
+### VERIFY
+
+The relocates-the-problem question answered directly per-piece above (not just "is it technically possible"),
+with each of diagAim's five inputs and crossAim's sixth traced to either an existing declared mechanism
+(`relTo`, `when`-gates, `probeVector`'s own internal enum-sign pattern, `stock`'s already-universal
+availability at this layer) or a small, general, non-Middle-specific new primitive — never to "call this
+function." The translate-shares-a-mechanism question answered directly: NO, arity and source are orthogonal,
+evidenced by tracing what each blocker actually blocks. OBSERVED vs INFERRED kept distinct throughout: the
+code traces (middleAxes' own definition, probeVector's own sign math, stock's own pervasive use, relTo's own
+existing point-only wiring) are OBSERVED, read directly this turn; the three-new-primitives shape and its
+relative size are a PROPOSED DESIGN and an ESTIMATE, not yet built or measured — flagged as such, not
+presented as fact. Zero product code touched, per the dispatch's own explicit "ASSESS ONLY. Build nothing." —
+`git status` clean of any `web/` change this turn; only this WORK-LOG entry (below) and a BACKLOG.md #61
+addendum recording the answer are new. `npm run test:node`: not re-run (nothing to invalidate it).
+

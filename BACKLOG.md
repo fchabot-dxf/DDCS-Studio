@@ -5786,6 +5786,41 @@ specifically):
 family fully ported onto the declared registry) → L6 (the seven remaining ops' affordances, declared from
 evidence, not copied). Full account: WORK-LOG t2569.
 
+### ⭐⭐⭐ t2571 — ASSESS ONLY: t2533's own STOP (diagAim/crossAim, a "category mismatch") answered further — a declarative shape EXISTS; translate's arity problem is UNRELATED and does not clear rule-of-three alone
+
+t2533 stopped porting gestures 4-8 (`diagAim`) because its five inputs are ALL derived from Middle's own
+internal geometry model, not literals/must-match-picked params. This turn traced every one of those inputs
+(plus `crossAim`'s own sixth) to its actual source, not just its call site, and applied the real test: does a
+declared shape exist, or does building one just relocate Middle's own business logic one layer sideways?
+
+**Traced (OBSERVED, live code, `panelTypes.js:707-757` + `middleWizard.js:49-56`)**: `primaryX` reduces to
+plain enum params (`axisOrder`/`axis`). `sign` (`dir2==='pos'?-1:1`) is an enum→number lookup — and
+`canvasWidgets.js`'s own ALREADY-BUILT `probeVector` gesture bakes the identical shape in internally
+(`dir==='neg'?-1:1`), proving it's a generalizable pattern, not new territory. `centreSec`/`centrePrim` read
+live `stock.w`/`stock.h` — already read at this SAME layer by every other declared `anchor.kind` branch
+shipped so far, just never exposed to an AUTHOR as a pickable source. `prim`'s fallback-to-centre-on-
+non-numeric-sentinel is a general "field with a declared default" convention. `crossAim`'s own extra
+dependency (`lineAt` riding another pass's live position) is the SAME shape the already-generic `relTo`
+mechanism provides for point handles — an extension, not a new category.
+
+**Answer: SIZE IT, both.** `diagAim` needs three new small, general primitives (a "system: stock W/H" pickable
+source; a declared enum→sign table, promoting `probeVector`'s own internal pattern; a numeric-with-declared-
+fallback field convention) plus one reused mechanism (`when`-gated presence, already precedented by
+`USER_START_ROWS`). None of them is "ask the op for this value" — each NAMES a declared thing. INFERRED
+estimate (not built): a MEDIUM lift, ~2-3× a two-picker gesture's own measured cost (t2533), smaller than "a
+different-shaped, much bigger design question." `crossAim` needs the same three plus extending `relTo` to a
+non-`point` gesture — real design work, but an extension of an existing mechanism, not an invented one.
+
+**`translate`'s arity problem does NOT share a mechanism with this — answered directly, not assumed.**
+`translate`'s blocker is HOW MANY field-pickers one block exposes (needs Blockly mutator/extendable-input
+machinery); `diagAim`/`crossAim`'s blocker is WHERE a FIXED number of inputs come FROM. Orthogonal axes — a
+mutator solves neither's root cause for the other. Per the owner's own stated bar (one mechanism serving three
+gestures clears rule-of-three honestly; one serving `translate` alone does not), **mutator support is NOT
+justified by this turn's evidence** — combining the two to manufacture a count would be gaming rule-of-three,
+not reaching it. `translate` would need its own, separate justification.
+
+Zero product code touched — an addendum to a closed arc, not a reopening. Full account: WORK-LOG t2571.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
