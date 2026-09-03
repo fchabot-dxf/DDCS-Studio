@@ -71123,3 +71123,72 @@ edits; both staged and committed below. Pre-existing untracked/modified files at
 `verification/` (screenshots, `ANALYTICS-BOT-DETECTION.md`, `RESTORE-CUSTOM-MACROS.zip`) predate this turn and
 are left untouched, per "touch only what you must."
 
+## 🔨 turn 2557 — the ratioY fact, the _writeParam guard (its own fix), probeVector build in progress
+
+Advisor approved the guard, asked ONE question first ("do NOT act on it either way this turn"), then to build
+probeVector on top of the guard as a full, separately-committed fix.
+
+### THE ratioY QUESTION, answered with its measurement — REOPENS BACKLOG #73's premise
+
+Question: does `ratioY≈2.2` mean a vertical drag genuinely moves the model by ~2x what the gesture implies
+(a functional defect, outranking the canvas-size question), or is it a canvas-aspect artifact with no bearing
+on what a drag writes (BACKLOG #73's ruling stands)?
+
+**Method**: instrumented the REAL committed test (`surfacing-start-position-1648.spec.js`'s own cross-face
+test, temporarily, then reverted via `git checkout HEAD --` and re-confirmed `git status` clean) to capture
+each face's SVG `viewBox` + on-screen `getBoundingClientRect()` immediately before its own `drag()` call,
+alongside the already-known jog values. (An earlier attempt to hand-replicate the scenario in a standalone
+scratch file used the WRONG `setStock` shape — `window.ddcsStudio.settings.stock` instead of the real
+`window.ddcsGetSettings().stock` — and produced jog numbers that did not match the real test at all
+(`wJogY:-201` vs the real `-38`); discarded before drawing any conclusion from it, per this session's own
+"don't trust a replica whose numbers don't match" discipline. Re-ran via direct instrumentation of the real
+test itself instead, which reproduced the exact known numbers (`wJogY:-38.073, tJogY:-83.881`) confirming the
+harness was now trustworthy.)
+
+**Measured** (real committed test, one run):
+```
+wizard: viewBox "0 0 771 308", rect 770.8×307.5px  ->  pxPerMm  X:0.9997  Y:0.9984
+twin:   viewBox "0 0 707 277", rect 706.8×276.5px  ->  pxPerMm  X:0.9997  Y:0.9982
+```
+Both faces render at an ESSENTIALLY IDENTICAL ~1:1 world-mm-to-CSS-pixel scale, on BOTH axes (the two faces'
+own pxPerMm differ by ~0.02% on Y, 0% on X — noise, not signal). **If the jog discrepancy were purely a
+canvas-SIZE/scale artifact (BACKLOG #73's own framing — a differently-sized canvas legitimately needs a
+different mm-per-pixel), ratioY would be ≈1.0. It measures 2.2.** The canvases DO differ in total viewBox
+EXTENT (771×308 vs 707×277 — a different amount of world shown), but NOT in pixel-to-mm scale — so the same
+screen-pixel drag should map to the same world-mm delta on both faces, and does not.
+
+**Answer, stated plainly**: ratioY is NOT explained by canvas display scale. Something else in the drag→write
+pipeline computes a materially different value for the SAME real screen-pixel drag on a scale-identical
+canvas — this IS the functional-defect category, not the cosmetic one. **BACKLOG #73's own premise (ruled on
+the strength of an 11% number, before jogY was measured) needs to be reopened** — the canvas-size gap
+`visualMaxHeight()` was never asked to close may still be real and worth documenting on its own terms, but it
+does NOT explain ratioY, and ratioY's actual root cause (something in the marker's own world-position→jog
+delta computation, differing between the wizard's own layout code and the twin's canvas-widget code —
+UNTRACED, not yet investigated) is a separate, more serious question. Per the advisor's own explicit
+instruction, NOT investigated further or acted on this turn — reporting the fact only.
+
+### THE _writeParam GUARD — its own fix, its own test
+
+`web/wizards/ops/panelTypes.js:219` (`_writeParam`) — the one-line fix: `const next = typeof val === 'number'
+? r3(val) : val;` (was: unconditional `r3(val)`). To reach it non-vacuously through the REAL declared-gesture
+API (not a private-closure hack), also added the `anchor.kind === 'probeVector'` render branch to
+`layoutSpecFromOp`'s switch (mirrors `projLength`'s own shape: fixed anchor + MUTE dot, extended from one
+role-tagged param to three — `axis`/`dir`/`dist` — matching `rect_handle`'s own w/h role-tagging pattern).
+This branch is scaffolding for the guard's own test, not the full authoring feature — no block file, no
+`bridge.js`/`userOps.js` round-trip yet (that's the SEPARATE build below, on top of this).
+
+New test: `tests/write-param-enum-guard-2557.spec.js` — a synthetic `def.bindings` (t1806's own hand-built,
+no-block-round-trip pattern, this same file's sibling above), a real `<select>`/`<select>`/`<input>` DOM host,
+`layoutSpecFromOp` + a real `onDrag(handleId, {x:0,y:30})` call (drives probeVector's own cardinal-snap:
+`|dy|>|dx|` → axis 'Y', `dy>=0` → dir 'pos').
+
+**Non-vacuity, proven both directions**: ran the new test against the ONE-LINE-REVERTED code (`const next =
+r3(val);`, no guard) — FAILED: `axisAfter` read back `""` (empty — `<select>`'s own DOM behavior when `.value`
+is assigned something matching no `<option>`; the "NaN" the diagnosis names is real internally, `Math.round(NaN
+* 1000)/1000`, even though the empty-selection readback isn't the literal string "NaN" — a small, useful
+correction to the exact language of the corruption, its EFFECT is identical: the field ends up wrong,
+matching no option). Restored the guard, re-ran — PASSED (`axisAfter:'Y'`, `dirAfter:'pos'`,
+`distAfter≈30`). Also re-ran the full sibling file (`canvas-handle-writable-1804.spec.js`, 4 tests, all
+existing numeric-write paths) alongside the new test — 5/5 green, confirming the guard doesn't regress any
+existing numeric write.
+

@@ -217,7 +217,15 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
     // walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
     const _writeParam = (name, val, opts) => {
-        const next = r3(val);
+        // t2557 — every gesture built so far (length/point/rect/radial/scaleX/shear/projLength) writes ONLY
+        // numbers, so `r3`'s unconditional rounding never mattered. `probeVector` (canvasWidgets.js's own
+        // comment on it, t?? — "axis/dir are STRINGS — the view's setFields must pass enums through, not round
+        // them like a number") is the FIRST to write an enum string through this SAME shared path: r3('X') =
+        // Math.round(NaN)/1000 = NaN, silently corrupting the field to the string "NaN" instead of 'X'. Not a
+        // probeVector-only concern — a latent bug any of the 7 shipped gestures would hit the moment one of
+        // them ever wrote a non-numeric value; guarding here (the one shared choke point) fixes it for all of
+        // them at once rather than re-guarding per gesture.
+        const next = typeof val === 'number' ? r3(val) : val;
         const f = _field(name);
         if (!f) {   // no bound field → the preview-only side-store, then ask the host to re-render (no 'input' to dispatch)
             if (previewOnlyParams[name] === next) return;   // unchanged → no re-render (the same loop-guard real fields get)
@@ -570,6 +578,29 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                     type: 'projLength', id: gid + '_proj', field: plB.param, cx: anchor.cx, cy: anchor.cy,
                     nx: anchor.nx, ny: anchor.ny, off: val / scale, scale, min: anchor.min, max: anchor.max,
                     value: val, label: anchor.label || 'width',
+                });
+            }
+            continue;
+        }
+        // t2557 (BACKLOG #71 pilot) — `probe_vector_handle` declares kind 'probeVector': a FIXED anchor (cx/cy,
+        // the probe's own start point — matches edgeData's own axis/dir/dist field shape) + THREE role-tagged
+        // params sharing one group ('axis'/'dir', both ENUM strings, + 'dist', the numeric reach). Mirrors
+        // rect_handle's own w/h role-tagging (two params, one group) extended to three. The FIRST declared
+        // gesture whose drag() writes non-numeric values through setFields/_writeParam — safe now that
+        // _writeParam (above) skips r3()'s rounding for non-number values.
+        if (anchor && anchor.kind === 'probeVector') {
+            const axB = groups[gid].find((b) => b.role === 'axis');
+            const dirB = groups[gid].find((b) => b.role === 'dir');
+            const distB = groups[gid].find((b) => b.role === 'dist');
+            items.push({ kind: 'hole', x: anchor.cx, y: anchor.cy, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the probe start is fixed, not draggable
+            if (distB && _writable(distB.param)) {
+                const axisVal = axB ? (params[axB.param] === 'Y' ? 'Y' : 'X') : 'X';
+                const dirVal = dirB ? (params[dirB.param] === 'neg' ? 'neg' : 'pos') : 'pos';
+                decls.push({
+                    type: 'probeVector', id: gid + '_probe', cx: anchor.cx, cy: anchor.cy,
+                    axis: axisVal, dir: dirVal, dist: num(params[distB.param]), field: distB.param,
+                    fieldAxis: axB ? axB.param : undefined, fieldDir: dirB ? dirB.param : undefined,
+                    minR: anchor.minR, maxR: anchor.maxR, label: anchor.label || 'probe',
                 });
             }
             continue;
