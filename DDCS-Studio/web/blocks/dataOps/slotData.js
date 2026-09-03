@@ -178,13 +178,18 @@ export function slotPreviewGeometry(p) {
         line(ax + nx * hw, ay + ny * hw, bx + nx * hw, by + ny * hw),                 // +edge
         line(ax - nx * hw, ay - ny * hw, bx - nx * hw, by - ny * hw),                 // −edge
     ];
+    // t2569 (BACKLOG #61 L6) — `emits: true` on all four: A/B/anchor/width every drag writes ax/ay/bx/by/width
+    // directly, and the centreline IS the emitted tool path (no sim-only competitor exists on this op, unlike
+    // corner/rotaryClock). `noSnap` left undeclared on `sl_anchor` deliberately: its own comment above analogises
+    // it to an origin-based pos handle (which snaps by design elsewhere in this app), and no live drag showed a
+    // problem — adding noSnap here would be an unrequested, unproven behaviour change (t2567's own caveat).
     const handles = [
         // t716 — the TRANSLATE anchor (the whole slot shifts, length + angle unchanged): moves A+B by the drag delta. Slot
         // has no single position param (A/B are absolute), so this is the anchor the origin-based ops get from their pos handle.
-        { type: 'translate', id: 'sl_anchor', cx: mx, cy: my, xs: [['ax', ax], ['bx', bx]], ys: [['ay', ay], ['by', by]], label: '✛' },
-        { type: 'point', id: 'sl_a', fx: 'ax', fy: 'ay', x: ax, y: ay, label: 'A' },
-        { type: 'point', id: 'sl_b', fx: 'bx', fy: 'by', x: bx, y: by, label: 'B' },
-        { type: 'projLength', id: 'sl_w', field: 'width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: tool, label: 'width' },
+        { type: 'translate', id: 'sl_anchor', cx: mx, cy: my, xs: [['ax', ax], ['bx', bx]], ys: [['ay', ay], ['by', by]], label: '✛', emits: true },
+        { type: 'point', id: 'sl_a', fx: 'ax', fy: 'ay', x: ax, y: ay, label: 'A', emits: true },
+        { type: 'point', id: 'sl_b', fx: 'bx', fy: 'by', x: bx, y: by, label: 'B', emits: true },
+        { type: 'projLength', id: 'sl_w', field: 'width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: tool, label: 'width', emits: true },
     ];
     return { paths, handles };
 }

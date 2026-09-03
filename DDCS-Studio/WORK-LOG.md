@@ -71939,3 +71939,124 @@ manifest's own guard right. `BACKLOG.md` #73 also updated: its own "WORSE axis"/
 Every scratch/debug test file and every temporary in-source `window.__T2567*`-gated experiment was reverted
 before this state — confirmed via `git diff` showing only the intended, permanent changes.
 
+## 🔨 turn 2569 — BACKLOG #61 L6: the seven handle-affordance ops, declared from what each handle ACTUALLY does today — the rule stated before any declaration, zero `noSnap` changes, `onEdit` needed none
+
+### RESEARCH FIRST — the vocabulary, not assumed
+
+Read `viz/canvasWidgets.js` in full before touching any op. Three affordances, three different mechanisms:
+- **`onEdit`** (click-to-type) is NOT a per-op boolean. It's a generic function `buildCanvasWidgets` always
+  returns; it's already forwarded correctly into the FeatureCanvas spec for every op checked (classic view or
+  twin, all seven targets included) — nothing to declare. The REAL gap behind it — several 'size' handles
+  across pocket/slot/drill/bore/text's twin never set a `value`, so click-to-edit is silently inert even
+  though `onEdit` itself is wired — is a DIFFERENT, deeper piece of work (deciding what number each of those
+  handles should display) than "declare the affordance," and is OUT OF SCOPE for this turn; logged as a new
+  BACKLOG item, not fixed here.
+- **`noSnap`** only means anything on a `kind:'move'` handle (`point`/`diagAim`/`translate`/simMarkers) — it's
+  a no-op on every 'size' handle. This is the one t2567 made LOAD-BEARING (pan-removal is scoped to noSnap
+  drags), so any addition here needed its own proof, not a copy from a sibling.
+- **`emits`** is purely a render/documentation tag: true when a handle's drag writes a param that reaches the
+  op's actually-emitted G-code. For a 'size' handle (circle/diamond) it tints the shape TEAL (`#14b8a6`,
+  `featureCanvas.js:660-668`). For a 'move' handle (point/translate/simMarkers) it does something DIFFERENT and
+  much less visible — `startGlyph.js`'s `resolveStartGlyph(manual, emits)` only flips SOLID vs HOLLOW fill
+  (`fill: emits !== false`) and only for an explicit `false`; `undefined` and `true` render byte-identically
+  (both solid). Confirmed live (see VERIFY) — this cost real time to discover and is worth stating plainly so
+  the next turn doesn't re-litigate it: **declaring `emits:true` on a move-kind handle is real, correct
+  metadata but produces NO visible change today.** The colour on a simMarker handle is further overridden by
+  `panelTypes.js:915`'s own `color: m.color || '#39c0d8'`, which wins over `resolveStartGlyph`'s cyan/amber
+  entirely — a second, independent reason a move-kind `emits` declaration is invisible there.
+
+Delegated the per-op fact-finding (which handle, which gesture, which real param, current noSnap/emits state)
+to an Explore agent reading all seven targets plus the reference ops the dispatch named (corner/middle/
+surfacing/drill/bore) — full report kept in this turn's transcript, summarized below.
+
+### A CORRECTION TO THE ORIGINAL BACKLOG #61 PREMISE
+
+Finding 2's own text named drill/bore/middle as ops that "already declare" these affordances. They don't — the
+agent's own read of `drillData.js`/`boreData.js` (shared `drillPatternGeometry`) and `middleData.js` +
+`panelTypes.js`'s own hand-built ②/cross-over decls found **zero** `noSnap`/`emits` on any of their handles,
+despite several (drill/bore's own `dr_pos`, middle's own diagTravel/diagPrimary/crossX/crossY) writing real
+emitted params. The only two places in the whole app with a genuine, intentional declaration before this turn
+were **corner's per-pass sim-starts** (`emits` only, threaded through the byRole `relTo` path) and **the lathe
+L5 pilot family** (`emits` + real `value`s, both). Noted in BACKLOG #61 rather than silently treated as
+settled — middle's own identical gap is a new, separate, deferred finding (not touched this turn: out of the
+seven named ops, and its own two hand-built decls live in `panelTypes.js`, not a data-op file).
+
+### THE RULE (stated before any declaration, per the dispatch)
+
+**`emits:true`** — declare on a handle exactly when a drag on it writes a param this op's OWN emit actually
+reads (traced per-handle, not inferred from a sibling). **`noSnap`** — leave undeclared on every move-kind
+handle across the seven UNLESS its own role is demonstrably not "seat at a stock-relative point," and even
+then only after a live before/after check finds an actual problem — a comment analogising a handle to a
+position handle is evidence FOR snapping being intended, not against it.
+
+### PER-OP, what was found and declared
+
+- **pocket** (`pocketData.js` + `pocketView.js`) — `pk_pos`/`origin` (point) writes originX/Y, the real
+  placeonstock shift; `pk_size`/`size` (rect or radial by shape) writes the real cut W×H/Ø. No sim-only
+  handle exists on this op to contrast against — both get `emits:true`. `noSnap`: left undeclared (position
+  snapping to a stock corner is the same intended behaviour as tap/drill/corner).
+- **slot** (`slotData.js` + `slotView.js`) — `sl_a`/`sl_b` (point, real endpoints), `sl_w`/`width`
+  (projLength, real cut width), and the twin-only `sl_anchor` (translate, shifts A+B together) all write
+  real toolpath-reaching params — all four get `emits:true`. `sl_anchor`'s own comment explicitly analogises
+  it to an origin-based pos handle (which snaps by design elsewhere); no live drag showed a problem — **left
+  `noSnap` undeclared**, a deliberate call, not an oversight (adding it would be an unproven behaviour change,
+  exactly what t2567's own caveat warns against).
+- **tap** (`tapData.js`) — one handle, `tap_pos` (point), writes the real hole position. `emits:true`.
+- **text** — TWO independent, divergent handle sets exist (found by the agent, not previously documented):
+  the classic view (`textView.js`: pos/height/width/slant, no rotation handle) and the twin atom hook
+  (`fillText.js`'s own `previewGeometry`: pos/rotation, no height/width/slant). Every handle in both sets
+  writes a real glyph-geometry param the emit reads — all six (four classic + two twin) get `emits:true`.
+- **polygon** — already fully instrumented (the L5 pilot, `latheProfileCanvas.js`'s `polygonProfileSpec`):
+  both handles carry `emits:true` AND a real `value`, onEdit genuinely live. Reference-quality already — no
+  change made.
+- **rotaryCenter** — has NO draggable handles at all in its 2D layout today: no `previewGeometry`, no
+  `simStartParams`, no x/y-role binding; `panelTypes.js`'s own `rotCenterBind` comment says so explicitly
+  ("PURELY VISUAL... no handle/emit/drag", `panelTypes.js:861`). There is nothing to declare an affordance
+  ON. Left as-is — a different, larger gap (an op with no interactive preview at all) than finding 2 asks
+  about; not silently treated as "done" or ignored, stated here and in BACKLOG #61.
+- **rotaryClock** — marker A (`__simstart0`) is genuinely sim-only (own file comment: "the emit doesn't use
+  A's absolute pos"); marker B (`__simstart1`) writes the real bound `span`/#6 that the probe-touch spacing
+  emits. Added `emits: true` to B's point object in `opSimStarts.js`'s own `rotary_clock` provider (A stays
+  undeclared, correctly matching its sim-only nature), then threaded it through `userOpView.js`'s
+  `simMarkers` map (`emits: starts[i] && starts[i].emits`) — the exact same one-line pattern already used
+  twice in that file for `mkManual`/`simStart` (t1688), previously just never extended to this branch. Both
+  markers are `noSnap:true` already, forced unconditionally for every simMarker at `panelTypes.js:915` —
+  untouched, no behaviour change possible here regardless.
+
+### VERIFY
+
+**Targeted regression** (15 spec files covering every touched op + the shared drag infra —
+`drag-render-truth-gate-2461`, `commit-on-release-2429`, `preview-handles-712`, `pocket-data-emit`,
+`rotary-clock-data-emit`, `rotary-clock-handles`, `rotary-clock-sim-starts`, `rotary-clock-in-place`,
+`mill-start-translate-716`, `mill-layout-716`, `text-atom-708`, `slot-twin-repoint-1500`,
+`path-anchor-contour-slot-text-2371`, `pocket-in-place`, `pocket-form-reproduction-2301`): **56/56 passed.**
+
+**Live visual proof, not assumed** (scratch spec, run then deleted): confirmed `pk_size` (a 'size'-kind rect
+handle) genuinely renders `rgb(20, 184, 166)` = `#14b8a6` after the `emits:true` addition — the mechanism is
+real, not inert data. Confirmed `rotaryClock`'s A and B render IDENTICALLY (`rgb(57, 192, 216)`, panelTypes.js's
+own simMarker default colour) before and after B's `emits:true` — proving the move-kind addition changed zero
+pixels, exactly as the code-read predicted, and is not a silent behaviour change of any kind.
+
+**No `noSnap` was added anywhere this turn** — the one candidate considered (`sl_anchor`) was deliberately
+left alone with a stated reason. This means the t2567 caveat ("any noSnap addition is a behaviour change
+requiring its own proof") has no live case to prove THIS turn — a fact worth stating plainly rather than
+leaving implicit.
+
+`npm run test:node`: unaffected (no pure-function module touched). `git status`: clean except this turn's nine
+product files, listed below.
+
+### BACKLOG
+
+`BACKLOG.md` #61's own L6 section added: the rule, the per-op table above, the drill/bore/middle premise
+correction, and three new DEFERRED findings logged (not fixed): middle's own identical undeclared-`emits`
+gap on its diagAim/crossAim decls; rotaryCenter's total absence of draggable 2D-layout handles; the
+onEdit-inert gap (handles with no `value` set, silently un-editable despite correct `onEdit` wiring) across
+pocket/slot/drill/bore/text-twin. ARC A (BACKLOG #61) is now closed per the dispatch — L1 through L6 complete,
+polygon confirmed reference-quality, the honest per-op case made rather than seven uniform copies.
+
+`git status`: `web/blocks/dataOps/pocketData.js`, `web/blocks/dataOps/slotData.js`,
+`web/blocks/dataOps/tapData.js`, `web/viz/opSimStarts.js`, `web/wizards/ops/fillText.js`,
+`web/wizards/views/pocketView.js`, `web/wizards/views/slotView.js`, `web/wizards/views/textView.js`,
+`web/wizards/views/userOpView.js` — nine files, all this turn's product changes, staged and committed below.
+The scratch visual-proof spec was deleted after use, confirmed via `git status` showing no trace of it.
+

@@ -150,7 +150,10 @@ const BUILT_IN = {
         // (a span-coupled default would feed back: bigger span → A shifts → bigger span). A is the operator's jog-to start
         // (sim-only, never emitted); B = A + span is the 2nd Z-down touch.
         const A = { x: ax != null ? ax * sx : sx / 2, y: ay != null ? ay * sy : sy / 2, z };
-        return [A, { x: A.x, y: A.y + span, z }];
+        // t2569 (BACKLOG #61 L6) — `emits: true` on B only: B's Y-drag writes the SPAN #6, a real bound macro var
+        // the emit reads; A is genuinely sim-only (the emit never uses A's absolute pos, per this fn's own header
+        // comment), so A correctly carries no `emits`. userOpView.js's simMarkers builder threads this through.
+        return [A, { x: A.x, y: A.y + span, z, emits: true }];
     },
 };
 

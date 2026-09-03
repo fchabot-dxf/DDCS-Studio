@@ -42,11 +42,13 @@ function buildTextSpec(params, stock) {
     const lineW = lay.lineW || 1;   // baseline advance (width-scaled, no slant) — anchors the width/slant handles
     // DECLARE the handles via reusable gestures (not hand-rolled): the four corners of the text box —
     // pos=point (bottom-left), height=length (top-left), width=scaleX (baseline right), slant=shear (slanted top-right).
+    // t2569 (BACKLOG #61 L6) — `emits: true` on all four: pos/height/width/slant each write a param that shapes
+    // the actually-emitted glyph strokes — no sim-only handle exists on this op to contrast against.
     const { handles, onDrag, onEdit } = buildCanvasWidgets([
-        { type: 'point', fx: 'tx_x', fy: 'tx_y', x: ox, y: oy, label: 'pos' },
-        { type: 'length', field: 'tx_height', ax: ox, ay: oy, axis: 'y', value: H, min: 2, label: 'height' },
-        { type: 'scaleX', field: 'tx_width', ax: ox, edgeX: ox + lineW, ay: oy, value: width, min: 0.2, label: 'width' },
-        { type: 'shear', field: 'tx_slant', ax: ox + lineW, ay: oy, h: H, value: slant, label: 'slant°' },
+        { type: 'point', fx: 'tx_x', fy: 'tx_y', x: ox, y: oy, label: 'pos', emits: true },
+        { type: 'length', field: 'tx_height', ax: ox, ay: oy, axis: 'y', value: H, min: 2, label: 'height', emits: true },
+        { type: 'scaleX', field: 'tx_width', ax: ox, edgeX: ox + lineW, ay: oy, value: width, min: 0.2, label: 'width', emits: true },
+        { type: 'shear', field: 'tx_slant', ax: ox + lineW, ay: oy, h: H, value: slant, label: 'slant°', emits: true },
     ], setFields);
     const pl = placementSpec(params, textBBox(params), 'tx_');   // opt-in: stays at x/y unless you pick a stock corner
     return {

@@ -835,6 +835,10 @@ export function createUserOpView(ns, opts) {
                         const simMarkers = (spb && Array.isArray(starts))
                             ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
                                 pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …
+                                // t2569 (BACKLOG #61 L6) — thread the pass's own computed `emits` (opSimStarts,
+                                // e.g. rotary_clock's B/span) onto the handle, same convention as mkManual (t1688)
+                                // and simStart below: undefined for every other spb provider (unchanged).
+                                emits: starts[i] && starts[i].emits,
                                 onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow, starts)) mgr.update(); },
                             } : null).filter(Boolean)
                             : (entryMarkers || manualMarkers);

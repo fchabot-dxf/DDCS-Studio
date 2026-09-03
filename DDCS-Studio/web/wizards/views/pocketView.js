@@ -38,12 +38,15 @@ export function buildPocketSpec(params, stock) {
     // (rect/ellipse — ellipse drags a half-extent, so divisor 0.5 → full W/H) or a radius-only `radial` (circle/polygon,
     // Ø = 2·distance). Each still drives a wizard PARAMETER via setFields() — never freeform geometry.
     const hs = handleScale(params, 'p_', ox, oy, num(params.w, 80), num(params.h, 60));
-    const decls = [{ type: 'point', id: 'origin', fx: 'p_originX', fy: 'p_originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
+    // t2569 (BACKLOG #61 L6) — `emits: true` on both handles: origin's drag writes p_originX/p_originY (the real
+    // placeonstock shift) and the size handle writes the real cut W×H/Ø — pocket has no sim-only handle to
+    // contrast against, unlike corner/rotaryClock, so both are unconditionally emits-eligible.
+    const decls = [{ type: 'point', id: 'origin', fx: 'p_originX', fy: 'p_originY', x: ox, y: oy, label: 'pos', emits: true, ...hs.pos }];
 
     if (params.shape === 'circle') {
         const R = num(params.dia, 50) / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
+        decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a, emits: true });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the boundary ring from the region kernel's contour.
         // t2038 — trueRegionFromFlat already reads these exact field names (originX/originY/shape/dia/sides/w/h)
@@ -53,15 +56,15 @@ export function buildPocketSpec(params, stock) {
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
         if (params.shape === 'polygon') {
             const R = num(params.dia, 50) / 2;
-            decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
+            decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a, emits: true });
         } else {
             const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2;
-            decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
+            decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', emits: true, ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
         }
     } else {
         const w = num(params.w, 80), h = num(params.h, 60);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', ...hs.size });
+        decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', emits: true, ...hs.size });
     }
 
     const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);

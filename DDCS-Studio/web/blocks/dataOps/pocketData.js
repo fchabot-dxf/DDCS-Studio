@@ -329,21 +329,24 @@ function _boundaryRing(p) {
 export function pocketPreviewGeometry(p) {
     const ox = _pn(p.originX, 0), oy = _pn(p.originY, 0), shape = p.shape || 'rect';
     const hs = handleScale(p, '', ox, oy, _pn(p.w, 80), _pn(p.h, 60));
-    const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
+    // t2569 (BACKLOG #61 L6) — `emits: true` on both handles: origin's drag writes originX/originY (the real
+    // placeonstock shift) and the size handle writes the real cut W×H/Ø — pocket has no sim-only handle to
+    // contrast against, unlike corner/rotaryClock, so both are unconditionally emits-eligible.
+    const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', emits: true, ...hs.pos }];
     const boundary = _boundaryRing(p);
     if (shape === 'circle') {
         const R = _pn(p.dia, 50) / 2;
         if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
-        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø', emits: true });
     } else if (shape === 'polygon') {
         if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
-        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø', emits: true });
     } else if (shape === 'ellipse') {
         if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
-        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', emits: true, ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
     } else {
         if (boundary.length) paths.push({ pts: boundary, cls: 'fc-path' });
-        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', emits: true, ...hs.size });
     }
     // t718 — the origin-inclusive boundary bbox: the twin's pocket geometry emits 0-relative (origin rides the placement
     // offX), so the layout consumer places against THIS drawn-frame bbox → the pocket frames the traced clearing passes.

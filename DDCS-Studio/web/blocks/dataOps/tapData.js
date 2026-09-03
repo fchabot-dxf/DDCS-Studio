@@ -101,9 +101,11 @@ export function tapPreviewGeometry(p) {
     const r = Math.max(1.5, _n(p.pitch, 1) * 3);   // a display ring scaled off the pitch (a visible thread-O, not to scale)
     const ring = []; for (let i = 0; i <= 16; i++) { const a = 2 * Math.PI * i / 16; ring.push({ x: ox + r * Math.cos(a), y: oy + r * Math.sin(a) }); }
     const hs = handleScale(p, '', ox, oy, 0, 0);
+    // t2569 (BACKLOG #61 L6) — `emits: true`: the only handle tap has, and it writes originX/originY, the real
+    // placeonstock shift for the tap cycle — no sim-only competitor on this op.
     return {
         paths: [{ pts: ring, cls: 'fc-guide' }],
-        handles: [{ type: 'point', id: 'tap_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }],
+        handles: [{ type: 'point', id: 'tap_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', emits: true, ...hs.pos }],
         bbox: { minX: ox, maxX: ox, minY: oy, maxY: oy },
     };
 }

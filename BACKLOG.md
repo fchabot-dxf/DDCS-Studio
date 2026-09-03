@@ -5720,6 +5720,72 @@ question.
 
 Full account: WORK-LOG t2497.
 
+### ⭐⭐⭐ L6 — t2569: the seven ops finding 2 named, declared from what each handle ACTUALLY does — ARC A CLOSED
+
+Finding 2's own text: "Handle AFFORDANCES (`onEdit`/`noSnap`/`emits`) — declared on some ops (corner/middle/
+surfacing/drill/bore/the lathe family), absent with no apparent rule on others (pocket/slot/tap/text/polygon/
+rotaryCenter/rotaryClock)."
+
+**A correction to that premise, found while researching it**: drill/bore/middle do NOT already declare these
+— read in full, none of their handles carry `noSnap`/`emits` despite several (drill/bore's `dr_pos`, middle's
+own diagTravel/diagPrimary/crossX/crossY) writing real emitted params. Before this turn, exactly TWO places in
+the app had a genuine, intentional declaration: corner's per-pass sim-starts (`emits` only) and the L5 lathe
+family (`emits` + `value`, both). The "declared vs absent, no apparent rule" framing undersold how uneven the
+starting state actually was.
+
+**The vocabulary, precisely** (read `canvasWidgets.js` in full before declaring anything): `onEdit` needs no
+per-op declaration — it's a generic function, already correctly forwarded everywhere checked, target and
+reference ops alike. The real gap behind it (several handles never set a `value`, so click-to-edit is silently
+inert despite correct wiring) is a DIFFERENT, deeper task, not what finding 2 asks — logged below as its own
+deferred item. `noSnap` only affects `kind:'move'` handles and is now LOAD-BEARING (t2567 scoped pan-removal
+to noSnap drags) — any addition needed live before/after proof. `emits` tints a SIZE-kind handle teal
+(`#14b8a6`); on a MOVE-kind handle it instead only flips solid↔hollow fill via `startGlyph.js`'s
+`resolveStartGlyph` (`fill: emits !== false`) — `undefined` and `true` render byte-identically, confirmed live
+— and is further overridden by `panelTypes.js:915`'s own explicit simMarker colour in rotaryClock's case. This
+means several of this turn's own `emits:true` additions are correct, real metadata with **zero visible
+effect today** — stated plainly so nobody re-discovers it expecting a colour change.
+
+**Declared, per op** (full per-handle reasoning in WORK-LOG t2569): pocket (`pk_pos`+`pk_size`, both
+`emits:true` — no sim-only competitor exists on this op), slot (`sl_a`/`sl_b`/`sl_w`/the twin-only
+`sl_anchor`, all four `emits:true`), tap (`tap_pos`, `emits:true`), text (both the classic view's four
+handles AND the twin's independent two-handle set — found to be genuinely DIFFERENT decl sets, not one
+shared source — all six `emits:true`), rotaryClock (marker B only — the real `span`/#6 write — `emits:true`
+via `opSimStarts.js`'s `rotary_clock` provider + a one-line thread-through in `userOpView.js`'s `simMarkers`
+map, mirroring the existing t1688 `mkManual` pattern; marker A stays undeclared, correctly, being genuinely
+sim-only).
+
+**Zero `noSnap` additions.** The one real candidate — slot's `sl_anchor` (a `translate`-kind handle, the
+app's only user of that gesture) — was deliberately LEFT undeclared: its own existing comment analogises it
+to an origin-based position handle (which snaps by design elsewhere), and no live drag showed a problem.
+Adding `noSnap` there would have been an unrequested, unproven behaviour change — exactly what t2567's own
+caveat warns against. This also means the caveat had no live case to actually prove this turn, which is worth
+recording rather than leaving ambiguous.
+
+**polygon**: already reference-quality from L5 (both handles `emits:true` + real `value`) — no change.
+**rotaryCenter**: has NO draggable 2D-layout handles at all today (no `previewGeometry`, no `simStartParams`,
+no x/y role — `panelTypes.js:861`'s own comment: "PURELY VISUAL... no handle/emit/drag"). Nothing exists to
+declare an affordance ON — a different, larger gap than finding 2 asks about, left as-is and named here
+rather than silently skipped.
+
+Verified: 56/56 targeted regression tests (drag/commit/emit specs across all seven ops + the shared drag
+infra) unchanged; a scratch live-visual check (run then deleted) confirmed `pk_size` genuinely renders
+`#14b8a6` and rotaryClock's A/B render pixel-identical before/after B's `emits:true` — the "no visible effect
+on move-kind" claim above is measured, not assumed.
+
+**Three new findings, deferred, not fixed this turn** (out of scope — the dispatch named these seven ops
+specifically):
+1. **middle** has the identical undeclared-`emits` gap on its own diagAim/crossAim decls (built inline in
+   `panelTypes.js`, not a data-op file) — real emitted params (#19-#22), no declaration.
+2. **rotaryCenter** has no draggable 2D-layout handles at all — a bigger gap than an undeclared affordance.
+3. **The onEdit-inert gap**: pocket's Ø/W×H, slot's width, drill/bore's every handle, and text-twin's
+   rotation all lack a `value`, so click-to-edit never activates despite `onEdit` being correctly wired —
+   deciding what number each should display is real, separate design work.
+
+**ARC A (BACKLOG #61) is now CLOSED**: L1 (mutation manifest) → L2/L3 (presence/reachability primitives) → L4
+(the 32-op sweep, 3 defects found, all now fixed: rotaryClock/#64, alignment/#65, parting/#66) → L5 (lathe
+family fully ported onto the declared registry) → L6 (the seven remaining ops' affordances, declared from
+evidence, not copied). Full account: WORK-LOG t2569.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`

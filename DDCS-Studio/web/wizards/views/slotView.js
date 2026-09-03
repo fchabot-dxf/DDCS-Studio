@@ -53,10 +53,12 @@ export function buildSlotSpec(params, stock) {
     // DECLARE the handles via reusable gestures (not hand-rolled): A/B = two `point`s; width = a `projLength` (the
     // perpendicular distance from the centreline → full width). Handles sit on the base slot (the [0,0] copy);
     // editing it repeats across the pattern. Each still drives a wizard PARAMETER via setFields() — never raw geometry.
+    // t2569 (BACKLOG #61 L6) — `emits: true` on all three: A/B/width every drag writes sl_ax/sl_ay/sl_bx/sl_by/
+    // sl_width, which the centreline (the emitted tool path) reads directly — no sim-only competitor on this op.
     const { handles, onDrag, onEdit } = buildCanvasWidgets([
-        { type: 'point', id: 'a', fx: 'sl_ax', fy: 'sl_ay', x: ax, y: ay, label: 'A' },
-        { type: 'point', id: 'b', fx: 'sl_bx', fy: 'sl_by', x: bx, y: by, label: 'B' },
-        { type: 'projLength', id: 'width', field: 'sl_width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: num(params.toolDia, 6), label: 'width' },
+        { type: 'point', id: 'a', fx: 'sl_ax', fy: 'sl_ay', x: ax, y: ay, label: 'A', emits: true },
+        { type: 'point', id: 'b', fx: 'sl_bx', fy: 'sl_by', x: bx, y: by, label: 'B', emits: true },
+        { type: 'projLength', id: 'width', field: 'sl_width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: num(params.toolDia, 6), label: 'width', emits: true },
     ], setFields);
 
     const pl = placementSpec(params, slotArrayBBox(params), 'sl_');   // opt-in: stays at A↔B unless you pick a stock corner

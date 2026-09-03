@@ -74,9 +74,11 @@ export const fillTextBlock = {
         const ox = num(p.x, 0), oy = num(p.y, 0), rot = num(p.rotation, 0);
         const r = Math.max(4, lay.lineW || 10);   // the ↻ handle rides the rotated baseline end (grab it to swing the label)
         const hs = handleScale(p, '', ox, oy, lay.lineW || 0, lay.lineH || 0);
+        // t2569 (BACKLOG #61 L6) — `emits: true` on both: pos writes x/y and rotation writes the emitted rotation
+        // transform — no sim-only handle exists on this twin path to contrast against.
         const handles = [
-            { type: 'point', id: 'txt_pos', fx: 'x', fy: 'y', x: ox, y: oy, label: 'pos', ...hs.pos },
-            { type: 'radial', id: 'txt_rot', fieldA: 'rotation', cx: ox, cy: oy, r, a: rot * Math.PI / 180, label: '↻' },
+            { type: 'point', id: 'txt_pos', fx: 'x', fy: 'y', x: ox, y: oy, label: 'pos', emits: true, ...hs.pos },
+            { type: 'radial', id: 'txt_rot', fieldA: 'rotation', cx: ox, cy: oy, r, a: rot * Math.PI / 180, label: '↻', emits: true },
         ];
         return { paths, handles };
     },
