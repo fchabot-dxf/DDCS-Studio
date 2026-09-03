@@ -71659,3 +71659,120 @@ each with the kill-switch table, the corrected root (scale recompute, not stale 
 the OLD framing was checked and found wrong before this fix was designed), the two-attempt account (why exact
 preservation was reverted), and the five-vector/rotaryClock re-run numbers including the one DECLARED residual.
 
+## 🔨 turn 2565 — ASSESSMENT ONLY: the pan-feedback restructure has a genuine SIZE, and a smaller answer exists and was measured to work
+
+Per the dispatch's own explicit instruction: assess, do NOT attempt. Three bounded, reverted experiments were
+run to answer the dispatch's own questions with evidence rather than opinion; nothing shipped
+(`git checkout HEAD --` after each, `git status` confirmed clean throughout — no source diff at any point this
+turn survives to the final state).
+
+### Q1 — what would diverging the render frame from the write-interpretation frame actually require?
+
+`_S`(world→screen, used to DRAW everything: stock, items, every handle, paths, labels, snap rings, corner/
+edge/attach pick targets) and `_W`/`_toWorld`(screen→world, used to INTERPRET the cursor — hit-testing on
+`pointerdown`, the value passed to `onDrag` on every `pointermove`, `dblclick` edit) both read the SAME `_tf`
+object (`cxw`/`cyw`/`scale`/`cx`/`cy`), and are EXACT algebraic inverses of each other under it
+(`_S(_W(v)) ≡ v` for any `_tf` — confirmed both algebraically and by a direct trace at t2559/t2561). Splitting
+them into two separately-mutable frames is possible mechanically (a second `panDx`/`panDy` offset, applied only
+in `_S`), but it runs into a real, not merely mechanical, problem: **if rendering and interpretation use
+different frames, the drawn handle stops tracking the cursor during the drag** — the exact "the handle follows
+the finger" property this whole file exists to provide. `_S`/`_W` are inverses of the SAME frame specifically
+so that "where I draw the handle" and "what value a given cursor position means" are the SAME question,
+answered once. Making them diverge doesn't just risk being hard — it risks being self-defeating for a
+POSITION handle specifically (where the drawn position IS the value, by construction): whichever frame renders
+the handle, that's where the user sees it, and whichever frame interprets the cursor, that's what gets
+written — if those disagree, the handle either lies about where it is, or the write disagrees with what the
+user sees, and either one is arguably worse than today's bug for a user to reason about.
+
+**Who depends on the shared frame, concretely** — every consumer of `_S`/`_disp`/`_W`/`_toWorld` in this one
+class: `_hit`/`_hitAttach`/`_hitCorner`/`_hitEdge`/`_snapToAnchor` (all hit-testing), the `pointermove` handler
+itself (drag interpretation AND the handle's own re-draw), `_fit`'s own bbox accumulation (reads `h.x/h.y`,
+which only means something under ONE shared frame), the wheel-zoom handler (mutates `scale`/`cxw`/`cyw`
+together, expects `_S`/`_W` to stay paired), and — notably — the ALREADY-CORRECT background-pan handler
+(`this.pan`), which mutates the SAME `cxw`/`cyw` but does NOT compound (see Q3). Nothing in this file currently
+assumes render and interpretation could differ; a genuine split touches the shared contract every one of these
+relies on, which is what makes it a restructuring rather than a local correction — CONFIRMS the guardrail was
+right to trip on it.
+
+### Q2 — is there a smaller answer? YES — measured, not theorized
+
+**Why the compounding happens, precisely (the piece that was missing before this turn)**: `_followHandle`'s
+own trigger (`is the cursor within the 80px gutter`) is itself correct and stable — it reads the RAW,
+`_tf`-independent viewBox point (confirmed at t2561: identical whether sourced from the post-write handle or
+the raw cursor, since `_S(_W(v))≡v`). The bug is that EVERY frame the trigger holds, `_followHandle` computes
+"how far PAST the margin is the cursor RIGHT NOW" and ADDS that to `cxw`/`cyw` UNCONDITIONALLY — never checking
+whether a PRIOR frame this SAME drag already applied a correction that (partially) accounts for it. Since a
+drag toward an edge naturally keeps the raw cursor inside the gutter for MANY consecutive frames (the mouse
+moves a little each frame, but stays within 80px of the edge the whole time), the SAME roughly-sized
+correction gets applied AGAIN AND AGAIN — and because `cxw`/`cyw` is the SAME frame `_toWorld` reads to compute
+the value that gets WRITTEN, each repeated correction gets read back in as if it were NEW cursor movement.
+This is a pure "unconditional per-frame re-application" bug, structurally unrelated to which SOURCE feeds the
+trigger (my own t2561 "cursor vs handle" attempt changed nothing, exactly because of this — I had fixed the
+wrong half of the mechanism).
+
+**Two smaller candidates, both quickly built (this turn only, both reverted) and measured against the SAME
+severity harness (t2559/t2561's own 30,-15px screen drag, jogY compared across 8/40/100 pointermove steps for
+the identical total mouse distance):**
+
+| variant | steps=8 | steps=40 | steps=100 | shape |
+|---|---|---|---|---|
+| today (shipped) | −38.073 | −269.234 | −702.66 | unbounded, super-linear |
+| delta-based pan (only apply the pan NOT already applied by a prior frame this same drag, mirroring the ALREADY-CORRECT background-pan handler's own `this.pan = v` pattern) | +9.954 | +11.203 | +11.391 | STABLE across step count — compounding eliminated — but not yet numerically exact (converges toward, doesn't quite reach, the value below) |
+| **no panning at all during a `noSnap` drag** (`_followHandle` becomes a no-op) | **+12.493** | **+12.493** | **+12.493** | **STABLE, and matches the naive mouse-px/scale expectation almost exactly (+12.47) — a correct answer, not merely a bounded one** |
+
+(The sign here is POSITIVE — a screen-up drag maps to `+world-Y` under `_W`'s own formula; t2559/t2561's own
+WORK-LOG entries reported this as negative loss/amplification using the ratio's own magnitude, which is still
+valid, but the raw sign in this table is corrected here for anyone who greps these numbers directly later.)
+
+**"No panning at all" was ALSO checked against `alignment-canvas-refit-732.spec.js`** (t732's own canonical
+test, the one the t2563 refit fix nearly broke) — running its own four-consecutive-away-drags scenario with
+panning disabled: `insets=[104,104,104,104]` (identical to today's shipped behaviour — passes t732's own
+`>100` requirement exactly) and world X still growing more negative every drag (`60 → −84.7 → −495.3 →
+−1355.9 → −3159.7` — satisfies t732's own "keeps growing" assertion too, and MUCH less extreme than today's
+own `−68316.6` by the 4th drag, itself a symptom of the SAME bug this turn is assessing). **Not panning during
+the ACTIVE drag doesn't cost t732 anything, because t732's own assertions are checked AFTER release, and
+t2563's own (already-shipped) refit-on-drop fix is what restores good viewport margin at that point —
+panning-during-drag and refit-on-release turn out to be two SEPARATE mechanisms serving the SAME goal, and
+only one of them is broken.**
+
+**The real trade-off, named plainly, a product call not a technical one**: disabling `_followHandle` means a
+marker dragged far enough toward an edge would go OFF-SCREEN WHILE STILL BEING DRAGGED (not visually tracked
+until release, when the fixed refit-on-drop brings it back into a comfortable, well-margined view). This is a
+genuine, user-visible regression from TODAY's stated intent (t532's own comment: "Lets a dragged handle move
+PAST the stock edge while staying visible"). Weighed against what it replaces — an invisible, unbounded,
+silent value-corruption bug, now measured to reach a 60-second HANG at 300 synthetic steps with every real
+number a floor against an actual mouse — this reads as a clear net improvement, but it is still a deliberate
+UX trade a product owner should sign off on, not something to fold into a "just fix it" turn.
+
+### Q3 — the size and shape, stated plainly
+
+**This is NOT a one-turn restructure, and it does not need to be one.** The FULL frame-divergence restructure
+(Q1) remains real work with a genuine risk of making things WORSE (a handle that disagrees with its own
+written value) for a benefit ("panning stays exactly as smooth as today") that may not be worth having, given
+Q2's own finding. **The SMALLER answer (no panning during a `noSnap` drag) is sized like a normal, single-turn
+fix**: one guarded early-return in `_followHandle` (or removing its one call site's own condition for `noSnap`
+handles), a permanent regression guard extending the SAME severity harness this turn already built (assert
+`jogY` at steps=8/40/100 all land within a small tolerance of each other, not growing), and a re-run of
+`alignment-canvas-refit-732.spec.js` plus the L1 manifest as the acceptance test — all INFRASTRUCTURE already
+exists (`dragHandleRenderTruth`, the manifest runner, `bootAlignment`, t2563's own kill-switch pattern) from
+the last three turns of this same arc. **The delta-based pan variant is a possible middle path** (keeps
+panning visually smooth during a drag, unlike "no panning") but needs real correctness work before it's
+trustworthy (this turn's own quick version converges but doesn't quite reach the exact value) — sized similarly
+to the no-pan option, one turn, but with more risk of a subtle remaining bug given the "converges but doesn't
+quite land" result already observed.
+
+**Recommendation, stated as a recommendation, not a decision made unilaterally**: "no panning during a
+`noSnap` drag" is the smallest, best-evidenced fix — it is measured to work, doesn't cost the one test that
+nearly broke last time, and its trade-off is nameable in one sentence for a product owner to approve or
+reject. If approved, it is a normal single turn, not an arc. The FULL frame-divergence restructure should stay
+on the roadmap as its own, separate, lower-priority item — worth doing eventually if "panning stays smooth
+during a far drag" turns out to matter to someone, but not blocking, and not free the way it looked before
+this turn's own two experiments.
+
+### TIER
+
+Assessment only. `git status` clean — no source files changed in the final state (three experiments built and
+reverted: `window.__T2565_DELTA`-gated delta-pan in `_followHandle`, `window.__T2565_NOPAN`-gated early
+return, and their own scratch test files, all removed). No product code shipped; no full suite run (nothing to
+gate).
+
