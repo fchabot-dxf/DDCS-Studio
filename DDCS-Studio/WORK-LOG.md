@@ -72441,3 +72441,68 @@ the `feature_canvas` flyout-drag issue further, did NOT chase the save-dialog sy
 any fix. `git status`: clean of product code — this turn built and ran one scratch test, then deleted it;
 nothing else changed.
 
+## 🔨 turn 2579 — ONE BOUNDED QUESTION, answered by measurement: `feature_canvas`'s own flyout-drag failure is REAL — it reproduces identically for machine-speed AND realistic, hover-paced human pointer travel
+
+### THE QUESTION
+
+The last open blocker from the diagAim chase: `feature_canvas` fails to connect via a real flyout drag at
+this specific stack depth (4 formfields), reproduced again after t2575's own popup fix shipped — proven
+separate from that root. The dispatch's own question, same method as t2539's own flyout-interception
+investigation (an A/B test comparing an instant/fast drag against realistic, incremental, hover-paused pointer
+travel, which that turn found reproduced identically both ways — the answer that made it real): does a HUMAN
+hit this, or only this session's own machine-speed automation?
+
+### METHOD — measured on the ACTUAL failing repro, not a simplified stand-in
+
+First attempt used a MINIMAL, isolated repro (4 API-built formfields, no prior click/picker history) — it did
+NOT reproduce the failure at all (the fast drag succeeded immediately). This itself is a real, OBSERVED data
+point: the failure is not simply "stack depth" in isolation, it depends on the actual sequence of prior
+interactions the real pilot performs (BINDMODE/ATOMTYPE picks, text edits, popup opens/closes) — discarded as
+inconclusive for the ACTUAL question and not chased further (that would have been a different investigation).
+
+Rebuilt the comparison on the REAL repro instead: a scratch copy of the parked test, un-skipped, with
+`dragFlyoutBlockTo`'s own retry loop modified to try ONE fast attempt (the original, machine-speed pattern —
+5/20/2-step moves, ~80ms waits) followed by THREE slow, realistic attempts (incremental pointer travel in
+8/25/30/10-step segments, with explicit HOVER PAUSES of 250-500ms mid-drag and just before release — the same
+shape t2539's own successful A/B method used) if the fast one failed. Every earlier drag in the SAME run
+(`user_root`, `progstart`, `raw`, `message`, `progend`, `param_group`, and all four `formfield`s) landed on
+its own first, fast attempt — confirming the harness itself drags correctly in general; this is not a
+broadly-broken drag mechanism.
+
+### THE MEASUREMENT
+
+```
+attempt 0  feature_canvas (FAST)            -> landed: false
+attempt 1  feature_canvas (SLOW realistic)  -> landed: false
+attempt 2  feature_canvas (SLOW realistic)  -> landed: false
+attempt 3  feature_canvas (SLOW realistic)  -> landed: false
+```
+
+**Identical failure, every technique, every attempt.** Slowing down, adding realistic hover pauses, and
+approaching the drop point incrementally rather than teleporting made no difference at all — the same shape
+t2539's own investigation found (both reproduced identically), here confirming the failure is real rather than
+an artifact of automation speed.
+
+### THE ANSWER
+
+**Real, not harness-speed-related.** A human dragging `feature_canvas` onto a stack that has already been
+through this same sequence of interactions (four formfields authored, each with BINDMODE/ATOMTYPE picks) would
+hit the identical failure — pointer travel realism does not change the outcome, so speed is ruled out as the
+variable. What remains genuinely UNKNOWN (not measured this turn, per the dispatch's own explicit "answer,
+do not fix" and "do not chase the save-dialog symptom" instructions): the EXACT mechanism (what specifically
+about this interaction sequence breaks the drop, since the minimal isolated repro did NOT reproduce it) and
+whether it's confined to `feature_canvas` specifically or would hit any block dropped at this point in this
+sequence — both left as open questions for whatever turn takes the actual fix.
+
+### VERIFY
+
+The question answered by measurement, method stated: an A/B drag-technique comparison on the real repro, not
+reasoning about the code. OBSERVED, not inferred: the drag-landed/not-landed outcome for every one of the ten
+prior drags (all fast, all succeeded) and all four `feature_canvas` attempts (one fast, three slow-realistic,
+all failed) — read directly off a live `getAllBlocks().length` count before/after each attempt, not assumed
+from the absence of an error. The MINIMAL-repro's own non-reproduction is reported as an observed, if
+inconclusive, data point rather than silently discarded. Per the dispatch's own explicit instruction: did NOT
+attempt a fix, did NOT chase the save-dialog symptom, did NOT chase the exact mechanism past establishing
+"real, not speed." `git status`: clean of product code — this turn built and ran two scratch tests (one
+inconclusive minimal repro, one conclusive full-repro comparison), then deleted both.
+
