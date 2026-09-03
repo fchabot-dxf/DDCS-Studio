@@ -1580,6 +1580,16 @@ vs. introducing a capability) or all three could be exactly what they say — se
 controller (confirm whether 3000 responds on the currently-running `2026-04-10-00` before or instead of
 flashing `2026-08-03-00`), not a judgment call made here.
 
+⚠ **CORRECTION (owner, 2026-09-02): `M350-LiveG` itself is NOT a firmware — it is the Windows EXE tool
+(`M350_LiveG_v1.7.exe`, §14's own line 789), and `github.com/foinnc/M350-LiveG` is that TOOL's own source repo
+(its own release/version history, unrelated to the CONTROLLER's firmware). This section's own heading/diagram
+("THREE FIRMWARE DATES", listing `2026-08-03-00` as "M350-LiveG's own STATED MINIMUM") reads easily as if
+LiveG carried a firmware of its own — it does not. `2026-08-03-00` is ONLY a claim made in that tool's own
+README about what CONTROLLER firmware version it expects to find — not something verifiable from the LiveG
+repo/release history itself, and not a firmware LiveG ships or is versioned against. Everything else in this
+section's own reconciliation (the timeline, the unconfirmed register-3000 boundary) is unaffected — only the
+framing of what "2026-08-03-00" IS (a controller-firmware claim IN a tool's README) needed correcting.
+
 **Confirmed as a match, worth recording plainly**: M350-LiveG's own stated parameter block —
 `P267`=B115200, `P279`=Slave, `P296`=None, `P297`=1 — matches this machine's own captured `setting` values
 for the SAME four params exactly (§ this file's own SYSDISK dump readings, `#267`/`#279`/`#296`/`#297`).
