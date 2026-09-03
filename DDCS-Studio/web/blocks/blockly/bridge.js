@@ -97,6 +97,7 @@ const HANDLE_ANCHOR_FIELDS = {
     scale_handle: ['field', 'baseField'],   // t2533 — baseField is read-only (never merged onto), but still a must-match picker
     shear_handle: ['field', 'hField'],   // t2533 — hField is read-only (never merged onto), but still a must-match picker
     proj_length_handle: ['field'],
+    probe_vector_handle: ['field', 'fieldAxis', 'fieldDir'],   // t2557 — dist/axis/dir, all three must-match (axis/dir are ENUM string writes, see panelTypes.js's own t2557 guard)
 };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],

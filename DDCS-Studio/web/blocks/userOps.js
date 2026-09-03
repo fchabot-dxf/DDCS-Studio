@@ -804,6 +804,14 @@ export function handleBindingsFromStack(children, realBindings) {
                 const max = (p.max === '' || p.max == null) ? null : Number(p.max);
                 const anchor = { kind: 'projLength', cx, cy, nx: axisX ? 1 : 0, ny: axisX ? 0 : 1, scale, min, max, label: p.label || 'width' };
                 out.push(attach(String(p.field || 'width'), gid, 'plen', anchor));
+            } else if (b.type === 'probe_vector_handle') {
+                const gid = 'pv' + (++n);
+                const cx = Number(p.cx) || 0, cy = Number(p.cy) || 0;
+                const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
+                const anchor = { kind: 'probeVector', cx, cy, minR: numOrNull(p.minR), maxR: numOrNull(p.maxR), label: p.label || 'probe' };
+                out.push(attach(String(p.field || 'dist'), gid, 'dist', anchor));
+                out.push(attach(String(p.fieldAxis || 'axis'), gid, 'axis', anchor));
+                out.push(attach(String(p.fieldDir || 'dir'), gid, 'dir', anchor));
             }
         }
     }
@@ -906,7 +914,22 @@ export function handleBindingsToBlocks(bindings) {
         min: b.anchor.min != null ? String(b.anchor.min) : '', max: b.anchor.max != null ? String(b.anchor.max) : '',
         label: b.anchor.label || 'width',
     } }));
-    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids];
+    // probe_vector_handle: triple each group's own dist/axis/dir bindings that carry a {kind:'probeVector'} anchor.
+    const byGroupPV = {};
+    for (const b of list) if (b && b.group && b.anchor && b.anchor.kind === 'probeVector' && (b.role === 'dist' || b.role === 'axis' || b.role === 'dir')) (byGroupPV[b.group] = byGroupPV[b.group] || {})[b.role] = b;
+    const pvKids = [];
+    for (const g in byGroupPV) {
+        const dist = byGroupPV[g].dist, axis = byGroupPV[g].axis, dir = byGroupPV[g].dir;
+        if (!dist || !axis || !dir) continue;
+        const a = dist.anchor;
+        pvKids.push({ type: 'probe_vector_handle', params: {
+            field: dist.param, fieldAxis: axis.param, fieldDir: dir.param, value: dist.default != null ? String(dist.default) : '',
+            cx: String(a.cx || 0), cy: String(a.cy || 0),
+            minR: a.minR != null ? String(a.minR) : '', maxR: a.maxR != null ? String(a.maxR) : '',
+            label: a.label || 'probe',
+        } });
+    }
+    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids, ...pvKids];
     if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }

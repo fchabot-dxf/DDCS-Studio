@@ -71192,3 +71192,80 @@ matching no option). Restored the guard, re-ran — PASSED (`axisAfter:'Y'`, `di
 existing numeric-write paths) alongside the new test — 5/5 green, confirming the guard doesn't regress any
 existing numeric write.
 
+### probeVector — the full authoring wiring, built on top of the guard, proven at the t2517/t2525 bar
+
+Same template as `rect_handle` (two role-tagged params sharing one group), extended to three (`dist`/`axis`/
+`dir`). Every registration point the 7 shipped gestures already touch (checked exhaustively — `grep`'d every
+file `proj_length_handle` appears in, confirmed no other list exists):
+- `web/wizards/ops/probeVectorHandle.js` (NEW) — the block itself, mirrors `rectHandle.js`'s own shape
+  (`field`/`fieldAxis`/`fieldDir` must-match pickers + `cx`/`cy`/`minR`/`maxR`/`label`).
+- `web/blocks/blockly/bridge.js` — `HANDLE_ANCHOR_FIELDS.probe_vector_handle = ['field', 'fieldAxis', 'fieldDir']`
+  (the must-match-picker registration; reuses the existing 'whenparam' pickKind, same as every other handle).
+- `web/blocks/userOps.js` — `handleBindingsFromStack`'s new `probe_vector_handle` branch (three `attach()` calls,
+  one group, mirroring `rect_handle`'s two); `handleBindingsToBlocks`'s reverse (`byGroupPV`, groups by role,
+  same shape as `byGroupR`).
+- `web/blocks/blockEmitter.js` — `METADATA_ONLY_LEAVES` += `'probe_vector_handle'` (same shape as the other 7 —
+  the block itself emits nothing, only the merged real bindings do).
+- `web/wizards/ops/index.js` — import + registration, same list every other handle block is in.
+- `web/wizards/ops/panelTypes.js` — the `anchor.kind === 'probeVector'` render branch (added in the pt1 commit
+  above, since the guard's own test needed it) is the SAME branch this build reuses — no duplicate/second
+  branch needed.
+- **NOT touched**: `web/ui/formWidgets.js` — confirmed via the node-tier's own "uiChildren vocabulary pairing"
+  canary (`npm run test:node`, 238/238, this test specifically) that a metadata-only handle nested in
+  `feature_canvas` needs no top-level uiTree render branch, matching all 7 prior gestures.
+
+New test `tests/probe-vector-handle-block.spec.js` (4 tests, mirrors `proj-length-handle-block.spec.js`'s own
+structure exactly): round-trip (all 3 roles resolve/merge/reverse, partial-unresolved fails visibly for the
+2 missing roles while the 1 present one still resolves) · gesture math in isolation (`CANVAS_GESTURES.
+probeVector.place/drag` — cardinal snap both axes, both dir signs, minR clamp, asserted as independent
+truths) · `layoutSpecFromOp` renders the handle + emit changes for all 3 outputs · **the t2517/t2525 bar**:
+authored through the real Blocks-pane UI (3 formfields placed first, `feature_canvas` + `probe_vector_handle`
+picking all 3 via the real must-match picker, real save dialog, a REAL page reload, then a REAL mouse drag on
+the rendered SVG handle) — the axis dropdown, dir dropdown, AND dist field all change, and the emitted G-code
+changes.
+
+**Two real bugs found and fixed while building the UI-drive test itself** (not in the wiring — in the test's
+own choice of synthetic write targets):
+1. First version bound `axis`→`progstart.dir` and `dir`→`progend.end`. Both fields BINARIZE their own real
+   emit logic (`cuttingBlocks.js`: `dir==='ccw'?'M4':'M3'`; `end==='M2'?'M2':'M30'`) — an arbitrary 'X'/'Y' or
+   'pos'/'neg' write is neither of the two literals each check tests for, so BOTH values collapse to the same
+   output line and the emit-changes assertion failed for a reason unrelated to the wiring being tested.
+   Fixed by retargeting to `raw`.text and `message`.text — both emit their string VERBATIM
+   (`macro.js`: `[String(p.text ?? '')]`; `hmi.js`: embeds `clean(p.text)` into the output either via
+   `dialect.hmiToast` or a `( MSG: … )` comment fallback) — genuinely differs for any two distinct strings.
+2. The UI-drive test's own first drag direction (screen `y - 70`, "up") produced `dirAfter:'pos'`, not the
+   expected `'neg'`, even though `axisAfter` correctly resolved to `'Y'` — this canvas's WORLD Y is inverted
+   relative to SCREEN Y (the standard CNC-canvas convention, Y-up world vs Y-down screen), so a screen-up drag
+   is a world-`+Y` delta. Not a wiring bug — confirmed by axis resolving correctly on the SAME drag — just the
+   test's own first direction choice being screen-relative instead of world-relative. Fixed by dragging screen
+   `y + 70` ("down") instead.
+
+Non-vacuity: all 4 new tests ran RED first (before the two fixes above), confirming they can fail; all 4 GREEN
+after. Full file re-run: 4/4.
+
+### TIER, full account
+
+`panelTypes.js`/`userOps.js`/`bridge.js`/`blockEmitter.js` are all AGENTS.md 1b shared-render-path files —
+full suite run, unconditional, matching the advisor's own explicit instruction this turn.
+
+Stale-mem-server check first (`netstat -ano | grep :3211`) — no LISTENING entry, only TIME_WAIT from earlier
+closed connections, safe to proceed (context/GIT-AND-TOOLING-HAZARDS.md #17).
+
+**`npm run test:node`: 238/238**, including the uiChildren-vocabulary-pairing canary (see above).
+
+**Full `--workers=4` suite: 3078 passed, 1 failed, 12 flaky, 26 skipped.** The one failure —
+`open-as-modal-1625.spec.js › A REAL OPEN AFTER A PREVIEW gets its INSERT back` — is this session's own
+already-documented BACKLOG #56 flake (unrelated to anything this turn touched). Re-ran that ONE file in
+isolation rather than arguing it away: **3/3 passed**, confirming flake, not regression. Nothing else new or
+unaccounted for.
+
+`git status`: the two NEW files (`probeVectorHandle.js`, `probe-vector-handle-block.spec.js`) plus the four
+edited registration points (`blockEmitter.js`, `bridge.js`, `userOps.js`, `index.js`) plus this WORK-LOG entry
+are this turn's own changes, staged and committed below. The new screenshot
+(`verification/t2557-probe-vector-handle-emit-wired.png`) is committed alongside, matching every prior
+gesture's own precedent (t2525/t2527/t2533's own screenshots are all tracked). The OTHER already-modified
+verification PNGs (t1512/t1526/t1617/t1976/t1988/t2149/t2525-length/point/rect/t2527) predate this turn
+(re-touched by the full-suite run regenerating them) and are left untouched, per "touch only what you must" —
+same handling as every prior turn this window. `ANALYTICS-BOT-DETECTION.md`/`RESTORE-CUSTOM-MACROS.zip` also
+predate this session and are left alone.
+
