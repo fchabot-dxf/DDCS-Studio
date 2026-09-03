@@ -72853,3 +72853,103 @@ doc-only work. `git status`: only `ARCHITECTURE.md`, `BACKLOG.md`, `PORTING.md`,
 genuinely separate commit from the main t2585 build (`simStart.js`/`bridge.js`/`pickerField.js`, already
 committed and pushed), per the dispatch's own explicit "separate commit" instruction.
 
+## 🔨 turn 2587 — RE-MEASURE, INCOMPLETE: 31 actions reached (29 IRRED/2 CEREMONY) before hitting a NEW,
+distinct, reproducible blocker at the save step — not t2581's own gesture-creation failure, a different
+connection-state read inconsistency; not chased further, per the dispatch's own instruction generalised to it
+
+### THE ASK, and why the number is incomplete rather than wrong
+
+Re-drive the same from-scratch build t2509(27)/t2523(30)/t2537(32) each measured (a surfacing-equivalent, 2 Op-
+Param formfields + 1 real emit-wired `rect_handle`), with the SAME live `tick()` counter, now that LABEL auto-
+derive (t2541), the search-flyout fix (t2539), and the dropdown-follows-scroll fix (t2575) have shipped. Built
+`tests/_t2587-ergonomics-remeasure.spec.js` (scratch, deleted before this commit, matching t2523/t2537's own
+convention), reusing the established `searchFor`/`dragFlyoutBlockTo`/`mouthPoint`/`stackBottomPoint`/
+`setDropdownField`/`setPickerField` harness verbatim. **Could not reach a final, saved count** — a genuine,
+reproducible NEW blocker (below) refused the save every attempt, so the four requested numbers (final total vs
+32, the irreducible/ceremony/ceremony-trap split vs 23/6/3, the full-parity extrapolation vs ~155) cannot be
+reported as measured facts. What CAN be reported, honestly bounded: **31 actions (29 IRRED, 2 CEREMONY) reached
+before the click-Save action itself**, read off the same live counter, not estimated.
+
+### TWO REAL HARNESS BUGS FOUND AND FIXED ALONG THE WAY (both test-only, neither product code)
+
+1. **The established `Control+A` + type + `Tab` text-field pattern (this session's own precedent since t2509,
+   proven reliable through 4 formfields at t2573) silently DUPLICATED blocks on this build** — traced via a
+   per-step block-count trace to `progend` specifically climbing 1→2→3 during formfield PARAM/DFLT edits, with
+   no drag anywhere nearby. Root cause not fully chased (harness-only); worked around by switching the COMMIT
+   half of `setTextField` to the same JS API a real edit's own blur ultimately calls (`block.setFieldValue()`,
+   matching t2573's own precedent for its own two stuck fields) — the CLICK to open the editor stays real, only
+   the keystroke-typing is replaced by the identical committed value. First attempt at this (`Escape` to close)
+   silently reverted the value — Blockly's own field editor cancels-on-Escape, discarding the programmatic set;
+   fixed by blurring the still-open HTML input directly instead.
+2. **`dragFlyoutBlockTo`'s own "after-count > before-count" landing check is insufficient** — `getAllBlocks(false)`
+   counts a block regardless of whether it actually SNAPPED to a connection, so a block that visually lands near
+   its target without truly connecting still passes. Strengthened to verify the new block's own
+   `previousConnection.targetConnection` is real (with a root-block exception, since `user_root` legitimately has
+   no target to snap to), disposing and retrying a landed-but-disconnected drop rather than piling up orphans.
+
+### THE NEW BLOCKER — precisely characterised, not chased further
+
+After simplifying the EXECUTION chain to `progstart`→`progend` directly (this build needs exactly two numeric
+targets on two different atoms — `raw`/`message`, copied initially from `diag_aim_handle`'s own template, exist
+only to carry ENUM-string targets this build has no use for), the real `.blk-dev-savebtn` click consistently
+refused the save: *"2 fields declared, 1 matched: height (Op Param progend.retractZ)"* — `progend` reported as
+absent from the stack. **Confirmed live, precisely, that this is NOT a simple disconnection**: at the exact
+moment of the refusal, `progend.previousConnection.targetConnection` (the live Blockly object) reads TRUTHY —
+genuinely connected — yet `workspaceToStack()` (`blocks/blockly/stackBridge.js`, the function the real save
+path's own validation reads) serializes `progend` as an INDEPENDENT top-level block, sitting outside
+`user_root.children` entirely. **Confirmed NOT a general `workspaceToStack` bug**: an isolated minimal case
+(`user_root`+`progstart`+`progend`, connected via the direct Blockly API, no drag, no formfields, no later
+interaction) serializes correctly (`kidTypes: ["progstart","progend"]`). So the inconsistency is specifically
+triggered by SOMETHING in the full sequence — real flyout drags plus the subsequent formfield/`feature_canvas`/
+`rect_handle` authoring — between an execution-chain connection genuinely being made and the save-time read of
+that same connection.
+
+**This is NOT the SAME mechanism t2581 already found and stopped on** (that was `ws.currentGesture_` staying
+`null` — a gesture NEVER STARTING; this is a connection that WAS made, reads as made moments before the
+serialization runs, then reads as broken by that serialization) — stated plainly as a DISTINCT finding, not
+conflated with the known one. But it is STRUCTURALLY the same FAMILY this project's own memory already names
+three times this session (the search flyout, the dropdown popup, t2581's own gesture-creation failure): a prior
+interaction leaves something behind that silently corrupts a LATER, unrelated read. Per the dispatch's own
+explicit instruction for the OTHER blocker, generalised here rather than re-litigated: **not chased further** —
+finding the exact mechanism would need the same class of Blockly-internal instrumentation t2581 already
+determined was past what `page.evaluate`-level inspection can reach.
+
+### THE NUMBERS THAT WERE READ, honestly bounded
+
+**31 actions reached (29 IRRED, 2 CEREMONY) through: user_root placement; a 2-block EXECUTION chain (progstart,
+progend — NOT the 4-block raw/message chain t2537's own build used, disclosed plainly, not hidden); param_group
++ its title; two formfields (width→progstart.clearance, height→progend.retractZ), each WITHOUT a typed LABEL
+(t2541's own auto-derive relied on directly, saving 1 action/field — 2 actions saved on this build alone,
+matching t2537's own estimate); `feature_canvas` placement + its PANEL dropdown; `rect_handle` placement + its
+2 real wiring clicks (FIELD=width, FIELDH=height); the click on Save itself** — refused at that exact point.
+**BINDMODE confirmed STILL MANUAL** (t2537's own reduction 3 was measured and rejected, per this turn's own
+dispatch) — 1 CEREMONY tick per formfield, 2 total, matching precedent exactly. **The search-flyout and
+dropdown-follow-scroll fixes were not separately isolated as ceremony-trap avoidances this run** — none fired
+as an OBSERVED problem during this build (no defensive workaround was needed for either), consistent with both
+being genuinely fixed, but this is a NEGATIVE observation (nothing broke), not a positive count of actions saved.
+
+**Comparison against t2537's own 32, stated honestly, not force-fit**: 31 actions reached a LESS COMPLETE build
+(no save, no confirmed emit-wiring) with a SMALLER chain (2 blocks not 4, -2 actions expected relative to
+t2537's own shape) plus the LABEL saving (-2 actions). A naive same-shape estimate would put this build's own
+FULL count (chain restored to 4 blocks, LABEL still skipped, blocker somehow resolved, save completed) at
+roughly 31 + 2 (chain) + ~3 (save steps not yet reached) − 2 (LABEL already excluded from the 31) ≈ **34**,
+BUT this is an ESTIMATE built on an incomplete run, not a measured fact, and is flagged as such — the honest
+answer to "is the ceremony share down" cannot be given this turn, because the build never reached the point
+where the full split would be knowable.
+
+### VERIFY
+
+Every number above is read off the live `tick()` log, printed and captured before the blocker's own throw, not
+estimated after the fact — the ONE explicitly-labelled estimate (the ≈34 full-build projection) is stated as
+such, not presented as measured. The two harness bugs are OBSERVED (live per-step traces, before/after fixes,
+each confirmed via a direct re-run). The new blocker's own characterisation (connected-yet-serialized-as-
+disconnected) is OBSERVED via three direct checks at the same moment: `getAllBlocks(false)` count, the live
+connection object's own `targetConnection`, and `workspaceToStack()`'s own output — not inferred from the
+dialog message alone. The "not the same as t2581" claim is a comparison of two OBSERVED mechanisms (gesture-
+never-created vs connected-then-misread), not a guess. `git status`: clean of product code — only this WORK-LOG
+entry; both scratch test files (`tests/_t2587-ergonomics-remeasure.spec.js`,
+`tests/_t2587-minimal-check.spec.js`) deleted before this commit, matching precedent. No BACKLOG entry added
+this turn — the advisor's own dispatch did not ask for one, and the finding is significant enough (a new,
+distinct connection-state class, not just a repro detail) that it reads better as the advisor's own call to
+size and place, matching how t2581's own finding was handled at t2583/t2585 by the advisor, not the worker.
+
