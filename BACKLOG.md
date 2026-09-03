@@ -7427,3 +7427,45 @@ render correctly anyway, because `resolveFormWidget`'s own type-default folds an
 - **Every other count above**: re-run the SAME anchored greps (field-name + colon, or `def.<name> =`) this sweep
   used, against the current 32-twin file list — if the twin count for any row has moved, the entry is stale for
   that row specifically, not necessarily the others.
+
+---
+
+> **⛔✅ t2545 — surfacing migrated to the declared `group_box`/`field_ref` tree (BACKLOG #71's own pilot,
+> finally unblocked by t2543's separate-slot fix). The two counts above this note now name are STALE for
+> surfacing specifically**: `split_horizontal` now returns 2/32 (`drillData.js` + `surfacingData.js`), and
+> `group_box` now returns 1/32 (surfacing's own four AREA/TOOL/TOOL & STEPOVER/DEPTH & FEED nodes) — not zero.
+> `path_anchor`'s own 6/32 full-parity row is unaffected in count, but surfacing's own instance (t2271's own
+> "the pilot," dead code since it was written per t2371's own WORK-LOG entry — declared, never once reachable
+> because surfacing was never tree-rendered) is now FINALLY LIVE, a side effect of this migration, not a
+> separate fix.
+>
+> **Proven, not asserted**: `surfacing-form-reproduction-2377.spec.js` (switched from `mode:'flat'`, which was
+> silently testing the bypassed renderer, to `mode:'tree'`) renders the SAME real def through BOTH
+> `renderOpForm` and `renderUiTree` and diffs — 30 rows, same order, zero orphans, all four section titles
+> match the live shell exactly, usage text and code-preview label reproduced verbatim. A NEW permanent test
+> (`surfacing-section-reorder-2545.spec.js`) settles the dispatch's own central question — measured directly,
+> not assumed at face value: `renderOpForm`'s section-box creation turns out to be NAME-KEYED, not literally
+> "contiguous run" fragile the way first framed; what genuinely IS array-position-hostage is section BOX
+> ORDER — reversing `def.bindings` reverses the FLAT render's own section order right along with it, while the
+> declared `group_box` tree's order (four explicit nodes) stays fixed regardless. A real, still load-bearing
+> distinction, reported as measured.
+>
+> **⚠ A genuine, understood, NOT-fixed gap this migration exposed, per the dispatch's own "report the real
+> cost" instruction — a new BACKLOG candidate, not silently absorbed into this turn's own scope.** Three tests
+> (`drag-render-truth-gate-2461` surfacing sf_pos, `preview-mutation-manifest-2463`'s sf-pos-snapback entry,
+> `surfacing-start-position-1648`'s cross-face ONE-SOURCED test) all trace to ONE shared root: the declared
+> `split_horizontal`'s own inner visualization canvas renders at DIFFERENT effective screen geometry depending
+> on which host container it's nested in (the Blocks-tab "auto op-preview" narrow panel: mouse-drag
+> hit-testing returns an ancestor instead of the handle, 0px movement, deterministic; the wide Customize
+> modal: the drag works but at roughly HALF the classic shell's own scale). Confirmed via a DIRECT CONTROL
+> against DRILL — the only other `split_horizontal` twin exhibits the IDENTICAL narrow-panel symptom
+> (`dr_pos`, same `.wiz-controls` overlap) — so this is PRE-EXISTING and LATENT in the split_horizontal
+> mechanism itself, not something this turn's own group_box/field_ref/param_table work introduced; it simply
+> had never been exercised through this exact narrow-panel drag route before, because drill was the only
+> split_horizontal twin and its own drag tests all go through the classic shell or the wide modal instead.
+> t2481's own container-query stacking fix (styles.css ~2779) IS firing correctly in the narrow case
+> (confirmed live, `flexDirection:'column'`) — the remaining defect is specifically in mouse-event
+> hit-testing/canvas scale, not the stacking mechanism. Not fixed this turn: genuinely out of "surfacing
+> only... the section migration only" scope, shared with drill, and risks the exact kind of undetected
+> second-order regression t2371's own full-suite catch already warns about if rushed. Full account, all three
+> failing tests + the drill control comparison: WORK-LOG t2545.

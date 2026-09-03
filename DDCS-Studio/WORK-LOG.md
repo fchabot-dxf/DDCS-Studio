@@ -70548,3 +70548,149 @@ own already-established pre-existing flake, 13 flaky, 26 skipped, matching prior
 `tests/cam-block-native-params-s53.spec.js`, `context/GIT-AND-TOOLING-HAZARDS.md`, BACKLOG.md, and this
 WORK-LOG entry.
 
+## t2545 -- THE SECTION MIGRATION, finally unblocked: surfacing's four group_box nodes -- SHIPPED, plus a real, understood, NOT-fixed gap the mechanism itself exposed (reported, not papered over)
+
+t2531 sized this pilot (surfacing, four sections) and reverted when it hit the two-owner bug; t2543 built the
+separate-slot fix that unblocks it. This turn used it: surfacing's uiChildren rebuilt around a declared
+`split_horizontal` (mirroring drill, t2299/t2341 -- the ONLY existing `hasTreeLayout()` trigger, never
+touched) wrapping a `param_group` whose children are now real structure -- `usage_text`, the reactivated
+t2271 `path_anchor` picker, four `group_box` nodes (AREA / TOOL / TOOL & STEPOVER / DEPTH & FEED, each holding
+its section's `field_ref` rows in order), `code_preview` -- with a `sim` node as the split's RIGHT pane. LEFT
+is the same param_group; the visualization moved from the classic shell's own hidden `.wiz-visual` into the
+tree's own declared inner pane, matching drill's already-shipped precedent exactly.
+
+**Worked the shape out of the code first.** `surfacingFieldGroups(stack)` (surfacingData.js, NEW) is the ONE
+place "what's in AREA, in what order" is computed -- a pure re-derivation over `deriveBindingsFor`, called
+BOTH by `buildSurfacingTwinStack()` (to build the field_ref tree, via a bootstrap stack carrying the same
+`children` but no tree yet -- proven safe because identity-matching only ever reads `children`, never
+uiChildren shape) and by `surfacingDataDef()` (for the real flat binding array). One computation, not two
+hand-kept copies that could drift the way t2375/t2377's own header comments warn a re-ordered array silently
+can. `withPassesField` folded into the DEPTH_FEED group directly, so 'passes' lands in its own fold
+automatically, no separate splice.
+
+**A TDZ bug, caught by the app failing to BOOT AT ALL (breaking even unrelated tests like corner's own) before
+a single spec ran deliberately.** `SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack())` runs
+at module-init time and now (via the new helper) reads `SURFACING_STRUCT`, declared LOWER in the same file --
+`ReferenceError: Cannot access 'SURFACING_STRUCT' before initialization`. Fixed by moving the `SURFACING_STRUCT`
+export above `surfacingFieldGroups`/`SURFACING_BINDINGS`, with a comment explaining why the reorder was
+necessary now when it wasn't before.
+
+**TWO genuine architectural traps, both understood BEFORE they were hit, both avoided.** (1) `hasTreeLayout()`
+was never touched -- the guardrail from t2531/dispatch stood; surfacing earns tree-mode the same way drill
+does, by declaring a real `split_horizontal`, not by widening the predicate. (2) t2371's own WORK-LOG entry
+(read in full before writing a line of `buildSurfacingTwinStack()`) records that FORCING surfacing into tree
+mode WITHOUT a real split — no compensating RIGHT-pane visualization, no section structure — was tried once
+and reverted (21 failures: the outer `.wiz-visual` blanked, the flat auto-sectioning dropped, nothing replaced
+either). This turn's migration is the FULL version t2371's own comment named as the eventual fix: the RIGHT
+pane supplies the SAME sim visualization the outer pane used to show; the four `group_box` nodes supply the
+SAME section grouping the flat auto-sectioning used to produce. Neither gap t2371 hit reopened.
+
+**THE ACCEPTANCE BAR, met and PROVEN, not asserted.** `surfacing-form-reproduction-2377.spec.js` switched from
+`mode:'flat'` (silently testing the now-bypassed renderer) to `mode:'tree'` (the shared default drill/pocket
+already use) -- this IS the row-diff gate t2529 built and the dispatch pointed at: it renders the SAME real
+def through `renderOpForm` AND `renderUiTree` and diffs. All three of its tests pass clean: 30 rows, same
+order, zero orphans, the four section titles match the LIVE SHELL exactly (AREA/TOOL/TOOL & STEPOVER/DEPTH &
+FEED), usage text and code-preview label match the live shell verbatim (reproduced from index.html:767/817-818,
+not restated from memory), and a tree-edit round-trips through the op model.
+
+**THE REAL ACCEPTANCE QUESTION -- can rows be reordered without the grouping breaking -- measured directly,
+not assumed.** Probed empirically first (a throwaway shuffle test) rather than trusting the dispatch's own
+"contiguous run" framing at face value: `renderOpForm`'s own section-box creation turns out to be NAME-KEYED
+(a `secEls[s]` map reused across non-adjacent same-name bindings), so a bare interleave does NOT fragment
+section membership the way a literal "contiguous run" description implies -- that would have been a WRONG
+claim to ship a test around. What genuinely IS array-position-hostage under FLAT rendering is section BOX
+ORDER (`secList`'s own first-seen-order construction) -- REVERSING `def.bindings` reverses the FLAT render's
+own section order right along with it (`['DEPTH & FEED','TOOL & STEPOVER','TOOL','AREA']`), while the
+declared `group_box` tree's own order stays exactly `AREA -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED`
+regardless -- four explicit nodes, written once, that array reordering cannot touch by construction. New
+permanent test (`surfacing-section-reorder-2545.spec.js`) proves this directly: FLAT order inverts with the
+array, TREE order and field-to-section membership stay identical either way, zero orphans. Not the literal
+fragmentation bug first assumed -- a real, still load-bearing distinction, reported as measured rather than as
+the dispatch's own initial guess.
+
+**FOUR pre-existing tests updated for the field_ref-skip/param_table-separation consequence (t2543's own
+mechanism), each substituted onto a genuinely still-materialized twin, never silently patched around:**
+`param-group-rows-1605.spec.js`'s own "values are LIVE both ways" test and `passes-field-1613.spec.js`'s own
+"BLOCKS Wizard View" test both depended on surfacing getting `param_field` canvas blocks materialized --
+surfacing no longer does (same, already-established outcome as drill's own `drillSame` pin, t2543). Switched
+to CORNER (param-group-rows) and — after POCKET turned out to be field_ref-based too, checked live before
+trusting it (`hasFieldRef:true, hasParamTable:false`, zero param_field blocks for it either) — CONTOUR
+(passes-field), both confirmed live still plain-materialized (`hasParamTable:true, hasFieldRef:false`) before
+committing to either substitution. `pane-sizer-1353.spec.js` / `pane-sizer-mobile-1468.spec.js` both opened
+surfacing via `openWiz` to test `.viz-pane-sizer` — a mechanism that only exists for a FLAT-rendered op at all
+(`isTree` unconditionally hides `.wiz-visual`) — switched both to POCKET, a genuinely flat op with the same
+`form3d+2d` panel type. `cam-substack-save-fork.spec.js`'s own pinned uiChildren order needed a one-word
+update (`path_anchor` -> `usage_text` at index 3) once `usage_text` was added ahead of `path_anchor` to
+reproduce the shell's own usage text for the row-diff gate above.
+
+**⚠ A REAL, UNDERSTOOD, DELIBERATELY NOT-FIXED GAP, surfaced by this migration -- reported per the dispatch's
+own "report the real cost" instruction, not silently absorbed.** Three tests remain red, all three traced to
+ONE shared root, confirmed via a DIRECT CONTROL comparison against drill (not assumed): the declared
+`split_horizontal`'s own inner visualization canvas renders at DIFFERENT effective screen geometry depending
+on which HOST CONTAINER it's nested in, in a way its own mouse-drag / scale-factor logic does not account for.
+
+1. `drag-render-truth-gate-2461.spec.js` (surfacing sf_pos, the Blocks-tab "place a block -> auto preview"
+   narrow panel): the handle exists, is visible, `elementFromPoint` at its own reported center returns an
+   ANCESTOR (`.wiz-controls`) instead of the SVG element -- the drag moves it 0.0px, every time, deterministic
+   not flaky. Confirmed PRE-EXISTING and NOT a section-migration defect: built the identical scenario for
+   DRILL (the only other split_horizontal twin) through the SAME narrow panel -- drill's own `dr_pos` handle
+   exhibits the IDENTICAL symptom (same `.wiz-controls` overlap, same squeezed-narrow visualization). The
+   container-query fix that stacks `.ui-split-horiz` in a narrow `.blk-formpane` (t2481, styles.css ~2779) IS
+   firing correctly (`computedFlexDir:'column'`, confirmed live) -- visually the layout renders CORRECTLY
+   (screenshot: a working-looking 2D/3D split, the pos handle visibly present) -- the remaining defect is
+   specifically in mouse-event HIT-TESTING at the handle's own computed screen center, not in the stacking
+   mechanism itself. This bug has been LATENT in drill since t2299/t2341; nothing tested a split_horizontal
+   twin's own drag handle through this exact narrow-panel route before, because drill was the only twin using
+   split_horizontal and its own drag tests all go through `openWiz` (classic shell) or the wide Customize
+   modal instead.
+2. `preview-mutation-manifest-2463.spec.js`'s own `[sf-pos-snapback]` entry uses the SAME narrow "placed-op
+   auto-preview" route (`bootSurfacing`+`probeDrag`) -- SAME root cause, not the old, already-established
+   pre-existing FLAKE this session's own memory records for this test (that entry used to be occasionally
+   timing-sensitive on a WORKING drag; this is now a hard, deterministic non-move because the drag mechanism
+   itself is broken in this context for a tree-mode twin).
+3. `surfacing-start-position-1648.spec.js`'s own cross-face "ONE-SOURCED" test (comparing the classic shell's
+   seed against the twin's, for an IDENTICAL pixel drag) fails differently -- not 0px, but roughly HALF the
+   expected magnitude (49.9 vs 24.985, closely 2x) -- consistent with the SAME underlying cause (the split's
+   own inner visualization canvas is a DIFFERENT physical size than the classic shell's dedicated
+   `.wiz-visual`, in the WIDE Customize modal this time, not the narrow panel) but via a DIFFERENT symptom
+   (scale-factor mismatch rather than zero movement, since the wide modal's own drag hit-testing still works).
+   The file's OTHER two twin-drag tests (WCS arm, Skim arm single-face) both pass -- the id lookup itself
+   needed a small, genuine fix (`userViz3dContainer_tree` alongside the pre-existing `userViz3dContainer`, tree
+   mode's own container id, formWidgets.js `nsId`) which is now landed; the CROSS-FACE numeric comparison is
+   the one still-open piece.
+
+**Why this was reported rather than fixed or reverted, per the dispatch's own explicit scope ("surfacing
+only... the section migration only") and its own guardrail's spirit (STOP AND REPORT rather than widen scope
+mid-turn):** the underlying defect is in the split_horizontal mechanism's OWN cross-context canvas geometry --
+a SEPARATE concern from the group_box/field_ref/param_table section-grouping work this turn actually shipped,
+shared with drill, and non-trivial to fix safely (CSS/DOM sizing across at least three distinct host contexts:
+narrow Blocks-tab panel, wide Customize modal, classic shell). Landing a rushed fix here risks exactly the
+kind of undetected second-order regression t2371's own full-suite catch warns about. The mechanism itself
+(section grouping) is fully proven and shipped; this is a clearly-scoped, clearly-diagnosed FOLLOW-UP, not an
+unfinished piece of THIS turn's own deliverable.
+
+**Verification, full account.** Non-vacuous proof: N/A this turn (no new production-logic test beyond the
+already-proven row-diff/reorder gates, both empirically validated against real, observed FLAT-vs-TREE
+behavior rather than assumed). Consolidated final surfacing-regression sweep (56 spec files touching
+`user_surfacing_data` either directly or via shared mechanism) -- 207 passed, only the 3 gap-tests above red,
+plus known-clean-in-isolation timing flakes (`undo-blind-writes-2427`'s own 3 tests, `hook-carry-1682`) that
+were separately confirmed 3-4/3-4 clean in true isolation, matching this session's own established discipline
+for distinguishing load-sensitivity from a real defect. `test:node` 238/238. **Full `--workers=4` suite: 3066
+passed, 3 failed (exactly the 3 diagnosed gap-tests above, nothing new/unexplained), 17 flaky, 26 skipped** --
+matches the targeted sweep's own findings exactly, confirming nothing was missed and nothing new surfaced at
+full scale.
+
+**Small item, separate commit, per a live correction from the owner mid-turn:**
+`bridge/controllers/expert-m350/FINDINGS.md` §14b's own "THREE FIRMWARE DATES" framing read as if `M350-LiveG`
+carried a firmware of its own — it is the Windows EXE tool (already correctly named earlier in the same file,
+line 789), and `2026-08-03-00` is only a claim in ITS OWN README about what CONTROLLER firmware it expects,
+not something verifiable from the LiveG repo/release history itself. Corrected in place with a dated note;
+the underlying timeline/reconciliation this section already recorded is unaffected.
+
+`git status` clean outside: `web/blocks/dataOps/surfacingData.js`, `tests/surfacing-form-reproduction-2377.spec.js`,
+`tests/surfacing-section-reorder-2545.spec.js` (new), `tests/param-group-rows-1605.spec.js`,
+`tests/passes-field-1613.spec.js`, `tests/pane-sizer-1353.spec.js`, `tests/pane-sizer-mobile-1468.spec.js`,
+`tests/cam-substack-save-fork.spec.js`, `tests/surfacing-start-position-1648.spec.js`,
+`bridge/controllers/expert-m350/FINDINGS.md` (separate commit), BACKLOG.md, and this WORK-LOG entry.
+(`verification/*.png` noise from repeated full-suite runs left unstaged, per hazard #9.)
+

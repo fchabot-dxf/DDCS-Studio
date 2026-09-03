@@ -129,7 +129,17 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
     await page.evaluate(() => window.ddcsLoadBlockStack([]));
-    await page.evaluate(() => window.ddcsEditWizardDef('user_surfacing_data'));
+    // t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to CONTOUR. Surfacing itself is
+    // no longer a valid subject for the SECOND half of this test: this turn's own migration moved surfacing
+    // onto the field_ref/group_box tree, and `materializeParamGroup`'s own field_ref-presence skip (t2543) means
+    // a field_ref-declaring twin no longer gets `param_field` canvas blocks materialized at all — the SAME,
+    // already-established outcome `cam-block-native-params-s52.spec.js`'s own `drillSame` test pins for drill.
+    // POCKET turns out to be field_ref-based too (checked live: `hasFieldRef: true, hasParamTable: false` for
+    // pocket, zero `param_field` blocks materialize for it either) — NOT a safe substitute, even though it's
+    // untouched by this turn. CONTOUR is genuinely still plain-materialized (checked live: `hasParamTable: true,
+    // hasFieldRef: false`, a real `param_field` block for every bound param including `depth`), and shares
+    // pocket's own depth:4/stepdown:1.5 defaults, so the numbers below are unchanged either way.
+    await page.evaluate(() => window.ddcsEditWizardDef('user_contour_data'));
     let last = -1;
     for (let i = 0; i < 120; i++) {
         const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);
@@ -137,18 +147,19 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
         last = n;
         await page.waitForTimeout(250);
     }
-    // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host now (sectioned
+    // t1752 — Customize via Blocks is deterministically the createUserOpView('blk') host now (sectioned
     // template, customizing=true — never the placed-op read-only case), not the old #blk-form.
     await expect(page.locator('#blk_wiz_user_form [data-param="passes"]'), 'the stepper renders on the blocks face').toHaveCount(1);
-    // Defaults 0.5 @ 0.5 → 1 pass. Step ▲ → depth 1.0 (one more whole bite), and the write rides the t1605
-    // writeback into the CANVAS param_field declaration — the two-way chain end to end.
-    await expect(page.locator('#blk_wiz_user_form [data-param="passes"]')).toHaveValue('1');
+    // Contour defaults depth:4 @ stepdown:1.5 -> ceil(4/1.5) = 3 passes. Step ▲ -> passes 4 -> depth
+    // 4 + (4-3)*1.5 = 5.5 (one more whole stepdown bite), and the write rides the t1605 writeback into the
+    // CANVAS param_field declaration — the two-way chain end to end.
+    await expect(page.locator('#blk_wiz_user_form [data-param="passes"]')).toHaveValue('3');
     await page.evaluate(() => document.querySelector('#blk_wiz_user_form [data-param="passes"]').nextElementSibling.click());
-    await expect(page.locator('#blk_wiz_user_form [data-param="depth"]'), 'the write lands in the depth field').toHaveValue('1');
+    await expect(page.locator('#blk_wiz_user_form [data-param="depth"]'), 'the write lands in the depth field').toHaveValue('5.5');
     await page.waitForFunction(() => {
         const walk = (bs, out = []) => { for (const b of bs || []) { if (!b) continue; out.push(b); walk(Array.isArray(b.children) ? b.children : Object.values(b.children || {}).flat(), out); walk(Array.isArray(b.uiChildren) ? b.uiChildren : Object.values(b.uiChildren || {}).flat(), out); } return out; };
         const pf = walk(window.ddcsGetBlockProgram() || []).find((b) => b.type === 'param_field' && b.params && b.params.param === 'depth');
-        return pf && Number(pf.params.dflt) === 1;
+        return pf && Number(pf.params.dflt) === 5.5;
     }, null, { timeout: 10_000 });
 });
 

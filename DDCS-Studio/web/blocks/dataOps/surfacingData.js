@@ -156,17 +156,18 @@ const SURFACING_BINDING_SPECS = [
  *  user_root/panel/sim/param_group prefix falls out for free (the old hand-kept WRAP_PREFIX_COUNT = 4). */
 export function surfacingBindingsFor(stack) { return deriveBindingsFor(stack, SURFACING_BINDING_SPECS); }
 
-/** Derived over the CANONICAL stack — the same one surfacingDataDef builds, so this export is the def's own binding
- *  set (the as-data spec iterates it to prove each param reaches the socket surfacingStack routes it to). */
-export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack());
-
 // t986 — the STRUCTURAL Z-mode toggle (NO value socket): it drives the applySkimStructure postInstantiate fork, not a
 // block param. Grouped with the WCS dropdown in the shell's own DEPTH & FEED section (t2377 — was the WRONG,
 // non-existent 'COORDINATES' name; see the fix note above SURFACING_BINDING_SPECS). Skim greys the WCS
 // (structGate below → data-op-gated).
 // t1609 — EXPORTED: the hand-coded surfacing modal consumes THIS declaration for its Z-mode field (options, label,
 // help, default) — one source, no copied list in the view. The paired WCS gate rides SURFACING_BINDINGS (the wcs
-// binding's `gate`), already exported above.
+// binding's `gate`), exported below.
+// t2545 — moved ABOVE `surfacingFieldGroups`/`SURFACING_BINDINGS` (was below, when nothing at module-init time
+// depended on it yet): `surfacingFieldGroups` now reads this at `buildSurfacingTwinStack()` time, itself called
+// by `SURFACING_BINDINGS`'s own module-init line below — referencing a later `const` before its own
+// initializer runs is a TDZ ReferenceError, not a stale-value bug, so it fails LOUD (caught live: the whole
+// app failed to boot, breaking even unrelated tests like corner's own, until this reorder).
 export const SURFACING_STRUCT = [
     // t1704 — not deferrable: Normal (absolute, WCS-referenced) and Skim (whole-op relative, jog-anchored) are
     // different program FRAMINGS (makePlace vs makeSkim, different wrapper atoms) — not two values of one move.
@@ -174,6 +175,45 @@ export const SURFACING_STRUCT = [
         widgetConfig: { options: [['Normal — WCS Z0', 'normal'], ['Skim — relative', 'skim']] },
         help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-operation RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
 ];
+
+/**
+ * t2545 (BACKLOG #71/#72, the section migration) — the four ordered/grouped field lists, computed ONCE and
+ * shared by both consumers that need this EXACT order: `buildSurfacingTwinStack()` (to build the declared
+ * `group_box`/`field_ref` tree) and `surfacingDataDef()` (the flat binding array `userOpFromStack` receives,
+ * unchanged in content/order from before this turn). Same pure derivation, called on the SAME stack shape
+ * from both places, rather than two hand-kept copies of "what's in AREA, in what order" that could silently
+ * drift apart — exactly the hazard t2375/t2377's own header comments both name (array order, not just the
+ * `section:` string, drives grouping). A single source makes that drift structurally impossible rather than
+ * merely avoided by care. Depends only on `stack`'s `children` (the exec atom body) — `match:{type:...}`
+ * predicates target exec-atom types (placeonstock/surfaceraster/wcs/progstart/entry/toolsel), none of which
+ * collide with the tree-only node types (`group_box`/`field_ref`/`param_group`/`split_horizontal`) — so
+ * calling this BEFORE the final uiChildren tree exists (a bootstrap stack with the same `children` but no
+ * tree yet) returns the identical param list/order as calling it AFTER, which is what makes building the
+ * field_ref tree from its own output, then re-deriving the real bindings from the FINISHED stack, safe.
+ */
+function surfacingFieldGroups(stack) {
+    const derived = surfacingBindingsFor(stack);
+    const areaFields = derived.filter((b) => b.section === 'AREA');
+    const toolStepoverFields = derived.filter((b) => b.section === 'TOOL & STEPOVER');
+    const depthFeed = derived.filter((b) => b.section === 'DEPTH & FEED');
+    const wcsIdx = depthFeed.findIndex((b) => b.param === 'wcs');
+    // t2377 — zMode (SURFACING_STRUCT — a separate array; the structural Z-mode toggle has no value socket)
+    // spliced into DEPTH & FEED between confirmEvery and wcs, matching the shell's own field order there.
+    const depthFeedFields = [...depthFeed.slice(0, wcsIdx), ...SURFACING_STRUCT, ...depthFeed.slice(wcsIdx)];
+    const rpmField = derived.filter((b) => b.section === 'TOOL');
+    const entryXY = entryBindingsFor(stack).map((b) => ({ ...b, section: 'AREA' }));
+    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL' }));
+    return {
+        AREA: [...areaFields, ...entryXY],
+        TOOL: [...toolNum, ...rpmField],
+        TOOL_STEPOVER: toolStepoverFields,
+        DEPTH_FEED: withPassesField(depthFeedFields),   // t1613 — the derived `passes` field, spliced after stepdown
+    };
+}
+
+/** Derived over the CANONICAL stack — the same one surfacingDataDef builds, so this export is the def's own binding
+ *  set (the as-data spec iterates it to prove each param reaches the socket surfacingStack routes it to). */
+export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack());
 
 // t1648 — THE START-POSITION MARKER: ONE declared target, mode-dependent (user-ruled: "the gui serve differently
 // in skim or wcs but it should look the same" — one widget, the MODE picks what it writes to, never a second
@@ -247,28 +287,69 @@ export function surfacingPreviewGeometry(p) {
  *  binding is only as good as the agreement between those two, and a second hand-copy here would reintroduce by the
  *  back door exactly the drift the identity match removes. (A function declaration — it is called at module init.) */
 export function buildSurfacingTwinStack() {
-    const exec = surfacingStack(SURFACING_DEFAULTS);
+    const body = appendToolSel(appendEntry(surfacingStack(SURFACING_DEFAULTS)));   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
+    // t2545 — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped param names
+    // surfacingFieldGroups derives — see that function's own header for why this is safe (identity matching
+    // depends only on `children`, never on uiChildren's shape).
+    const g = surfacingFieldGroups([{ type: 'user_root', params: {}, uiChildren: [], children: body }]);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
     return [{
         type: 'user_root',
         params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            // t2271 (wizards-as-data E2 measurement, PILOT) — the dual stock-attach/path-datum corner picker.
-            // surfacing's own static shell (index.html:754) mounts it at prefix "sf_" — copied verbatim, not
-            // re-derived. See formWidgets.js's own 'path_anchor' branch for how it reproduces the widget's
-            // getElementById convention without touching ui/pathAnchorField.js itself, and for why the
-            // stockAttach/pathDatum dropdown rows (surfacingData.js's own declared bindings, below) are
-            // hidden rather than left visible — the shell shows the picker only, no text fallback.
-            { type: 'path_anchor', params: { prefix: 'sf_' } },
-            {
-                type: 'param_group',
-                params: { group: 'Surfacing' },
-                children: [],
+        uiChildren: [{
+            // t2545 (BACKLOG #71/#72, the section migration) — wrapped in split_horizontal so hasTreeLayout()
+            // (userOpView.js) routes this twin onto renderUiTree, same mechanism drill already uses (t2299/
+            // t2341) — the ONLY existing trigger, unchanged (see that function's own header; NOT widened here).
+            // Ratio '360px:*' mirrors the shell's own CSS shorthand exactly, same as drill's own comment states.
+            // t2371's own header (userOpView.js) documents that forcing tree mode on surfacing WITHOUT this —
+            // no split, no compensating RIGHT-pane visualization, no group_box structure — was tried once and
+            // reverted (it blanked the outer .wiz-visual pane and dropped the flat auto-sectioning, 21 failures
+            // on the full suite). This is the FULL migration that comment named as the eventual, deliberate
+            // fix: the RIGHT pane below supplies the SAME sim visualization the outer pane used to show, and
+            // the four `group_box` nodes below supply the SAME section grouping the flat auto-sectioning used
+            // to produce — nothing is left blanked or dropped this time, both compensating structures are here.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Surfacing' },
+                    children: [
+                        // t2545 — usage_text/code_preview, REPRODUCED verbatim from the live shell (index.html:767,
+                        // 817-818), not restated from memory: `.wiz-usage`'s own text and the preview block's own
+                        // "CODE PREVIEW (DDCS M350 COMPLIANT)" label, mirroring drill's own usage_text-first/
+                        // code_preview-last ordering (drillData.js) — both are now asserted by the SAME shared
+                        // form-reproduction gate (tests/support/formReproduction.js) drill/pocket already pass,
+                        // since switching this def's own reproduction spec to `mode:'tree'` (the shared default)
+                        // reaches this comparison for the first time.
+                        { type: 'usage_text', params: { text: 'Skims the top of the stock flat over a rectangular area. Opens sized to the whole stock top; drag the handles to face a sub-area. The tool overhangs the area edge by its radius so the whole top is faced — keep the area within fixture clearance. Spindle start + end-of-program come from Settings.' } },
+                        // t2271 (wizards-as-data E2 measurement, PILOT) — the dual stock-attach/path-datum corner
+                        // picker, FINALLY reachable: t2371's own WORK-LOG entry found this exact declaration had
+                        // been dead code since it was written (surfacing was never tree-rendered, and
+                        // `renderUiTree`'s own path_anchor branch is the only place it's ever read) — this
+                        // migration activates it as a side effect, not a separate fix. Placed first in AREA's own
+                        // group (mirrors mountFlatPathAnchor's own "before the stockAttach row" positioning) —
+                        // hides the stockAttach/pathDatum rows wherever their own field_ref nodes land below and
+                        // mounts the real picker in their place, byParam-driven (position-independent either way).
+                        { type: 'path_anchor', params: { prefix: 'sf_' } },
+                        { type: 'group_box', params: { title: 'AREA' }, children: fieldRefsOf(g.AREA) },
+                        { type: 'group_box', params: { title: 'TOOL' }, children: fieldRefsOf(g.TOOL) },
+                        { type: 'group_box', params: { title: 'TOOL & STEPOVER' }, children: fieldRefsOf(g.TOOL_STEPOVER) },
+                        { type: 'group_box', params: { title: 'DEPTH & FEED' }, children: fieldRefsOf(g.DEPTH_FEED) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
+                // drillData.js's own t2301 comment for the full mechanism). Kept as the single combined `sim`
+                // node (NOT split into preview3d+feature_canvas like drill/t2511) — that split was explicitly
+                // deferred FROM surfacing once t2511 found surfacing wasn't tree-rendered, and is unrelated to
+                // this turn's own scope (the section migration only); both shapes render byte-identical DOM
+                // per t2511's own proof, so this stays exactly what it already was.
+                RIGHT: [
+                    { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+                ],
             },
-        ],
-        children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
+        }],
+        children: body,
     }];
 }
 
@@ -276,23 +357,13 @@ export function buildSurfacingTwinStack() {
  *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function surfacingDataDef() {
     const stack = buildSurfacingTwinStack();
-    // t2377 — reordered so formWidgets.js's own first-seen-wins section-box order comes out
-    // AREA -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED, matching the shell exactly (see the fix note above
-    // SURFACING_BINDING_SPECS for the full mechanism). toolNum (SHARED toolBindingsFor, no section at the
-    // source) and entryX/entryY (SHARED entryBindingsFor, stale 'GEOMETRY') are overridden LOCALLY via .map()
-    // here (Rule 1b: never edit deriveBindings.js itself). zMode (SURFACING_STRUCT — a separate array; the
-    // structural Z-mode toggle has no value socket) is spliced into DEPTH & FEED between confirmEvery and wcs,
-    // matching the shell's own field order there (depth, stepdown, [clearance — unbound frontier], zMode, wcs).
-    const derived = surfacingBindingsFor(stack);
-    const areaFields = derived.filter((b) => b.section === 'AREA');
-    const toolStepoverFields = derived.filter((b) => b.section === 'TOOL & STEPOVER');
-    const depthFeed = derived.filter((b) => b.section === 'DEPTH & FEED');
-    const wcsIdx = depthFeed.findIndex((b) => b.param === 'wcs');
-    const depthFeedFields = [...depthFeed.slice(0, wcsIdx), ...SURFACING_STRUCT, ...depthFeed.slice(wcsIdx)];
-    const rpmField = derived.filter((b) => b.section === 'TOOL');
-    const entryXY = entryBindingsFor(stack).map((b) => ({ ...b, section: 'AREA' }));
-    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL' }));
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...areaFields, ...entryXY, ...toolNum, ...rpmField, ...toolStepoverFields, ...depthFeedFields]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
+    // t2377 — order comes out AREA -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED, matching the shell exactly.
+    // t2545 — re-derived over the FINAL, real stack (safe — see surfacingFieldGroups' own header on why
+    // uiChildren's shape doesn't affect this), the SAME computation buildSurfacingTwinStack already used to
+    // build the group_box/field_ref tree above, so the flat binding array below and the declared tree can
+    // never disagree about what's in each group or in what order — one source, not two hand-kept copies.
+    const g = surfacingFieldGroups(stack);
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...g.AREA, ...g.TOOL, ...g.TOOL_STEPOVER, ...g.DEPTH_FEED], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.previewVarSeed = startMarkerVarSeed;   // t1648/t1650 — the ONE declared seed shape (see startMarkerVarSeed above)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)

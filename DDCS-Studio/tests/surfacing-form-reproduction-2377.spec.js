@@ -1,10 +1,15 @@
 import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 /**
- * WIZARDS-AS-DATA — t2377: the arc's THIRD `mode:'flat'` reproduction (surfacing), after contour+slot at
- * t2375. Surfacing is the t2375-slot shape: only `wcs` and `zMode` carried `section:` at all before this
- * turn (both the stale, non-existent `'COORDINATES'` name) — mostly ABSENCE, not mismatch. See
- * surfacingData.js's own header comment above SURFACING_BINDING_SPECS for the full fix account.
+ * WIZARDS-AS-DATA — t2377 gave surfacing real `section:` metadata (reproduced via `mode:'flat'`, since
+ * surfacing was flat-rendered live at the time — `hasTreeLayout()` never true for it, see drillData.js's own
+ * t2511 comment for the primary source on that fact). t2545 (BACKLOG #71/#72, the section migration) moved
+ * surfacing onto the declared `split_horizontal`/`group_box`/`field_ref` tree (mirroring drill), so it is now
+ * genuinely tree-rendered live — switched to `mode:'tree'` (the shared default drill/pocket already use) to
+ * test the REAL render path rather than silently keep exercising the now-bypassed flat one. EXPECTED_ORDER
+ * and EXPECTED_ORPHANS are UNCHANGED from t2377: the four `group_box` folds place every field explicitly (see
+ * surfacingData.js's own `surfacingFieldGroups`/`buildSurfacingTwinStack`), so there are still zero orphans —
+ * same claim as flat mode's own "every bound field renders somewhere", now proven through the tree instead.
  *
  * EXPECTED_ORDER is hand-derived from index.html's own `#wiz_surfacing` shell (lines 745-791): AREA
  * (originX, originY, offZ, [hidden stock+jog fields], w, h) → TOOL (rpm — `sf_tool` in the shell is the
@@ -32,7 +37,6 @@ const EXPECTED_ORDER = [
 ];
 
 registerFormReproductionSuite({
-  mode: 'flat',
   wizardLabel: 'surfacing',
   dataModule: '/blocks/dataOps/surfacingData.js',
   defFactory: 'surfacingDataDef',

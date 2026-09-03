@@ -150,10 +150,21 @@ test.describe(() => {
         // t2271 — surfacing's uiChildren gained a `path_anchor` node (declared picker), shifting `opunit` one row further.
         // t2301 (BACKLOG 20) — 'panel' removed from surfacing's own uiChildren (id-collided with sim's own layout2d
         // pane, see surfacingData.js's own comment); one fewer prefix row, `sim` now leads.
-        expect(r.flatTypes.slice(0, 4), 'the uiChildren keep their positions').toEqual(['user_root', 'sim', 'path_anchor', 'param_group']);
+        // t2545 (BACKLOG #71/#72, the section migration) — surfacing's own uiChildren restructured to a SINGLE
+        // `split_horizontal` node (mirroring drill) wrapping `param_group` (now non-empty: path_anchor + four
+        // `group_box` folds, each holding its section's `field_ref` rows) as LEFT, `sim` as RIGHT — no more bare
+        // `sim`/`path_anchor`/`param_group` siblings at the top level, so `materializeParamGroup` no longer even
+        // reaches this def (field_ref-presence skip, t2543) — `param_group` here is surfacing's own DECLARED
+        // structure, never materialize's target. The CLAIM itself is unchanged (everything uiChildren-side
+        // precedes the opunit-wrapped exec run); checking the ONE outer `split_horizontal` node is sufficient by
+        // construction — flattenBlocks is pre-order, so a parent's own index is always lower than every node
+        // nested inside it, which is where param_group/usage_text/path_anchor/group_box/field_ref/sim all now
+        // live. usage_text leads param_group's own children (matching drill's own usage_text-first convention,
+        // and reproducing the live shell's `.wiz-usage` text verbatim — surfacingData.js's own header comment).
+        expect(r.flatTypes.slice(0, 4), 'the uiChildren keep their positions').toEqual(['user_root', 'split_horizontal', 'param_group', 'usage_text']);
         expect(r.flatTypes.indexOf('opunit'), 'the opunit is present').toBeGreaterThan(-1);
-        for (const ui of ['sim', 'path_anchor', 'param_group']) {
-            expect(r.flatTypes.indexOf(ui), `${ui} (a uiChild) precedes the opunit-wrapped exec run`).toBeLessThan(r.flatTypes.indexOf('opunit'));
+        for (const ui of ['split_horizontal']) {
+            expect(r.flatTypes.indexOf(ui), `${ui} (the sole top-level uiChild) precedes the opunit-wrapped exec run`).toBeLessThan(r.flatTypes.indexOf('opunit'));
         }
         expect(r.unresolvedBindings, 'EVERY saved binding still resolves to a socket that exists (no corruption)').toBe(0);
         expect(r.emitIdentical, 'the saved wrapped op emits BYTE-IDENTICAL to the source twin (opunit transparent)').toBe(true);

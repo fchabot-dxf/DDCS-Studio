@@ -15,9 +15,15 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
+// t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to POCKET. `.viz-pane-sizer`
+// resizes the OUTER `.wiz-visual` pane — a mechanism that only applies to a FLAT-rendered op at all: tree
+// mode (`render()`'s own `isTree` branch, userOpView.js) unconditionally hides `.wiz-visual` in favor of the
+// declared tree's OWN inner visualization. Surfacing is now genuinely tree-rendered (mirroring drill), so
+// `.wiz-visual`/its sizer no longer exist for it — not a regression in the sizer mechanism itself (still
+// exercised here, on pocket, exactly as before), just no longer a valid subject for THIS particular twin.
 const openTwin = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
-    await page.evaluate(() => window.openWiz('user_surfacing_data'));
+    await page.evaluate(() => window.openWiz('user_pocket_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
 };

@@ -205,7 +205,10 @@ test('Skim arm, TWIN: a real drag persists the jog seed and leaves the emitted t
     expect(codeAfter, 'the twin\'s emitted program is BYTE-IDENTICAL before/after the Skim drag').toBe(codeBefore);
 
     const seed = await page.evaluate(() => {
-        const c2 = document.getElementById('userViz3dContainer');
+        // t2545 (BACKLOG #71/#72, the section migration) — surfacing is now genuinely tree-rendered (mirroring
+        // drill), so its 3D container carries the TREE-mode id (`nsId('userViz3dContainer_tree')`,
+        // formWidgets.js) rather than the flat-mode one this test originally pinned — try both, tree-mode first.
+        const c2 = document.getElementById('userViz3dContainer_tree') || document.getElementById('userViz3dContainer');
         const host = c2 && c2.parentElement && c2.parentElement.querySelector('.wiz-viz3d');
         return host ? host.__varSeed : null;
     });
@@ -244,7 +247,10 @@ test('t1650 review fix: the seed shape is ONE-SOURCED — the WIZARD calls the S
     const tc = await twinMarkerCenter(page);
     await drag(page, tc, 30, -15);
     const twinSeed = await page.evaluate(() => {
-        const c2 = document.getElementById('userViz3dContainer');
+        // t2545 (BACKLOG #71/#72, the section migration) — surfacing is now genuinely tree-rendered (mirroring
+        // drill), so its 3D container carries the TREE-mode id (`nsId('userViz3dContainer_tree')`,
+        // formWidgets.js) rather than the flat-mode one this test originally pinned — try both, tree-mode first.
+        const c2 = document.getElementById('userViz3dContainer_tree') || document.getElementById('userViz3dContainer');
         const host = c2 && c2.parentElement && c2.parentElement.querySelector('.wiz-viz3d');
         return host ? host.__varSeed : null;
     });

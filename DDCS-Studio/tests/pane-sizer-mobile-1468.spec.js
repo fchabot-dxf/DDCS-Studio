@@ -23,9 +23,13 @@ import { test, expect } from '@playwright/test';
  * would land on has to be inside a preview, not inside the panel behind it.
  */
 
+// t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to POCKET, same reasoning as
+// pane-sizer-1353.spec.js's own header comment: `.wiz-visual` (and its stacked-height mechanism this file
+// tests) only exists for a FLAT-rendered op; surfacing is now genuinely tree-rendered (mirroring drill), so
+// it is no longer a valid subject for this mechanism, which is otherwise unchanged.
 const openTwin = async (page) => {
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate(() => window.openWiz('user_surfacing_data'));
+    await page.evaluate(() => window.openWiz('user_pocket_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(700);
 };
