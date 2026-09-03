@@ -915,6 +915,47 @@ answer to "where did it stop", which beacons cannot give either.
 
 ---
 
+## ⭐⭐ [VENDOR-STATED] REGISTER `16062` IS THE CURRENT EXECUTING G-CODE LINE NUMBER
+
+*(2026-09-02. **Q.G. Zhang — the vendor — messaged the owner an annotated screenshot unprompted**, captioned
+in his own words: **"Modbus read method for current executing G-code line number"**, with the M350-LiveG repo
+link. This is a vendor statement, not a community inference and not read off someone's source.)*
+
+```
+  Start Addr  16062      Reg Count  2      Format  Float CD AB
+  three reads during a running G01 X0 / G01 X100 loop:
+    488.0   (raw 000043F4)  →  502.0  (raw 000043FB)  →  543.0  (raw C0004407)
+```
+
+⇒ **This is the answer to the question recorded above** — *"there must be a way to decipher the line number
+while running code"* (2026-08-20, after the Modbus probe returned `0x00`). It was asked before slave mode
+and the newer firmware existed; the negative result was true at the time and is now superseded.
+
+⚠ **The advisor argued AGAINST this reading and was wrong.** The objection was that 488–543 is too large to
+be a line number for the ~10-line payload on screen. The owner's counter was contextual and correct: the
+vendor sent it unprompted, with an arrow pointing at the value, knowing exactly what was being asked for.
+⭐ **Recorded because the failure mode generalises** — arithmetic plausibility was allowed to outweigh direct
+conversational evidence from the one person who actually knows.
+
+### ⛔ WHAT IS NOT ESTABLISHED
+
+1. **Reset behaviour.** Does it zero at program start, or count cumulatively since power-on? **Asked, awaiting
+   reply.** It decides the implementation, not the feasibility: reset-per-program is read-directly, cumulative
+   is note-at-start-and-subtract. The 488–543 magnitude against a 10-line payload hints at cumulative.
+2. **Firmware floor.** Unknown which release added it. `2026-08-03-00`'s own changelog covers register `3000`
+   G-code injection ONLY — see the firmware entry — so `16062` is not from that release and predates it.
+3. **The V4.1.** M350/Expert only as far as anything here shows. ⚠ This is why the `SYSDISK` route above stays
+   open rather than being closed by this: it is the only candidate that would work on **every** controller.
+4. Not bench-verified on the owner's own machine — see `bench/04-modbus-slave-test-plan.md`.
+
+### WHAT IT REPLACES, if it holds
+
+`instrument.js` today injects beacons on **Z-up retracts** and infers progress from them, so a program with no
+retract reports nothing. A declared line number read straight off the controller is the same claim without the
+inference, on **any** program, with no injection and no cost to the machine.
+
+---
+
 ## [CONFIRMED] The vendor Modbus manual (V1.1) — read in full, 17 pages
 
 Source: `M350-main/Docs/Modbus开发资料/M350-Modbus Manual_V1_1.pdf`, from foinnc's own development pack.
