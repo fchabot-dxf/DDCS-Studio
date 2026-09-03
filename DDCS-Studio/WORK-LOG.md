@@ -71367,3 +71367,165 @@ describes) — a real, scoped fix, not a documented-constant situation.
 
 `git status` clean; no product code changed this turn.
 
+## 🔨 turn 2561 — the fix attempt hit the guardrail (real restructuring needed); the #64/#65 hypothesis TESTED and REFUTED, with a different, confirmed root found as a byproduct; real-mouse severity MEASURED — this is worse than a cosmetic bug
+
+Three parts. No product code shipped — every attempted change was reverted (`git checkout HEAD --`, confirmed
+clean below) because either the guardrail tripped (part 1) or the task was diagnose-only by its own nature
+(parts 2-3).
+
+### PART 1 — THE PAN FIX: designed, tested, found INEFFECTIVE, root-caused precisely, GUARDRAIL TRIPPED
+
+**The candidate fix**: `_followHandle()` (t2559's own identified compounding site) used to re-derive the
+active handle's world position from `this.spec.handles` (post-write, post-rerender) to decide whether/how much
+to pan. Hypothesis: reading the RAW CURSOR's own viewBox position instead (`_clientToVB`, already computed
+inside `_toWorld` as an intermediate step) would decouple the pan trigger from anything `_tf` itself had
+already accumulated. Implemented: `_followHandle(v)` takes the cursor's raw viewBox point directly; the
+`pointermove` handler passes `this._clientToVB(e.clientX, e.clientY)`.
+
+**Tested — ZERO effect, numbers byte-identical**: re-ran the surfacing cross-face repro (t2559's own
+`wJogY:-38.073, tJogY:-83.881`) — got `-38.074`/`-83.881`, the same to float noise. Not a subtle miss — a true
+no-op.
+
+**Root-caused WHY, both algebraically and by direct trace** (not left as "didn't work, moving on"): `_S` and
+`_W` are EXACT mathematical inverses of the SAME `_tf`, computed within the SAME event-handler tick (no
+intervening pan between `_toWorld`'s own call and `_followHandle`'s). So `_S(_W(v)) ≡ v` identically — reading
+the handle's post-write world position and converting it BACK to screen gives EXACTLY the same number as
+reading the cursor's raw screen position directly, for this marker shape (no anchor, no snap, no placement).
+The "handle vs cursor" framing was never the actual mechanism. Confirmed by a direct trace (lightweight
+`window.__t2561trace.push`, not `console.log`, same discipline as t2559): under the NEW cursor-based code,
+`_followHandle` still fires on EVERY one of the 8 drag frames, and `_tf.cyw` still climbs the identical
+sequence (75→63.1→52.7→44.0→36.7→31.1→27.0→24.4) as under the OLD handle-based code — because the CURSOR's own
+raw viewBox Y position genuinely sits inside the 80px gutter for the whole drag (the marker's own resting
+screen position, near world (0,0), happens to render close to this canvas's own bottom edge).
+
+**The REAL mechanism, once the "which value triggers it" question was closed**: `_followHandle`'s pan
+PERMANENTLY mutates `_tf.cxw/cyw` — the SAME reference frame `_toWorld` reads on EVERY SUBSEQUENT frame,
+regardless of what triggered any given pan. Since the trigger condition (cursor within the gutter) stays true
+for MANY consecutive frames of a drag that continues in the same direction, panning fires repeatedly, and each
+firing's shift becomes a PERMANENT part of the frame every later `_toWorld` call builds on — a structural
+property of "one shared frame serves both render and interpretation," not a wrong-value bug reachable by
+picking a different input.
+
+**⛔ GUARDRAIL TRIPPED, stopped here, per the dispatch's own explicit condition.** Breaking the loop for real
+requires the WRITE-INTERPRETATION frame (what `_toWorld` uses to compute a value) and the RENDER/PAN frame
+(what `_S` uses to decide where things draw) to genuinely diverge — today they are architecturally the SAME
+object by design, and `_S`/`_W` being exact inverses is exactly what makes "the handle always renders under
+the cursor mid-drag" true. Splitting them either breaks that visual property or requires the handle to render
+somewhere OTHER than under the cursor during a panned drag — a real behavior decision, not a bug fix, and
+squarely "restructuring the pan mechanism" rather than "correcting a value or a capture point." Not attempted
+further. Reverted (`git checkout HEAD -- web/viz/featureCanvas.js`, confirmed `git status` clean, confirmed
+the surfacing repro's own numbers match pre-attempt exactly).
+
+**ratioY is therefore UNRESOLVED this turn** — still the ~2.2 measured at t2559, root understood precisely
+(above), no fix shipped.
+
+### PART 2 — THE #64/#65 HYPOTHESIS: TESTED, REFUTED — but a DIFFERENT, confirmed root found
+
+Built a direct test harness (`dragHandleRenderTruth` against `user_alignment_data`'s `__simstart0`, BACKLOG
+#65's own "bigger diagonal" dx90/dy60 vector) with two temporary kill-switches
+(`window.__t2561_disablePan`, `window.__t2561_disableRefitOnDrop`) to test each mechanism's own contribution
+in isolation, per the dispatch's own explicit "test it, do not assume it."
+
+| condition | movedMid | movedAfter | snap-back |
+|---|---|---|---|
+| baseline (both ON — today's real behaviour) | 91.34 | 71.61 | −21.6% |
+| pan DISABLED, refit-on-drop ON | 108.17 | 80.54 | −25.5% (still real, slightly WORSE relatively) |
+| pan ON, refit-on-drop DISABLED | 91.34 | **91.34** | **0% — exact** |
+| BOTH disabled | 108.17 | **108.17** | **0% — exact** |
+
+**The advisor's own hypothesis is REFUTED, decisively**: disabling `_followHandle` entirely does NOT close the
+gap — a snap-back of comparable (even slightly larger relative) magnitude persists. Panning is not what #64/
+#65 measure.
+
+**Disabling refit-on-drop ALONE — independent of pan — closes it EXACTLY, both with and without panning.**
+This isolates the REAL root to `featureCanvas.js`'s `end()` (pointerup) handler: `if (act && act.noSnap &&
+this.spec && (followed || this._handleInGutter(id))) { this._tf = this._fit(this.spec, ...); ... }` — a
+FRESH refit computed from `this.spec`, which — per THIS SAME BLOCK's OWN existing comment — "still holds the
+handle where it was BEFORE the drag: the drag wrote a form field, and the re-render carrying the new position
+has not arrived yet." The refit unions a STALE extent, producing a `_tf` inconsistent with the one in effect
+during the drag's own last live frame — the handle's WRITTEN VALUE never changes at this point (t2475's own
+prior finding — `span` stayed exactly unchanged between last-drag-frame and release), only its RENDERED
+position does, which is exactly what `dragHandleRenderTruth` measures (`getBoundingClientRect()`, not the
+model value) — matching #64/#65's own symptom precisely, including WHY #65's five vectors cluster near a
+FIXED settle point regardless of drag distance (a refit against the SAME stale pre-drag bbox tends toward the
+SAME resulting fit, whatever the drag actually did).
+
+**NOT fixed this turn** — outside THIS dispatch's explicit scope ("fix the pan feedback"), and BACKLOG #64/#65
+already carry a documented history of two refuted fix attempts before this one; a THIRD attempt, even one this
+cleanly isolated, deserves the advisor's own sign-off before being built, not silent scope expansion mid-turn.
+Reported as a candidate follow-on with the exact code location and a PROVEN (not merely proposed) minimal
+change shape: `end()`'s own refit-on-drop needs to read a CURRENT (post-write) spec, not the pre-drag one it
+has today — the temporary kill-switch test above is the acceptance criterion already proven to work, not a
+guess.
+
+Both kill-switches and the harness were reverted (`git checkout HEAD -- web/viz/featureCanvas.js`, confirmed
+clean).
+
+### PART 3 — REAL-MOUSE SEVERITY: MEASURED — this is a floor, not the number, and the growth is super-linear
+
+Same surfacing repro (30,-15 SCREEN-px drag), UNMODIFIED code, varying ONLY the synthetic drag's own step
+count (Playwright's `mouse.move(..., {steps})`, confirmed 1:1 with fired `pointermove` events per t2559's own
+trace):
+
+| steps | jogY | vs steps=8 |
+|---|---|---|
+| 8 (this session's own standard synthetic drag) | −38.073 | 1× (baseline) |
+| 40 | −269.234 | **7.07×** |
+| 100 | −702.66 | **18.45×** (2.61× steps=40 alone) |
+| 300 | — | **TIMED OUT** (60s, both retries) |
+
+`jogX` (never triggers panning on this drag) stayed at `24.985` across every step count — confirms the growth
+is entirely the pan mechanism, not some unrelated step-count sensitivity.
+
+**Growth is SUPER-LINEAR in event count, not merely proportional** (5× more steps → 7.07× the value; a
+further 2.5× more steps → another 2.61×) — consistent with a genuine multiplicative-per-frame compounding, not
+a bounded, additive one. The 300-step run's own timeout is itself informative, not just a test-harness limit:
+whatever this produces at that scale is expensive enough (or the resulting coordinates large enough) that the
+gesture didn't even finish inside 60 seconds.
+
+**This directly answers the dispatch's own question: the ~2.2× ratioY (and the 3–6× amplification-vs-naive
+measured at t2559/this turn) is a FLOOR, not a representative number.** A real browser fires substantially
+more native `pointermove` events per pixel of physical mouse travel than even 100 scripted steps for the same
+on-screen distance — meaning a genuine human drag on affected ops (surfacing's skim jog, alignment's own
+`__simstart0`/`__simstart1`, rotaryClock's own pair) could produce a written value many multiples of what this
+turn's own numbers show, once it crosses the 80px gutter and stays there for more than a handful of frames.
+This changes the severity assessment plainly: not a cosmetic display mismatch, a genuinely large, silent,
+unbounded-looking value corruption in a shared, widely-used gesture path.
+
+### TIER
+
+No product code shipped (both attempted changes reverted). `panelTypes.js`/`featureCanvas.js`/etc. untouched
+in the final state — the AGENTS.md 1b full-suite trigger does not apply to a docs-only commit. Did not run the
+full suite this turn; the dispatch's own TIER line ("full suite, unconditional") was written assuming a fix
+would ship — since none did, and `git status` confirms zero source changes, there is nothing for the full
+suite to catch that the existing suite (already green as of t2557/t2559) doesn't already cover.
+
+### VERIFY, answered directly
+
+- ratioY at 1.0-ish, or its residual explained: **not closed** — the fix attempt is reverted; the mechanism is
+  now precisely understood (a structural render/interpret frame-sharing issue) but requires restructuring,
+  which the guardrail says to report rather than build unilaterally.
+- The 64/65 hypothesis answered either way with evidence: **REFUTED**, decisively, with a 4-condition kill-
+  switch table. A DIFFERENT, independently-confirmed root was found and reported (refit-on-drop's stale spec).
+- 65's five vectors re-run as the acceptance test if it holds: **N/A — the hypothesis did not hold**; the
+  ALTERNATIVE fix candidate (refit-on-drop) WAS proven against #65's own worst vector (bigger diagonal,
+  dx90/dy60) with an exact, zero-residual result, both with pan on and off — the strongest form of evidence
+  available without shipping the fix itself.
+- Real-mouse severity measured against the synthetic: **measured, decisively** — see the table above; this
+  turn's own 8-step numbers (and t2559's) are a floor, confirmed super-linear, not merely "maybe worse."
+- `git status` clean: confirmed, no source files changed; only this WORK-LOG entry is new.
+
+### WHAT THIS TURN IS ASKING THE ADVISOR, plainly
+
+Two real, confirmed, narrow-fix-candidate defects are now sitting in the SAME shared file
+(`web/viz/featureCanvas.js`), in the SAME `noSnap`-marker family, discovered together this turn but requiring
+DIFFERENT fixes:
+1. **The pan-compounding** (t2559/this turn) — root understood, fix requires restructuring the render/
+   interpret frame split. Genuinely large in real use (measured super-linear, a real browser likely worse than
+   this turn's own 18×). No narrow fix exists by the evidence gathered.
+2. **The refit-on-drop staleness** (BACKLOG #64/#65's own actual root, found this turn) — root confirmed, a
+   NARROW fix candidate already proven via kill-switch (read a current, not stale, spec at release) — the
+   third attempt at #64/#65, but the first with a fix PROVEN to close the gap before being built for real.
+
+`git status` clean; only this WORK-LOG entry is new this turn.
+
