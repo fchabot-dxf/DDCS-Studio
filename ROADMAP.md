@@ -263,7 +263,34 @@ The reason it went unnoticed: `preview-only, emit unaffected` was (correctly) a 
 meaning *needs no declaration and no gate* — and ~2450 tests assert emitted text and data structures while
 essentially **none render anything**, so a preview defect cannot turn a test red. The only detector was the user.
 
-**ARC A — PREVIEW AS DATA (STARTED 2026-08-31).** One declared source per presentation fact, read by every
+## ✅ ARC A — COMPLETE, 2026-09-03 (t2461 → t2569)
+
+```
+  L1  mutation manifest        the gate proves itself against declared DATA
+  L2  presence primitive       does the affordance EXIST
+  L3  reachability             can it be REACHED — went RED on live unfixed code
+  L4  prove the gate wide      32/32 accounted for · 3 real defects found
+  L5  port the lathe geometry  all 7 ops declared · zero hand-written residue
+  L6  declare the affordances  the RULE stated first, then applied
+  L7  delete the unread blocks owner ruling
+```
+
+⭐ **What the arc was actually for, and what it produced.** It found `#64`, `#65`, `#66`, `#67`, `#68`,
+`#70` — **before the owner did**, which had never happened here. The registry gained exactly two
+capabilities, each only after a THIRD op independently needed it, each proven inert before use.
+
+⚠ **And it did NOT reach the goal it was mapped onto.** Asked *"can built-ins be reconstructed in
+blocks?"*, the advisor ran ARC A — a **de-duplication** goal — while the owner meant an **authoring**
+goal. The arc completed with the goal unreached; a from-scratch wizard still rendered a black preview.
+See `the-goal-is-authoring-not-declaration` (memory) and the authoring thread below, which outlives it.
+
+⇒ **The live work is now AUTHORING, not this arc**: 8 of 11 gestures block-authorable, handles wired to
+the emit, and the measured cost of building a wizard by hand (32 UI actions for 2 of ~20 params) as the
+open problem. `BACKLOG #71` carries it.
+
+---
+
+**ARC A — PREVIEW AS DATA (STARTED 2026-08-31, ✅ COMPLETE 2026-09-03).** One declared source per presentation fact, read by every
 renderer in a pane. ⚠ **The make-or-break is the GATE, not the declarations**: the emit port had byte-identity as
 its proof; the preview has no equivalent. If a preview-equivalent of byte-identity cannot be built cheaply, the
 arc should not start — build the gate first. Known members: the coordinate frame (t1672/t1686 — two renderers in
