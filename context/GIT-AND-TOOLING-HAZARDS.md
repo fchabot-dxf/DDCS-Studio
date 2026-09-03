@@ -238,3 +238,22 @@ it never touches the DDCS git tree. `record-segments.js <tour>` (preferred) reco
 clip then crossfade-stitches them — no live-navigation stalls, and a crossfade can carry meaning. Needs the
 full `Gyan.FFmpeg` (the Playwright-bundled build lacks h264/mp4/drawtext). First tour spec:
 `ddcs-studio.tour.js`. Re-shoot with one command rather than re-editing when the (fast-moving) site changes.
+
+## 17. A stale mem-server LISTENING on port 3211 makes a full suite report "0 tests, 0s" instead of erroring — this CORRECTS t2537's own shelved "reporter quirk" guess
+
+`webServer.reuseExistingServer: false` (`playwright.config.js`) means: always start a FRESH server, and if the
+port is already taken, fail the whole run — but the custom `progressReporter.mjs` doesn't surface that failure
+as visible text, it just prints `[progress] suite starting — 0 tests, 4 workers` then `DONE in 0s — 0 passed`
+immediately, which reads exactly like a `--list`-vs-plain-run reporter quirk (t2537 hit this once on a single
+scratch file and shelved it as "not investigated further, out of scope" — that guess was wrong). The real cause
+is a leftover `node tests/support/mem-server.cjs` process still bound to 3211 from an EARLIER, already-finished
+command in the same session (a targeted spec run, another background full-suite attempt, etc. — this repo's
+own long-lived multi-command sessions make this common). Diagnose with `netstat -ano | grep :3211` — a
+`LISTENING` row with a PID is the tell (a `TIME_WAIT` row is not — that's a closed connection, harmless).
+Confirm the PID is your own leftover via `Get-Process -Id <pid> | Select StartTime` before killing it (match
+against your own command timestamps, not another seat's), then `Stop-Process -Id <pid> -Force`, confirm the
+port is free (`Get-NetTCPConnection -LocalPort 3211`), and re-run. A REAL zero-test run (a bad `-g` filter, a
+typo'd path) still errors visibly and differently — this signature (`0 tests` at suite-START, `DONE in 0s`) is
+specific to the webServer bind failure. Also: `--list` and a real run share the SAME `test-results/summary.json`
+output path — running `--list` after a real run silently overwrites that run's actual results with the
+listing's own (all-`skipped`) stats, so don't run `--list` between a real run finishing and reading its summary.

@@ -57,7 +57,7 @@ function isAtom(blk) {
     // panel block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not
     // values). Value-bearing atoms (assign / param / move / …) are untouched.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field' || def.kind === 'param_table'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values; t2543 param_table: same shape as cam_table, materialize's own metadata container
 }
 
 // t2156 — every candidate op the workspace holds (top-level, wrapped, with children), each paired with its LIVE
@@ -518,8 +518,14 @@ export function maybeMaterializeParamGroup(def) {
         if (!def || !def.opType || !Array.isArray(def.template)) return def;
         const hasVal = (def.bindings || []).some((b) => b && b.blockIndex != null);
         if (!hasVal && (!def.bindingSpecs || !def.bindingSpecs.some((s) => s && s.match))) return def;
-        const existing = flattenBlocks(def.template).find((b) => b && b.type === 'param_group');
-        if (existing && existing.children && existing.children.length > 0) return def;   // idempotent — already has a populated form group
+        // t2543 (BACKLOG #71 owner ruling) — SEPARATE SLOT: check for `param_table` (materialize's own target),
+        // never `param_group` (a twin's own form-layout declaration, untouched by this function). See
+        // wizards/ops/paramTable.js's own header and materializeParamGroup's own comment for the full account
+        // (including the SECOND, `field_ref` skip mirrored here — drill's own already-declared row placement,
+        // t2299 — kept symmetric with materializeParamGroup's own two checks rather than relying on it alone).
+        const flat0 = flattenBlocks(def.template);
+        if (flat0.some((b) => b && b.type === 'param_table')) return def;   // idempotent — already materialized
+        if (flat0.some((b) => b && b.type === 'field_ref')) return def;   // already row-placed by declaration — materializing would be redundant
         materializeParamGroup(def);
     } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
     return def;

@@ -511,9 +511,10 @@ export function paramFieldsFromStack(template) {
 
 /**
  * paramGroupFromBindings — the FORM materializer (block-native-params S5.1), the mirror of camTableFromBindings. A def's value
- * bindings → a param_group block, one param_field per binding in binding PRE-ORDER, label/default/widget/type from the binding
- * (NO classifier — the form shows every param; expose/bake is the pendant's concern, not the form's). PURE + INERT (nothing
- * consumes it yet). Returns null when the def has no value bindings.
+ * bindings → a param_table block (t2543 — separate from param_group, see paramTable.js's own header), one param_field per
+ * binding in binding PRE-ORDER, label/default/widget/type from the binding (NO classifier — the form shows every param;
+ * expose/bake is the pendant's concern, not the form's). PURE + INERT (nothing consumes it yet). Returns null when the def has
+ * no value bindings.
  */
 export function paramGroupFromBindings(def, group = 'Settings') {
     let valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
@@ -546,37 +547,59 @@ export function paramGroupFromBindings(def, group = 'Settings') {
             units: wc.units || b.units || '',
         } };
     });
-    return { type: 'param_group', params: { group }, children };
+    return { type: 'param_table', params: { group }, children };
 }
 
 /**
- * block-native-params S5.3 — materialize a param_group INTO a def (the FORM analog of materializeCamTable). Injects
+ * block-native-params S5.3 — materialize a param_table INTO a def (the FORM analog of materializeCamTable). Injects
  * paramGroupFromBindings into the user_root PRESENTATION mouth and re-derives EVERY binding blockIndex BY IDENTITY over the
  * post-injection flatten (the wrapForkAtSave pattern; a blanket shift would corrupt a uiChildren binding). Mutates `def` in
- * place; idempotent (no-op if the def has no value bindings or already carries a param_group). COMPOSES with materializeCamTable:
+ * place; idempotent (no-op if the def has no value bindings or already carries a param_table). COMPOSES with materializeCamTable:
  * each runs its own identity re-derive over the CURRENT flatten, so running both sequentially re-indexes correctly across the
- * combined injection. BYTE-NEUTRAL by construction: param_field emits [] + param_group is transparent, and formBindings
- * consuming it reproduces today's form (order/label/widget/default, and canvas group/role which it re-derives from the binding).
- * PURE — the caller (the S5.3 hook) decides when. Returns def.
+ * combined injection. BYTE-NEUTRAL by construction: param_field emits [] + param_table emits [] directly (not transparent,
+ * matching cam_table — its children are declarations, not atoms), and formBindings consuming it reproduces today's form
+ * (order/label/widget/default, and canvas group/role which it re-derives from the binding). PURE — the caller (the S5.3 hook)
+ * decides when. Returns def.
+ *
+ * t2543 (BACKLOG #71 owner ruling) — SEPARATE SLOT: this used to find-or-create a `param_group` node and overwrite ITS
+ * children, sharing the exact array `renderUiTree`'s own transparent form-layout branch reads (t1605) — two incompatible
+ * owners of one array. Now targets `param_table` exclusively, found by TYPE alone (`flattenBlocks(...).find(b => b.type ===
+ * 'param_table')`), the SAME idempotency shape `materializeCamTable` already uses for `cam_table` — never inspects, never
+ * mutates, a twin's own `param_group` node (whatever its own `children` may declare — empty, or group_box/field_ref rows).
+ * `param_table` never pre-exists in a hand-authored twin (nothing but this function ever creates one), so there is no
+ * "update in place" case left to handle — every non-idempotent call is a fresh injection.
+ *
+ * t2543 — a SECOND, EXPLICIT skip named directly rather than inherited by accident: a twin whose OWN template already
+ * declares `field_ref` nodes (drill, t2299 — the only twin with this shape today, and the precedent BACKLOG #72's own
+ * group_box migration follows) places its rows by reading `def.bindings` directly through `renderUiTree`'s
+ * `field_ref`/`param_group` branches — it needs NO param_field block to find or describe a row, so canvas materialization
+ * would add 30+ blocks with zero form-rendering effect either way. `cam-block-native-params-s52.spec.js`'s own
+ * `drillSame` test already PINS this — drill's `formBindings` must return `def.bindings` BY REFERENCE, unchanged — a real,
+ * reasoned product expectation from t2299, not an accident of the old ambiguous guard this turn retires elsewhere. The OLD
+ * guard achieved this by COINCIDENCE (drill's own non-empty `param_group.children` happened to also mean "don't
+ * materialize"); this check achieves the SAME outcome for the SAME reason, named plainly, decoupled from param_group
+ * entirely — a future group_box-migrated twin (BACKLOG #72) will hit this same skip once it ALSO declares field_ref rows,
+ * which is the correct outcome for the identical reason, not a special case for drill alone.
  */
 export function materializeParamGroup(def) {
     if (!def || !Array.isArray(def.template)) return def;
     const root = def.template.find((b) => b && b.type === 'user_root');
     if (!root) return def;
-    const existing = flattenBlocks(def.template).find((b) => b && b.type === 'param_group');
-    if (existing && existing.children && existing.children.length > 0) return def;   // already has a populated one — idempotent
+    const flat0 = flattenBlocks(def.template);
+    if (flat0.some((b) => b && b.type === 'param_table')) return def;   // already materialized — idempotent, exactly like materializeCamTable's own check
+    if (flat0.some((b) => b && b.type === 'field_ref')) return def;   // already row-placed by declaration — materializing would be redundant, see header
 
     const pg = paramGroupFromBindings(def);
     if (!pg) return def;   // no value bindings — nothing to declare
-    
+
     const flatBefore = flattenBlocks(def.template);
-    
-    if (existing) {
-        existing.children = pg.children;
-    } else {
-        root.uiChildren = [pg, ...(root.uiChildren || [])];
-    }
-    
+    // t2543 — APPEND, not prepend (unlike materializeCamTable's own cam_table, which has no pre-existing sibling
+    // to disturb). param_table replaces what used to be an IN-PLACE FILL of a twin's own (often empty) param_group
+    // node — a twin's hand-authored uiChildren order (e.g. surfacing's sim/path_anchor/param_group, t2271/t2301)
+    // is real, declared structure that must survive materialize untouched, same as param_group's own children now
+    // do. Prepending here reordered it and broke cam-substack-save-fork.spec.js's own pinned order — caught live,
+    // not assumed.
+    root.uiChildren = [...(root.uiChildren || []), pg];
     const flatAfter = flattenBlocks(def.template);
     /**
      * t1632 — the remap writes COPIES, never the caller's binding OBJECTS. The old in-place `b.blockIndex = ni`

@@ -65,7 +65,9 @@ test('S5.1 — paramGroupFromBindings: one param_field per value-binding in PRE-
         const control = back.map((row) => nameOf(FW.resolveFormWidget(row)));
         return { type: pg.type, rows: pg.children.map((c) => ({ type: c.type, param: c.params.param, label: c.params.label, widget: c.params.widget, dflt: c.params.dflt })), back, control };
     });
-    expect(r.type).toBe('param_group');
+    // t2543 (BACKLOG #71 owner ruling) — SEPARATE SLOT: paramGroupFromBindings now returns a `param_table`
+    // node (materialize's own separate target), never `param_group` (a twin's own form-layout declaration).
+    expect(r.type).toBe('param_table');
     // t1562 — these two bindings declare NO `widget` (only `type: 'number'`), so the materialized row carries '' —
     // INHERIT — and the control is derived from the type. This used to read 'number', which is what the assertion
     // pinned; that literal fallback WAS the t1562 defect (an explicit widget beats the type-derived default in

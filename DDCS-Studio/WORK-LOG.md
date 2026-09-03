@@ -70440,3 +70440,111 @@ permanent test files (`label-auto-derive-2541.spec.js`, `shared-labels-1611.spec
 `handle-form-render-fixes-2527.spec.js`, `bridge/controllers/expert-m350/FINDINGS.md` (separate commit),
 BACKLOG.md, and this WORK-LOG entry.
 
+## t2543 -- SEPARATE THE SLOT: `param_group.children`'s two owners, resolved by the owner ruling (SEPARATE, not structure-preserving materialize) -- and TWO real regressions the fix's own naive form would have shipped, both caught and fixed before commit
+
+t2531 found and reverted the bug: `param_group.children` was shared by `renderUiTree`'s own form-layout branch
+(t1605) and `materializeParamGroup`'s own flat `param_field` canvas-materialization target (S5.3) -- a twin
+declaring `group_box`/`field_ref` nodes there (BACKLOG #72's authorability-sweep migration) made the old
+`children.length > 0` idempotency guard false-positive, and tightening it instead made materialize OVERWRITE
+the declared structure. This turn's dispatch supplied the ruling: SEPARATE SLOT. Two genuinely different
+things sharing one array IS the problem; teaching the second consumer to tolerate the first leaves both owners
+in place for whoever comes next to break.
+
+**Worked the shape out of the code first, per the dispatch's own instruction.** `materializeCamTable`
+(`data/opCamMap.js`) already solves the identical problem for the CAM pendant: idempotency by TYPE alone
+(`flattenBlocks(...).some(b => b.type === 'cam_table')`), injection as a fresh SIBLING node
+(`root.uiChildren = [ct, ...]`), never reading or writing another node's children. `cam_table` has zero
+presence in `formWidgets.js` -- canvas-only, invisible to form rendering by construction. This is exactly the
+shape the ruling calls for, so `paramTable.js` (NEW) mirrors it: `{ type: 'param_table', kind: 'param_table',
+mouth: 'DO', emit: () => [] }`, NOT added to `blockEmitter.js`'s `TRANSPARENT_CONTAINERS` (its children are
+declarations, not atoms, matching `cam_table`/`cam_field`'s own precedent). `materializeParamGroup`
+(`userOps.js`) now finds-or-creates `param_table` by type alone and never inspects or mutates a twin's own
+`param_group` node -- whatever it declares (empty, or group_box/field_ref rows) survives byte-identical,
+proven by a new permanent test (below). `paramGroupFromBindings` (the S5.1-era builder `materializeParamGroup`
+calls) now returns a `param_table` node instead of `param_group`. `devMode.js`'s `maybeMaterializeParamGroup`
+(the editWizardDef-time hook) and `isAtom` (devMode.js, atom-exposure gate) both updated to recognize
+`param_table` in place of the old shared-array check.
+
+**REGRESSION 1, caught by the mandatory full suite, not assumed safe: drill's own DELIBERATE "never
+materializes" contract.** The simplest version of the fix (idempotency = mere `param_table` presence) caused
+drill -- the one twin with `hasTreeLayout() === true`, whose `param_group.children` is hand-authored, rich,
+field_ref-based structure from t2299, predating this session entirely -- to get a brand-new `param_table` with
+36 `param_field` children materialized for the FIRST TIME at boot. All 39 drill-specific tests still passed
+(no FORM regression), but `cam-block-native-params-s52.spec.js`'s own `drillSame` test, carrying a detailed,
+dated t1632/t2299 comment, failed: it PINS `formBindings(drill) === drill.bindings` (same reference,
+unchanged) because "drill's tree places its rows via field_ref nodes... deliberately NOT param_field, which
+collides with the authored-block scan this same materialization path uses." This is documented, deliberate
+product behavior, not an accidental gap safe to close -- so the fix, not the test, needed correcting. Added a
+second, named skip condition to both `materializeParamGroup` and `maybeMaterializeParamGroup`:
+`if (flat0.some(b => b.type === 'field_ref')) return def;` -- a twin whose template already declares
+`field_ref` rows reads `def.bindings` directly through `renderUiTree`'s own branches and needs no `param_field`
+block; the OLD shared-array guard achieved this outcome by COINCIDENCE (drill's non-empty `param_group.children`
+happened to also mean "don't materialize"), this achieves the SAME outcome for the SAME reason, named
+plainly and decoupled from `param_group` entirely -- a future BACKLOG #72 twin will hit the identical skip once
+it too declares field_ref rows, which is the correct outcome, not a drill special case.
+
+**REGRESSION 2, caught by the mandatory full suite, on a DIFFERENT twin than the one t2531 itself
+found:** `cam-substack-save-fork.spec.js`'s own pinned uiChildren order (`['user_root', 'sim', 'path_anchor',
+'param_group']`, tracked through three prior comment updates -- t1593/t2271/t2301) broke: surfacing already
+declares an (empty) `param_group` node as part of its own hand-authored layout order. The OLD mechanism found
+and FILLED that existing node in place, preserving position; my fix's initial form -- mirroring
+`materializeCamTable`'s own `[ct, ...(uiChildren||[])]` PREPEND literally -- built a brand-new `param_table`
+and prepended it, shoving `sim`/`path_anchor`/`param_group` down by one and breaking the pin. Unlike
+`cam_table` (a type that never existed on any twin before, so no ordering test could have pinned its position),
+`param_table` replaces what used to be an in-place fill of a real, already-positioned node -- prepending was
+never safe once that was true. Fixed by switching the injection to APPEND
+(`root.uiChildren = [...(uiChildren||[]), pg]`): a twin's own declared sibling order is now genuinely
+untouched, matching what the ruling already promised for `param_group.children` itself. Re-ran
+`cam-substack-save-fork.spec.js` clean after the fix; its own assertion needed no further edit since it only
+pins the first four slots and relative order, not an exact index for the appended node.
+
+**The new permanent test, corrected once for the same field_ref discovery.** `param-group-table-separation-
+2543.spec.js`'s first draft used `group_box` wrapping `field_ref` for its own demo bindings -- which, under the
+field_ref skip above, is EXACTLY the drill-parity case, so materialize correctly declines to inject a
+`param_table` for those same bindings, and the test's own "hasParamTable: true" expectation was simply wrong
+given the corrected design. Rewrote it to demonstrate the actual two-owner-separation claim cleanly: a
+`group_box` wrapping informational content (no field_ref) for LAYOUT, alongside separate, undeclared value
+bindings that DO get a `param_table`. A second test hand-builds a tree with BOTH a group_box/field_ref
+structure and a `param_table` sibling side by side (decoupled from materialize's own decision logic, which the
+first test already covers) to prove the RENDER contract holds: the group_box places its declared rows, the
+unplaced binding reaches the form via the pre-existing orphan-net fallback, and `param_table` renders as a
+silent no-op -- never the `unwired-block` placeholder branch. Proved non-vacuous by toggling `false &&` onto
+the new `formWidgets.js` `param_table` render branch: fails cleanly (the exact assertion this branch exists to
+satisfy), restored, re-ran green.
+
+**A THIRD finding, tooling not product: a stale mem-server on port 3211 makes a full suite run report "0
+tests, 0s" instead of erroring.** The first full-suite attempt this turn used a `--reporter` CLI flag by
+mistake (caught and corrected per AGENTS.md/hazard #7 before it produced a misleading result) and the retry,
+with the correct config-default reporters, still came back `[progress] DONE in 0s -- 0 passed, 0 failed`. Not
+the reporter-quirk t2537 shelved as "not investigated further" -- `netstat` showed a LISTENING node process
+already bound to 3211 (my own leftover from an earlier targeted run in this same turn, confirmed by start
+time), and the config's `reuseExistingServer: false` refuses to start a second server on an occupied port,
+failing the whole run near-instantly with no visible error under the custom progress reporter. Killed the
+leftover, port freed, the retry ran the real 36-minute suite. Documented as `GIT-AND-TOOLING-HAZARDS.md` #17 --
+this corrects, not just supplements, t2537's own shelved assumption.
+
+**Verification, full account.** Non-vacuous proof (see above) on both new-test assertions this turn depends
+on. Targeted batch (mechanism files: `cam-block-native-params-s2` through `-s53`, `cam-block-native-params`,
+`gui-param-grouping`, the new separation spec, plus the t2531 canaries `param-group-rows-1605`/
+`passes-field-1613`) -- 49/49 green with the final code. Broader regression sweep -- all 12 drill-specific spec
+files (39 tests) + all 7 handle-block families + `handle-target-fails-visibly-2525`/
+`handle-form-render-fixes-2527`/`op-title-realsymptom-2363` -- 88/88 green (these files were touched by
+`userOps.js`/`devMode.js`/`formWidgets.js`/`blockEmitter.js`, all four AGENTS.md rule 1b shared-render-path
+files, so the full suite was never optional here regardless of the targeted pass being clean -- t2531's own
+precedent, restated by this turn's own dispatch). `test:node` 238/238, both before and after the append-order
+fix. **Full `--workers=4` suite, run 1 (before the append-order fix): 3070 passed, 3 failed** --
+`cam-substack-save-fork.spec.js` (regression 2, fixed), `probe-port-gate-1880.spec.js` (investigated below,
+pre-existing), `preview-mutation-manifest-2463.spec.js` (already-documented pre-existing flake, sf-pos-
+snapback). `probe-port-gate-1880.spec.js`'s failing test was run 4x in isolation against the fixed code (1/4
+failed, "port field never settled a gate state") AND 4x against a temporary revert to pre-t2543 code restored
+from my own backup copies, not HEAD (1/4 failed, IDENTICAL error signature) -- confirmed pre-existing and
+environmental, not caused by this turn, before moving on. **Full suite, run 2 (after the append-order fix):
+3071 passed, 1 failed** -- only `preview-mutation-manifest-2463.spec.js` (sf-pos-snapback), the session's
+own already-established pre-existing flake, 13 flaky, 26 skipped, matching prior clean runs' skip count.
+
+`git status` clean of anything outside `web/wizards/ops/paramTable.js` (new), `web/wizards/ops/index.js`,
+`web/blocks/userOps.js`, `web/blocks/devMode.js`, `web/blocks/blockEmitter.js`, `web/ui/formWidgets.js`,
+`tests/param-group-table-separation-2543.spec.js` (new), `tests/cam-block-native-params-s5.spec.js`,
+`tests/cam-block-native-params-s53.spec.js`, `context/GIT-AND-TOOLING-HAZARDS.md`, BACKLOG.md, and this
+WORK-LOG entry.
+

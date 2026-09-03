@@ -1737,6 +1737,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // (t1562's rule): this branch decides only WHERE the rows land, never what they contain.
                 const pgKids = childrenOf(node.children);
                 traverse(pgKids, container);
+            } else if (node.type === 'param_table') {
+                // t2543 (BACKLOG #71 owner ruling) — materializeParamGroup's OWN separate target (paramTable.js's
+                // own header has the full account): a flat set of REAL param_field Blockly block records for the
+                // Blocks-tab CANVAS, never meant to become form-tree structure. A canvas-only concern, exactly
+                // like `cam_table` (which ALSO carries no branch here) — its own rows are already covered by
+                // `renderOpForm`/`byParam`'s own pre-rendered rows, placed into the tree by whatever
+                // `param_group`/`group_box`/`field_ref` nodes the twin ACTUALLY declares (or the orphan-net
+                // fallback, if it declares none). Deliberately a silent no-op, not the unwired-placeholder branch
+                // below — this is CONSUMED metadata, not an unrecognized structural gap.
             } else if (node.type === 'group_box') {
                 // t1561 STEP 2 — a titled card. Collapsible per its own `collapsible` param; REUSES the exact
                 // form-sec fold mechanism `section` already uses (same classes, same applyFold call) rather than

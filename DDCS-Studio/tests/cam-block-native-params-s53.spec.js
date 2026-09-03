@@ -36,9 +36,10 @@ test('S5.3 — materializeParamGroup is BYTE-NEUTRAL for the FORM, incl. CANVAS 
         // widget (undefined and 'number' resolve to the same number widget — render-identical, so that difference is cosmetic).
         const shape = (fb) => fb.map((b) => ({ param: b.param, key: b.key, label: b.label, default: b.default, group: b.group, role: b.role }));
         const widgetsMatch = before.length === after.length && before.every((b, i) => resolveFormWidget(b) === resolveFormWidget(after[i]));
-        return { before: shape(before), after: shape(after), widgetsMatch, x0w: after[0].widget, x0g: after[0].group, x0r: after[0].role, y0g: after[1].group, y0r: after[1].role, hasPg: flattenBlocks(mat.template).some((b) => b.type === 'param_group') };
+        // t2543 (BACKLOG #71 owner ruling) — SEPARATE SLOT: materialize now injects `param_table`, never `param_group`.
+        return { before: shape(before), after: shape(after), widgetsMatch, x0w: after[0].widget, x0g: after[0].group, x0r: after[0].role, y0g: after[1].group, y0r: after[1].role, hasPg: flattenBlocks(mat.template).some((b) => b.type === 'param_table') };
     }, canvasDef.toString());
-    expect(r.hasPg, 'a param_group was materialized').toBe(true);
+    expect(r.hasPg, 'a param_table was materialized').toBe(true);
     // the CANVAS group is intact: x0 keeps its xy-pad widget + group/role, y0 keeps its group/role, order preserved
     expect(r.after, 'label/default/group/role/order byte-identical to today — canvas grouping NOT flattened').toEqual(r.before);
     expect(r.widgetsMatch, 'every field resolves to the SAME rendered widget').toBe(true);
@@ -63,7 +64,8 @@ test('S5.3 — composes with S4b: cam_table + param_group both inject; bindings 
         const flat = flattenBlocks(combined.template);
         const resolve = combined.bindings.every((b) => { const blk = flat[b.blockIndex]; return blk && blk.type === (b.key === 'rate' ? 'feed' : 'move'); });
         return {
-            hasBoth: flat.some((b) => b.type === 'cam_table') && flat.some((b) => b.type === 'param_group'),
+            // t2543 — param_table, not param_group (materialize's own separate target)
+            hasBoth: flat.some((b) => b.type === 'cam_table') && flat.some((b) => b.type === 'param_table'),
             resolve,
             formSame: JSON.stringify(formBindings(combined).map((b) => ({ p: b.param, g: b.group, r: b.role }))) === JSON.stringify(beforeForm.map((b) => ({ p: b.param, g: b.group, r: b.role }))),
             slotOk: stackToSlot(combined, {}, new Set(), 0).body.length > 0,
@@ -81,7 +83,8 @@ test('S5.3 — maybeMaterializeParamGroup: a pill op materializes; a literal op 
     const r = await page.evaluate(async (mk) => {
         const { maybeMaterializeParamGroup } = await import('/blocks/devMode.js');
         const { flattenBlocks } = await import('/blocks/userOps.js');
-        const has = (def) => flattenBlocks(def.template).filter((b) => b.type === 'param_group').length;
+        // t2543 — param_table, not param_group (materialize's own separate target)
+        const has = (def) => flattenBlocks(def.template).filter((b) => b.type === 'param_table').length;
         const pill = new Function('return ' + mk)()();
         maybeMaterializeParamGroup(pill);
         const idem = has(pill); maybeMaterializeParamGroup(pill); const idem2 = has(pill);   // idempotent
@@ -128,15 +131,18 @@ test.describe(() => {
             registerUserOp(def);
             localStorage.setItem('ddcs_user_ops', JSON.stringify([def]));   // editWizardDef reads listUserOps (the store)
         }, canvasDef.toString());
+        // t2543 (BACKLOG #71 owner ruling) — SEPARATE SLOT: materialize's own canvas target is `param_table`,
+        // never `param_group` (the twin's own form-layout declaration, which this op never even carries — it's
+        // a pill-authored canvas op, no group_box structure). See paramTable.js's own header for the full account.
         await page.evaluate(() => window.ddcsEditWizardDef('user_s53canvas'));
-        await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).some((b) => b.type === 'param_group'), { timeout: 8000 });
+        await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).some((b) => b.type === 'param_table'), { timeout: 8000 });
         await page.waitForTimeout(300);
         const r = await page.evaluate(() => {
             const all = window.__blkws.getAllBlocks(false);
-            return { camTable: all.filter((b) => b.type === 'cam_table').length, paramGroup: all.filter((b) => b.type === 'param_group').length, paramFields: all.filter((b) => b.type === 'param_field').length };
+            return { camTable: all.filter((b) => b.type === 'cam_table').length, paramTable: all.filter((b) => b.type === 'param_table').length, paramFields: all.filter((b) => b.type === 'param_field').length };
         });
-        // the FORM half (param_group) materialized; the PENDANT half (cam_table) too since a pill fork routes universal — composed
-        expect(r.paramGroup, 'a param_group materialized on customize-open').toBe(1);
+        // the FORM half (param_table) materialized; the PENDANT half (cam_table) too since a pill fork routes universal — composed
+        expect(r.paramTable, 'a param_table materialized on customize-open').toBe(1);
         expect(r.paramFields, 'with a param_field per value binding (x0/y0/frate)').toBe(3);
         expect(r.camTable, 'and the cam_table composed in (pill fork routes universal)').toBe(1);
     });

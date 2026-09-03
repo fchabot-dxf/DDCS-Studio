@@ -7126,6 +7126,37 @@ interactive handles.
 > question (2025-12-11 / 2026-04-10 / M350-LiveG's stated 2026-08-03 minimum) recorded as likely three
 > sequential milestones, not a contradiction — NOT resolved, per the dispatch's own explicit instruction;
 > needs the owner's own controller. Full account: WORK-LOG t2541.
+>
+> **⛔✅ t2543 — SEPARATE THE SLOT, the owner ruling on t2531's own deferred two-owner bug, shipped.**
+> `param_group.children` no longer serves two masters: `materializeParamGroup` now targets a NEW, dedicated
+> `param_table` node (`wizards/ops/paramTable.js`), found/injected by TYPE alone — mirroring
+> `materializeCamTable`'s own `cam_table` precedent exactly — and never reads or writes a twin's own
+> `param_group` declaration again. A group_box-declaring `param_group` now survives materialize
+> byte-identical, proven by a new permanent test; the mechanism is landed and demonstrated, per this turn's
+> own scope, but NOT used by any real twin yet (no section migration happened this turn).
+>
+> **Two real regressions, both caught by the mandatory full suite and fixed before commit, neither shipped
+> silently.** (1) The fix's simplest form broke drill's own DELIBERATE t2299 "never materializes" contract
+> (`cam-block-native-params-s52.spec.js`'s own dated `drillSame` pin) — fixed with a second, named skip: any
+> twin already declaring `field_ref` rows needs no `param_field` block, decoupled from `param_group` entirely
+> so a future BACKLOG #72 twin gets the same correct treatment, not a drill special case. (2) The fix's literal
+> mirroring of `cam_table`'s own PREPEND placement broke `cam-substack-save-fork.spec.js`'s own pinned
+> uiChildren order on surfacing (`sim`/`path_anchor`/`param_group`, tracked through three prior updates) —
+> `cam_table` never existed on any twin before so no ordering test could pin its position; `param_table`
+> replaces what used to be an in-place fill of an already-positioned node, so prepending was never safe.
+> Fixed by switching to APPEND.
+>
+> **A third finding, tooling not product**, corrects rather than repeats t2537's own shelved guess: the "0
+> tests, 0s" full-suite anomaly is a stale mem-server left LISTENING on port 3211 from an earlier command in
+> the same session, colliding with `reuseExistingServer: false` — not a reporter quirk. Documented as
+> `GIT-AND-TOOLING-HAZARDS.md` #17.
+>
+> Full `--workers=4` suite, run 1 (before the append-order fix): 3070 passed, 3 failed (the two regressions
+> above + the session's own already-documented `preview-mutation-manifest-2463` flake). Run 2 (after): 3071
+> passed, 1 failed (only the pre-existing flake), 13 flaky, 26 skipped. `probe-port-gate-1880.spec.js`'s own
+> single flaky failure confirmed pre-existing via a direct 4x-vs-4x control run against a temporary revert to
+> pre-t2543 code (restored from my own backup, not HEAD) — identical ~25% flake rate both sides. Full
+> account: WORK-LOG t2543.
 
 ---
 
