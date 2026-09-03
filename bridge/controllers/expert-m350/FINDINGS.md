@@ -949,8 +949,11 @@ conversational evidence from the one person who actually knows.
    forbids.** Recorded because the advisor had been citing that principle at the worker all session.
 2. **Firmware floor.** Unknown which release added it. `2026-08-03-00`'s own changelog covers register `3000`
    G-code injection ONLY — see the firmware entry — so `16062` is not from that release and predates it.
-3. **The V4.1.** M350/Expert only as far as anything here shows. ⚠ This is why the `SYSDISK` route above stays
-   open rather than being closed by this: it is the only candidate that would work on **every** controller.
+3. ⛔ **THE V4.1 WILL NOT GET THIS — owner-stated, 2026-09-02.** Not "unknown", not "unverified": it is not
+   coming. ⇒ **The `SYSDISK` byte-offset route above is NOT a fallback, it is the ONLY route for the V4.1**,
+   and per [[v41-and-v3-outnumber-expert]] the V4.1 and V3 outnumber the Expert in the field. Anything built
+   on `16062` alone leaves the larger population with no progress tracking at all. Design for two sources
+   from the start, not one with a patch later.
 4. Not bench-verified on the owner's own machine — see `bench/04-modbus-slave-test-plan.md`.
 
 ### WHAT IT REPLACES, if it holds
