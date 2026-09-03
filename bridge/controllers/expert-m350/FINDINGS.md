@@ -949,11 +949,15 @@ conversational evidence from the one person who actually knows.
    forbids.** Recorded because the advisor had been citing that principle at the worker all session.
 2. ~~**Firmware floor.**~~ ⭐ **ANSWERED, same conversation: `2026.09.02`.** Vendor's own words: *"the system
    needs to be updated to the 2026.09.02 version"* + *"I will package and upload the new version shortly."*
-   ⇒ ⛔ **It does not POSTDATE our records — it does not exist yet.** Unreleased at the time of writing
-   (2026-09-02). `16062` is a brand-new capability, not something we had been failing to find.
-   ⚠ So the earlier reasoning here was backwards: this was never a register waiting to be discovered on the
-   owner's current firmware. Nothing to test until the release lands. **Watch for it** — recorded in
-   `context/CHANNELS.md` as pending with the vendor.
+   ⇒ ⛔ **`16062` is a BRAND-NEW capability, not something we had been failing to find.** The earlier
+   reasoning in this entry was backwards.
+   ⭐ **RELEASED same day** — `foinnc/M350` tag `2026-09-02-00`, 6 assets. Its ENTIRE changelog is one line:
+   *"扩展 Modbus 寄存器地址映射"* / *"Expanded Modbus register address mapping."* **No enumeration of what was
+   added.** `16062` is presumably part of it; nothing in the release says so.
+   ⇒ ⭐ **THIS IS THE MOMENT TO ASK FOR THE REGISTER MAP.** The vendor has just stated he expanded the
+   mapping and not said to what. Everything we know about `6500`/`10000`/`15000`/`16062` has been
+   reverse-engineered from a screenshot, a PC tool's source, and one message. A map ends that permanently
+   and is a natural follow-up to his own release note rather than a fresh request.
 3. ⛔ **THE V4.1 WILL NOT GET THIS — owner-stated, 2026-09-02.** Not "unknown", not "unverified": it is not
    coming. ⇒ **The `SYSDISK` byte-offset route above is NOT a fallback, it is the ONLY route for the V4.1**,
    and per [[v41-and-v3-outnumber-expert]] the V4.1 and V3 outnumber the Expert in the field. Anything built
