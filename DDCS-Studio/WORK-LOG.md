@@ -70920,3 +70920,85 @@ has reached (t2547: 3071, t2531-era baseline: ~3066-3070).
 
 `git status` clean outside `web/styles.css` (the bounded-height rule) and this WORK-LOG entry.
 
+## t2553 -- REPLACING THE 200px CONSTANT WITH visualMaxHeight() TRIED, MEASURED WRONG, REVERTED CLEAN: a genuine "wiring needs a mechanism that does not exist yet" finding, per the dispatch's own guardrail
+
+Read `visualMaxHeight()` (paneAccordion.js:210-252) in full before building anything, per the dispatch's own
+explicit instruction. It is a REAL, live, footer-aware ceiling computation, proven correct for TWO cases
+already: the classic shell (t1353's own original, `hb.bottom - vb.top` against `.wiz-2pane`) and a
+SPLIT-NESTED visual in the NARROW/stacked layout (t2355's own "climb from `.ui-split-pane` to `.ui-split`"
+fix, specifically the Blocks-tab auto-preview panel drill was already reachable through). It had never once
+been exercised in the THIRD combination this arc's own work newly created: a split-nested visual inside the
+WIDE Customize modal.
+
+### THE WIRE-UP TRIED, exactly as asked
+
+`applyVisualHeight()`'s own `px == null` (bootstrap, no stored preference) branch was extended: for a
+`.wiz-visual` whose own parent is `.ui-split-pane` (the split-nested case, ONLY -- the classic branch's own
+`v.parentElement` is `.wiz-2pane`, never matches, byte-unchanged), compute `visualMaxHeight(v)` and apply it
+as `--viz-explicit-h`/`--viz-stack-h`, the SAME shape the "stored preference" branch already uses -- a
+genuinely UNSTORED default (never written to localStorage, matching t2113's own "recomputed from the real
+window every time" guarantee). `styles.css`'s own `-200px` hand-tuned constant was removed as dead code (the
+custom property is now always set by JS before the stylesheet's own `var(--viz-explicit-h, ...)` fallback
+could ever be read).
+
+### MEASURED WRONG, immediately, before trusting it
+
+`--viz-explicit-h` computed to `900px` -- exactly `VIZH_MAX`, the function's own absolute safety fallback, not
+a real number. Replicated `visualMaxHeight()`'s own exact logic inline (not from memory) to confirm it was the
+LOGIC, not a timing race (the bootstrap call running before layout settles): called it AFTER a full page
+settle, got the IDENTICAL 900. Traced why: the climb correctly reaches `.ui-split-horiz` (`climbed: true`,
+confirmed), but `.ui-split-horiz`'s own `hb.bottom` measured `1388.5px` -- its own NATURAL, UNCONSTRAINED
+height, tracking `.ui-split-pane1`'s own 30-row form content (the EXACT SAME unbounded-growth mechanism
+t2551's own investigation found and named), NOT the modal's real visible/footer boundary. `hb.bottom - vb.top`
+computed to `1263px`, clamped down to `900` (`VIZH_MAX`) since it exceeds the sanity bound -- WORSE than
+t2551's own hand-tuned `-200px` constant, which kept a confirmed `~31px` clear of the footer; `900px` pushed
+the marker to `y=915.95` in a 900px viewport, off-screen again, and `.wiz-visual`'s own bottom to `1025.5px`,
+past the footer at `793.5px` by over 200px.
+
+### WHY THIS IS THE HONEST "FIFTH VISIT" ANSWER, not a fixable wiring gap
+
+`visualMaxHeight()`'s own "climb to `.ui-split`" strategy assumes the climbed host (`.ui-split-horiz`) is
+ITSELF bounded once climbed -- true in the narrow/stacked case (t2355's own account: even THERE it needed a
+`return VIZH_MAX` special-case for `≤860px`, "the modal itself goes height:auto... there is no real ceiling to
+protect"), and true in the classic wide-modal case (`.wiz-2pane`'s own height:100% resolves against the
+modal's real `min(93dvh,1000px)` bound). In THIS THIRD combination, `.ui-split-horiz` is ALSO effectively
+unbounded, for a DIFFERENT reason than either prior case: `.wiz-controls`'s own tree-mode `flex:1 1 100%`
+stretches it to match its OWN sibling's unconstrained content height (the t2551-named mechanism), and
+`align-items:stretch` then pulls `.ui-split-horiz` itself to match. `visualMaxHeight()` was never built to
+recognize or correct for THIS shape of unboundedness -- fixing it would mean changing the function's OWN
+computation (e.g., climbing further, or independently measuring the MODAL's own real footer rather than
+trusting the immediate climbed host's own bottom edge), a genuine, separate piece of work on `paneAccordion.js`
+itself, not a wiring change. Per the dispatch's own explicit instruction ("if wiring it needs a mechanism
+that does not exist yet, STOP AND REPORT; I would rather keep a documented constant than invent plumbing to
+remove one") -- reverted BOTH files (`paneAccordion.js`, `styles.css`) to their exact committed t2551 state
+via `git checkout HEAD --`, confirmed via `git status` clean and a re-run of the full test file matching
+t2551's own exact numbers (6/7 passed, the cross-face test still at `27.786` vs `24.985`, unchanged).
+
+### VERIFY, answered directly
+
+- Canvas size real numbers before/after: UNCHANGED from t2551 (the attempt was reverted before shipping;
+  "before" and "after" this turn are the same state, re-confirmed).
+- Both self-referential tests ("WCS arm, TWIN", "Skim arm, TWIN"): still GREEN, unchanged, re-confirmed live.
+- Marker clear of the footer: unchanged from t2551's own measured `~31px` margin -- the ATTEMPTED replacement
+  would have made this WORSE (marker off-screen again), which is exactly why it was reverted before it ever
+  reached a commit.
+- Cross-face test: still red, `27.786` received vs `24.985` expected (~11% off), unchanged.
+- **A fifth visit to this rule IS still possible, stated plainly**: the `-200px` constant in `styles.css`
+  remains a hand-tuned number, not a live computation. Closing that gap properly needs `visualMaxHeight()`
+  itself extended to correctly bound a split-nested visual inside an UNCONSTRAINED wide-modal host (not just
+  wired to as-is) -- real, scoped, separate work, not attempted here per the guardrail's own explicit
+  preference for a documented constant over invented plumbing.
+
+TIER: full suite, unconditional, per the dispatch's own instruction -- run anyway despite no product code
+shipping this turn (the attempt was reverted before commit), rather than reasoning past an explicit
+instruction on the belief nothing could have changed.
+
+**Full `--workers=4` suite: 3071 passed, 1 failed, 14 flaky, 26 skipped** -- the ONE failure is
+`surfacing-start-position-1648.spec.js`'s own cross-face test, exactly the already-documented, honestly-red
+piece named above (received `27.786` vs expected `24.985`, matching the isolated re-run above precisely).
+`open-as-modal-1625.spec.js` (this session's own established BACKLOG #56 flake) did not fire this particular
+run, consistent with its own known intermittent nature. `test:node` 238/238. Nothing new, nothing
+unaccounted for -- the revert is confirmed clean at full scale, not just by `git status`.
+
+`git status` clean outside this WORK-LOG entry.
+
