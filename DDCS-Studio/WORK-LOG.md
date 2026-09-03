@@ -72751,3 +72751,105 @@ suites" hazard). `npm run test:node`: 238/238, unchanged. `git status`: only thi
 `tests/simstart-relto-reachability.spec.js`) plus this WORK-LOG entry and a BACKLOG #61 addendum. The small item
 (the 23 ARCHITECTURE.md candidates from t2535) is its own separate commit, per the dispatch's own instruction.
 
+## 🔨 turn 2585 (small item) — the 23 t2535-deferred memory candidates VERIFIED against HEAD, not force-fit:
+17 SURVIVE and are now written into their real target docs, 6 DROPPED as superseded/already-shipped/already-
+covered — not product code, its own separate commit
+
+### THE ASK, restated precisely — and a correction to how it was framed
+
+t2535 (WORK-LOG line 70003) reviewed 96 old memories and split 23 into a genuine-but-deferred bucket, itself
+sub-routed to THREE different destinations, not one: 14 to `ARCHITECTURE.md`, 8 to `ROADMAP.md`/`BACKLOG.md`, 1
+to a porting-specific doc. This turn's dispatch characterized all 23 as "for ARCHITECTURE.md" — that simplifies
+t2535's own routing, which this turn followed as-recorded rather than force-fitting content into the wrong file
+(the exact mistake t2535 itself warned against: "a rushed insert alongside 22 context-file writes already done
+this turn" would undercut ARCHITECTURE.md's own "verified by reading" bar). Stated plainly, not silently
+corrected: the dispatch's own summary and t2535's own actual record disagree on WHERE the 23 belong; this turn
+honored the record.
+
+### METHOD — two parallel research agents, verification only, no writes; then the writing pass done directly
+
+Split the 23 by destination: one Explore agent verified the 14 ARCHITECTURE.md-bound candidates against current
+code (grep/read every file:line the memory cites, or the area of the codebase the topic covers if it names
+none); a second verified the 9 ROADMAP/BACKLOG/porting-bound candidates (including checking BACKLOG.md/
+ROADMAP.md themselves for near-duplicate coverage — the exact DROP criterion t2519/t2535 both established).
+Neither agent edited anything; each returned a structured per-memory verdict (SURVIVES + a ready-to-insert
+paragraph in the target doc's own voice, or DROPPED + the evidence). I spot-checked three of the highest-stakes
+citations myself before trusting the rest (`postGating.js:54-55`, `opSimContext.js:43`, `cornerData.js:95`,
+`ddcs-v41.js:33-48`) — all matched exactly, giving confidence in the batch without re-deriving every one myself.
+
+### THE SPLIT — 17 SURVIVE (13 ARCHITECTURE.md, 3 BACKLOG.md, 1 PORTING.md), 6 DROPPED
+
+**SURVIVED, written into `ARCHITECTURE.md`'s new "MIGRATED FACTS" section** (a separate, dated sub-section —
+the rest of the 2026-08-10 document was NOT re-verified this turn, only these 13, so the file's own global
+"Verified... at HEAD" header was left untouched rather than falsely widened): `uichildren-vocabulary-is-dual`,
+`universal-cam-hybrid`, `wizards-as-data-emit-is-template-not-delegate`, `workpiece-model-pivot`,
+`persistence-user-owned-file-principle`, `personalised-sim-from-dump`, `probe-clearance-plane-gated-to-active-wcs`,
+`probe-surface-block-generalises-probing`, `probes-never-read-wcs`, `s4-live-blocks-view-complete`,
+`sim-declarations-sim-side-not-editor-text`, `postgating-owns-field-disabled`,
+`ios-ring-switch-silences-webaudio` (this last one written as an OPEN gap, not a shipped mitigation — its own
+documented fix, `navigator.audioSession.type='playback'`, still does not appear anywhere in `web/`, confirmed
+again via a fresh grep; no ruling exists anywhere on whether that's an oversight or a deliberate cost tradeoff).
+
+**SURVIVED, written into `BACKLOG.md`** (new items #74-76): desktop packaging is Windows-only, macOS never
+built (#74, a real still-open platform constraint, absent from BACKLOG/ROADMAP entirely); the CAM slot hand-edit
+escape hatch, "Fork E" (#75 — but ONLY this half of the original memory survives: its OTHER half, S4, the live
+Blocks-view editor, shipped 2026-08-07 per commit `205b9007`, matching the memory's own predicted design almost
+exactly, so migrating it again would have been stale-as-written); the rejected "Engrave Label" CAM design (#76,
+a negative decision worth preserving so it isn't costly re-litigated — not previously recorded anywhere).
+
+**SURVIVED, written into `PORTING.md`**: `scratch-var-free-is-per-post-firmware-scoped` — neither
+`bridge/controllers/README.md` nor `PORTING.md` stated this as a general discipline before this turn (the
+concrete V4.1/#42/#43-vs-#190/#191 worked example existed only scattered in `ddcs-v41.js`'s own code comments);
+added to `PORTING.md`'s own "Discipline" line, the doc's own natural home for a cross-target verification rule.
+
+**DROPPED (6), each with a specific reason, not a vibe:**
+- `2d-layout-canvas` — the underlying engine (`featureCanvas.js`/`clearing.js`) is still genuinely shared, but
+  the MECHANISM the memory describes (a per-op adapter with its own `onDrag`, driven by `wizardManager.update()`)
+  is the legacy per-wizard-view pattern; per `ARCHITECTURE.md` Q1 those 14 coded views (drillView.js etc.) are
+  unreachable from the bar today. The live mechanism (`panelTypes.js`'s declared-handle registry) is a DIFFERENT
+  shape than what the memory would have restated — inserting the memory's own text would have shipped a stale
+  description under a true-sounding title, worse than not inserting at all.
+- `alignment-real-correction` — superseded by a newer, more specific, more current ROADMAP finding
+  (`ROADMAP.md:466-517`, 2026-08-22: V4.1 rotates natively, contradicting the standing premise this memory's
+  own "controller-agnostic" framing assumed) covering the same open question on a broader, hardware-grounded
+  footing.
+- `controller-import-remote-sim` — its own stated "deferred leg" (cloud profile save/load) has shipped
+  (`ui/workspaceManager.js`'s ☁ Cloud tab); the memory's central claim is now simply false.
+- `desktop-google-oauth` — the memory's own stated external prerequisite (a Google "Desktop app" client id the
+  USER had to obtain) is resolved: the app now bundles and auto-seeds its own (`bridge-app/fairy/config.py:180-237`,
+  with provenance-tracked auto-replacement for a prior mis-seeded client). What genuinely remains open (a live
+  end-to-end round-trip, unconfirmed) is already tracked near-verbatim in `ROADMAP.md:105`.
+- `cam-probing-and-simulate` — fully shipped, self-documenting in code (the `G04 P` dwell-convention comment the
+  memory quotes is still word-for-word present in `camMacroKit.js:16-20`); no open decision, no distinct claim
+  to add anywhere.
+- `gui-blocks-roundtrip-target` — its own stage-B target (param blocks as the persistent round-tripping source,
+  replacing index-based bindings) is already filed, in the identical terms, at `ROADMAP.md:204`.
+
+### THE HONEST NUMBER, per the dispatch's own explicit ask
+
+**17 of 23 survive (~74%) — a HIGH rate, not a low one, and that itself needs stating precisely rather than
+conflated with t2535's own original 96-item pass.** t2535's own overall STALE+DROP rate across all 96 was much
+higher (51 of 96, ~53%) because that batch was UNFILTERED. These 23 were already t2535's OWN pre-screened
+"genuinely still true" bucket — the routing was wrong, not the content — so a high survival rate here is the
+expected, consistent result, not a surprise finding. The real signal in this turn's own 26% drop rate is
+different: every single DROP was caused by something SHIPPING or being SUPERSEDED in the roughly one month
+between t2535 (part of the memory-migration arc) and now, on a fast-moving codebase — not by t2535's own
+verification being sloppy the first time. That is itself the finding worth naming: even a carefully-screened
+"still true" bucket has a real half-life on this project, and 23 items sitting deferred for even a modest
+stretch is enough for a quarter of them to go stale underneath you.
+
+### VERIFY
+
+Every SURVIVES verdict carries a `file:line` citation checked against the code, not the memory's own prior
+wording; every DROPPED verdict names the specific superseding commit/file/line, not a vibe. Three of the
+highest-stakes citations spot-checked directly by me (not just trusted from the agent report) before writing:
+`postGating.js:54-55`, `opSimContext.js:43`, `cornerData.js:95`, `ddcs-v41.js:33-48` — all matched exactly.
+OBSERVED vs INFERRED: every SURVIVES/DROPPED verdict above is OBSERVED (a live grep/read result, this turn or
+the agents'); the "half-life" framing in the honest-number section is my own INTERPRETATION of that observed
+pattern, flagged as such. `test:node`/Playwright: not re-run — pure documentation edits (`ARCHITECTURE.md`,
+`BACKLOG.md`, `PORTING.md`), zero product code touched, matching the dispatch's own implicit tier (no code
+changed) and this file's own prior identical-shape turns (t2519/t2535) which also skipped a suite re-run for
+doc-only work. `git status`: only `ARCHITECTURE.md`, `BACKLOG.md`, `PORTING.md`, and this WORK-LOG entry — a
+genuinely separate commit from the main t2585 build (`simStart.js`/`bridge.js`/`pickerField.js`, already
+committed and pushed), per the dispatch's own explicit "separate commit" instruction.
+

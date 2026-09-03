@@ -777,6 +777,116 @@ WORK-LOG- and test-header-reported; not re-measured.)*
 
 ---
 
+## MIGRATED FACTS — a separate pass, verified by reading, at HEAD `2f6f9149` (2026-09-03)
+
+**This section was NOT part of the 2026-08-10 read-through above** — the rest of this document was not
+re-verified this turn, only the 13 items below (t2585, closing out t2535's own deferred batch of 23 memory
+candidates — 6 dropped as superseded/already-shipped/already-covered, reported in WORK-LOG t2585, not here).
+Same rule as the rest of the file: name the declaration, cite `file:line`, mark what's genuinely unresolved.
+
+**A new `uiChildren` node type needs TWO registrations, or Blockly throws and aborts the Customize-route
+render.** A render branch in `formWidgets.js`'s `traverse()` (`web/ui/formWidgets.js:1447`, e.g. the
+`code_preview` branch at `:1650`) AND a matching Blockly block def in `wizards/ops/` (e.g.
+`web/wizards/ops/codePreview.js:21`), registered in `wizards/ops/index.js` and fed into
+`Blockly.defineBlocksWithJsonArray` (`web/blocks/blockly/bridge.js:865`). The two halves are declaratively
+independent — nothing enforces that adding one also adds the other, and a lone-half type throws `Invalid block
+definition for type: <x>` the instant `ddcsEditWizardDef` renders the Blocks-tab canvas, which can abort
+rendering of unrelated fields too.
+
+**CAM slot building is a deliberate HYBRID, not a replace.** `camTypeOf` (`web/data/opCamMap.js:547`) resolves a
+program op to a premium, live-parametric generator — `GEN = {corner,edge,surface,pocket,cpocket,zprobe,inside,
+boss,align}` (`opCamMap.js:525-526`, drawn from `data/probeToSlot.js`/`data/millToSlot.js`) — or falls back to
+`{universal:true}` for any op the generators can't express, routing to `data/stackToSlot.js`'s UNROLL
+(value-role params stay live `#var` knobs via `data/atomRoles.js`/`data/exposeClassifier.js`; geometry bakes to
+literals). A third mode, SUB-STACK (`wizards/ops/userRoot.js`'s `opunit` boundary block, transparent in
+`blockEmitter.js`'s fold — see Q2's own fold table), lets a custom op embed a *standard* generator sub-unit that
+stays live via `data/subStackToSlot.js`. Multi-part programs compose through `data/slotPack.js:177`
+`composeParts` (uniquifies labels, strips all but the last terminal `M30`); local scratch vars allocate
+collision-free through `data/camScratch.js`'s declared `SCRATCH_BANDS`/`nextLocalVar`/`fieldVarCollisions`.
+
+**The emit source for a wizards-as-data op is the TEMPLATE itself (M2), not a JS builder it delegates to (M3,
+rejected)** — a deliberate choice so re-authoring a wizard in the Blocks tab (e.g. wrapping a probe in an
+`array` to make a grid) actually changes what gets built. `instantiate(def, params)` (`userOps.js:674`) clones
+`def.template` — FROZEN JSON DATA — then `deriveGuards`/`pruneGuards` (`whenGuard.js:38`) resolve variant
+branches and `deriveBindings` (`dataOps/deriveBindings.js:50`) re-derives value bindings BY IDENTITY after
+prune. A legacy JS stack builder (e.g. `cornerStack`) survives only as the SEED that produced the frozen
+template at authoring time, never as a runtime dependency.
+
+**Stock is a richer WORKPIECE, not a bare box.** `settings.stock` stays flat for back-compat, with an additive
+`stock.features[]`, projected by `getWorkpiece()`/`projectWorkpiece()` (`engine/workpiece.js:90,116`). The
+taxonomy is SHAPE × SIDE, not boss-vs-pocket: `{rect:{outside:'boss',inside:'pocket'},
+round:{outside:'round-boss',inside:'bore'}}` (`workpiece.js:20-21`) — OUTSIDE features share the outer stock
+outline, INSIDE features are per-op cavities. `deriveLegacyFeatures` (`:64`) reproduces the old hardcoded
+pocket when no `features[]` is declared, so legacy renders stay byte-identical. Editing is centralized in one
+dedicated modal, `ui/stockEditor.js`, opened from every wizard's own preview composer
+(`viz/createPreviewPanel.js:32,1270`) rather than duplicated per wizard.
+
+**Persistence is a user-OWNED file, never localStorage or the exe's WebView storage** (both app-managed, wiped
+on update). The File System Access API is the one mechanism for both shells: `data/fsHandles.js`/`data/backup.js`
+(`BACKUP_STORES`, `:57`) for the intentional `.ddcs` Save, `data/libraryFolder.js:42-43` for granular
+`.wiz`/`.cam` source sharing, `data/deployFolder.js` for baked machine deploys. The desktop exe's WebView-storage
+amnesia risk (a bare `webview.start()` defaulting to `private_mode=True`) was a real, reported bug (t1257) — now
+closed by routing both launchers through one function, `bridge/bridge-app/fairy/webview_storage.py:35`
+`start_persistent()`, which sets `private_mode=False` and a stable per-user `storage_path`.
+
+**The preview's machine-frame math is sourced from the static controller dump, not live machine state.**
+`GcodeExecutionEngine` takes a `wcsOffset` ctor option (`engine/GcodeExecutionEngine.js:78,137`) and computes
+`part = machine·unitScale − wcsOffset` throughout (`:698,1142,1224`) — a no-op (origin offset) until a profile
+supplies a real one. `bridge/bridge-app/fairy/ops.py`'s `_read_setting_params` (`:920`) parses the raw
+`SYSDISK/setting` f64 array; `_map_geometry_to_profile`/`_map_geometry_to_profile_v41` (`:576,762`) emit the
+`geometry`/`wcs` blocks `profile()` (`:436`) serves to `web/data/profileStore.js`.
+
+**A probe wizard's "Clearance plane" work-frame move is offered only when it is provably reading the same WCS
+its own probe writes.** `clearMode:'plane'` is gated by `optionGate: { requireAll: [{param:'wcs',is:'active'},
+{param:'probeZFirst',is:true}], fallback:'hop' }` (`blocks/dataOps/cornerData.js:95`) — auto-reverting to Hop
+otherwise, since a specific G54-G59 target op only WRITES that WCS's offset registers without activating it, so
+the plane would read whatever WCS happens to be runtime-active. Max (G53) and Hop (relative) stay frame-
+independent and are always offered.
+
+**Probing is generalised into one declared primitive**, `wizards/ops/probeSurface.js` — "a shared sub-builder,
+not an atom" (`:1-4`) — composed by every probe wizard's stack builder rather than each hand-rolling its own G31
+sequence + stylus-radius comp: `wizards/stacks/{corner,edge,middle,alignment,rotaryCenter,rotaryClock}Wizard.js`
+and `wizards/lathe/latheProbe.js` all import it. Radius compensation lives in `wizards/ops/radiuscomp.js`,
+bundled by the block rather than duplicated per wizard.
+
+**A probe op's WCS is its OUTPUT, not its input** — the stored table value is definitionally suspect at probe
+time (stale from the last part). The sim never maps a probe op's picture through the declared WCS table:
+`viz/opSimContext.js:43` states it directly ("this program probes FOR the WCS... renders via the honest margin
+approximation EVEN WHEN a WCS [exists]"), backed by `createPreviewPanel.js`'s `g53ApproxForViz` (`:861`, wired at
+`:879`) and `probesForWcs` (`:1405`). Mill/cut ops are unaffected — they legitimately read the WCS they run in.
+
+**Editing a CAM slot (macrosApp's `editCamSlot`) also loads its op(s) into the Blocks tab so the tab shows real
+structure.** The one-source load path is `devMode.js:557` `reconstructUserOpBlock(opType)`, used by both
+`editWizardDef` (single, `:621`) and `editWizardDefs` (multi, `:607`) — there is no separate Blocks→slot
+converter. A def-save fires `ddcs:userops-changed`, caught by `macrosApp.js:1171` `rebuildStaleCamSlots`, which
+rebuilds any CAM slot whose op has gone `defVStale` via `buildSlotFromOps`.
+
+**The editor follows Option B: editor TEXT stays clean**, with op info read from the program model, never from
+`( @DDCS … )` G-code comments — enforced by `tests/editor-sim-real-insert.spec.js:44` (`hasMarker` must be
+`false`). A sim-only declaration (e.g. "this probe contact is a radius-compensated surface") must be read
+SIM-SIDE, from the op stack itself. `wizards/ops/probeSurface.js:75-78` documents a concrete instance: an
+earlier `( @DDCS:1 {"op":"probe-surface",...} )` marker was removed for exactly this reason; the sim now reads
+the radius-comp result off the op stack directly. (That same file's own top-of-file docblock, lines 5-7, is
+stale prose still describing the removed marker — the code at `:75-78` overrides it; worth fixing if anyone
+next edits that file.)
+
+**`ui/postGating.js` owns the CAPS axis of wizard-field `.disabled`** (greying fields the active post can't
+support), re-running on load and every `ddcs:settings-changed`; its cap-ON pass blanket re-enables every input
+in a `[data-cap]` panel unless the element opts out. The contract: `postGating.js:54-55` — `if (ok &&
+c.dataset.opGated === 'true') return;` before `c.disabled = !ok`. An op view greying a field for its own
+method/mode reason must set `data-op-gated="true"`, or postGating silently re-enables it a tick later.
+
+**The iPhone Ring/Silent switch silences Web Audio (`AVAudioSessionCategoryAmbient`) but not `<audio>`
+(`...Playback`)** — a platform fact, not an app bug (traceable to WebKit's `AudioSessionIOS.mm`; Apple closed
+WebKit#237322 as "configuration changed"). `ui/sound.js:28-34` ships an unrelated Android-scheduling-race fix
+(`resume().then(go)`, t2134) but as of this HEAD contains no `navigator.audioSession` call —
+`grep -rn audioSession DDCS-Studio/web` is empty. **UNVERIFIED-AS-DECIDED**: the documented iOS-16.4+ fix
+(`navigator.audioSession.type='playback'`) has not shipped; whether that is an oversight or a deliberate cost
+tradeoff (non-mixing, can grab a Bluetooth/car route, gates Now-Playing eligibility) has no recorded ruling in
+WORK-LOG/BACKLOG/ROADMAP as of this turn.
+
+---
+
 ## UNVERIFIED — the honest gaps
 
 - **Nothing was executed.** No test, no browser, no dev server. Every claim above is static reading with a

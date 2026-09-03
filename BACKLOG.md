@@ -7934,3 +7934,34 @@ still real** — it explains the ~11% BOTH axes now show equally — but the "WO
 implication that HEIGHT is asymmetrically worse than WIDTH for this gap specifically, do not survive: they
 described the other bug, not this one. `tests/surfacing-start-position-1648.spec.js`'s own declared band was
 tightened to match (ONE band, ~1.05-1.20, both axes) at t2567 — see that turn's own WORK-LOG entry.
+
+---
+
+### 74. Desktop packaging is Windows-only — macOS was planned, never built
+
+[OPEN, no build scheduled] All three CI workflows (`.github/workflows/desktop-release.yml`,
+`desktop-build-check.yml`, `test.yml`) run on `windows-latest` only; `desktop/build_fairy.ps1` is PowerShell-only;
+there is no `macos-latest` runner, `.app`, or `.dmg` anywhere in the repo. Do not design around a Mac build
+existing — a Windows-only API (`winsound`, `windll`) costs nothing today beyond a `sys.platform` guard. If ever
+built: the same pywebview script via WKWebView (pyobjc), built on a GitHub Actions `macos-latest` runner
+(PyInstaller can't cross-compile) with `--windowed` (bare binaries lose keyboard focus on macOS); unsigned
+builds hit Gatekeeper; real signing/notarization needs a $99/yr Apple Developer account. (Migrated from memory,
+t2585 — verified still true at HEAD `2f6f9149`.)
+
+### 75. CAM slot hand-edit escape hatch (Fork E) — still not built
+
+[OPEN] The declare-once CAM authoring model (the wizard is the one editor, Settings is pure display) has no raw-
+block hand-edit path: a slot with no `slot.ops` manifest shows "ⓘ hand-built — no wizard Edit" with no way in.
+S4 (loading a universal/substack op's own structure into the Blocks tab on Edit) shipped 2026-08-07 and covers
+block-able ops; Fork E — an app-wide code→blocks escape hatch for arbitrary CAM macro bodies — remains the one
+deferred fork from the original declare-once design. `regenGuard` (`web/ui/macrosApp.js:1188`) is reserved for
+this path; it currently only serves the unrelated "⟲ Rebuild" action (t1456). (Migrated from memory, t2585 —
+the rest of that memory's own content, S4 itself, was confirmed already shipped and is not repeated here.)
+
+### 76. [REJECTED 2026-07-10, do not re-propose] Enum-label "Engrave Label" CAM slot design
+
+Operator-numbered + `-t2` preset labels for a CAM slot's own on-pendant name, rejected outright by the owner.
+Grounded facts that survive the rejection and are worth keeping in mind if a similar idea resurfaces: the
+Expert CAM/param fields are only `-t0` int / `-t1` dec / `-t2` enum; `#` vars are floats; free-typed text entry
+on the controller pendant is impossible — any future "named label on the pendant" idea runs into this same
+wall. (Migrated from memory, t2585.)

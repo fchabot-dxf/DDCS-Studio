@@ -18,6 +18,18 @@ then DM500/V3-class, then grbl-class (= unroll). Every parametric op ports once;
 **Discipline:** per-target verify instruments; one PILOT op proven end-to-end (emit · sim ·
 round-trip · verify) before any fleet port — the corner-gated-pilot rule.
 
+**Scratch-var freedom is per-post, not global** (migrated from memory, t2585 — verified at HEAD `2f6f9149`).
+`varMap`'s "grounded FREE" means only *Studio-emit-free* (zero references across every wizard/CAM emit + the
+goldens) — it does not prove a var is free of the **target controller's own firmware macro locals**, and that
+band differs per post. Concrete, already-hit case: the Expert's Hop-cap scratch (`#42`/`#43`, globally free in
+`varMap`) is firmware-**unsafe** on V4.1, whose executable macros write `#0-148`; V4.1's own `safeHop` uses
+`#190`/`#191` instead, native-vetted free in V4.1's `#149-489` band (`DDCS-Studio/web/wizards/dialects/ddcs-v41.js:33,43,47-48`).
+Before baking a scratch var into a new per-post atom, verify it against **that** target's own documented
+firmware-local band — the same standard already applied to V4.1 — not just `varMap`'s emit-scoped "free." The
+risk is real only when a firmware macro (G31/M-code/subprogram) executes between the write and the read; pure
+arithmetic/G0/G53 in between is safe, but picking a firmware-band-clear var is the belt-and-suspenders default
+for anything safety-critical.
+
 ---
 
 ## Status: V4.1 ARC **CLOSED** (S1–S5) · DM500 stage 1 MEASURED (thin, not POST_VERIFIED) · S5 ran on real hardware
