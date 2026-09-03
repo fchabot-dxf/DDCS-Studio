@@ -72506,3 +72506,73 @@ attempt a fix, did NOT chase the save-dialog symptom, did NOT chase the exact me
 "real, not speed." `git status`: clean of product code — this turn built and ran two scratch tests (one
 inconclusive minimal repro, one conclusive full-repro comparison), then deleted both.
 
+## 🔨 turn 2581 — GUARDRAIL TRIGGERED, STOPPED before fixing: real narrowing achieved (a GENERAL gesture-start failure, not feature_canvas-specific), several concrete "leftover state" candidates measured and RULED OUT, exact mechanism not found
+
+### THE DISPATCH, and the lead to test rather than build on
+
+FIX IT, with an explicit, INFERRED lead named as inferred: the failure depends on the PRIOR INTERACTION
+SEQUENCE (t2579's own finding — an isolated 4-formfield stack drags fine, the real pilot's own history does
+not), matching the shape of two prior confirmed bugs this same day (the search flyout, the dropdown popup) —
+something a picker interaction leaves behind, still present and still hit-testable when the next drop happens.
+`elementFromPoint` at the drop coordinate was named as the cheapest first measurement. Explicit guardrail: if
+the root is NOT leftover state — if it's genuinely in Blockly's own drop/connection logic — stop and report
+rather than force a fix.
+
+### MEASURED, in order, each result read live before moving to the next
+
+Instrumented a scratch copy of the parked pilot (un-skipped, feature_canvas/diag_aim_handle creation reverted
+to the real drag) with `elementFromPoint` at three points per drag (before, mid-drag holding, right before
+mouseup) plus a live count of `.blocklyDraggable.blocklyDragging` elements and `ws.currentGesture_` state.
+
+1. **`elementFromPoint` at the drop coordinate — NOT the culprit.** Every drop-coordinate check across the
+   whole run (all ten prior successful drags AND all `feature_canvas` attempts) resolved to a normal SVG
+   element (`rect`/`path`/`text`) belonging to the canvas itself — never a stray overlay, never the dropdown
+   popup (independently confirmed `hidden:true` throughout). The advisor's own cheapest-first measurement came
+   back clean.
+2. **The GRAB coordinate is correct and the click lands on the right element** — `elementFromPoint` at the
+   flyout's own `feature_canvas` block position resolved to its own "feature canvas panel" text on the FIRST
+   attempt, confirmed against the block's own live `getBoundingClientRect()`.
+3. **Yet Blockly never creates a gesture for this mousedown at all.** `ws.currentGesture_` is `null` both
+   BEFORE and immediately AFTER the mousedown (80ms later) — contrasted directly against every one of the ten
+   PRECEDING successful drags in the SAME run, each of which shows a real gesture object
+   (`{inProgress:'n/a', isDragging:false}`, the normal pre-drag-threshold state) at the identical checkpoint.
+   `.blocklyDragging` element count: 0, where every successful drag showed 1.
+4. **NOT feature_canvas-specific — a CONTROL with an unrelated block type proves it general.** Dragging
+   `length_handle` (a completely different, already-proven-working block) at the IDENTICAL point in the
+   sequence ALSO failed to create a gesture (`currentGesture_` stayed `null`) and never landed. This is the
+   turn's own key finding: **whatever breaks here blocks ANY new drag, not something specific to
+   `feature_canvas`'s own block definition** — the "feature_canvas fails" framing itself was one layer too
+   specific.
+5. **Ruled out, one at a time, each independently checked rather than assumed:** only ONE `feature_canvas`
+   block exists in the flyout at the failure point (no duplicate/disabled shadow copy intercepting it);
+   `Blockly.Events.isEnabled()` is `true`; the workspace's own `options.readOnly` is `false`; no `position:fixed`
+   overlay with a non-zero rect sits over the canvas (the dropdown popup correctly `hidden`, a settings overlay
+   present but zero-sized, nothing else with a meaningful footprint); `Blockly.Touch.clearTouchIdentifier()`
+   (a real, exported API, tested directly as a targeted fix attempt for a plausible "stuck touch/pointer
+   identifier blocks a new gesture" hypothesis) made no difference — the control drag still failed to create a
+   gesture immediately after calling it.
+
+### THE GUARDRAIL, applied honestly
+
+None of the concrete, checkable "leftover DOM/app state" candidates a `page.evaluate` can reach explain the
+failure. What's established beyond doubt: something changes, DURING the four-formfield authoring sequence,
+about the workspace's or Blockly's own readiness to start a NEW gesture — general, not per-block — and it
+persists past that sequence ending (the popup closed, events enabled, nothing visibly stuck). Finding the EXACT
+mechanism from here would mean instrumenting Blockly's own minified source directly (a breakpoint inside its
+own `onMouseDown_`/gesture-creation path) rather than continuing to guess at candidate causes from the
+outside — a different class of investigation than what this turn's own tools could responsibly attempt further
+without either forcing a fix on an unconfirmed cause or spending well past a reasonable turn's own budget on
+more blind candidates. **Per the dispatch's own explicit guardrail, stopped here rather than either forcing a
+fix or continuing to guess.**
+
+### VERIFY
+
+Every claim in this account is OBSERVED, not inferred: gesture state, drag-landed counts, flyout block
+enumeration, `Events.isEnabled()`, `options.readOnly`, and the `Touch.clearTouchIdentifier()` result were all
+read live, each logged before moving to the next hypothesis — none of the "ruled out" claims rest on reasoning
+about the code alone. The ONE inference in this account — "something about the formfield/picker sequence
+changes gesture-start readiness" — is stated as inferred (from the contrast between the isolated-repro's own
+success and the real pilot's own failure), not asserted as found. `git status`: clean — one scratch test built,
+instrumented progressively, then deleted; no product code touched, no fix attempted, matching the dispatch's
+own explicit guardrail.
+

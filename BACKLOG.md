@@ -5871,6 +5871,33 @@ popup opens, while calling `showEditor_()` directly does) — a save-dialog symp
 investigated. Re-parked with the corrected, three-part diagnosis (one fixed, two open) rather than left
 standing on the original, now-known-incomplete framing. Full account: WORK-LOG t2575.
 
+### ⭐⭐⭐⭐ t2579/t2581 — `feature_canvas` drag proven REAL for a human, then narrowed to a GENERAL gesture-creation
+failure at this stack depth; guardrail triggered, stopped before fixing
+
+t2579 settled whether the drag failure was a harness-speed artifact or real: a 4-attempt A/B (1 fast, 3 slow
+with real pointer travel + 250-500ms hover pauses) ALL failed identically at the drop, while every other drag
+in the same run landed on its first fast attempt. Real for a human. Side-finding, reported even though it came
+from an inconclusive detour: an isolated 4-formfield stack built without the pilot's own BINDMODE/ATOMTYPE
+picker history drags fine — the failure is STATE-dependent (tied to the prior interaction sequence), not
+structure-dependent (raw stack depth).
+
+t2581 attempted the fix on that lead, instrumented `dragFlyoutBlockTo` with `elementFromPoint` at three
+checkpoints, `.blocklyDraggable.blocklyDragging` element counts, and `ws.currentGesture_` state around
+mousedown. Reframed the bug: `ws.currentGesture_` stays `null` before AND after the `feature_canvas` mousedown
+(vs a real gesture object on every one of the 10 prior successful drags in the run) — and a CONTROL drag of an
+unrelated block (`length_handle`) at the identical sequence point ALSO failed to create a gesture. **So the bug
+blocks ANY new drag gesture from starting at this point — it is not `feature_canvas`-specific.** Ruled out via
+direct measurement: duplicate/disabled `feature_canvas` flyout entries (only one exists, `rendered:true`),
+`Blockly.Events.isEnabled()` (true), `ws.options.readOnly` (false), a stray `position:fixed` overlay over the
+canvas (none — enumerated all `body > div` elements), `Blockly.Touch.clearTouchIdentifier()` called directly as
+a targeted fix attempt (did not unblock the control drag's own gesture creation either).
+
+None of the checkable "leftover state" candidates explained it, and going further would need breakpoint-level
+debugging of Blockly's own minified source — past what `page.evaluate`-based inspection reaches. Per the
+dispatch's own explicit guardrail ("if the root is NOT leftover state ... STOP AND REPORT before fixing"),
+stopped without forcing an unconfirmed fix. Zero product code changed this turn. Still open, now correctly
+scoped as general (not `feature_canvas`-specific) rather than per-block. Full account: WORK-LOG t2579, t2581.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
