@@ -833,6 +833,22 @@ export function handleBindingsFromStack(children, realBindings) {
                     eTravel.anchorUnresolved = true; ePrimary.anchorUnresolved = true;
                 }
                 out.push(eTravel, ePrimary);
+            } else if (b.type === 'cross_aim_handle') {
+                const gid = 'ca' + (++n);
+                const axisField = p.axisField ? String(p.axisField) : null;
+                const signField = p.signField ? String(p.signField) : null;
+                const signWhenPos = (p.signWhenPos === '' || p.signWhenPos == null) ? 1 : Number(p.signWhenPos);
+                const anchor = {
+                    kind: 'crossAim', axisField, signField, signPosValue: p.signPosValue || 'pos', signWhenPos,
+                    relToRow: p.relToRow ? String(p.relToRow) : '', label: p.label || '↔',
+                };
+                const entry = attach(String(p.field || 'cross'), gid, 'cross', anchor);
+                // axisField/signField are READ-ONLY context (never merged onto — each may already carry its own,
+                // unrelated handle) but must still resolve, same fail-visibly doctrine as diag_aim_handle's own.
+                if ((axisField && !byParam.has(axisField)) || (signField && !byParam.has(signField))) {
+                    entry.anchorUnresolved = true;
+                }
+                out.push(entry);
             }
         }
     }
@@ -967,7 +983,17 @@ export function handleBindingsToBlocks(bindings) {
             label: a.label || '②',
         } });
     }
-    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids, ...pvKids, ...daKids];
+    // cross_aim_handle: one binding per handle (role 'cross'), like length_handle/radial_handle. axisField/
+    // signField/signPosValue/signWhenPos/relToRow are read back off the anchor's own literal string/number — not
+    // themselves binding roles here (read, not merged), same convention as diag_aim_handle's own axisField/signField.
+    const crossAims = list.filter((b) => b && b.group && b.anchor && b.anchor.kind === 'crossAim' && b.role === 'cross');
+    const caKids = crossAims.map((b) => ({ type: 'cross_aim_handle', params: {
+        field: b.param,
+        axisField: b.anchor.axisField || 'axis', signField: b.anchor.signField || 'dir',
+        signPosValue: b.anchor.signPosValue || 'pos', signWhenPos: b.anchor.signWhenPos != null ? String(b.anchor.signWhenPos) : '1',
+        relToRow: b.anchor.relToRow || '', label: b.anchor.label || '↔',
+    } }));
+    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids, ...pvKids, ...daKids, ...caKids];
     if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }

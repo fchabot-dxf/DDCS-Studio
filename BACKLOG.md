@@ -5898,6 +5898,34 @@ dispatch's own explicit guardrail ("if the root is NOT leftover state ... STOP A
 stopped without forcing an unconfirmed fix. Zero product code changed this turn. Still open, now correctly
 scoped as general (not `feature_canvas`-specific) rather than per-block. Full account: WORK-LOG t2579, t2581.
 
+### ⭐⭐⭐⭐⭐ t2583 — `cross_aim_handle` BUILT: BACKLOG #61 CLOSED, both sized gestures now shipped — `relTo`
+proven to extend beyond `point`-kind handles, three production tests green, UI-drive parked on t2581's own
+still-open blocker (not fought again)
+
+The SECOND and last gesture t2571's own assessment sized (`diagAim`'s own two primitives, REUSED unchanged,
+PLUS extending `relTo` — previously wired only for `point`-kind handles — to feed a `crossAim`-shaped decl's
+`lineAt`). Built: one new file (`wizards/ops/crossAimHandle.js`) + the same six touch-point edits every prior
+gesture port used. `relTo` extension proven LIVE, not just designed: a real declared `simstart` row's own world
+position, fed through `panelStarts` (the same source the 3D marker reads), correctly resolves `lineAt` — hand-
+traced (60, distinct from the 40 stock-half default so the test can't pass by accident) — and correctly FALLS
+BACK to the stock-half default when `panelStarts` isn't available yet, proving the defensive guard, not just the
+happy path. Found, logged, and left alone (not this turn's to fix): `simstart`'s own block definition has no
+author-facing `id` field yet, so `relTo` (in EITHER direction) has never actually been reachable by clicking
+through the app — only by a literal template, which is how every non-UI-drive test on this file (including
+this turn's own new relTo test) has always built its cases. Three tests green through real production code
+paths (`layoutSpecFromOp`, `emitMapped`, `builderOf`), each proven non-vacuous by a live disable/re-enable of
+its own covering branch. Regression: all 9 gesture-block spec files together — 37 passed, 0 failed, 2 skipped
+(both known-parked UI-drive tests). `test:node`: 238/238, unchanged.
+
+**The fourth (UI-drive) test PARKED without a fresh attempt** — the dispatch's own instruction: if it hits the
+SAME blocker t2581 found, don't fight it again, prove what production code paths can prove, and park with the
+same reason. It does hit the same blocker (a general, sequence-state-dependent gesture-creation failure, not
+specific to any block type — t2581's own finding, unchanged by anything in this build). BACKLOG #61 is now
+CLOSED as a build item: both `diagAim` and `crossAim` are shipped, block-authorable, and independently proven
+correct through the same production code paths a real UI action would call — the ONE thing standing between
+either and a full end-to-end UI proof is the general `feature_canvas` drag blocker t2579/t2581 already own as
+its own separate, still-open item above. Full account: WORK-LOG t2583.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`

@@ -99,6 +99,7 @@ const HANDLE_ANCHOR_FIELDS = {
     proj_length_handle: ['field'],
     probe_vector_handle: ['field', 'fieldAxis', 'fieldDir'],   // t2557 — dist/axis/dir, all three must-match (axis/dir are ENUM string writes, see panelTypes.js's own t2557 guard)
     diag_aim_handle: ['fieldTravel', 'fieldPrimary', 'axisField', 'signField'],   // t2573 — fieldTravel/fieldPrimary are written; axisField/signField are read-only companions (never merged onto), same doctrine as scale_handle's baseField
+    cross_aim_handle: ['field', 'axisField', 'signField'],   // t2583 — field is written; axisField/signField are read-only companions (never merged onto), same doctrine as diag_aim_handle's own; relToRow is a free-text sim-start row id, not a must-match param picker (same shape as formfield's own relToRow)
 };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],

@@ -72576,3 +72576,91 @@ success and the real pilot's own failure), not asserted as found. `git status`: 
 instrumented progressively, then deleted; no product code touched, no fix attempted, matching the dispatch's
 own explicit guardrail.
 
+## 🔨 turn 2583 — BUILT `cross_aim_handle`: BACKLOG #61's SECOND and last sized gesture, the `relTo` extension to
+a non-point gesture proven live, three production tests green, the UI-drive test parked on t2581's OWN blocker
+
+### THE BUILD
+
+One new file (`wizards/ops/crossAimHandle.js`) plus six touch-point edits, the EXACT same shape `diag_aim_handle`
+(t2573) used: `wizards/ops/index.js` (import+registry), `blocks/blockly/bridge.js`'s `HANDLE_ANCHOR_FIELDS`,
+`blocks/userOps.js`'s `handleBindingsFromStack`+`handleBindingsToBlocks`, `wizards/ops/panelTypes.js`'s new
+`anchor.kind==='crossAim'` branch, `blocks/blockEmitter.js`'s `METADATA_ONLY_LEAVES`. Middle's own hardcoded
+crossAim decl-building (`panelTypes.js`, untouched) stays as-is — this is the block-authorable parallel, same
+relationship `diag_aim_handle` has to Middle's own hardcoded diagAim.
+
+**The two REUSED primitives** (t2571's own assessment: "everything diagAim needs"): `resolveAnchorCoord`'s
+stock-W/H tokens (for the axis span, `wallFace = sign>0 ? 0 : span`) and `resolveEnumSign` (for `sign` itself) —
+byte-identical calls to `diag_aim_handle`'s own, no changes to `anchorSources.js` needed. `axisField`/`signField`
+are the same read-only-companion doctrine `diag_aim_handle` established (must-match, never merged onto, fail-
+visibly together with the written `field` when either doesn't resolve).
+
+**THE HARDER HALF, actually built**: `lineAt` — the live world position of ANOTHER declared pass along the
+PERPENDICULAR axis, which canvasWidgets.js's own `crossAim` gesture needs and `diagAim` never did. t2571 traced
+this to the SAME `relTo` mechanism already wired for `point`-kind handles (`resolveRelToIndex`+`panelStarts`,
+reached today only via `formfield`'s own `relToRow` field). This block carries the IDENTICAL `relToRow` (an
+existing declared sim-start row id, e.g. `'wall1'`) rather than inventing a new reference shape, and
+`panelTypes.js`'s new branch resolves it: `ri = resolveRelToIndex(def.opType, params, {row: anchor.relToRow})`,
+then reads `panelStarts[ri]`'s own live `x`/`y` (whichever is perpendicular to `axisX`) — the SAME per-pass
+source the existing `point` relTo branch and the 3D marker both already read, so this can't diverge from either.
+Falls back to `resolveAnchorCoord`'s own stock-half token when no row resolves (unauthored `relToRow`, a row
+absent under the op's current `when` gates, or — the case actually tested — `panelStarts` simply not computed
+yet), mirroring the exact fallback Middle's own hardcoded branch already uses.
+
+**A genuinely pre-existing, unrelated gap found along the way, NOT this turn's to fix**: `simstart`'s own block
+definition (`wizards/ops/simStart.js`) has no `id` FIELD in its `allFields` — an author cannot currently set a
+sim-start row's own stable id through the Blockly UI at all, meaning `relTo` (in EITHER direction — the existing
+point-handle path or this turn's new crossAim path) has never actually been reachable by a human clicking
+through the app, only by a literal template object (as every non-UI-drive test on this file already does, and as
+this turn's own new relTo test does too — the underlying object model reads `params.id` regardless of whether a
+block exposes a field for it, per `simStartsFromStack`'s own existing code). Logged here rather than silently
+worked around; not fixed this turn — out of this turn's own scope, and orthogonal to what BACKLOG #61 is sizing.
+
+### VERIFY — three tests, the exact production code paths a real UI action would ultimately call
+
+1. **Round-trip**: `cross_aim_handle` → ONE anchor entry (role `cross`, unlike `diagAim`'s two — this gesture
+   drives a single field), MERGED from the real binding when `field` resolves; FAILS VISIBLY when either the
+   written target OR a read-only companion (`axisField`/`signField`) doesn't. Reverse round-trip checked too.
+2. **Gesture math in isolation**: `CANVAS_GESTURES.crossAim.place/drag` (pre-existing, unmodified — the SAME
+   independent-truth check `diag_aim_handle`'s own test 2 used) — BOTH axis orientations (`axisX` true/false),
+   `place` at `wallFace+sign*cross` along the distance axis riding `lineAt` on the perpendicular, `drag`
+   re-derives `cross` (clamped ≥1).
+3. **The relTo extension, proven live — the turn's own genuinely new ground**: a real op's `def.bindings` merge
+   the anchor onto the one real binding; `layoutSpecFromOp` RESOLVES `lineAt` to a declared `simstart` row's own
+   live world position (a `frac` anchor at fx=0/fy=0.75 on a 100×80 stock → y=60, fed through `panelStarts` the
+   same way the live 3D-marker computation would) — hand-traced (`axisF` dflt 'X'→axisX=true; `signF` dflt
+   'pos'→sign=+1→wallFace=0; `cross` dflt 50→x=50; relTo 'wall1'→y=60) and matched exactly, DISTINCT from the
+   stock-half fallback (40) so the test can't pass by accident. The SAME op, called again with `panelStarts`
+   withheld (`null`), correctly FALLS BACK to the stock-half default (y=40) — proving the defensive
+   `Array.isArray(panelStarts)` guard, not just the happy path. `emitMapped`+`builderOf` confirm all three inputs
+   (the numeric write and both enum companions) independently change the emitted G-code.
+
+**Vacuity checked, not assumed**: temporarily disabled the new `panelTypes.js` branch → test 3 failed (2/3 →
+1/3); separately disabled the new `userOps.js` forward branch → tests 1 AND 3 failed (2/3 → 1/3, test 3 also
+depends on the forward branch resolving the anchor at all) — both restored immediately after, confirmed clean.
+
+### THE FOURTH TEST — PARKED without attempting a build, same reason as `diag_aim_handle`'s own fifth
+
+The dispatch's own instruction was explicit: "if crossAim's UI proof hits the SAME blocker, do not fight it —
+prove what you can through the real production code paths... and park the UI drive with the same reason." Did
+not attempt a fresh diagnosis or a new API-workaround: t2581 (immediately prior turn) already spent a full turn
+chasing this exact blocker's own root cause under the advisor's own explicit guardrail and correctly stopped
+without finding it (see that turn's own WORK-LOG entry) — it is a GENERAL gesture-creation failure at a
+particular authoring-sequence state, proven NOT specific to any one block type (`length_handle` control, same
+turn). Nothing about `cross_aim_handle`'s own code changes that finding. `test.skip`'d with a header naming the
+park's own reason plainly, per the dispatch's own explicit framing that this IS itself a data point worth
+reporting either way — here, "still blocked, unchanged cause" rather than a narrowing.
+
+### VERIFY
+
+Three tests green through the exact production code paths (`layoutSpecFromOp`, `emitMapped`, `builderOf`) a real
+UI action would call, each proven non-vacuous by a live disable/re-enable, not assumed. The relTo extension's own
+hand-traced numbers are asserted VALUES (60 resolved vs 40 fallback), not just "a handle rendered." OBSERVED vs
+INFERRED: every number in this account was read live from a real test run; the "same general blocker, no new
+cause" claim for the parked test rests on t2581's own prior turn, cited, not re-derived from scratch.
+`npm run test:node`: 238/238 green (unchanged). Regression: all 8 prior gesture-block spec files + this turn's
+own new one, run together: 37 passed, 0 failed, 2 skipped (the two known-parked UI-drive tests, diagAim's own
+and this turn's own) — no regression from the six shared touch-point files this turn edited. `git status`: only
+this turn's own new/edited files (`wizards/ops/crossAimHandle.js`, `wizards/ops/index.js`,
+`blocks/blockly/bridge.js`, `blocks/userOps.js`, `wizards/ops/panelTypes.js`, `blocks/blockEmitter.js`,
+`tests/cross-aim-handle-block.spec.js`) plus this WORK-LOG entry and a BACKLOG #61 addendum.
+

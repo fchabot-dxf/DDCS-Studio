@@ -641,6 +641,40 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             }
             continue;
         }
+        // t2583 (BACKLOG #61, t2571 assessment's own crossAim half) — `cross_aim_handle` declares kind
+        // 'crossAim': ONE role-tagged param (role 'cross', like radial_handle's own single-binding shape) PLUS
+        // TWO read-only companions (`axisField`/`signField`, same doctrine as diagAim's own) PLUS a `relTo`
+        // REFERENCE (`anchor.relToRow`) — canvasWidgets.js's own `crossAim` gesture needs `lineAt`, the LIVE
+        // world position of another declared pass along the PERPENDICULAR axis, which t2571 traced to the SAME
+        // mechanism `relTo` already provides for `point`-kind handles (`resolveRelToIndex`+`panelStarts`,
+        // imported at this file's own top) — EXTENDED here to feed a non-point gesture's `lineAt` instead of an
+        // x/y offset. Mirrors middle's OWN hardcoded crossAim decl-building further down this file (untouched —
+        // that path is Middle's own built-in twin): `wallFace`/`sign` derive from the SAME sign convention
+        // (`wallFace` = 0 when sign>0, else the axis's own stock span — the identical relationship middle's own
+        // `dir1Plus ? 0 : span` / `dir1Plus ? 1 : -1` pair encodes, just sourced from a declared enum instead of
+        // `middleAxes`); `lineAt` falls back to the perpendicular stock HALF when no row resolves (unauthored
+        // `relToRow`, or a row not present under the op's current `when` gates) — the same stock-centred default
+        // middle's own hardcoded branch uses when `panelStarts[0]`/`[last]` isn't available yet.
+        if (anchor && anchor.kind === 'crossAim') {
+            const crossB = groups[gid][0];
+            items.push({ kind: 'hole', x: 0, y: 0, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — this gesture's own wall face is stock/relTo-derived, not a fixed literal
+            if (crossB && _writable(crossB.param)) {
+                const axisX = params[anchor.axisField] !== 'Y';
+                const sign = resolveEnumSign(anchor.signField, params, anchor.signPosValue, anchor.signWhenPos);
+                const span = resolveAnchorCoord(axisX ? 'stockW' : 'stockH', stock);
+                const wallFace = sign > 0 ? 0 : span;
+                const ri = anchor.relToRow ? resolveRelToIndex(def.opType, params, { row: anchor.relToRow }) : null;
+                const pt = (ri != null && Array.isArray(panelStarts)) ? panelStarts[ri] : null;
+                const fallback = resolveAnchorCoord(axisX ? 'stockHalfH' : 'stockHalfW', stock);
+                const lineAt = pt ? num(axisX ? pt.y : pt.x, fallback) : fallback;
+                const cross = Math.max(1, num(params[crossB.param], 50));
+                decls.push({
+                    type: 'crossAim', id: gid + '_cross', axisX, wallFace, sign, cross, lineAt,
+                    field: crossB.param, label: anchor.label || '↔',
+                });
+            }
+            continue;
+        }
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;
