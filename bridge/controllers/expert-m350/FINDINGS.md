@@ -939,9 +939,12 @@ conversational evidence from the one person who actually knows.
 
 ### ⛔ WHAT IS NOT ESTABLISHED
 
-1. **Reset behaviour.** Does it zero at program start, or count cumulatively since power-on? **Asked, awaiting
-   reply.** It decides the implementation, not the feasibility: reset-per-program is read-directly, cumulative
-   is note-at-start-and-subtract. The 488–543 magnitude against a 10-line payload hints at cumulative.
+1. ~~**Reset behaviour.**~~ ⭐ **ANSWERED by the vendor, same conversation: IT RESETS at program start.**
+   ⇒ Read it directly; `line / total_lines` is the progress fraction. No baseline capture, no subtraction.
+   ⚠ **One thing to reconcile on the bench, NOT a contradiction:** the screenshot read 488–543 against a
+   ~10-line payload, which cannot be a per-program line count. The likely explanation is that **streaming
+   into register `3000` is not a "program start"** the way loading and running a file from disk is — the two
+   paths may count differently. Check both, and do not assume the streamed case behaves like the run case.
 2. **Firmware floor.** Unknown which release added it. `2026-08-03-00`'s own changelog covers register `3000`
    G-code injection ONLY — see the firmware entry — so `16062` is not from that release and predates it.
 3. **The V4.1.** M350/Expert only as far as anything here shows. ⚠ This is why the `SYSDISK` route above stays
