@@ -25,6 +25,7 @@ import { evalExpr } from './expr.js';   // t1627 — shape fields take numbers O
 import { placeShiftOfStack } from '../../blocks/blockEmitter.js';
 import { latheLayoutSpec } from '../../viz/latheProfileCanvas.js';   // t1273 — a LATHE op draws its half-profile here; the mill XY-stock layout has nothing to say about a bar on centres   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
 import { MULTI_WIDGETS } from '../../ui/formWidgets.js';   // t1690 — the ONE declared "this widget owns several params as a single control" registry (renderOpForm's own renderUnit reads it); _writable derives from the SAME set instead of a DOM query
+import { resolveAnchorCoord, resolveEnumSign } from './anchorSources.js';   // t2573 — the stock-anchor + enum-sign primitives diag_aim_handle needs (t2571's own assessment); resolveAnchorCoord also retrofit onto point_handle's own ax/ay below, proving it general
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -467,7 +468,11 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             decls.push({ type: 'broken', id: gid + '_broken', x: ax, y: ay, color: '#ef4444', label: `⚠ ${anchor.label || 'handle'}: "${targetName}" not declared` });
             continue;
         }
-        if (anchor && anchor.kind === 'point') { pos(anchor.ax || 0, anchor.ay || 0, anchor.label || 'pos'); continue; }
+        // t2573 — `point_handle`'s own ax/ay now resolve through `resolveAnchorCoord` (anchorSources.js): a
+        // plain numeric string is byte-identical to before; a NEW stock-token string ('stockHalfW', …) now
+        // anchors a point handle at a live stock-relative position — the SECOND, independent consumer proving
+        // t2571's own stock-anchor primitive general, not diag_aim_handle's private helper.
+        if (anchor && anchor.kind === 'point') { pos(resolveAnchorCoord(anchor.ax, stock, 0), resolveAnchorCoord(anchor.ay, stock, 0), anchor.label || 'pos'); continue; }
         // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
         // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent
         // param. Mirrors the byRole.x/y/len branch further down (same MUTE anchor dot + canvasWidgets `length`
@@ -601,6 +606,37 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                     axis: axisVal, dir: dirVal, dist: num(params[distB.param]), field: distB.param,
                     fieldAxis: axB ? axB.param : undefined, fieldDir: dirB ? dirB.param : undefined,
                     minR: anchor.minR, maxR: anchor.maxR, label: anchor.label || 'probe',
+                });
+            }
+            continue;
+        }
+        // t2573 (BACKLOG #61, the t2571 assessment's own build) — `diag_aim_handle` declares kind 'diagAim':
+        // TWO role-tagged params sharing one group (role 'travel'/'prim', like rect_handle's own w/h) PLUS TWO
+        // read-only companions (`axisField`/`signField`, same doctrine as scale_handle's own `baseField`) this
+        // branch reads live. Mirrors middle's OWN hardcoded diagAim decl-building further down this file
+        // (untouched — that path is Middle's own built-in twin, this one is the block-authorable path any
+        // custom wizard can now reach) — same canvasWidgets.js `diagAim` gesture, same five resolved inputs,
+        // just sourced from DECLARED anchor fields instead of Middle's own `middleAxes`/`dir1`/`dir2` reads.
+        // `primaryX` resolves from `axisField`'s own live value ('X'/'Y', probe_vector_handle's own convention);
+        // `centreSec`/`centrePrim` resolve via `resolveAnchorCoord`'s own stock-half tokens, swapped on
+        // `primaryX` the same way middle's own hardcoded branch swaps stock.w/stock.h; `sign` resolves via
+        // `resolveEnumSign` (the declared enum→sign convention, t2571's own generalisation of `probeVector`'s
+        // internal pattern); `prim`'s own non-numeric-sentinel fallback reuses `centrePrim`, unchanged shape.
+        if (anchor && anchor.kind === 'diagAim') {
+            const travelB = groups[gid].find((b) => b.role === 'travel');
+            const primB = groups[gid].find((b) => b.role === 'prim');
+            items.push({ kind: 'hole', x: 0, y: 0, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — this gesture's own centre is stock-derived, not a fixed literal
+            if (travelB && primB && _writable(travelB.param) && _writable(primB.param)) {
+                const primaryX = params[anchor.axisField] !== 'Y';
+                const centreSec = resolveAnchorCoord(primaryX ? 'stockHalfH' : 'stockHalfW', stock);
+                const centrePrim = resolveAnchorCoord(primaryX ? 'stockHalfW' : 'stockHalfH', stock);
+                const sign = resolveEnumSign(anchor.signField, params, anchor.signPosValue, anchor.signWhenPos);
+                const travel = Math.max(1, num(params[travelB.param], 50));
+                const pp = parseFloat(params[primB.param]);
+                const prim = Number.isFinite(pp) ? pp : centrePrim;
+                decls.push({
+                    type: 'diagAim', id: gid + '_diag', primaryX, centreSec, sign, travel, prim,
+                    fieldTravel: travelB.param, fieldPrimary: primB.param, label: anchor.label || '②',
                 });
             }
             continue;

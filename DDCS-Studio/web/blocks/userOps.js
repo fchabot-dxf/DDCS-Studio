@@ -749,7 +749,14 @@ export function handleBindingsFromStack(children, realBindings) {
                 out.push(attach(String(p.field || 'len'), gid, 'len', anchor));
             } else if (b.type === 'point_handle') {
                 const gid = 'ph' + (++n);
-                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                // t2573 — ax/ay kept as the RAW authored string (not eagerly Number()'d): panelTypes.js's own
+                // `anchor.kind==='point'` branch now resolves each through `resolveAnchorCoord` (anchorSources.js,
+                // t2571's stock-anchor primitive), which needs live `stock` — unavailable at this static-binding-
+                // build layer. A plain numeric string ('0', '40', …) still resolves byte-identical; only a NEW
+                // stock-token string ('stockHalfW', …) activates the lookup, proving the primitive general beyond
+                // diag_aim_handle, its first consumer.
+                const ax = (p.ax === '' || p.ax == null) ? '0' : String(p.ax);
+                const ay = (p.ay === '' || p.ay == null) ? '0' : String(p.ay);
                 const anchor = { kind: 'point', ax, ay, label: p.label || 'pos' };
                 out.push(attach(String(p.fx || 'x'), gid, 'x', anchor));
                 out.push(attach(String(p.fy || 'y'), gid, 'y', anchor));
@@ -812,6 +819,20 @@ export function handleBindingsFromStack(children, realBindings) {
                 out.push(attach(String(p.field || 'dist'), gid, 'dist', anchor));
                 out.push(attach(String(p.fieldAxis || 'axis'), gid, 'axis', anchor));
                 out.push(attach(String(p.fieldDir || 'dir'), gid, 'dir', anchor));
+            } else if (b.type === 'diag_aim_handle') {
+                const gid = 'da' + (++n);
+                const axisField = p.axisField ? String(p.axisField) : null;
+                const signField = p.signField ? String(p.signField) : null;
+                const signWhenPos = (p.signWhenPos === '' || p.signWhenPos == null) ? -1 : Number(p.signWhenPos);
+                const anchor = { kind: 'diagAim', axisField, signField, signPosValue: p.signPosValue || 'pos', signWhenPos, label: p.label || '②' };
+                const eTravel = attach(String(p.fieldTravel || 'diagTravel'), gid, 'travel', anchor);
+                const ePrimary = attach(String(p.fieldPrimary || 'diagPrimary'), gid, 'prim', anchor);
+                // axisField/signField are READ-ONLY context (never merged onto — each may already carry its own,
+                // unrelated handle) but must still resolve, same fail-visibly doctrine as scale_handle's baseField.
+                if ((axisField && !byParam.has(axisField)) || (signField && !byParam.has(signField))) {
+                    eTravel.anchorUnresolved = true; ePrimary.anchorUnresolved = true;
+                }
+                out.push(eTravel, ePrimary);
             }
         }
     }
@@ -929,7 +950,24 @@ export function handleBindingsToBlocks(bindings) {
             label: a.label || 'probe',
         } });
     }
-    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids, ...pvKids];
+    // diag_aim_handle: pair each group's own travel/prim bindings that carry a {kind:'diagAim'} anchor.
+    // axisField/signField/signPosValue/signWhenPos are read back off the anchor's own literal string/number —
+    // not themselves binding roles here (read, not merged), same convention as scale_handle's own baseField.
+    const byGroupDA = {};
+    for (const b of list) if (b && b.group && b.anchor && b.anchor.kind === 'diagAim' && (b.role === 'travel' || b.role === 'prim')) (byGroupDA[b.group] = byGroupDA[b.group] || {})[b.role] = b;
+    const daKids = [];
+    for (const g in byGroupDA) {
+        const travel = byGroupDA[g].travel, prim = byGroupDA[g].prim;
+        if (!travel || !prim) continue;
+        const a = travel.anchor;
+        daKids.push({ type: 'diag_aim_handle', params: {
+            fieldTravel: travel.param, fieldPrimary: prim.param,
+            axisField: a.axisField || 'axis', signField: a.signField || 'dir2',
+            signPosValue: a.signPosValue || 'pos', signWhenPos: a.signWhenPos != null ? String(a.signWhenPos) : '-1',
+            label: a.label || '②',
+        } });
+    }
+    const kids = [...lenKids, ...ptKids, ...rectKids, ...radKids, ...scaleKids, ...shearKids, ...projKids, ...pvKids, ...daKids];
     if (!kids.length) return [];
     return [{ type: 'feature_canvas', params: { panel: 'form2d' }, children: kids }];
 }

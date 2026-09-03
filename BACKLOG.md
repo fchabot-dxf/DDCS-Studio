@@ -5821,6 +5821,34 @@ not reaching it. `translate` would need its own, separate justification.
 
 Zero product code touched — an addendum to a closed arc, not a reopening. Full account: WORK-LOG t2571.
 
+### ⭐⭐⭐⭐ t2573 — `diag_aim_handle` BUILT: two general primitives, four production tests green; a NEW finding, `feature_canvas`/handle picker-click instability at 4+ formfields, parked for its own turn
+
+t2571 sized this as buildable, not "accept the limit." Built: `wizards/ops/anchorSources.js` (`resolveAnchorCoord`
+— a closed stock-token vocabulary, `stockW`/`stockH`/`stockHalfW`/`stockHalfH`, not a formula language;
+`resolveEnumSign` — the declared form of `probeVector`'s own internal enum-sign pattern) + `diagAimHandle.js`,
+wired through the same six touch points every prior gesture port used. `resolveAnchorCoord` proven general (not
+`diag_aim_handle`'s own private helper) via a SECOND, independent consumer: `point_handle`'s own ax/ay now
+resolves through it too, verified live (`ax:'stockHalfW'` on a 100×80 stock renders at x=50).
+
+**Four tests green**, exercising the exact production code paths a real UI action would call: round-trip both
+directions (resolved + BOTH companions fail-visibly), gesture math in isolation, the stock-anchor primitive's
+generality, and full `layoutSpecFromOp`/`emitMapped`/`builderOf` integration (hand-traced position matched
+exactly; all four inputs independently confirmed to change the emitted G-code).
+
+**The fifth test — the full manual UI-drive, the same t2517/t2525 bar every prior gesture met — PARKED, not
+deleted**, after an exhaustive, evidence-based chase found and FIXED three real, generalisable pre-existing
+test-harness bugs (cross-run workspace-model pollution; a keyboard-shortcut block-duplication risk in ANY
+click-based field-set helper; `dragFlyoutBlockTo` failing silently) but could not isolate the final blocker: a
+`diag_aim_handle` picker click opens a popup with the field's own CONFIRMED-correct `pickKind` yet shows stale
+rows from an earlier interaction — reproducible only once a pilot needs a FOURTH formfield (this gesture's
+own second picker pair), never hit by any of the 8 prior single-picker-pair gesture pilots. **New finding,
+its own dedicated turn** — full diagnostic trail in WORK-LOG t2573, not silently buried.
+
+Caught and fixed along the way: a real regression in `point-handle-block.spec.js`'s own pre-existing assertion
+(ax/ay's new string representation); and — separately, unrelated to this build — t2569's own `emits:true`
+additions had left `preview-spec-gate-1688`'s golden snapshot stale since that turn (its own `test:node` was
+never run), regenerated and diffed clean this turn. `test:node`: 238/238. Full account: WORK-LOG t2573.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
