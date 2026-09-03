@@ -70846,3 +70846,77 @@ No product code touched this turn (the scratch CSS edit used to gather evidence 
 after measuring, confirmed byte-identical via `git diff --stat` returning empty before this entry was
 written). `git status` clean.
 
+## t2551 -- THE CANVAS GROWTH, LANDED WITH A BOUND. Both self-referential drag tests GREEN; the precision-matching cross-face test stays red, honestly, closer than ever
+
+Read t2347/t2355/t2357 in full first, per the dispatch's own instruction. t2355's own account turned out to be
+the missing piece: `formWidgets.js`'s `simBox`/`buildVizBox` both carry an INLINE `flex: 0 1 auto` (deliberate,
+grow:0 -- t2355 tried grow:1 first and proved it wrong, since a COLUMN flex item's `flex-grow` fights an
+explicit `height` on the same main axis). Inline always beats a stylesheet rule for the SAME property, so
+naively re-adding `flex: 1 1 0` via CSS should have been inert -- except `paneAccordion.js`'s own
+`applyVisualHeight()` bootstrap call STRIPS that inline `flex`/`height` the moment there is no stored
+`ddcs_visual_height` preference (t2355's own finding), which is EVERY fresh session, including every
+Playwright test. Once stripped, `.wiz-visual`'s only size driver is the stylesheet's `height:
+var(--viz-explicit-h, auto)` -- `auto` resolves to content size (392px), and the `flex:1 1 0` a CSS rule adds
+back then consumes whatever free height its own flex container offers, which for `.wiz-controls` in tree mode
+(no explicit height, `render()`'s own JS sets only `flex:1 1 100%`, stretches to its OWN unconstrained
+30-row-form content) is effectively unbounded.
+
+### THE FIX — a bounded height fallback, not a flex change
+
+`t2355`'s own account states an explicit `height` on a column flex item supplies its effective flex-basis
+directly, no `flex-grow` needed at all -- so the mechanism was never wrong, only the SHAPE (grow-to-fill an
+unbounded container vs a bound of its own). Gave the height FALLBACK itself a bound, mirroring the EXISTING
+`.wiz-box.two-pane { height: min(93dvh, 1000px) }` pattern per the dispatch's own explicit preference for
+reusing a pattern over inventing one, scoped to `@media (min-width: 861px)` (the SAME gate the bare rule
+already uses -- t2355's own account: narrow/stacked mode has no real ceiling to protect, a fixed bound would
+be the wrong shape there). `render()`'s own tree-mode JS override was never touched, per the guardrail.
+
+**First attempt (bare `min(93dvh,1000px)`, no chrome allowance) reproduced a DIFFERENT, real bug on the exact
+first measurement** -- t1353's own original defect, on the split-nested case this time: the grown canvas
+pushed its own marker UNDER the modal's fixed INSERT/CANCEL footer. `elementFromPoint` at the marker's own
+screen center returned the FOOTER BUTTON, not the handle; a real `page.mouse` drag landed there instead,
+producing zero delta -- the SAME symptom class `paneAccordion.js`'s own `visualMaxHeight()` comment already
+names for the classic case, now confirmed live for the tree-nested one too. MEASURED the real footer position
+(`~793px` from the modal top on a 900px-viewport run) against `.wiz-visual`'s own top (`~125px`, past the
+header) to size a real chrome allowance rather than guess one: `calc(min(93dvh, 1000px) - 200px)` leaves a
+confirmed `~31px` clear of the footer while growing the canvas from its old, undersized 154px-tall viewBox to
+247-377px depending on viewport -- close to the classic shell's own 308-354px, not identical.
+
+### DELIBERATELY NOT CHASED: exact pixel parity via a hand-tuned magic-number offset
+
+Tuning the chrome-allowance constant (`-260px` → `-200px`) measurably narrowed the cross-face scale mismatch
+(`surfacing-start-position-1648`'s own ONE-SOURCED test: received 49.9 vs expected 24.985 pre-t2551, ~2x off
+→ 27.8 vs 24.985 post-fix, ~11% off) without touching the footer margin's own safety (31px, confirmed).
+Pushing the constant further to chase EXACT equality was a live option but deliberately not taken: a
+hand-tuned CSS constant matching the classic shell's own dimensions PIXEL-FOR-PIXEL would be a second,
+brittle expression of what `paneAccordion.js`'s own `visualMaxHeight()` already computes LIVE and
+correctly (footer-aware, tree-aware since t2355) — reaching for that existing, principled mechanism instead of
+a magic number is the RIGHT fix for exact parity, and doing it well is a separate turn, not a five-minute
+tuning pass grafted onto this one. This is exactly the "touching a separate mechanism" the guardrail warns
+against if done carelessly; done properly it is real work, not urgent enough to rush into the same turn that
+already had two other root causes to get right.
+
+### THE ACCEPTANCE BAR, both halves, checked directly rather than trusted from a pass alone
+
+Canvas size, real numbers: viewBox grew from 822×154 (pre-fix) to comparable-to-classic dimensions at every
+tested viewport, confirmed via live `getBoundingClientRect()`/`viewBox` reads, not inferred. Marker rect
+confirmed inside the viewport AND clear of the footer by measuring both rects directly (not just trusting a
+green test). **Both self-referential tests ("WCS arm, TWIN", "Skim arm, TWIN") are GREEN** -- the real
+acceptance bar the dispatch named. `surfacing-start-position-1648`'s own cross-face ONE-SOURCED test --
+reported either way, per the dispatch's own instruction -- stays RED, materially closer (~11% off vs ~100%+
+off, or a dead 0 before the footer-overlap fix) but not exact, for the reasons above.
+
+### Verification, full account
+
+Targeted acceptance batch (drag-render-truth-gate-2461, preview-mutation-manifest-2463 -- ALL its manifest
+entries including sf-pos-snapback, pane-sizer-1353, pane-sizer-mobile-1468, hand-built-form, drill-canvas,
+param-group-rows-1605, wizard-face-1599) -- **29/29 green**, confirming the fix holds across the whole known
+regression surface from every prior turn in this arc, not just the two named tests. `test:node` 238/238.
+**Full `--workers=4` suite: 3074 passed, 2 failed** -- `open-as-modal-1625.spec.js` (re-confirmed clean 3/3
+in isolation, the session's own already-established BACKLOG #56 flake) and `surfacing-start-position-1648`'s
+own cross-face test (the one reported-red-either-way piece above) -- both `drag-render-truth-gate-2461` and
+`preview-mutation-manifest-2463` clean at full scale. 3074 passed is the highest clean count this whole arc
+has reached (t2547: 3071, t2531-era baseline: ~3066-3070).
+
+`git status` clean outside `web/styles.css` (the bounded-height rule) and this WORK-LOG entry.
+

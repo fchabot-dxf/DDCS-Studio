@@ -2668,15 +2668,58 @@ button.primary:hover {
    widened via a descendant-tolerant selector so it reaches the split-nested case too — unconditional (not
    width-gated): the missing reset is the same defect at any viewport, stacked mode just has a far smaller
    total budget, so an ordinary drag hits the clamp far more easily there.
-   t2547 — a related reach gap was tried and REVERTED here: adding `flex: 1 1 0` to this same rule (so a
-   split-nested `.wiz-visual` also GROWS, not just shrinks-to-0) does close the canvas-size/scale-factor gap
-   behind `surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test — but it regressed TWO
-   OTHER, previously-passing tests in the SAME file ("WCS arm, TWIN", "Skim arm, TWIN"), which stopped finding
-   their own drag marker at its expected screen position once the canvas grew. Not yet understood well enough
-   to land safely — see WORK-LOG t2547 for the full account and the STOP-AND-REPORT call this triggered. */
+   t2547 — a related reach gap was tried and REVERTED here first: adding `flex: 1 1 0` to this same rule (so a
+   split-nested `.wiz-visual` also GROWS, not just shrinks-to-0) did close the canvas-size/scale-factor gap
+   behind `surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test — but it ALSO regressed
+   two OTHER, previously-passing tests in the SAME file ("WCS arm, TWIN", "Skim arm, TWIN"), which stopped
+   finding their own drag marker on screen once the canvas grew. t2549 measured WHY, precisely, before trying
+   again: `flex: 1 1 0` on the INLINE style (`formWidgets.js`'s own `simBox`/`buildVizBox`, both
+   `flex: 0 1 auto` — deliberately grow:0, t2355's own finding) should always beat a stylesheet rule for the
+   SAME property — but `paneAccordion.js`'s own `applyVisualHeight()` bootstrap call STRIPS that inline
+   `flex`/`height` from every mounted `.wiz-visual` the moment there is no stored `ddcs_visual_height`
+   preference (t2355's own finding, restated here because it is exactly why the CSS rule ever mattered at
+   all) — a FRESH session (a first-ever open, or any fresh Playwright context) always hits this, so in
+   practice the stylesheet governs unconditionally for a first-time user. Once the inline flex/height is gone,
+   `.wiz-visual`'s ONLY remaining size driver is the desktop rule below (`height: var(--viz-explicit-h,
+   auto)`) — `auto` resolves to CONTENT size (392px, no cap), and `flex: 1 1 0` (grow:1) made it consume
+   whatever free height its own flex container offered instead — which, because `.wiz-controls` in tree mode
+   has NO explicit height of its own either (`render()`'s own JS sets only `flex: 1 1 100%`, not a height,
+   userOpView.js) and stretches to match ITS OWN unconstrained content (the form's rows), meant "whatever free
+   height" was effectively unbounded — tall enough to push the marker below any real viewport. `flex: 1 1 0`
+   was never the wrong MECHANISM (t2355's own account confirms an explicit `height` on a column flex item
+   supplies its own effective flex-basis directly, no `flex-grow` needed at all) — it was the wrong SHAPE:
+   growing to fill an UNBOUNDED container instead of being given a bound of its own. THE FIX: give the height
+   fallback itself a bound, mirroring the EXISTING pattern this project already uses for the SAME purpose
+   (`.wiz-box.two-pane`'s own `height: min(93dvh, 1000px)`, styles.css:~2572) rather than inventing a new cap
+   or touching `flex`/`render()`'s own tree-mode override (a SEPARATE mechanism — pulling it into this CSS fix
+   is exactly how a fifth visit to this rule gets created). `var()`'s own fallback only applies when the
+   custom property is genuinely UNSET, so a real stored preference (`--viz-explicit-h` set) still governs
+   exactly as before, byte-identical — this only changes the DEFAULT for a twin nobody has ever resized.
+   Scoped to the SAME `min-width: 861px` gate the bare rule below already uses (not left unconditional like
+   the `min-height: 0` reset above it): t2355's own account is explicit that "the modal itself is
+   `height: auto` at ≤860px too" — narrow/stacked mode has no real ceiling to protect and a fixed `93dvh` bound
+   would be the wrong shape there, not a stronger one.
+   t2551 — LANDED, with a chrome allowance the first attempt did not have. A bare `min(93dvh, 1000px)` (the
+   modal's OWN total budget, unadjusted) grew `.wiz-visual` tall enough to push its own marker UNDER the
+   modal's fixed INSERT/CANCEL footer — `elementFromPoint` at the marker's own screen center returned the
+   footer BUTTON, not the handle; `page.mouse`-level drag events landed there instead, silently producing
+   zero delta. This is the EXACT symptom `paneAccordion.js`'s own `visualMaxHeight()` comment (t1353) already
+   named for the classic case ("a too-tall visual pushes the CANCEL/INSERT footer off" the fixed modal) — this
+   turn hit its split-nested twin. MEASURED, not guessed: the real footer sits ~793px from the modal top in a
+   900px-viewport run, `.wiz-visual` itself starts ~125px down (past the header) — `-200px` subtracted from
+   the modal's own `min(93dvh,1000px)` budget leaves a real, confirmed ~31px clear of the footer while still
+   growing the canvas from its old undersized 154px-tall viewBox to 247-377px (viewport-dependent), close to
+   parity with the classic shell's own 308-354px. NOT byte-identical to the classic shell (a hand-tuned CSS
+   constant chasing that would be a brittle, second expression of `visualMaxHeight()`'s own LIVE,
+   footer-measuring logic — the RIGHT tool for exact parity, deliberately not reached for here per the
+   guardrail against pulling a SEPARATE mechanism into this fix) — `surfacing-start-position-1648.spec.js`'s
+   own cross-face scale-comparison test stays red, closer than before (~11% off vs ~100% before) but not
+   exact; both its OWN sibling drag tests ("WCS arm, TWIN", "Skim arm, TWIN") are GREEN, which is the acceptance
+   bar this turn's own dispatch named explicitly. Full account: WORK-LOG t2551. */
 .ui-split-pane > .wiz-visual { min-height: 0; }
 @media (min-width: 861px) {
     .wiz-visual { height: var(--viz-explicit-h, auto); }
+    .ui-split-pane > .wiz-visual { height: var(--viz-explicit-h, calc(min(93dvh, 1000px) - 200px)); }
 }
 .viz-pane-splitter:focus-visible { outline: none; }
 .viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
