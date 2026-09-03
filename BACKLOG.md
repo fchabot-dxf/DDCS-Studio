@@ -7469,3 +7469,55 @@ render correctly anyway, because `resolveFormWidget`'s own type-default folds an
 > only... the section migration only" scope, shared with drill, and risks the exact kind of undetected
 > second-order regression t2371's own full-suite catch already warns about if rushed. Full account, all three
 > failing tests + the drill control comparison: WORK-LOG t2545.
+
+---
+
+### 73. `visualMaxHeight()`'s own "climb to `.ui-split`" strategy has never been asked to bound a split-nested visual inside an UNCONSTRAINED wide-modal host — a real, scoped gap, RULED to stay a documented constant rather than be closed
+
+*(t2545/t2547/t2549/t2551/t2553's own arc — the split_horizontal cross-context canvas-geometry family. t2551
+landed a hand-tuned CSS constant, `calc(min(93dvh,1000px) - 200px)`, as the fix for the canvas-growth half of
+this arc; t2553 tried to replace it with the LIVE, principled computation `visualMaxHeight()` already
+provides and found it does not yet reach this case. t2555 — owner-ruled: the constant STAYS, this entry
+exists so a future turn starts from the diagnosis rather than re-deriving it, not because a fix is imminent.)*
+
+**THE FINDING, precise, not "the wire-up failed":** `visualMaxHeight(visual)` (`web/ui/paneAccordion.js:210`)
+computes a live, footer-aware ceiling by climbing from a `.wiz-visual`'s own immediate host to a container
+that holds BOTH it and its sibling(s), then measuring `hostBottom - visualTop - roomBelow`. This is PROVEN
+correct for exactly two cases: (1) the classic shell, where `.wiz-2pane`'s own `height:100%` resolves against
+the modal's real `min(93dvh,1000px)` bound; (2) a split-nested visual in the NARROW/stacked layout (t2355's
+own fix — climbing from `.ui-split-pane` to `.ui-split-horiz`, which at ≤860px is `height:auto` too and
+therefore explicitly special-cased to return `VIZH_MAX`, since "the modal itself goes height:auto... there is
+no real ceiling to protect"). **Never exercised in a THIRD combination**: a split-nested visual inside the
+WIDE Customize modal. There, the climb correctly reaches `.ui-split-horiz`, but that container is ALSO
+unbounded — for a DIFFERENT reason than the narrow case: `render()`'s own tree-mode JS (`userOpView.js`) sets
+`.wiz-controls` to `flex: 1 1 100%` with no explicit height, and `align-items: stretch` then pulls
+`.ui-split-horiz` to match `.wiz-controls`'s own unconstrained form-column content (the exact mechanism
+t2551's own investigation named). MEASURED, not inferred (t2553): calling `visualMaxHeight()` on surfacing's
+own twin in the wide modal returned `900` — `VIZH_MAX`, the function's own absolute safety fallback — because
+the RAW computation (`1263px`) exceeded it, not because the function found a real ceiling and clamped
+sensibly. **The function is not broken; it has never been asked this question.**
+
+**THE COST OF NOT FIXING IT, stated in real numbers (t2555, measured live, both axes — the first report of
+this only characterized jogX):** the twin's own split-nested preview canvas and the classic shell's canvas
+scale a real-world drag distance differently, and NOT uniformly — width and height are bounded by two
+independent factors (width by the split's own fixed-plus-flex column allocation; height by the landed
+`-200px` chrome-aware bound). A dragged-jogX/jogY pair on IDENTICAL params/IDENTICAL pixel delta lands at
+`ratioX ≈ 1.11` (twin ~11% larger) and `ratioY ≈ 2.20` (twin ~120% larger — the WORSE axis, not previously
+reported) versus the classic shell's own numbers.
+`tests/surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test now DECLARES both bands
+explicitly (t2555) rather than asserting exact equality and staying permanently red.
+
+**WHAT CLOSING THIS WOULD ACTUALLY TAKE, so a future attempt doesn't re-discover the same dead end**:
+`visualMaxHeight()`'s own climb-and-measure strategy needs a THIRD case — recognizing when the climbed host
+is ITSELF unbounded because of tree-mode's own `flex:1 1 100%` override (not just the narrow-width
+`height:auto` case it already special-cases), and in that case either climbing FURTHER (to something with a
+genuinely definite height — the modal's own outer chrome) or independently locating the real footer boundary
+rather than trusting the immediate climbed host's own `getBoundingClientRect().bottom`. This is a change to
+the FUNCTION's own logic, not a wiring change — real, scoped work, not a five-minute pass.
+
+**RULED, not merely deferred (t2555, owner)**: the residual is ~11%/~120% canvas-scale drift on ONE operation
+(surfacing) in ONE modal (the wide Customize dialog) — extending `visualMaxHeight()` for a cosmetic gain, on a
+rule that has already taken FOUR visits (t2347/t2355/t2357/t2551), is not worth a fifth. The `-200px` constant
+in `styles.css` (t2551, `.ui-split-pane > .wiz-visual` inside `@media (min-width:861px)`) stays. This entry
+exists to be the diagnosis a future turn starts from, if/when the cosmetic gain becomes worth the work — not
+a queued TODO expected to be picked up soon.

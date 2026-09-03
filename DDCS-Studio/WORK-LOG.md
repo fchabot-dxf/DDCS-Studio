@@ -71002,3 +71002,124 @@ unaccounted for -- the revert is confirmed clean at full scale, not just by `git
 
 `git status` clean outside this WORK-LOG entry.
 
+## 🔨 turn 2555 — accept the -200px ruling, DECLARE the cross-face gap, assess probeVector (assess-only, no build)
+
+Three parts per the dispatch. Parts 1-2 are done and committed; part 3 (the main item) concludes with an
+assessment and an explicit STOP-and-report, per the dispatch's own "⛔ Assess FIRST and report before
+building" instruction.
+
+### PART 1 — the -200px constant: accepted, no code change
+
+The advisor's own ruling (t2555 dispatch): the hand-tuned `-200px` chrome allowance in `styles.css` (t2551)
+stays permanently. Extending `visualMaxHeight()` to close the residual ~11%/~120% canvas-scale gap is real
+work for a cosmetic win, and the rule has already taken four visits. Nothing to build here — filed as
+BACKLOG #73 (part 2 below) so a future attempt starts from the diagnosis instead of re-deriving it.
+
+### PART 2 — declared the cross-face gap, filed BACKLOG #73
+
+`tests/surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test previously asserted exact
+equality (`toBeCloseTo(wJogX, 2)`) and had sat permanently red since t2551 landed the `-200px` constant
+(t2481's own precedent: an undeclared red trains everyone to stop reading the suite's failed-count). Rewrote
+the final two assertions into a named, bounded ratio band instead of bare equality or silence — `ratioX` in
+`(1.05, 1.20)`, `ratioY` in `(1.9, 2.5)` — each with a comment explaining WHY the gap exists and pointing at
+this WORK-LOG/BACKLOG #73 rather than reading as an arbitrary tolerance.
+
+**New measurement this turn**: prior reports (t2547/t2551/t2553) only ever characterized the X-axis mismatch
+(~11%). Measuring BOTH axes live (3 stable repeated runs) found jogY is far worse: `wJogX:24.985,
+wJogY:-38.073, tJogX:27.786, tJogY:-83.881` → `ratioX≈1.112, ratioY≈2.203`. This is a real correction to the
+prior characterization (width and height are bounded by two independent mechanisms — the split's own
+fixed-plus-flex column allocation vs. the landed chrome-aware height bound — so they diverge by different,
+unrelated amounts), now declared explicitly in both the test comment and BACKLOG #73.
+
+**Non-vacuity, proven**: re-ran the full 7-test file after the edit — 7/7 passed (confirmed live this turn,
+not carried over from memory). Reverting the assertion to the old bare `toBeCloseTo` would fail it again
+(unchanged underlying numbers, confirmed by the diff itself — this IS the pre-existing red turned into a
+declared, bounded pass, not a new behavior).
+
+Filed BACKLOG #73 (`BACKLOG.md`, appended after #72's own chain) with the full diagnosis: what
+`visualMaxHeight()`'s climb strategy assumes, why it holds for two cases (classic wide-modal, split-nested
+narrow) and fails for the third (split-nested wide-modal — `.ui-split-horiz` unbounded via tree-mode's own
+`flex:1 1 100%` + `align-items:stretch`), the real-number cost (ratioX/ratioY above), what closing it would
+actually require (a third case in `visualMaxHeight()` itself, or independently locating the real footer
+rather than trusting the climbed host's own `.bottom`), and the explicit t2555 owner ruling that it stays
+deferred.
+
+### PART 3 — probeVector assessment: FITS the anchor/params shape, BLOCKED on a real, narrow, PRE-FLAGGED gap in the shared write-back path. Not built. Reporting, per the dispatch's own instruction.
+
+**The question asked**: does `probeVector` (the last unevaluated gesture in the original BACKLOG #71
+handle-porting campaign) fit the proven template — fixed anchor + must-match-picked params — the way the 7
+shipped gestures do, or does it read the op's own internal geometry the way `diagAim`/`crossAim` do (which
+blocked them)?
+
+**On the geometry axis: it fits, cleanly.** Read `probeVector`'s full declaration
+(`web/viz/canvasWidgets.js:165-183`). Its `place()`/`drag()` functions read ONLY declared anchor data —
+`d.cx/cy/axis/dir/dist/field/fieldAxis/fieldDir/minR/maxR/label` — the exact same shape as the 7 shipped
+gestures, nothing op-computed like `diagAim`'s `d.centreSec`/`d.wallFace`. `drag()`'s snap-to-cardinal logic
+(`|dx|≥|dy| → X else Y`, sign → pos/neg) is pure geometry off the drag delta, not a read of anything the op
+derived. **This is NOT the diagAim/crossAim category.**
+
+**But it hits a DIFFERENT, real blocker, and it was already anticipated**: `probeVector.drag()` returns THREE
+keys per drag frame — `[d.fieldAxis]: 'X'|'Y'` (a STRING), `[d.fieldDir]: 'pos'|'neg'` (a STRING), `[d.field]:
+<number>`. Every one of the 7 shipped gestures writes ONLY numbers; `probeVector` would be the FIRST to write
+a string through the generic handle-drag write path. That path is `buildCanvasWidgets`'s `onDrag` →
+`layoutSpecFromOp`'s `setFields(m, opts)` → `_writeParam(name, val, opts)` (`web/wizards/ops/panelTypes.js:
+219`), whose FIRST line, unconditional, for every field, is `const next = r3(val);` — and `r3` (line 72) is
+`const r3 = (n) => Math.round(n * 1000) / 1000;`, a pure numeric rounder with no type branch anywhere in
+`_writeParam`'s body (read the full function, lines 219-254 — confirmed no guard exists). `r3('X')` →
+`Math.round(NaN)/1000` → `NaN` → `f.value = NaN` → the DOM coerces to the string `"NaN"`, which matches no
+`<option>` on an axis/dir `<select>` — a silent, wrong write, not a crash, which is the worse failure mode.
+
+This was NOT a fresh discovery invented this turn — `canvasWidgets.js:168`'s own comment on `probeVector`
+already flags it verbatim: *"NOTE: axis/dir are STRINGS — the view's setFields must pass enums through (not
+round them like a number)."* A prior turn (the original BACKLOG #71 campaign) already saw this exact gap and
+correctly stopped rather than wire it — the same discipline this turn is applying now.
+
+**Checked whether an existing precedent already solves this — it doesn't, for a DRAG gesture.** The only
+existing enum-writing mechanisms on this canvas are `onEdgePick` (`panelTypes.js:858-864`) and `onCornerPick`
+(:866-872) — both CLICK-based pickers, each with its OWN locally-scoped `setParam` helper (`s.value = val;
+s.dispatchEvent(new Event('change'))`) that bypasses `_writeParam` entirely. Neither is reachable from
+`CANVAS_GESTURES`' `onDrag` path — they're a structurally separate mechanism (click-to-select-a-target, not
+drag-to-continuous-value), so `probeVector` can't just reuse them as-is without effectively rebuilding its
+own equivalent bypass.
+
+**THE ASSESSMENT**: `probeVector` fits the anchor/must-match-params SHAPE the 7 shipped gestures use, and is
+NOT blocked on op-internal geometry — but it cannot be wired through the EXISTING generic write-back path
+without first extending `_writeParam`/`setFields` to skip `r3`'s rounding for non-numeric values (a small,
+scoped, additive guard — e.g. `typeof val === 'number' ? r3(val) : val` — used by every gesture, not just
+this one, so it needs care but is not large). This is a THIRD category, distinct from both "ships as-is" (the
+7) and "blocked on op-internal geometry" (diagAim/crossAim): **fits the template, blocked on a small, real,
+previously-flagged-but-unbuilt gap in the shared numeric-only write mechanism.**
+
+**STOPPING HERE, not building the fix or the feature**, per the dispatch's own explicit instruction ("⛔
+Assess FIRST and report before building") and this exact turn's own opening ruling on the SAME principle
+applied to `visualMaxHeight()` ("if wiring it needs a mechanism that does not exist yet, STOP AND REPORT").
+The `_writeParam` guard is small and low-risk relative to `visualMaxHeight()`'s own structural gap, but it is
+still a change to a function every one of the 7 shipped gestures depends on, and building it plus the full
+`probeVector` wiring (block file, `bridge.js` HANDLE_ANCHOR_FIELDS, `userOps.js` round-trip, `panelTypes.js`
+anchor.kind branch, `blockEmitter.js` METADATA_ONLY_LEAVES, `index.js` registration, plus a synthetic proof
+stack since no shipped op uses this gesture today) is a full build, not a one-line unblock — exactly the size
+of task the dispatch asked to be reported before starting, not silently absorbed into "does it fit."
+
+**No code touched for this part.** Files read only: `web/viz/canvasWidgets.js` (152-192, full
+CANVAS_GESTURES tail), `web/blocks/dataOps/edgeData.js` (axis/dir/dist field shape), `web/wizards/ops/
+panelTypes.js` (420-577 the anchor.kind switch; 195-292 `_writeParam`/`setFields`/`onDragEnd`; 800-872 the
+edge/corner click-pickers), `web/blocks/userOps.js` (700-919, the handle-binding round-trip machinery, as a
+reference template for what a `probeVector` build would need), `web/wizards/ops/pointHandle.js` (reference
+template).
+
+### TIER
+
+Ran the one touched test file directly (`surfacing-start-position-1648.spec.js`, 7/7 green, confirmed this
+turn). No shared-render-path file touched (styles.css/formWidgets.js/blocksApp.js/blockEmitter.js/
+paneAccordion.js all untouched this turn — the AGENTS.md 1b full-suite trigger doesn't apply). BACKLOG.md and
+WORK-LOG.md are docs-only. Scoped tier is correct here; not running the full suite for a docs+one-test-file
+turn.
+
+`proc_health.py watch`: no lingering processes from this turn (the only command run was the single targeted
+Playwright file, already exited).
+
+`git status`: `BACKLOG.md` and `tests/surfacing-start-position-1648.spec.js` are the two files this turn
+edits; both staged and committed below. Pre-existing untracked/modified files at the repo root and in
+`verification/` (screenshots, `ANALYTICS-BOT-DETECTION.md`, `RESTORE-CUSTOM-MACROS.zip`) predate this turn and
+are left untouched, per "touch only what you must."
+
