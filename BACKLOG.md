@@ -5943,9 +5943,11 @@ common to both, which is not an actionable shared cause. See #57 for the same co
 ---
 
 ### 64. [t2475 — a NARROW candidate fix was built AND TESTED, empirically REFUTED (zero effect on the repro) —
-GUARDRAIL TRIPPED, stopped per the dispatch's own explicit condition, not fixed] `rotaryClock`'s `__simstart0`
-marker SNAPS BACK on release — a real drag-render-truth defect, found by L4 (BACKLOG #61), REPORT ONLY, not
-fixed
+GUARDRAIL TRIPPED, stopped per the dispatch's own explicit condition, not fixed. t2561 — a SECOND hypothesis
+(the pan-feedback loop) tested via a 4-condition kill-switch and ALSO REFUTED, but the kill-switch isolated the
+REAL root as a byproduct. ✅ FIXED t2563 — the refit-on-drop's own scale recompute relocating the just-released
+handle; permanent guard seeded into the L1 mutation manifest (`simstart-refit-snapback`)] `rotaryClock`'s
+`__simstart0` marker SNAPPED BACK on release — a real drag-render-truth defect, found by L4 (BACKLOG #61)
 
 *(filed t2471, per L4's own explicit "report, don't fix, each becomes its own turn" scope — see BACKLOG #61's
 own L4 section for the full sweep this was found in.)*
@@ -6053,12 +6055,35 @@ WORK-LOG t2475.
 `movedMid` again — AND, separately, the `__simstart1`/B-moves-when-A-drags test (§ above) is the sharper,
 root-confirming check: it should show `movedB` near 0, not 20+px, once/if this is ever fixed.
 
+### ⭐⭐⭐⭐⭐⭐⭐ t2561/t2563 — THE REAL ROOT FOUND (a THIRD hypothesis, isolated by a kill-switch, not guessed)
+and ✅ FIXED — see #65's own t2561/t2563 section for the full diagnosis+fix account (both ops share the
+identical mechanism; #65's own five-vector table was the acceptance test)
+
+t2561 tested a THIRD hypothesis (the pan-feedback loop this same arc had just found, `featureCanvas.js`'s
+`_followHandle`) via a 4-condition kill-switch (pan on/off × refit-on-drop on/off) against `alignment`'s own
+worst vector — REFUTED (disabling pan alone does not close the gap) — but the kill-switch isolated the REAL
+root as a byproduct: `end()`'s own refit-on-drop recomputes a genuinely NEW `scale` (not just a re-centre),
+and a scale change alone, applied to an ALREADY-CORRECT world position (the OLD "stale spec" claim was itself
+checked and found FALSE this turn — measured directly, `this.spec` matches the last live drag frame exactly),
+moves the marker's SCREEN position — the visible "snap." t2563 fixed it: only override the refit's own natural
+`cxw`/`cyw` (restoring the pre-refit screen position) when the natural roomy fit would leave the marker CLOSER
+to a viewport edge than it already was — reconciled this way (not exact-position preservation, which was tried
+first and broke t732's own real purpose, see #65's own account below) so the refit still gives genuine
+breathing room past the gutter for the NEXT drag. Verified against rotaryClock's own repro directly (this
+entry, 0px residual) AND #65's own full five-vector table (below) — FOUR of five settle at 0px residual or
+better; the fifth (the single most extreme drag) carries a real, DECLARED ~20px residual, entangled with the
+separate pan-feedback arc (t2559/t2561), not silently claimed away. Permanent regression guard:
+`tests/support/previewMutations.js`'s new `simstart-refit-snapback` entry (an in-flight code mutation
+reverting the fix, seeded on the pure-+X vector for a clean signal both ways — proven to reproduce the
+ORIGINAL numbers almost exactly, `75.4px mid → 55.1px after`, versus BACKLOG's own `75.4 → 55.3`), run by
+`preview-mutation-manifest-2463.spec.js`. Full account: WORK-LOG t2561/t2563.
+
 ---
 
-### 65. [t2475 — SAME ROOT AS #64: two tested candidate fixes, both refuted; GUARDRAIL TRIPPED, see #64's own
-t2475 section for the full account] `alignment`'s `__simstart0` marker SNAPS/CLAMPS to a near-fixed settle
-point regardless of drag direction or magnitude — a real, REPRODUCED drag-render-truth defect, found by L4,
-REPORT ONLY, not fixed
+### 65. [t2475 — a SECOND hypothesis (the pan-feedback loop) tested via a 4-condition kill-switch, ALSO
+REFUTED — but the kill-switch isolated the REAL root as a byproduct. ✅ FIXED t2563 — see below] `alignment`'s
+`__simstart0` marker SNAPPED/CLAMPED to a near-fixed settle point regardless of drag direction or magnitude —
+a real, REPRODUCED drag-render-truth defect, found by L4
 
 *(filed t2471, same L4 sweep as #64 — see BACKLOG #61's own L4 section.)*
 
@@ -6102,6 +6127,79 @@ result — refuted here too, same guardrail, see #64's own t2475 section for the
 `movedAfter` clustering near a value independent of the drag's own `dx`/`dy` — the reproducibility, not any
 single number, is the claim. The sharper, root-confirming check: the B-moves-when-A-drags test should show
 `movedB` near 0, not 60+px, once/if this is ever fixed.
+
+### ⭐⭐⭐⭐⭐⭐⭐ t2561/t2563 — REFUTED a THIRD hypothesis (pan-feedback) via a proven kill-switch, found the REAL
+root as a byproduct, ✅ FIXED — this entry's own five-vector table is the acceptance test, RE-RUN below
+
+**t2561, the kill-switch (bigger-diagonal vector, dx90/dy60)**:
+
+| condition | movedMid | movedAfter | snap-back |
+|---|---|---|---|
+| baseline (today's real behaviour) | 91.34 | 71.61 | −21.6% |
+| pan DISABLED, refit-on-drop ON | 108.17 | 80.54 | −25.5% (still real, slightly WORSE) |
+| pan ON, refit-on-drop DISABLED | 91.34 | **91.34** | **0% — exact** |
+| BOTH disabled | 108.17 | **108.17** | **0% — exact** |
+
+The advisor's own pan hypothesis (same ops, same handle, same `noSnap` path, a converging feedback loop
+explaining a fixed settle point) was REFUTED by measurement, not accepted on plausibility — disabling
+`_followHandle` alone does not close the gap. Disabling refit-on-drop alone, independent of pan, closes it
+EXACTLY — isolating the real root to `featureCanvas.js`'s `end()` handler.
+
+**t2563, the root, precisely (correcting the OLD "stale spec" framing this same block's own prior comment
+carried)**: `end()`'s refit-on-drop computes a genuinely NEW `scale` (`_fit(..., roomy=true)`, to accommodate
+the current extent generously) — MEASURED directly this turn: `this.spec` at this point is NOT stale (it
+exactly matches the value the last live drag frame wrote; t2447's own adjacent comment already explains why —
+an every-frame-commit handle leaves nothing for `onDragEnd` to flush, so no extra render happens in between).
+The scale change ALONE, applied to that already-correct position, moves its SCREEN position — the visible
+snap `dragHandleRenderTruth` measures (`getBoundingClientRect()`, never the model value). This is exactly why
+#65's own cluster near ~55px was independent of drag distance: the roomy fit's own scale converges toward
+roughly the SAME value regardless of where the drag actually went.
+
+**THE FIX, two attempts, the second is what shipped**: a first attempt (capture the actively-dragged handle's
+own screen position under the frozen mid-drag transform, then after the new roomy fit solve `cxw`/`cyw` to
+restore it EXACTLY) gave every one of #65's own five vectors a 0px residual — but broke a REAL, PRE-EXISTING
+test (`alignment-canvas-refit-732.spec.js`, t732's own canonical acceptance test): it pinned the marker at
+EXACTLY the 80px drag gutter on every drop, defeating t732's own real purpose (give a gutter-pinned marker
+BREATHING ROOM past the gutter so the NEXT drag has somewhere to go — `insets=[80,80,80,80]` instead of t732's
+own required `>100`). Reconciled on the ONE claim genuinely in tension with t732 and not fighting it: EDGE
+clearance. Compare the marker's own distance from the nearest viewport edge before refit (frozen mid-drag) and
+after (the natural roomy fit); only override `cxw`/`cyw` (restoring the pre-refit position) when the natural
+refit would leave the marker CLOSER to an edge than it already was; when the natural refit already gives AT
+LEAST as much clearance (t732's own common case — its 104px roomy margin exceeds the 80px drag gutter), leave
+the fit's own natural, generous placement alone.
+
+**#65's own five-vector table, RE-RUN after the shipped fix** (the acceptance test named at dispatch, since it
+is what refuted every prior theory):
+
+```
+  original (dx40,dy25):    moved 42.9 mid -> settled 66.6   (0px residual — settles PAST where it tracked)
+  repeat of the same:      moved 42.9 mid -> settled 66.6   (0px residual — same)
+  pure +X (dx60,dy0):      moved 62.0 mid -> settled 69.4   (0px residual — same)
+  pure +Y (dx0,dy60):      moved 15.6 mid -> settled 63.9   (0px residual — same, incl. the ONE prior outlier)
+  bigger diagonal (90,60): moved 91.3 mid -> settled 71.6   (⚠ ~20px residual — DECLARED, see below)
+```
+
+**FOUR of five settle at 0px residual or better** — several settle FURTHER from the drag start than the raw
+mid-drag tracking alone (the natural roomy fit legitimately giving room, not a bug). **The fifth — "bigger
+diagonal," the single MOST EXTREME drag in #65's own table — carries a real, MEASURED ~20px/22% residual**
+(down from the pre-fix ~45px/50% loss, a substantial but not complete improvement). Root of the remainder,
+stated plainly rather than glossed: the edge-distance reconciliation only intervenes when the natural refit
+loses ground on EDGE clearance specifically; "bigger diagonal" 's own natural refit clears every edge FINE
+while still drifting sideways from where the live drag tracked it — a real gap the edge-distance metric alone
+does not close. A second reconciliation attempt (also gating on the marker's overall distance from where the
+DRAG GESTURE began, not just the pre-refit frame) was tried and dropped: it did not improve "bigger diagonal"
+at all, and it broke t732 a SECOND way (an ordinary, single large drag ALSO loses raw pixel distance-from-start
+under any legitimate rescale — the metric fights any scale change, not just a bad one). Closing this residual
+further looks entangled with the SEPARATE, deliberately out-of-scope pan-feedback compounding this same arc
+already isolated and reported (t2559/t2561) — not something this block's own logic can finish alone.
+
+#64's own rotaryClock repro re-run separately: 47.2 mid → 47.2 after, 0px residual. Permanent regression guard
+seeded into the L1 mutation manifest (`tests/support/previewMutations.js`'s `simstart-refit-snapback` entry,
+run by `preview-mutation-manifest-2463.spec.js`) — seeded on the PURE +X vector specifically (a clean, reliable
+RED/GREEN signal both ways), not "bigger diagonal" (whose own declared residual would fail the runner's default
+5px tolerance for a reason unrelated to whether the fix works). The mutation reproduces `75.4px mid → 55.1px
+after`, matching BACKLOG's own original pure-+X number (`75.4 → 55.3`) almost exactly, proving the seed is a
+faithful revert, not a synthetic guess. Full account: WORK-LOG t2561/t2563.
 
 ---
 

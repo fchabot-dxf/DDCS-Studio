@@ -71529,3 +71529,133 @@ DIFFERENT fixes:
 
 `git status` clean; only this WORK-LOG entry is new this turn.
 
+## 🔨 turn 2563 — BACKLOG #64/#65 FIXED: the refit-on-drop's own scale recompute, not a stale spec
+
+Dispatch: fix the refit-on-drop, ONLY (pan-feedback stays explicitly out of scope this turn — GUARDRAIL still
+holds there, its own separate arc). Sign-off already given for a third #64/#65 attempt, on the strength of
+t2561's own kill-switch (an isolated variable, not a hypothesis).
+
+### THE CORRECTION MADE BEFORE BUILDING ANYTHING — "stale spec" was never actually verified, and it's wrong
+
+Before writing a fix, checked the ONE claim everything (the existing code comment, t2561's own report, this
+turn's own dispatch) rested on: is `this.spec` genuinely STALE at `end()` for a `noSnap` marker? Instrumented
+directly (`this.spec.handles`'s own value logged at the exact line the refit-on-drop reads it, for alignment's
+own bigger-diagonal repro) and found: **`this.spec.handles[__simstart0]` EXACTLY matches the value the LAST
+live pointermove frame wrote — not stale at all.** t2447's own adjacent comment (already in the file, one
+paragraph above) already explains why: an every-frame-commit handle (which every marker reaching this branch
+is) leaves `onDragEnd` nothing to flush, so no extra render happens between the last drag frame and this point
+— `this.spec` was never going to be behind.
+
+**The REAL mechanism**: `_fit(this.spec, this._vw, this._vh, true)` (the "roomy" refit) computes a genuinely
+NEW `scale` — not just a re-centre — sized to fit the CURRENT full extent (stock + items + handles + paths)
+with a generous margin. A scale change alone, applied to the SAME (already-correct) world position, moves that
+position's SCREEN coordinates — which is exactly what `dragHandleRenderTruth` measures
+(`getBoundingClientRect()`, never the model value). The marker's own stored VALUE was fine throughout; only
+its RENDER discontinuously jumped when the view rescaled underneath it.
+
+This also explains the one detail every prior theory (including the original stale-spec one) never accounted
+for: **why #65's five vectors settle near the SAME ~55px regardless of drag distance.** A roomy refit's own
+scale, computed from roughly the same base extent each time (the drag distance itself barely changes what
+"the full current extent" looks like once one marker is far out), converges toward a similar resulting screen
+position for the SAME marker across very different drags — a genuine "fixed settle point," explained by the
+mechanism, not merely correlated with it.
+
+### THE FIX — two attempts, the SECOND is what shipped, because the FIRST broke a real, pre-existing test
+
+**Attempt 1**: capture the actively-dragged handle's own screen position under the OLD (frozen, mid-drag)
+`_tf` BEFORE calling `_fit()`; after the roomy fit computes its own new `scale`/`cxw`/`cyw`, solve `cxw`/`cyw`
+again so that marker's own screen position is preserved EXACTLY. Gave every one of #65's own five vectors a
+0px residual — but running the FULL suite (not just the manifest) caught it breaking
+`alignment-canvas-refit-732.spec.js`, t732's OWN canonical acceptance test for this exact block: `insets =
+[80,80,80,80]` instead of the required `>100` — the marker was pinned at EXACTLY the 80px drag gutter on every
+one of four consecutive drops, because "exact preservation" IS "no breathing room" when the marker was
+gutter-pinned at the moment of release, which is precisely when the refit fires. t732's own purpose (give a
+gutter-pinned marker room so the NEXT drag has somewhere to go) and #64/#65's own purpose (don't disorient the
+user's just-completed drag) are BOTH real, and exact preservation satisfies only the second at the first's
+expense. Reverted before shipping (this is why "verify a release with a hard reload"/full-suite discipline
+matters — the manifest alone, scoped to the new entry, would never have caught this).
+
+**Attempt 2, shipped**: reconciled on the ONE claim genuinely in tension with t732 and not fighting it outright
+— EDGE clearance (`Math.min` of all four viewport-edge distances, the SAME metric t732's own test asserts).
+Compute it for the marker's screen position both before refit (frozen mid-drag) and under the NATURAL roomy
+fit (no override). Only override `cxw`/`cyw` (restoring the pre-refit position) when the natural refit would
+leave the marker CLOSER to an edge than it already was; when the natural refit already gives AT LEAST as much
+clearance (t732's own common case — its 104px roomy margin exceeds the 80px drag gutter), leave the fit's own
+natural, generous placement alone:
+```js
+const edgeDist = (s) => Math.min(s.x, this._vw - s.x, s.y, this._vh - s.y);
+if (edgeDist(naturalScreen) < preEdgeDist) { t.cxw = ...; t.cyw = ...; }   // else leave the natural fit alone
+```
+A THIRD variant was also tried and dropped: additionally gating on the marker's overall distance from where
+the drag GESTURE began (not just the pre-refit frame), to try to also close #65's own worst-vector residual
+(below). It improved nothing there — the residual's own root isn't edge-adjacent at all, it's sideways drift —
+and it broke t732 a SECOND, DIFFERENT way: an ordinary single large drag ALSO loses raw pixel distance-from-
+gesture-start under ANY legitimate rescale (the whole view shrinking to show more content shrinks every
+on-screen distance proportionally, including a perfectly healthy one), so gating on it fights every rescale,
+not just a bad one. Dropped; confirmed removing it changed nothing for the vector it was meant to help.
+Scoped entirely to this one block; `_followHandle`, `_toWorld`, `point.drag`, and every other file are
+untouched — a value/capture-point correction, not the render/interpret-frame restructuring the guardrail
+reserved for the pan-feedback bug.
+
+### VERIFY
+
+**#65's own five-vector table, re-run after the SHIPPED fix** (the acceptance test the dispatch named, since
+it's what refuted every prior theory):
+```
+  original (dx40,dy25):    moved 42.9 mid -> settled 66.6   (0px residual — settles PAST the mid-drag position)
+  repeat of the same:      moved 42.9 mid -> settled 66.6   (0px residual — same)
+  pure +X (dx60,dy0):      moved 62.0 mid -> settled 69.4   (0px residual — same)
+  pure +Y (dx0,dy60):      moved 15.6 mid -> settled 63.9   (0px residual — same, incl. the one prior OVERSHOOT outlier)
+  bigger diagonal (90,60): moved 91.3 mid -> settled 71.6   (⚠ ~20px/22% residual — DECLARED, not silently accepted)
+```
+**FOUR of five settle at 0px residual or better.** The fifth — "bigger diagonal," the single MOST EXTREME drag
+in #65's own table — carries a real, MEASURED ~20px residual (down substantially from the pre-fix ~45px/50%
+loss, but not zero). Its own natural refit clears every viewport edge fine (so the edge-distance check never
+overrides it) while still drifting sideways from where the live drag tracked it — a real gap the edge-distance
+metric alone does not close, and (per the dropped third attempt, above) appears entangled with the SEPARATE,
+deliberately out-of-scope pan-feedback compounding this same arc already isolated at t2559/t2561, not
+something closeable from inside this one block alone. **#64's own rotaryClock repro** (dx40,dy25): 47.2 mid →
+47.2 after, 0px residual.
+
+**Permanent regression guard, seeded into the L1 mutation manifest** (`tests/support/previewMutations.js`, new
+entry `simstart-refit-snapback`) — an in-flight `page.route()` mutation reverting JUST this fix's own
+correction (back to the bare `this._tf = this._fit(...)` call), run by `preview-mutation-manifest-2463.spec.js`
+(added a `bootAlignment`/`alignment` DRAG_PROBES entry, mirroring `bootSurfacing`'s own shape). Seeded on the
+PURE +X vector deliberately, not "bigger diagonal": the latter's own declared ~20px residual would fail this
+runner's default 5px tolerance for a reason unrelated to whether the fix works, while pure +X gives a clean
+signal both ways. Ran the FULL 9-entry manifest (all 6 prior entries + this new one): **9/9 green** — MUTATED
+phase shows the new entry going RED with `moved 75.4px mid -> 55.1px after`, matching BACKLOG #65's own
+ORIGINAL pure-+X numbers (`75.4 -> 55.3`) almost exactly — proof the seeded mutation is a faithful revert of
+the real historical bug, not a synthetic guess dressed up as one. CLEAN phase (this fix as it ships): green.
+Every one of the 6 PRE-EXISTING manifest entries (pocket/surfacing snapback, the flyout-corner synthetic, the
+pane-sizing regression, the pocket presence seed, the drill reachability seed) also stayed green, unaffected.
+
+**No regression to the sibling drag-mechanics suites**: `alignment-handles-independent.spec.js` (2/2, the
+"dragging A never moves B" contract), `drag-render-truth-gate-2461.spec.js` (3/3), `lathe-drag-responsive-
+2505.spec.js` (2/2), `lathe-handle-hit-2501.spec.js` (10/10), `commit-on-release-2429.spec.js` (7/7, the
+ORIGINAL t2447 bug class this whole `end()` handler exists to guard), `alignment-canvas-refit-732.spec.js`
+(2/2, t732's own test — the ONE the first attempt broke, now green) — 26/26 total, run together.
+
+### TIER
+
+`featureCanvas.js` is a shared render-path file (AGENTS.md 1b) — full suite, unconditional, per the dispatch's
+own instruction. `npm run test:node`: 238/238. Full `--workers=4` suite: first attempt reported "0 tests, 0s"
+— the known context/GIT-AND-TOOLING-HAZARDS.md #17 stale-mem-server symptom (a `netstat` check at that moment
+showed nothing LISTENING on 3211, consistent with it having already closed by the time I checked — the
+manifest suite's own run immediately before had its own webServer instance still winding down). Re-ran
+immediately and it DID catch a real regression (t732, above) from the first fix attempt — exactly the kind of
+catch rule 1b's own full-suite-before-you-believe-it discipline exists for; fixed, then re-ran the full suite
+again with the shipped (second) fix: **3082 passed, 1 failed, 9 flaky, 26 skipped.** The one failure —
+`preview-mutation-manifest-2463.spec.js`'s own PRE-EXISTING `sf-pos-snapback` entry (T2447's own mutation, an
+entirely different code path from this turn's own edits) — is unrelated to this turn's own change: it ALSO
+failed identically in the very first (attempt-1) full-suite run before any reconciliation existed, and re-ran
+1/1 green in isolation just now, a load-sensitive flake under full-suite parallel contention, not a regression.
+`npm run test:node`: 238/238, re-confirmed.
+
+### BACKLOG
+
+`BACKLOG.md` #64 and #65 both updated: headers marked ✅ FIXED t2563, and a new t2561/t2563 subsection added to
+each with the kill-switch table, the corrected root (scale recompute, not stale spec — explicitly naming that
+the OLD framing was checked and found wrong before this fix was designed), the two-attempt account (why exact
+preservation was reverted), and the five-vector/rotaryClock re-run numbers including the one DECLARED residual.
+

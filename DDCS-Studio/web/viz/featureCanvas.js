@@ -274,11 +274,60 @@ export class FeatureCanvas {
             const followed = this._followed; this._followed = false;
             if (act && act.noSnap && this.spec && (followed || this._handleInGutter(id))) {
                 this._userAdjusted = true;
+                // t2563 (BACKLOG #64/#65) — the OLD comment here claimed `this.spec` is stale at this point (the
+                // drag's own re-render "has not arrived yet"). MEASURED, this turn, and found FALSE for every
+                // `noSnap` marker that commits every frame (surfacing's skim jog, alignment/rotaryClock's own
+                // sim-start pair — every marker that ever reaches this branch): traced `this.spec.handles`
+                // directly at this exact line and found it EXACTLY matches the value the last live pointermove
+                // frame wrote — t2447's own adjacent comment (above, on `onDragEnd`) already says why: an
+                // every-frame-commit handle leaves `onDragEnd` nothing to flush, so no extra render happens
+                // between the last drag frame and here. The REAL mechanism: `_fit(..., roomy=true)` computes a
+                // genuinely NEW `scale` (to accommodate the full current extent, generously) via a bbox-CENTROID
+                // recentre — for a marker that is the extreme point of that bbox, this lands it at roughly
+                // `ROOMY_MARGIN_PX` from an edge BY CONSTRUCTION, near-independent of how far it was actually
+                // dragged (BACKLOG #65's own "clusters near ~55px regardless of drag distance" symptom, exactly).
+                //
+                // A first attempt (always restoring the marker's exact pre-refit screen position) FAILED
+                // `alignment-canvas-refit-732.spec.js`: it pinned the marker at exactly the 80px GUTTER on every
+                // drop, defeating t732's own real purpose (give a gutter-pinned marker BREATHING ROOM so the
+                // next drag has somewhere to go). A second attempt ALSO gated on the marker's own overall
+                // distance from where the drag GESTURE BEGAN (not merely the pre-refit frame) was tried and
+                // dropped: on t732's own single, ordinary (large) drag, a roomy refit's scale change alone
+                // reduces that absolute-pixel distance too (the whole view legitimately shrinking to show more
+                // content shrinks EVERY on-screen distance proportionally, including this one) — gating on it
+                // fought t732 with NO measurable benefit to BACKLOG #65's own worst vector (verified: dropping
+                // the gate changed nothing there, only broke t732).
+                //
+                // Reconciled on the ONE claim that is actually in tension with t732 and doesn't fight it: EDGE
+                // clearance. Compute the marker's own distance from the nearest viewport edge (the same metric
+                // t732's own test asserts) both before refit (frozen mid-drag transform) and after (the natural
+                // roomy fit). Only override cxw/cyw (restoring the pre-refit screen position) when the natural
+                // refit would leave the marker CLOSER to an edge than it already was (a genuine retreat/snap
+                // toward the frame); when the natural refit already gives it AT LEAST as much edge clearance
+                // (t732's own common case — the roomy margin, 104px, exceeds the drag gutter, 80px), leave the
+                // fit's own natural, generous placement alone. This closes BACKLOG #64/#65's own five-vector
+                // table to 0px residual on FOUR of five vectors (the fifth, the single MOST EXTREME drag tested,
+                // improves from a 45px/50% loss to a ~20px/22% one — see WORK-LOG t2563 for why the remainder is
+                // a real, DECLARED, bounded residual rather than a further narrow fix: it is entangled with the
+                // separate, deliberately out-of-scope pan-feedback compounding this same arc already isolated
+                // and reported at t2559/t2561, not something this block's own logic can close further alone).
+                const p2 = this._placement || { x: 0, y: 0 };
+                const hNow = (this.spec.handles || []).find((x) => String(x.id) === String(id));
+                const hx = hNow ? hNow.x + (p2.x || 0) : null, hy = hNow ? hNow.y + (p2.y || 0) : null;
+                const edgeDist = (s) => Math.min(s.x, this._vw - s.x, s.y, this._vh - s.y);
+                const preScreen = hNow ? this._S(hx, hy) : null;
+                const preEdgeDist = preScreen ? edgeDist(preScreen) : 0;
                 this._tf = this._fit(this.spec, this._vw, this._vh, true);
-                // …AND AGAIN ON THE NEXT RENDER. At pointerup `this.spec` still holds the handle where it was BEFORE the
-                // drag: the drag wrote a form field, and the re-render carrying the new position has not arrived yet. So
-                // the fit above unions an extent the marker is no longer in, and it lands back on the gutter — which is
-                // why it worked on every OTHER drop (the one that happened to fit a caught-up spec) and not the rest.
+                if (hNow && preScreen) {
+                    const t = this._tf;
+                    const naturalScreen = this._S(hx, hy);
+                    if (edgeDist(naturalScreen) < preEdgeDist) {
+                        t.cxw = hx - (preScreen.x - t.cx) / t.scale;
+                        t.cyw = hy - (t.cy - preScreen.y) / t.scale;
+                    }
+                }
+                // …AND AGAIN ON THE NEXT RENDER, in case a genuinely deferred commit (a DIFFERENT handle shape,
+                // not the every-frame-commit ones this fix targets) still lands after this point — unchanged.
                 this._refitPending = true;
                 this._draw(this.spec, this._vw, this._vh);
             } else if (hadSnap && this.spec) {

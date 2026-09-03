@@ -98,6 +98,26 @@ async function bootSurfacing(page) {
     await page.waitForTimeout(400);
 }
 
+/** t2563 (BACKLOG #64/#65's own permanent guard) — boots alignment's `def.simStartParams`-declared marker
+ *  pair, same `_framed`/`makeOp`/`ddcsLoadBlockStack` convention as every boot above (not `window.openWiz` —
+ *  the harness earlier turns used to diagnose #64/#65 live, kept OUT of this manifest so the runner stays
+ *  internally consistent, matching `bootDrillPattern`'s own t2481 precedent for the same choice). */
+async function bootAlignment(page) {
+    await page.goto('/?debug=feat');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp, null, { timeout: 60000 });
+    await page.evaluate(() => window.showApp('blocks'));
+    await page.evaluate(async () => {
+        const { _framed, makeOp } = await import('/blocks/opBuilders.js');
+        const framed = _framed('user_alignment_data', {});
+        const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+        const op = makeOp('user_alignment_data', {}, bare);
+        const stack = [framed.find((b) => b && b.type === 'progstart'), op, framed.find((b) => b && b.type === 'progend')].filter(Boolean);
+        window.ddcsLoadBlockStack(stack);
+    });
+    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length > 3);
+    await page.waitForTimeout(400);
+}
+
 /** Runs a drag-render-truth probe; returns {ok, detail} instead of throwing, so the CALLER decides whether
  *  pass or fail is the expected outcome (mirrors emitEquivalence's own {pass, diffs} shape, not a bare assert). */
 async function probeDrag(page, boot, hid, dragOpts) {
@@ -207,6 +227,7 @@ async function probeReachability(page, entry) {
 const DRAG_PROBES = {
     pocket: (page, seed) => probeDrag(page, bootPocketRect, 'pk_size', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
     surfacing: (page, seed) => probeDrag(page, bootSurfacing, 'sf_pos', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
+    alignment: (page, seed) => probeDrag(page, bootAlignment, '__simstart0', { dx: seed.dx, dy: seed.dy, steps: seed.steps, settleMs: seed.settleMs }),
     'tool-picker-popup': (page) => probeFlyoutPosition(page),
     'wizard-view-pane': (page) => probePaneSizing(page),
 };

@@ -156,6 +156,33 @@ const T2481_STYLES_DRILL_SPLIT_UNFIX = {
     replace: ``,
 };
 
+// ── Entry 7 — t2563 (BACKLOG #64/#65's own permanent guard). Reverts the refit-on-drop position-preservation
+// fix: the roomy refit-on-drop (t732) computes a genuinely NEW `scale` to accommodate the full current extent
+// — a scale change alone, applied to the SAME (already-correct, never-stale — measured directly this turn,
+// correcting the OLD comment's own staleness claim) world position, moves its SCREEN position, which is what
+// dragHandleRenderTruth actually measures. The fix solves `cxw`/`cyw` (keeping the new `scale`) so the just-
+// released handle's own screen position is preserved exactly; this mutation strips that correction back to the
+// bare `this._tf = this._fit(...)` call, reproducing #64/#65's own snap-back exactly. ─────────────────────────
+const T2563_FEATURECANVAS_REFIT_ON_DROP = {
+    path: '/viz/featureCanvas.js',
+    find: `                const p2 = this._placement || { x: 0, y: 0 };
+                const hNow = (this.spec.handles || []).find((x) => String(x.id) === String(id));
+                const hx = hNow ? hNow.x + (p2.x || 0) : null, hy = hNow ? hNow.y + (p2.y || 0) : null;
+                const edgeDist = (s) => Math.min(s.x, this._vw - s.x, s.y, this._vh - s.y);
+                const preScreen = hNow ? this._S(hx, hy) : null;
+                const preEdgeDist = preScreen ? edgeDist(preScreen) : 0;
+                this._tf = this._fit(this.spec, this._vw, this._vh, true);
+                if (hNow && preScreen) {
+                    const t = this._tf;
+                    const naturalScreen = this._S(hx, hy);
+                    if (edgeDist(naturalScreen) < preEdgeDist) {
+                        t.cxw = hx - (preScreen.x - t.cx) / t.scale;
+                        t.cyw = hy - (t.cy - preScreen.y) / t.scale;
+                    }
+                }`,
+    replace: `                this._tf = this._fit(this.spec, this._vw, this._vh, true);`,
+};
+
 export const PREVIEW_MUTATIONS = [
     {
         id: 'pk-size-snapback',
@@ -206,5 +233,21 @@ export const PREVIEW_MUTATIONS = [
         op: 'drill',
         affordance: { containerSelector: '#blk_wiz_user', selectors: ['.fc-handle[data-hid="dr_pos"]'] },
         proven: 'the reachability primitive\'s own acceptance test — proves L3 by reverting BACKLOG #68\'s own fix, exactly as L1/L2 required',
+    },
+    {
+        id: 'simstart-refit-snapback',
+        defect: 'alignment/rotaryClock\'s own noSnap sim-start marker (__simstart0) snaps back on release — BACKLOG #64/#65, fix t2563 (the refit-on-drop\'s own scale change relocating the just-released handle)',
+        files: [T2563_FEATURECANVAS_REFIT_ON_DROP],
+        op: 'alignment',
+        // t2563 — pure +X (dx60,dy0), not #65's own "bigger diagonal" (dx90,dy60): BOTH are real bug vectors,
+        // but "bigger diagonal" is the single MOST EXTREME drag in #65's own table, and its own residual after
+        // the fix (~20px, down from ~45px pre-fix — see BACKLOG #65's own t2563 account) is a real, DECLARED,
+        // bounded gap entangled with the separate pan-feedback arc (t2559/t2561, deliberately out of scope this
+        // turn) — NOT within `assertDragRenderFaithful`'s own default 5px tolerance, so it would fail this
+        // runner's CLEAN phase for a reason unrelated to whether THIS fix works. Pure +X shows a clean, strong
+        // signal both ways: BUGGY = a clear ~20px loss (RED, comfortably past the 5px tolerance); FIXED = a
+        // +7.4px margin (GREEN, comfortably past it the other way) — the reliable seed for a permanent gate.
+        seed: { dx: 60, dy: 0, steps: 10, settleMs: 400 },
+        proven: 'PROVEN RED at t2563 via the same 4-condition kill-switch that isolated the root; 4 of #65\'s own 5 vectors settle at 0px residual once fixed, this one (pure +X) among them — the 5th (bigger diagonal) is DECLARED, not silently dropped, see BACKLOG #65\'s own t2563 account',
     },
 ];
