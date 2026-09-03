@@ -72391,3 +72391,53 @@ instead of the single, since-corrected "picker staleness" framing t2573 shipped.
 `git status`: `web/blocks/blockly/dropdownPopup.js` (the real fix), `tests/diag-aim-handle-block.spec.js`
 (re-parked with the corrected diagnosis) — staged and committed below.
 
+## 🔨 turn 2577 — ONE BOUNDED QUESTION, answered directly and cleanly: a RELOADED wizard's own field does NOT share the API-created-block click failure — a harness fact, not an authoring-path defect
+
+### THE QUESTION
+
+t2575 found that an API-created block's own field (`ws.newBlock()+initSvg()+render()`, used as this turn's
+own test-harness workaround for the still-separate `feature_canvas` drag issue) does not respond to a real
+mouse click, while `showEditor_()` called directly opens the same, correct popup every time. Blocks are ALSO
+created programmatically when a saved wizard is reloaded — so the dispatch's own question, narrowly: does
+THAT reload path share the same failure? If yes, reopening a saved wizard silently gives an author fields that
+will not open — a real defect on the exact path the whole authoring goal depends on.
+
+### ANSWERED BY DIRECT COMPARISON, not by reasoning about the code paths
+
+OBSERVED first, before testing anything: `blocks/blockly/stackBridge.js`'s own header comment (line 269)
+already states the reload path deliberately does NOT use `ws.newBlock()+initSvg()+render()` — "in Blockly v11
+the latter creates valid block MODELS but never drives the render queue... the 'code is there but I can't see
+the blocks' bug. `serialization.load` flushes the render queue correctly." This is a STRONG prior (the two
+paths are built differently, on purpose, for an adjacent but related reason), but per the dispatch's own
+explicit instruction, not treated as the answer by itself.
+
+**Built the direct comparison live**: a real saved custom wizard (a `probe_vector_handle` pilot, the same
+shape `probe-vector-handle-block.spec.js`'s own established PILOT const uses) → its own def fetched via
+`listUserOps()` → its `template` fed through `window.ddcsLoadBlockStack`, the SAME function a real "reopen
+this wizard" action calls, going through `programModel.setStack` → `stackToWorkspace` →
+`Blockly.serialization` (never `ws.newBlock()`). Confirmed the reloaded block genuinely exists
+(`getAllBlocks(false).filter(type==='probe_vector_handle').length === 1`), then a REAL `page.mouse.click()` on
+its own FIELD picker (`elementFromPoint` confirmed landing on the correct `<text>` node, reading "dist") —
+**the popup opened correctly: `hidden:false`, 3 real candidate rows.**
+
+### THE ANSWER
+
+**No — the click failure does NOT affect a reloaded wizard.** It is narrowly confined to blocks built via the
+raw `ws.newBlock()+initSvg()+render()` sequence, which is used ONLY by this turn's own test-harness workaround
+for the (still separate, still open) `feature_canvas` drag issue — never by the real app's own reload path,
+which was already built differently for an adjacent reason before this question was ever asked. **A harness
+fact, confined to a test's own construction shortcut, not a product defect on the reload/authoring path.**
+Matches the dispatch's own prediction: t2517 and t2525 both saved, reloaded, and drove real fields
+successfully — no contradiction, because the reload path was never the one sharing the bug.
+
+### VERIFY
+
+The question answered by direct, live comparison (a real reload through the real production function, then a
+real mouse click), not by re-reading code and inferring — the code comment was read FIRST as a lead, then
+independently confirmed, not substituted for the observation. OBSERVED throughout: the block count after
+reload, the exact element under the click coordinate, the popup's own `hidden`/row-count state — no inference
+stood in for a measurement anywhere in the chain. Per the dispatch's own explicit instruction: did NOT chase
+the `feature_canvas` flyout-drag issue further, did NOT chase the save-dialog symptom past it, did NOT attempt
+any fix. `git status`: clean of product code — this turn built and ran one scratch test, then deleted it;
+nothing else changed.
+
