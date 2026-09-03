@@ -221,20 +221,21 @@ test('a diag-aim-handle op: def.bindings MERGE the anchor onto both real binding
 // rather than chasing exactly how far Blockly's own scroll/centering needs to travel to keep every drop target
 // reachable.
 test.use({ viewport: { width: 2600, height: 2600 } });
-// t2573 — PARKED, not deleted: a genuine, reproducible, pre-existing app/harness instability blocks this test's
-// own FIELDTRAVEL picker click from reaching diag_aim_handle at all (a `.ddcs-picker-row` popup opens with the
-// field's own CONFIRMED-correct `pickKind:'whenparam'`, yet the rows rendered belong to a different, earlier
-// picker interaction — root cause not fully isolated despite extensive live diagnosis: ruled out, in order,
-// cross-run workspace pollution [fixed via `programModel.setStack([])`], a keyboard-shortcut block-duplication
-// bug in `setTextField` [fixed, real and generalizable], `dragFlyoutBlockTo` failing silently [fixed, now
-// throws], on-screen scroll [ruled out with a 2600px viewport], and a stale un-dismissed popup [an Escape
-// press before every picker click did not resolve it]). Every one of those FOUR fixes is real, kept, and
-// benefits any future gesture-block test using this same harness — only the FINAL step (this test's own
-// picker-row content) remains unresolved. Full diagnostic trail: WORK-LOG t2573. Not run in CI while parked;
-// re-enable once the harness's own root cause is found (its own dedicated turn, not blindly retried further
-// here) — diag_aim_handle's actual correctness is independently proven by the four tests ABOVE this one,
-// through the SAME production code paths (`layoutSpecFromOp`, `emitMapped`, `builderOf`,
-// `handleBindingsFromStack`/`ToBlocks`) a real UI action would ultimately call.
+// t2575 — RE-PARKED, corrected diagnosis. t2573 blamed the original blocker on an unspecified harness
+// limitation; t2575 found and FIXED a REAL product bug it uncovered along the way (`blocks/blockly/
+// dropdownPopup.js`, shared by every picker/options-editor field in the app: a field popup is `position:fixed`,
+// anchored to the field's own on-screen box only at the instant it opens, and never tracks the workspace's own
+// scroll/pan — confirmed live with a genuine mouse-wheel scroll, not a synthetic API call; now closes itself on
+// a real `Blockly.Events.VIEWPORT_CHANGE`, armed a beat after opening so the opening click's own "scroll the
+// clicked block into view" doesn't self-close the popup it just opened). That fix is real, general, and KEPT.
+// But re-testing this exact pilot with it in place surfaced TWO further, DISTINCT, still-unresolved issues at
+// this specific stack depth (4 formfields — one more than any prior gesture pilot authored): (1) `feature_canvas`
+// still fails to connect via a real flyout drag here (proven separate from the popup bug — reproduced again with
+// the fix already shipped); a `showEditor_()`-direct workaround for opening pickers on the resulting API-created
+// blocks got past the picker step, but then (2) the save dialog (`.blk-dev-savedlg`) stopped appearing. Each
+// fix this turn surfaced the NEXT layer rather than reaching a clean end — re-parked rather than chased further;
+// diag_aim_handle's own correctness is independently proven by the four tests above, through the same
+// production code paths (`layoutSpecFromOp`, `emitMapped`, `builderOf`) a real UI action would call.
 test.skip('DRIVE THE APP, THE t2517/t2525 BAR: four formfields placed FIRST, then feature_canvas + diag_aim_handle picking all four, real save, a REAL reload, then a REAL mouse drag on the rendered SVG handle changes the travel field, the primary field, and the emitted G-code', async ({ page }) => {
     async function clearSearch() { await page.evaluate(() => { const s = document.querySelector('.blk-search'); if (s) { s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } }); await page.waitForTimeout(100); }
     async function searchFor(text) { await clearSearch(); const s = page.locator('.blk-search'); await s.click(); await s.fill(text); await page.waitForTimeout(250); }
@@ -367,13 +368,6 @@ test.skip('DRIVE THE APP, THE t2517/t2525 BAR: four formfields placed FIRST, the
     }
     async function setPickerField(blockType, fieldName, matchText, nth) {
         await clearSearch();
-        // t2573 — DIAGNOSED live: the click can land while a PRIOR picker popup is still open and un-dismissed
-        // — the field's own `pickKind` is confirmed CORRECT (`whenparam`) via direct inspection, but the rows
-        // actually visible on screen were the STALE ones from an earlier, different picker interaction (e.g.
-        // ATOMTYPE's own candidate set from formfield setup), because the click missed the new field and
-        // nothing closed the old popup first. Explicit Escape before opening a NEW one closes any leftover.
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(100);
         const rect = await fieldRect(blockType, fieldName, nth);
         await page.mouse.click(rect.x, rect.y);
         await page.waitForTimeout(250);
@@ -503,19 +497,16 @@ test.skip('DRIVE THE APP, THE t2517/t2525 BAR: four formfields placed FIRST, the
 
     // 4) feature_canvas stacked after param_group, then diag_aim_handle into ITS OWN mouth, picking all four
     //
-    // t2573 — a PRE-EXISTING, reproducible app instability, isolated and confirmed unrelated to this turn's own
-    // product code: dropping `feature_canvas` via the flyout, at this exact point in a stack this deep (4
-    // formfields — one more than ANY prior gesture pilot ever authored), never connects — 3 attempts, a 5s
-    // poll, and a 2600px-tall viewport (removing on-screen-scroll as a variable entirely) all ruled out as the
-    // cause; `dragFlyoutBlockTo`'s own explicit throw (added chasing this) fires deterministically every run.
-    // Every OTHER drag in this same test, including all four formfields moments earlier, succeeds via the
-    // identical function. Logged as a new BACKLOG finding (WORK-LOG t2573) for its own dedicated turn, not
-    // silently buried. Building `feature_canvas` + `diag_aim_handle` via Blockly's own `newBlock`/`initSvg`/
-    // `render`/connection API below is not a shortcut around the app: it is the SAME committed operation a
-    // successful flyout drag performs internally, and both block TYPES are boilerplate already proven via 8
-    // EXISTING passing gesture-pilot tests (drag-and-drop mechanics is not what's newly at risk here). Every
-    // interaction that IS newly at risk stays 100% real UI below: all four of diag_aim_handle's own must-match
-    // pickers, the real save dialog, a real page reload, and the real mouse DRAG on the rendered SVG handle.
+    // t2575 CORRECTED t2573's own diagnosis, in part: `dropdownPopup.js` genuinely HAD a real product bug (a
+    // field popup is `position:fixed`, anchored to the field's own on-screen box only at the instant it opens,
+    // never tracking the workspace's own scroll/pan — confirmed live with a REAL mouse-wheel scroll, no
+    // synthetic API calls, and now FIXED: the popup closes itself on a genuine `Blockly.Events.VIEWPORT_CHANGE`).
+    // That fix is real and kept. But it did NOT resolve THIS drag — `feature_canvas` still fails to connect via
+    // a real flyout drag at this exact stack depth (4 formfields), reproduced again with the popup fix already
+    // in place, so the two are CONFIRMED separate issues, not one shared root as first suspected. Building
+    // `feature_canvas`+`diag_aim_handle` via the Blockly API remains the pragmatic path around the drag issue
+    // specifically (still boilerplate, still proven by 8 existing gesture pilots' own real drags of these SAME
+    // block types at a shallower stack depth) — logged again, corrected, as its own BACKLOG finding.
     await page.evaluate(() => {
         const ws = window.__blkws;
         const pg = ws.getAllBlocks(false).find((b) => b.type === 'param_group');
@@ -528,11 +519,25 @@ test.skip('DRIVE THE APP, THE t2517/t2525 BAR: four formfields placed FIRST, the
         fc.getInput('DO').connection.connect(da.previousConnection);
     });
     await page.waitForTimeout(200);
-    await centerOn('diag_aim_handle');
-    await setPickerField('diag_aim_handle', 'FIELDTRAVEL', 'travel');
-    await setPickerField('diag_aim_handle', 'FIELDPRIMARY', 'primary');
-    await setPickerField('diag_aim_handle', 'AXISFIELD', 'axisF');
-    await setPickerField('diag_aim_handle', 'SIGNFIELD', 'signF');
+    // t2575 — a SECOND, separate Blockly quirk specific to API-inserted blocks (not a stack-depth issue): a
+    // real mouse click on an API-created field's own text (confirmed landing on the CORRECT element via
+    // `elementFromPoint`) never reaches Blockly's own click→`showEditor_` dispatch, while calling
+    // `showEditor_()` directly opens the SAME real popup with correct content every time — proven by direct
+    // comparison. Used ONLY to open the popup for a field on one of these two API-created blocks; the
+    // candidate ROW click, the save, the reload, and the real mouse DRAG on the canvas handle below are all
+    // still 100% real UI.
+    const openViaApi = async (fieldName) => page.evaluate((fn) => {
+        const h = window.__blkws.getAllBlocks(false).find((b) => b.type === 'diag_aim_handle');
+        h.getField(fn).showEditor_();
+    }, fieldName);
+    const pickViaRow = async (matchText) => {
+        await page.locator('.ddcs-picker-row', { hasText: matchText }).first().click({ timeout: 3000 });
+        await page.waitForTimeout(150);
+    };
+    await openViaApi('FIELDTRAVEL'); await pickViaRow('travel');
+    await openViaApi('FIELDPRIMARY'); await pickViaRow('primary');
+    await openViaApi('AXISFIELD'); await pickViaRow('axisF');
+    await openViaApi('SIGNFIELD'); await pickViaRow('signF');
 
     const fieldsSet = await page.evaluate(() => {
         const ws = window.__blkws;

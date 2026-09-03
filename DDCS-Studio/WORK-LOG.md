@@ -72307,3 +72307,87 @@ likely required beyond what `page.evaluate` diagnostics can practically reach fr
 `tests/node/__snapshots__/preview-spec-1688.txt` (regenerated) — all this turn's product changes, staged and
 committed below.
 
+## 🔨 turn 2575 — A REAL product bug found and FIXED (`dropdownPopup.js`'s own scroll-staleness, shared by every picker field in the app); the parked test's OWN diagnosis corrected but NOT fully resolved — TWO further, distinct issues surfaced past the fix
+
+### THE DISPATCH, and what it got right
+
+The advisor pushed back on t2573's own "harness limitation" framing: a picker popup opening with the field's
+own CONFIRMED-correct `pickKind` yet showing stale rows from an earlier interaction is not obviously a harness
+artifact — it reproduces only past a 4th formfield (this gesture's own second picker pair, never hit by any
+prior single-pair pilot), which is exactly the shape of a real, waiting product bug. Told to fix it at the
+source, not route around it, and to test the "is this a harness thing" question rather than assume it.
+
+### FOUND: a REAL, general, confirmed-live product bug in `blocks/blockly/dropdownPopup.js`
+
+Read `pickerField.js`'s own `_candidates()`/`showEditor_()` in full: candidates are ALWAYS computed fresh from
+the live workspace at popup-open time — no caching, no staleness possible there. The actual bug lives one
+layer down, in the SHARED popup helper both `pickerField.js` and `optionsEditorField.js` ride
+(`dropdownPopup.js`): the popup div is `position:fixed`, positioned against the field's own `getBoundingClientRect()`
+ONLY at the instant `openFieldPopup` runs — it never tracks the workspace's own scroll/pan/zoom afterward.
+
+**Proved this is real for an actual human, not a test-harness artifact**, per the dispatch's own explicit bar
+(the same question that settled BACKLOG #70 and the search-flyout interception, both times landing on "yes, a
+real person hits this"): a scratch test opened a picker, then performed a GENUINE `page.mouse.wheel()` scroll
+— no `centerOnBlock`, no synthetic API call — and the popup stayed open, `position:fixed`, at its byte-identical
+OLD screen coordinates while the canvas panned underneath it. On a stack tall/wide enough (this pilot's own
+4-formfield pilot, past every prior single-pair gesture), a stale popup can end up sitting directly over a
+DIFFERENT field's own next click, silently swallowing it — no error, no visual cue, the click just lands
+between the stale rows and does nothing useful.
+
+### FIXED, then diagnosed the fix itself carefully (two false starts, both caught live before shipping)
+
+`closeFieldPopup()` now runs whenever the popup's own owner workspace fires a genuine
+`Blockly.Events.VIEWPORT_CHANGE`. Two attempts before this one, both wrong, both caught by re-testing rather
+than assumed correct: (1) closing on ANY `ws.addChangeListener` event (unfiltered) self-closed the popup
+before it ever became visible — this app's own background live-preview churn fires unrelated change events
+continuously; (2) filtering to `VIEWPORT_CHANGE` alone still self-closed on open, because the SAME click that
+opens a field's editor can itself trigger Blockly's own "scroll the clicked block into view" — a real
+`viewport_change`, not noise, just not the ONE this guard exists to catch. Final shape: filter by
+`VIEWPORT_CHANGE` AND arm the listener a beat (400ms) after opening, so the opening click's own settle window
+passes before the guard goes live. Verified with the SAME scratch mouse-wheel scroll: popup opens, survives
+its own opening click's settle, then closes cleanly on a genuine later scroll — confirmed via the shared
+regression pass below that no EXISTING picker interaction (33 tests across 8 gesture-block spec files) regressed.
+
+### NOT FULLY RESOLVED — re-testing the parked pilot surfaced the fix did not reach the original failure, and TWO further distinct issues live underneath it
+
+Un-skipped the original test with the fix in place: it failed at the SAME step, for a DIFFERENT reason than
+first diagnosed. Chased further, each finding independently verified before moving to the next (not assumed):
+
+1. **`feature_canvas` still fails to connect via a real flyout drag** at this exact stack depth — reproduced
+   AGAIN with the popup fix already shipped, proving the drag failure and the popup bug are two SEPARATE
+   issues, not one shared root (t2573's own build had already routed around this via the Blockly API;
+   restoring the real drag to re-test the popup fix's own effect on it was the right check to make, and it
+   answered cleanly: no effect, still broken).
+2. **A real mouse click on an API-created block's own field never reaches Blockly's own click→`showEditor_`
+   dispatch** — proved by DIRECT comparison: `document.elementFromPoint` at the click coordinate correctly
+   resolves the field's own `<text>` node every time, yet no popup opens; calling `field.showEditor_()`
+   directly (bypassing Blockly's own click recognition) opens the identical, CORRECT popup every time. A
+   narrow, documented `showEditor_()`-direct call for opening a picker on one of the two API-created blocks
+   got past this step — the candidate ROW click, the save, the reload, and the real mouse drag stayed 100%
+   real UI throughout.
+3. **The save dialog (`.blk-dev-savedlg`) then stopped appearing** — a THIRD, still-uninvestigated symptom,
+   reached only after fixing #2, at which point the turn's own time budget was spent.
+
+**Re-parked, corrected rather than left standing on the wrong diagnosis.** The test's own header now names
+all three findings precisely, distinguishing the ONE that's fixed (the popup bug, real, general, shipped) from
+the TWO that remain open (drag-connection failure; the save-dialog symptom past it) — a future turn chasing
+this should not re-discover the popup bug as if it were still the blocker, and should not need to re-earn the
+"is this real for a human" answer for the popup piece, only for whatever remains.
+
+### TIER
+
+`dropdownPopup.js` is shared by every picker (`pickerField.js`) and options-editor (`optionsEditorField.js`)
+field in the app — full targeted regression across all 8 prior gesture-block spec files +
+`handle-target-fails-visibly-2525` (33 tests): green outright, no regression. `test:node`: 238/238, unaffected
+(no pure-function module touched). Full `--workers=4` suite: not run — the change is additive (a new guard
+that only ever CLOSES a popup earlier than before; it cannot cause a popup to stay open, or open one that
+wouldn't have anyway), and the 33-test targeted pass already covers every real consumer of the shared file.
+
+### BACKLOG
+
+Updated: the diag_aim_handle full-UI-drive finding now names three distinct symptoms (one fixed, two open)
+instead of the single, since-corrected "picker staleness" framing t2573 shipped.
+
+`git status`: `web/blocks/blockly/dropdownPopup.js` (the real fix), `tests/diag-aim-handle-block.spec.js`
+(re-parked with the corrected diagnosis) — staged and committed below.
+

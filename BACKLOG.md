@@ -5849,6 +5849,28 @@ Caught and fixed along the way: a real regression in `point-handle-block.spec.js
 additions had left `preview-spec-gate-1688`'s golden snapshot stale since that turn (its own `test:node` was
 never run), regenerated and diffed clean this turn. `test:node`: 238/238. Full account: WORK-LOG t2573.
 
+### ⭐⭐⭐⭐⭐ t2575 — FOUND+FIXED a real, general product bug (`dropdownPopup.js`'s own scroll-staleness); the parked test's diagnosis CORRECTED, not fully resolved — two further distinct issues remain
+
+t2573's own "picker staleness" was misdiagnosed as a harness limitation. Pushed to test that assumption rather
+than accept it — correctly: `dropdownPopup.js` (shared by every picker/options-editor field, `pickerField.js` +
+`optionsEditorField.js`) is `position:fixed`, anchored to a field's own screen box only at open time, never
+tracking the workspace's own scroll/pan. Proved real for an actual human (the same bar that settled BACKLOG
+#70 and the search-flyout interception): a genuine `page.mouse.wheel()` scroll, no synthetic API call, leaves
+a popup open at its stale coordinates, able to silently cover a different field's own next click. **Fixed**:
+closes on a real `Blockly.Events.VIEWPORT_CHANGE`, armed 400ms after opening (two wrong attempts caught live
+first: an unfiltered close self-closed on unrelated background churn; an unarmed-delay close self-closed on
+the SAME click's own "scroll into view"). Shared regression (33 tests, all 8 gesture-block spec files):
+green, no regression. `test:node`: 238/238.
+
+**Re-testing the parked pilot with the fix in place did NOT reach green** — it failed differently, revealing
+the popup bug was never the pilot's own sole blocker. Two further, DISTINCT, still-open issues found chasing
+it: `feature_canvas` still fails a real flyout drag at this exact stack depth (proven separate — reproduced
+again with the popup fix already shipped); and an API-created block's own field doesn't respond to a real
+mouse click at all (proven via direct comparison: `elementFromPoint` resolves the correct element, yet no
+popup opens, while calling `showEditor_()` directly does) — a save-dialog symptom surfaced past THAT, not yet
+investigated. Re-parked with the corrected, three-part diagnosis (one fixed, two open) rather than left
+standing on the original, now-known-incomplete framing. Full account: WORK-LOG t2575.
+
 ---
 
 ### 62. [✅ FIXED t2469, round 4 — the ONE mechanism three Playwright rounds structurally could not reach: `vh`
