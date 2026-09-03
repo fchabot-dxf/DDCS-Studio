@@ -71269,3 +71269,101 @@ verification PNGs (t1512/t1526/t1617/t1976/t1988/t2149/t2525-length/point/rect/t
 same handling as every prior turn this window. `ANALYTICS-BOT-DETECTION.md`/`RESTORE-CUSTOM-MACROS.zip` also
 predate this session and are left alone.
 
+## 🔨 turn 2559 — DIAGNOSIS ONLY: ratioY's real root is `_followHandle()`'s auto-pan, a per-frame feedback loop — NOT the canvas-scale question BACKLOG #73 was ruled on
+
+Per the dispatch's own explicit instruction: ⛔ diagnose, do not fix. No product code shipped this turn — two
+files were temporarily instrumented to gather the measurement below, then reverted (`git checkout HEAD --`,
+confirmed clean via `git status`).
+
+### METHOD
+
+Added a lightweight in-page trace (`window.__t2559trace.push({...})` — NOT `console.log`, see the false lead
+below) inside `featureCanvas.js`'s `pointermove` handler (captures `rawWorld`, `_tf.cxw/cyw/scale` on every
+drag frame) and its `_fit()` (captures the fit result + bbox), reverted after. Ran the REAL cross-face drag
+(same setup as the committed `surfacing-start-position-1648.spec.js` test) on both faces and read the trace
+back via `page.evaluate` after each drag.
+
+**A false lead, corrected before trusting it**: the first attempt used `console.log` directly inside the
+hot-path handlers and produced wildly different numbers (`jogY:-201.85` wizard vs the real, previously-
+established `-38.073`) — briefly suspected an "observer effect" (console.log overhead perturbing pointermove
+event timing/coalescing, which would matter for a per-frame-compounding mechanism). Switched to the lightweight
+array-push version — got the IDENTICAL `-201.85` — proving overhead was NOT the cause. The actual cause: my
+scratch test was missing `test.use({ viewport: { width: 1280, height: 900 } })`, a FILE-LEVEL override the
+real committed test declares (`surfacing-start-position-1648.spec.js:27`) that I hadn't carried over — a
+narrower default viewport shrinks the rendered canvas, which (per the mechanism found below) directly changes
+how much the auto-pan feedback compounds. Added the matching viewport override — the trace then reproduced
+`jogY:-38.073` (wizard) / `-83.881` (twin) EXACTLY, matching every prior turn's own measurement. Both false
+leads are recorded because they're the kind of trap a future re-run of this diagnosis would hit again blind.
+
+### THE MECHANISM, OBSERVED then read to confirm
+
+**OBSERVED** (the trace, both faces, matching-viewport run): `_tf.scale` is PERFECTLY CONSTANT across all 8
+drag frames on both faces (wizard 1.2027, twin 1.0816 — confirms FeatureCanvas's own fit is genuinely frozen
+during an active drag, as its own comment claims). `_tf.cxw` also NEVER changes on either face for this drag
+(stays at 100 throughout) — X never triggers panning. `_tf.cyw` changes on EVERY SINGLE FRAME on BOTH faces
+(wizard: 75→63.1→52.7→44.0→36.7→31.1→27.0→24.4; twin: 75→55.8→38.4→22.7→8.7→-3.5→-14.0→-22.8) — Y triggers
+panning every frame, on both faces.
+
+**READ to confirm** (`featureCanvas.js:386-399`, `_followHandle()`): fires on every `pointermove` while a
+`noSnap`-kind handle is active (surfacing's skim jog marker IS `noSnap`, matching this mechanism's own scoping
+comment — also alignment/rotary's own free-jog sim-start markers). Reads the HANDLE'S OWN current spec
+position (already updated by THIS SAME frame's `onDrag`, since the field-write→re-render pipeline runs
+synchronously before `_followHandle` is called), converts to screen via `_S`, and if it sits within
+`GUTTER_PX=80` px of an edge (or past it), shifts `_tf.cxw`/`cyw` so the handle's OWN screen position lands
+back EXACTLY at the 80px margin. The bug: the NEXT frame's `_toWorld()` reads THIS SAME shifted `cxw`/`cyw` as
+its reference frame — so a reference frame that was re-centred around the handle's OWN (already-reported)
+world position feeds directly into computing the NEXT frame's world position, which then re-triggers another
+pan, which re-centres AGAIN — a closed loop where each frame's correction becomes part of the next frame's
+input. `_toWorld`'s formula (`cxw ± (screen−cx)/scale`) has no way to distinguish "the frame shifted because
+the user moved the mouse" from "the frame shifted because auto-pan chased the handle" — both look identical to
+it, so panning's own compensation gets read back in as if it were further real cursor movement.
+
+### THE NUMBERS, reproduced and explained (not merely restated)
+
+| | scale | naive Y delta (−15px / scale) | ACTUAL jogY | amplification |
+|---|---|---|---|---|
+| wizard | 1.2027 | −12.47 | **−38.073** | **3.05×** |
+| twin | 1.0816 | −13.87 | **−83.881** | **6.05×** |
+
+X, where panning never fires this drag, matches the naive prediction almost exactly on BOTH faces (wizard
+24.985 vs naive 24.945, ratio 1.0016; twin 27.786 vs naive 27.736, ratio 1.0018) — confirming the BASE
+mechanism (`_toWorld`'s single per-face `_tf.scale`) is correct, and isolating the divergence to whatever ONLY
+fires on Y for this drag: the auto-pan loop. **The cross-face ratioX (1.112) is fully explained by the plain
+scale ratio between the two canvases (1.1119 = wizard scale / twin scale) — this IS BACKLOG #73's own
+mechanism (a real, benign, canvas-size-driven scale difference), unchanged and still correctly diagnosed.**
+**ratioY (2.203) is NOT that mechanism — it decomposes as `1.112 (the same base scale ratio) × 1.982 (the
+RATIO of the two faces' own auto-pan amplification, 6.05/3.05)` ≈ 2.204, matching the observed 2.203 to 4
+significant figures.** The twin amplifies roughly 2× more than the wizard because the SAME fixed 80px gutter
+consumes a much larger fraction of the twin's own smaller canvas, so its handle crosses the gutter threshold
+more insistently, triggering a larger per-frame correction more often.
+
+**Why Y triggers panning here and X doesn't (inferred, not separately measured)**: both canvases are wide and
+short (wizard 771×308, twin 707×277 — roughly 2.5:1). A modest downward drag reaches the 80px top/bottom
+gutter far sooner than an equivalent rightward drag reaches the much-more-distant left/right gutter — this is
+about THIS drag's own geometry against a wide-short canvas, not something specific to Y as an axis; a
+sufficiently large horizontal drag would trigger the identical loop on X.
+
+### VERDICT
+
+**BACKLOG #73's own diagnosis (the canvas-size/scale difference) is CORRECT and stays — it fully explains
+ratioX and would, on its own, explain ratioY too if capped at ~1.11×.** The additional ~2× ratioY carries
+beyond that is a SEPARATE, more serious bug: `_followHandle()`'s auto-pan is not a bounded "keep it visible"
+correction — for a handle whose OWN reported position keeps landing back in the gutter, it compounds EVERY
+FRAME, inflating the reported drag distance by 3–6× beyond the real mouse movement in this test's own
+measurement (a 15px mouse drag became a 26–70px-equivalent world move) — genuinely "a handle lying about how
+far it moved something" (the dispatch's own framing), scoped to `noSnap` markers (surfacing's skim jog,
+alignment/rotary's own free sim-start probes — not corner/edge/rect/radial/etc., which snap and don't reach
+this code path). Whether an 8-step SYNTHETIC test drag understates or overstates real-mouse severity (a real
+browser fires far more native `pointermove` events per pixel of physical mouse travel than this test's
+scripted 8 steps) was NOT measured this turn — flagged as an open question for whoever scopes the fix, since
+it bears on how bad this is in actual use, not just in this test harness.
+
+**NOT a one-line fix, by the evidence gathered**: closing this needs `_followHandle`'s own re-centering to
+stop feeding its OWN correction back into the NEXT frame's `_toWorld` input — e.g., tracking the accumulated
+pan separately from the reference frame `_toWorld` reads, or basing the pan trigger on the RAW cursor's own
+screen position rather than the handle's (already-shifted) reported one. This is BEHAVIOR every `noSnap`
+handle drag depends on (the "keep dragging past the stock edge" UX `_followHandle`'s own header comment
+describes) — a real, scoped fix, not a documented-constant situation.
+
+`git status` clean; no product code changed this turn.
+
