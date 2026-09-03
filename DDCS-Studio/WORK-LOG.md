@@ -70694,3 +70694,104 @@ the underlying timeline/reconciliation this section already recorded is unaffect
 `bridge/controllers/expert-m350/FINDINGS.md` (separate commit), BACKLOG.md, and this WORK-LOG entry.
 (`verification/*.png` noise from repeated full-suite runs left unstaged, per hazard #9.)
 
+## t2547 -- FIX IT: the split_horizontal cross-context canvas gap, drill included. Two of three ROOT-CAUSED and FIXED; the third investigated, a real attempted fix REVERTED after it regressed working tests, reported per the guardrail's own instruction
+
+The advisor's own call: not a follow-up BACKLOG item -- a dead drag handle on a REAL rendered element is BACKLOG
+#66's own signature (four investigations, a dozen refuted hypotheses, before that one turned out real), now
+confirmed on TWO shipping ops. Fix the mechanism, drill included, this turn.
+
+### THE HIT-TESTING BUG (drag-render-truth-gate-2461, preview-mutation-manifest-2463's sf-pos-snapback) -- ROOT-CAUSED AND FIXED
+
+Diagnosed empirically, not by CSS archaeology first: `document.elementsFromPoint()` at the handle's own
+reported screen center returned `.wiz-controls` as the FIRST (topmost) hit -- the SVG wasn't even IN the hit
+stack. Playwright's own actionability check said it plainly: `<div class="wiz-controls">... intercepts pointer
+events`. Traced the DOM chain from the handle upward and found the actual cause: `#blk_wiz_user_form` (the
+host `blocksApp.js`'s `applyBlkReadOnly` marks read-only for a PLACED, not-currently-edited op) carries class
+`blk-form-readonly` PLUS the native `inert` property (t1750 ACT 1b-iv, `blocksApp.js:817-830`) -- and `inert`
+cascades to an ENTIRE subtree with NO per-descendant opt-out (the HTML spec's own rule: an element is inert if
+ANY ancestor is inert; a descendant clearing its own `inert` attribute cannot un-inert itself). t1750's own
+mechanism was built and is CORRECTLY SCOPED for FORM FIELDS (`writeAuthoredValue` genuinely cannot write a
+placed op's `{type:'op',params}` shape yet -- t1748's own finding, still true, still the right call for
+inputs/selects/segmented/xy-pad). But a declared `split_horizontal`'s own RIGHT pane (the visualization) lives
+INSIDE that same host in tree mode, and its drag handles use a COMPLETELY DIFFERENT, WORKING write path
+straight to the placed op's own `.params` (confirmed: `drag-render-truth-gate-2461`'s own model-value check
+already asserted `originX` changes after a real drag, on a PLACED op) -- t1750 never anticipated that shape
+existing (tree mode + a live handle inside the SAME host it marks wholesale), so the blanket `inert` silently
+disabled a genuinely-intended interaction it was never meant to touch.
+
+**THE FIX** (`blocksApp.js`'s `applyBlkReadOnly`): scope the `inert`/`blk-form-readonly` marking to the
+split's own LEFT pane (`.ui-split-pane1`, the form-field content) when a tree-mode split exists as a direct
+child of the host, leaving the RIGHT pane (`.ui-split-pane2`, the visualization) genuinely interactive; a
+flat-mode op (no split at all -- its own handles, if any, live in the OUTER `.wiz-visual`, never inside this
+host) keeps the original host-wide scope, byte-unchanged. Both possible prior targets are explicitly cleared
+first, since this runs on every onShow/refresh and a render can flip tree<->flat without a reload (t1750's own
+comment, unchanged behavior there). Verified live, both properties independently: `pane1.inert === true`,
+`pane2.inert === false`, the handle's own `.click({timeout})` now SUCCEEDS, AND a genuine form field (`w`)
+still reports `disabled:false` but `closest('[inert]')` truthy -- the ORIGINAL t1750 fix's own guarantee
+(fields visibly, functionally read-only) is completely undisturbed, only the SCOPE narrowed to exclude the one
+subtree that was never form-field content in the first place.
+
+**PROVEN on BOTH ops, per the dispatch's own explicit instruction** ("a real drag proven in the narrow panel
+on both ops, with the field write confirmed") -- targeted batch: `drag-render-truth-gate-2461.spec.js` (both
+its own tests: surfacing sf_pos AND pocket pk_size, the SECOND handle-kind proof) and
+`preview-mutation-manifest-2463.spec.js`'s own sf-pos-snapback entry all green, 17/18 in that combined run
+(the 18th being the separate, still-open scale issue below). A broader 23-file regression sweep (every test
+referencing `blk-form-readonly`/`applyBlkReadOnly`, plus drill-canvas/drill-form-reproduction/drill-as-data,
+plus the pane-sizer files this same turn's own t2545 work had already substituted onto pocket) -- 23/23 green,
+confirming the readonly-scoping change touches nothing else. **Full `--workers=4` suite: BOTH files clean.**
+
+### THE CANVAS-SCALE MISMATCH (surfacing-start-position-1648's own cross-face ONE-SOURCED test) -- ROOT-CAUSED, a REAL FIX ATTEMPTED, REGRESSED TWO OTHER TESTS, REVERTED, REPORTED PER THE GUARDRAIL
+
+Root cause found and CONFIRMED, not guessed: measured the twin's own rendered SVG (`viewBox="0 0 822 154"`)
+against the classic shell's own (`viewBox="0 0 886 354"`), same op, same viewport -- a ~2.3x HEIGHT shortfall.
+Traced the height chain from the SVG upward: `.viz-container` sits pinned at its own 160px MINIMUM floor
+(t2357's own fix, unrelated, still working correctly), `.viz-split` measures only 364px (2 panes at their
+shared floor, nothing to grow into), and the actual culprit is ONE LEVEL UP -- `.wiz-visual`, nested inside
+`.ui-split-pane2`, computes `flex: 0 1 auto` (auto-sized to content, never GROWING) because the base rule
+supplying its growth (`.wiz-2pane > .wiz-visual { flex: 1 1 0; ... }`) uses a DIRECT-CHILD combinator that
+structurally cannot reach a split-nested `.wiz-visual` -- the EXACT SAME "selector authored for the classic
+shell's own DOM depth" bug class t2347/t2355/t2357 already named and partially fixed (t2347's own
+`.ui-split-pane > .wiz-visual { min-height: 0; }` reset the SHRINK side of this identical gap; the GROW side
+was left unfinished).
+
+**THE ATTEMPTED FIX**: extend that same rule to `.ui-split-pane > .wiz-visual { flex: 1 1 0; min-width: 0;
+min-height: 0; }` (adding the missing growth properties from the base rule, `order` deliberately excluded --
+irrelevant where `.wiz-visual` is the split pane's SOLE child). Measured live: `.wiz-visual` grew from 392px to
+its full 1263px pane height, `.viz-container` from 160px to 589.5px each -- the canvas-size root cause is
+real and this closes it structurally.
+
+**⛔ REGRESSED TWO OTHER, PREVIOUSLY-PASSING TESTS IN THE SAME FILE** ("WCS arm, TWIN" and "Skim arm, TWIN") --
+both stopped finding their own drag marker at its expected screen position once the canvas grew (their own
+`twinMarkerCenter()` helper, or the underlying handle-position math, depends on something about the canvas's
+PRIOR size/aspect-ratio that growing it broke). Not understood well enough in the time available to fix
+safely alongside the growth change -- REVERTED per the guardrail's own explicit instruction ("if the fix needs
+the canvas-scale... path restructured rather than corrected, STOP AND REPORT"): re-ran the three-file batch
+after reverting and confirmed the clean 17/18 state (with the ORIGINAL two "TWIN" tests passing again) was
+restored exactly, no residual damage from the attempt. The revert is CSS-only (a comment documenting the
+attempt and why it was reverted stays; the functional rule is byte-identical to before this turn). The
+`surfacing-start-position-1648.spec.js` cross-face test's own expectation was NOT touched, per the dispatch's
+own explicit instruction not to adjust it -- it stays red, honestly, for the real, now well-diagnosed reason.
+
+**Why this is a STOP, not a push-through**: growing `.wiz-visual` correctly fixes the SCALE problem but
+appears to interact with something ELSE downstream (marker-position calculation, possibly canvas-size-relative
+math baked into `twinMarkerCenter`/`layoutSpecFromOp`, not yet traced) in a way a same-turn investigation could
+not safely untangle without risking a THIRD undetected regression on top of the two already caught. The
+dispatch's own guardrail exists for exactly this shape of finding.
+
+### Verification, full account
+
+`test:node` 238/238, before and after both changes. Targeted regression (hit-test fix): 17/18 in the 3-file
+acceptance batch (only the known-open scale test red) + 23/23 broader sweep (readonly-mechanism + drill +
+pane-sizer files). **Full `--workers=4` suite: 3071 passed, 2 failed** -- `open-as-modal-1625.spec.js`
+(re-confirmed clean 3/3 in isolation immediately after, matching this session's own already-established
+pre-existing flake, BACKLOG #56) and `surfacing-start-position-1648.spec.js`'s own cross-face test (the one
+still-open, reported-not-fixed piece above) -- both `drag-render-truth-gate-2461` and
+`preview-mutation-manifest-2463` are CLEAN at full scale, confirming the hit-test fix holds with no new
+regressions anywhere else in the suite.
+
+`git status` clean outside: `web/blocks/blocksApp.js` (the readonly-scoping fix), `web/styles.css` (comment-only
+-- the attempted growth fix was reverted to byte-identical, only a documenting comment added), and this
+WORK-LOG entry. No BACKLOG addendum this turn: the remaining scale gap is recorded here, in full, for whoever
+picks it up next -- not re-filed as a fresh backlog item, since the advisor's own dispatch already made this a
+named, active line of work rather than a queued one.
+

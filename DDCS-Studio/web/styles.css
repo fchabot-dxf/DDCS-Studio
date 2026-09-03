@@ -2667,7 +2667,13 @@ button.primary:hover {
    resolved `min-height: 300px` and refusing to shrink past it. Same reset the desktop rule already declares,
    widened via a descendant-tolerant selector so it reaches the split-nested case too — unconditional (not
    width-gated): the missing reset is the same defect at any viewport, stacked mode just has a far smaller
-   total budget, so an ordinary drag hits the clamp far more easily there. */
+   total budget, so an ordinary drag hits the clamp far more easily there.
+   t2547 — a related reach gap was tried and REVERTED here: adding `flex: 1 1 0` to this same rule (so a
+   split-nested `.wiz-visual` also GROWS, not just shrinks-to-0) does close the canvas-size/scale-factor gap
+   behind `surfacing-start-position-1648.spec.js`'s own cross-face ONE-SOURCED test — but it regressed TWO
+   OTHER, previously-passing tests in the SAME file ("WCS arm, TWIN", "Skim arm, TWIN"), which stopped finding
+   their own drag marker at its expected screen position once the canvas grew. Not yet understood well enough
+   to land safely — see WORK-LOG t2547 for the full account and the STOP-AND-REPORT call this triggered. */
 .ui-split-pane > .wiz-visual { min-height: 0; }
 @media (min-width: 861px) {
     .wiz-visual { height: var(--viz-explicit-h, auto); }

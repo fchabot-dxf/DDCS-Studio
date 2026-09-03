@@ -821,12 +821,36 @@ async function buildWorkspace() {
   // carries WHY. Called after every onShow/refresh in both branches below, not just once, since a render can flip
   // placed↔authoring (switching which op the canvas holds) without a full page reload in between.
   const BLK_READONLY_REASON = 'Read-only here — a placed operation edits through its wizard (STUDIO tab) or its blocks on this canvas, not this pane.';
+  // t2547 (BACKLOG #72's own split_horizontal gap) — a declared split's own RIGHT pane (formWidgets.js's
+  // split_horizontal/split_vertical visualization) carries LIVE drag handles with their own, separate,
+  // working write path (a placed op's own `.params`, confirmed by drag-render-truth-gate-2461.spec.js's own
+  // model-value check) — unlike a placed op's form-FIELD edits, which `writeAuthoredValue` genuinely cannot
+  // handle yet (t1750's own finding, unchanged). `inert` cascades to an ENTIRE subtree with no per-descendant
+  // opt-out (the HTML spec's own "an element is inert if any ancestor is inert" rule — a descendant clearing
+  // its own `inert` cannot un-inert itself under an inert ancestor) — marking the WHOLE host read-only
+  // silently also disabled every drag handle nested inside it, in the ONE context (a placed op's own
+  // auto-preview, tree mode) where dragging is a real, intended interaction: confirmed live via
+  // `elementFromPoint`/Playwright's own actionability check both reporting `.wiz-controls` (an ANCESTOR)
+  // intercepting the click meant for the handle, on BOTH surfacing and drill (the only two split_horizontal
+  // twins) — latent since drill's own t2299/t2341, never exercised through this exact placed-preview route
+  // before. Scope the readonly/inert marking to the split's own LEFT pane (`.ui-split-pane1`, the form-field
+  // content) when a tree-mode split exists as a DIRECT child of the host, leaving its RIGHT pane (the
+  // visualization) genuinely interactive; a flat-mode op (no split — its own handles, if any, live in the
+  // OUTER `.wiz-visual`, never inside this host at all) keeps the original host-wide scope, unchanged.
   function applyBlkReadOnly(readOnly) {
     const host = document.getElementById('blk_wiz_user_form');
     if (!host) return;
-    host.classList.toggle('blk-form-readonly', !!readOnly);
-    host.inert = !!readOnly;
-    if (readOnly) host.title = BLK_READONLY_REASON; else host.removeAttribute('title');
+    const pane1 = host.querySelector(':scope > .ui-split-horiz > .ui-split-pane1, :scope > .ui-split-vert > .ui-split-pane1');
+    const target = pane1 || host;
+    // Always clear BOTH possible prior targets first: this runs on every onShow/refresh and a render can
+    // flip tree<->flat without a reload (t1750's own comment) — a stale mark from the OTHER scope must not
+    // survive the switch.
+    for (const el of [host, pane1]) {
+        if (el && el !== target) { el.classList.remove('blk-form-readonly'); el.inert = false; el.removeAttribute('title'); }
+    }
+    target.classList.toggle('blk-form-readonly', !!readOnly);
+    target.inert = !!readOnly;
+    if (readOnly) target.title = BLK_READONLY_REASON; else target.removeAttribute('title');
   }
   // t2397 (BACKLOG #43) — the meta/wrapper block kinds NEVER themselves own a form param by a bare field name
   // (mirrors pickerField.js's own `META_TYPES` exclusion for the SAME reason, declared independently here —
