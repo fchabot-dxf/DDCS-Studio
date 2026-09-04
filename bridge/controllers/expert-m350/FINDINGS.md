@@ -1911,3 +1911,43 @@ called wrong: the probe-set tool offset being non-zero (that is what tool offset
 soft limit (the one bound whose value changes per job), the "stale setting file" (two readings from different
 moments), and this. ⇒ ⭐ **Every one dissolved when the owner supplied ordinary context the measurement could
 not carry.** ⛔ Before calling a reading a fault, ask what was happening at the machine when it was taken.
+
+### 33. ⭐⭐ MULTI-LINE SEQUENCES RUN OVER MODBUS — the PC can execute a test program unaided `[CONFIRMED 2026-08-26]`
+`V20_read_2500.nc`'s whole body was injected line by line and executed — the `#1505` message appeared on the
+pendant and the value read back correctly. **No pendant interaction, no loaded file, no macro on the disk.**
+
+```
+#915 = #2500                                        ok
+#1510 = #2500                                       ok
+#1511 = #1430                                       ok
+#1505 = -5000(V20 via modbus ref=%.3f tool=%.3f)    ok   -> message appeared
+read back #2500 via register 7330: -1.9204          ✓
+```
+⚠ ~0.9 s between lines. Faster was not tried; the controller must finish one line before the next arrives.
+
+⇒ **What this seat can now do to the Expert, unaided:**
+| | how |
+|---|---|
+| read any parameter | `6500 + 2×index` (§28) |
+| read any variable | inject to a scratch slot, read back (§31) |
+| read live position | tracks continuously during motion (§29) |
+| execute any single line | injection (§30) |
+| **execute a SEQUENCE** | ⭐ this section |
+| ⛔ **start a loaded `.nc` file** | **NO PROVEN WAY** |
+
+### ⛔ THE REMAINING GAP — starting a loaded program
+Injected lines execute in what behaves like an MDI context. ⭐ **That is almost certainly why the state test
+found nothing**: a full-region diff (2,400 registers) across an injected `G04 P25.0` dwell, and again across
+four passes while a program was run from the pendant, showed **zero changed registers**. ⇒ Either run-state is
+not exported at all, or injected lines never enter it. **Not distinguishable until a program can be started
+and watched.**
+
+⚠ This is the ROADMAP's own standing question — *"remote start without the panel: does `sysstart` re-Select
+and run a PC-named file, or a `#2037` virtual Start button? This is the gate for hands-free delivery→run."*
+
+Two candidate routes, neither tried:
+* **`#2037` virtual buttons** — documented in the `ddcs-expert` skill as pressing panel buttons from G-code.
+  ⛔ If a virtual Start exists, **the PC can press Start** — which is exactly the *"running is
+  operator-pressed"* line. Needs the owner's ruling on that specific act, not a general permission.
+* **`M98 P<O-number>`** — works today, no new capability. ⛔ But every O-number on this controller is a
+  factory routine (`O501` homing, `O502` tool-setter) and they MOVE. Only safe with an O-number we wrote.
