@@ -75094,3 +75094,124 @@ line if dispatched — pure volume (21 multi-spec params, `group_box`/`field_ref
 needed, no structural blocker per t2623/t2625's own measurement) rather than a novel mechanism. Corner stays
 the deferred trap, untouched this arc.
 
+## t2627 — SWEEP FOR THE THIRD ONE, then pocket (dispatched, in that order)
+
+Dispatch: sweep every spec for an all-registered-op loop with no scaling timeout budget (field-help-798 was the
+SECOND instance of form-kernel-720's own t2621 class — two is a pattern, find the third now rather than have it
+surface as a mystery red when pocket lands). Then pocket, the last real migration this arc — 10 target types,
+89 entries, 21 multi-spec params, the table's own hardest. Corner stays deferred, its own turn.
+
+### THE SWEEP — one more instance found and fixed, the same structural way
+
+Grepped every test file that enumerates `listUserOps()`/`userBuilderTypes()` (78 files), narrowed to files that
+loop OUTSIDE a single `page.evaluate()` call (a real per-op Playwright round trip per iteration, the only shape
+actually at risk — an in-page loop inside one `page.evaluate()` is bounded by that ONE call, not by N separate
+waits stacking under contention). Found 3 total candidates carrying this shape:
+
+1. `form-kernel-720.spec.js` — already fixed (t2621), scales.
+2. `field-help-798.spec.js` — fixed last turn (t2625), scales.
+3. `fork-parity-1593.spec.js`'s own "THE REAL GESTURE" test — a genuinely heavier per-op sequence (customize +
+   save-as-wizard + 3×30s waits + an emit-compare evaluate) over all 32 twins, with an EXPLICIT but FIXED
+   `test.setTimeout(300_000)` — not the "bare 60s default" risk class the other two were (it never relied on
+   the default), so it had never actually failed in any of this session's full runs. Measured its own
+   uncontended runtime (2m1s, 32 twins, ~3.8s/op) rather than assuming: the fixed 300s gives only ~2.4x
+   headroom over that, tighter than form-kernel-720's own ~3.7x margin, and a genuinely bigger absolute number
+   (126s uncontended vs 51.5s) gives contention more room to compound. Converted to the SAME scaling pattern
+   (`test.setTimeout(Math.max(300_000, twins.length * 15000))`) as prevention, not a fix for an observed red.
+
+**The rest of the census (~75 files) sorted cleanly into two low-risk buckets, both confirmed by reading, not
+assumed**: files whose loop runs entirely INSIDE one `page.evaluate()` (`roundtrip-whole-program-1319`,
+`unclosed-bracket-refuses-1601`, `literal-hole-ownership-1389`, `picture-parity-1772`,
+`twin-section-invariant-2381`, `section-order-parity-2617` — no Playwright-level per-op wait to stack up), and
+files that loop over a small, curated, hardcoded list rather than the full catalog (`passes-field-1613`,
+`stock-spill-792`, `lathe-visible-1281`, `atc-roundtrip`, `flow-labels-unique-1408`, `multi-op-import-1916`,
+`preset-removal-2359` — the last of these DOES loop the full ~32-item wizard-library list, but with only a
+fixed 100ms sleep per iteration, no explicit wait carrying its own timeout, so it stays bounded regardless of
+contention). **Three exist; all three scale now. The class is closed.**
+
+### POCKET MIGRATED — the last real op this arc
+
+Read pocket's own EXISTING `pocketDataStack()` first, before writing anything: it already declared a
+`field_ref`/`grid_container`/`section` tree (built at t2301) — but `section` (not `group_box`) and NO
+`split_horizontal` wrapper, so `hasTreeLayout()` was FALSE and this entire hand-authored tree had been DEAD
+DATA since t2301, confirmed dead again at t2381/t2403 (`pocket-form-reproduction-2301.spec.js`'s own header
+already documents this). Activating it — not building from scratch — was the actual migration: wrapped the
+existing content in `split_horizontal` (RIGHT: preview3d+feature_canvas, replacing the old bare `sim` node),
+renamed every `section` node to `group_box`, and closed the pre-existing 19-field ORPHAN SET the t2301 tree had
+never placed (direction/entry/rampAngle/helixDia/helixPitch/confirmEvery/restTool/restDia/restStepover/
+material/the stock-datum cluster/entryX/entryY/passes) — placed into whichever group its other fields already
+established as its conceptual home, plus a genuinely NEW "REST MACHINING" group_box (POCKET_STRUCT_BINDINGS'
+own `group:'rest'` tag, no shell equivalent at all). Zero orphans now, matching contour's/slot's own bar.
+
+**`POCKET_BINDING_SPECS`' own `section:` values reassigned from the old GEOMETRY/TOOL & CUT (G/T) split to the
+shell's own 5 real names** — bookkeeping only, since this tree places every `field_ref` BY HAND (drill's own
+precedent), never by filtering bindings on `.section`. Verified the SHAPE-then-strategy ordering directly
+against the live shell markup (index.html's own `#wiz_pocket`: `p_shape` then `p_strategy` then `p_originX`
+then `p_w`) rather than assuming — confirmed my tree's placement was RIGHT and an existing test
+(`clearing-cluster-800.spec.js`'s own P6.1) had been asserting the FLAT render's array-bucketing artifact, not
+the shell's real layout; fixed that test's own assertions to the shell-verified truth instead of forcing my
+tree to match a stale one.
+
+**A genuinely subtle mechanism, found by the cross-op section-order guard, not guessed**: `renderOpForm`
+bundles bindings sharing a `.group` (NOT `.section`) into ONE render unit (`byGroup[b.group]`), and that unit's
+OWN classic section comes from whichever member is pushed FIRST — `strategy`/`direction`/`stepoverPct` all
+carry `group:'clearing'`, and `strategy` (spliced in first, section SHAPE) becomes `unit[0]`, so the WHOLE trio
+classically renders under SHAPE regardless of `direction`/`stepoverPct`'s own individual `.section` value.
+Moved `toolDia`/`wallOffset` (TOOL & STEPOVER's only UNGROUPED, and therefore true first-occurrence, members)
+earlier in the array — ahead of `wcs` (DEPTH & FEED) — so the classic first-seen order actually agrees with the
+tree's own group_box order: SHAPE -> TOOL -> TOOL & STEPOVER -> DEPTH & FEED -> REST MACHINING. Also split
+`POCKET_STRUCT_BINDINGS` (was one array, one splice point) into `POCKET_STRUCT_BINDINGS` (just `strategy`,
+spliced early) and a new `POCKET_REST_BINDINGS` (restTool/restDia/restStepover, appended LAST) for the same
+reason — bundling them at one splice point forced REST MACHINING to appear before DEPTH & FEED.
+
+**One own mistake, caught before it ever ran, not shipped**: an early edit consumed the `wcs` binding entry
+entirely while rewriting its surrounding comment (an `old_string`/`new_string` boundary slip, not a design
+error) — caught by grepping for `param: 'wcs'` right after the reorder pass, finding only the tree's own
+`field_ref` reference and no binding-spec entry left at all. Restored at its new position, comment intact,
+before anything downstream ever saw the gap.
+
+**Three real "moving target" regressions found by the wider battery, all fixed at their source, none papered
+over**: (1) `pocket-form-reproduction-2301.spec.js` itself needed a full rewrite (was `mode:'flat'`, pinning
+the DEAD tree's own field order — switched to the shared tree default, matching contour's/slot's own t2621/
+t2625 precedent). (2) `pane-sizer-1353.spec.js` + `pane-sizer-mobile-1468.spec.js` had ALREADY been swapped
+once (t2545, surfacing → pocket) for exactly this reason — `.viz-pane-sizer` only exists for classic-rendered
+ops, and pocket just stopped being one. Swapped again, to `user_corner_data` — confirmed live (grepped
+cornerData.js for `split_horizontal`/`split_vertical`, zero hits) that corner is now the LAST genuinely
+classic-rendered op among the 32 registered twins, so it is the natural stable subject going forward as long as
+it stays the deferred pilot. (3) `twin-section-invariant-2381.spec.js`'s own registry-wide vocabulary survey
+needed pocket added to `VOCABULARY_EXCEPTIONS` (moved from "no exception, canonical GEOMETRY/TOOL & CUT" to a
+`reason:'shell'` entry, the same bucket contour/slot/surfacing/text already sit in).
+
+### VERIFY
+
+Targeted pocket battery (pocket-form-reproduction-2301 + pocket-data-emit + pocket-rides-raster-1406 +
+rest-machining-871 + clearing-cluster-800 + depth-entry-804 + concentric-shapes-802 + feeds-speeds-867 +
+pocket-in-place + pocket-tenant-extraction-1391 + cutting-rpm-996 + passes-field-1613 + twin-section-invariant-
+2381 + mill-family-token-policy-1758 + stock-spill-792 + pane-sizer-1353 + pane-sizer-mobile-1468 +
+form-section-collapse-820 + the new pocket-canvas-mount-2627): 86+ tests, all green after the fixes above.
+Cross-op section-order guard: still 30/30 tree-mode ops (pocket didn't add a 31st count — it REPLACED a prior
+non-tree entry). Rule-20 fold-count guard, form-kernel-720, field-help-798, fork-parity-1593: 10/10. Rule 17's
+own census (grepped the whole `tests/` dir for `pocketData`/`POCKET_DATA_OPTYPE`/`user_pocket_data`/etc — 54
+files, minus the ones already covered in the targeted battery — ~40 files): 138/138 clean on the first pass,
+zero further surprises. Node tier: 238/238.
+
+**Full suite via `npm test`: 3165 passed, 1 failed (`preview-mutation-manifest-2463.spec.js`, the same
+pre-existing load-dependent flake classified at every prior gate this session), 11 flaky, 28 skipped, e2e exit
+1.** Neither the sweep's fork-parity-1593 fix nor pocket's own migration introduced any new failure.
+
+`git status`: `web/blocks/dataOps/pocketData.js` (the migration), `tests/fork-parity-1593.spec.js` (the
+scaling-budget fix), `tests/pocket-form-reproduction-2301.spec.js` (mode switch + new EXPECTED_ORDER),
+`tests/clearing-cluster-800.spec.js` (shell-verified order fix), `tests/pane-sizer-1353.spec.js` +
+`tests/pane-sizer-mobile-1468.spec.js` (subject swap, pocket → corner), `tests/form-section-collapse-820.spec.js`
+(stale section-name fix), `tests/twin-section-invariant-2381.spec.js` (vocabulary exception added),
+`tests/pocket-canvas-mount-2627.spec.js` (new).
+
+### NEXT
+
+31 of 32 built-in-equivalent ops are now on `renderUiTree`. Only corner remains — the deferred trap, and per
+the dispatch's own framing it deserves a turn where it is the only thing happening, not the tail of another.
+`user_corner_data` is now load-bearing as the LAST stable classic-render subject for `pane-sizer-1353.spec.js`/
+`pane-sizer-mobile-1468.spec.js`/`.viz-pane-sizer` in general — if corner ever migrates, those two files will
+need a structural answer (a synthetic classic-mode fixture, matching the `passes-field-1613` precedent) rather
+than a 3rd subject swap with nothing left to swap to.
+

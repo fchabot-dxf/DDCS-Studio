@@ -3,11 +3,22 @@ import { test, expect } from '@playwright/test';
 /**
  * t800 BATCH 4 — the FORM-HONESTY campaign closer.
  *
- * P6 THE CLEARING CLUSTER: strategy → direction → stepover land TOGETHER, right after shape/size, before feeds. `direction`
+ * P6 THE CLEARING CLUSTER: strategy → direction → stepover, in that RELATIVE order. `direction`
  * is surfaced in the form for the first time — a real atom field (the builder used to hardcode 'bothways'). It is labelled +
  * gated per what the emitting walk actually does: bothways = boustrophedon zig-zag; oneway = climb (lift + rapid back each
  * pass); otherway = conventional. Only the raster path reads it — concentric rings IGNORE it — so the field is gated
  * `when strategy is raster` (honest: no inert control on the spiral default).
+ *
+ * t2627 — P6.1's OWN "together, right after shape/size" framing retired: pocket migrated onto the declared
+ * group_box tree (contour's/slot's own recipe), which reproduces the LIVE SHELL's real visual layout
+ * (index.html's own `#wiz_pocket` markup) instead of the old flat render's array-position bucketing. The shell
+ * itself places `strategy` inside the SHAPE box (right after `shape`, BEFORE originX/w/h — confirmed directly
+ * in index.html, not assumed) and `stepoverPct`/`wallOffset` inside a SEPARATE TOOL & STEPOVER box — they were
+ * never visually adjacent in the real UI; "together" was an artifact of the flat render's own 2-bucket
+ * (GEOMETRY/TOOL & CUT) grouping, not a shell truth. `direction` (shell-absent, twin-only) now leads the TOOL &
+ * STEPOVER box specifically so `strategy < direction < stepoverPct` — the one relative-order claim from t800
+ * that still means something — survives across the box boundary; "size before clearing" does not (size is
+ * shell-adjacent to strategy, not before it).
  *
  * t1418 — WHICH ATOM CARRIES IT MOVED, AND THE SPEC FOLLOWED. In t800 the answer was always `pocketfill` (stepover.js's
  * `fillStrategy`, unrolled in JS). t1406 re-pointed the both-ways rect arm at the parametric `surfaceraster`, and t1418
@@ -23,7 +34,7 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('P6.1 the pocket form reads shape → size → CLEARING(strategy/direction/stepover) → feeds', async ({ page }) => {
+test('P6.1 the pocket form reads shape → strategy → size, and direction leads stepover in its own TOOL & STEPOVER box', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
   await page.evaluate(() => window.openWiz('user_pocket_data'));
@@ -32,9 +43,11 @@ test('P6.1 the pocket form reads shape → size → CLEARING(strategy/direction/
   const idx = (p) => order.indexOf(p);
   for (const p of ['shape', 'w', 'strategy', 'direction', 'stepoverPct', 'feed']) expect(idx(p), `${p} present in the form`).toBeGreaterThan(-1);
   expect(idx('shape'), 'shape before size').toBeLessThan(idx('w'));
-  expect(idx('w'), 'size before the clearing cluster').toBeLessThan(idx('strategy'));
-  expect(idx('strategy'), 'strategy LEADS the clearing cluster').toBeLessThan(idx('direction'));
-  expect(idx('direction'), 'direction then stepover').toBeLessThan(idx('stepoverPct'));
+  // t2627 — strategy sits in the SHAPE box, right after shape, BEFORE originX/w/h (the shell's own real
+  // layout, index.html's #wiz_pocket markup — p_shape then p_strategy then p_originX then p_w).
+  expect(idx('shape'), 'shape before strategy').toBeLessThan(idx('strategy'));
+  expect(idx('strategy'), 'strategy before size').toBeLessThan(idx('w'));
+  expect(idx('direction'), 'direction leads stepover in the TOOL & STEPOVER box').toBeLessThan(idx('stepoverPct'));
   expect(idx('stepoverPct'), 'clearing before feeds').toBeLessThan(idx('feed'));
 });
 

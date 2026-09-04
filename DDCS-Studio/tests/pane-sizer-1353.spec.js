@@ -21,9 +21,15 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 // declared tree's OWN inner visualization. Surfacing is now genuinely tree-rendered (mirroring drill), so
 // `.wiz-visual`/its sizer no longer exist for it — not a regression in the sizer mechanism itself (still
 // exercised here, on pocket, exactly as before), just no longer a valid subject for THIS particular twin.
+//
+// t2627 — SWAPPED AGAIN: pocket migrated onto the declared group_box tree this turn, so it stops being a
+// valid subject for the SAME reason surfacing did. `user_corner_data` is now the LAST remaining genuinely
+// classic-rendered op among the 32 registered twins (confirmed directly: grepped cornerData.js for
+// `split_horizontal`/`split_vertical`, zero hits — `hasTreeLayout()` is false), and it has a real `form3d+2d`
+// panel (a real `.wiz-visual` pane to resize) — a stable subject as long as it stays the deferred pilot.
 const openTwin = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
-    await page.evaluate(() => window.openWiz('user_pocket_data'));
+    await page.evaluate(() => window.openWiz('user_corner_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
 };

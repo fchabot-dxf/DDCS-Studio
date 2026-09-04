@@ -24,16 +24,20 @@ test('a LONG form (pocket) renders collapsible sections; folding one survives a 
     return { n: secs.length, titles: secs.map((s) => s.querySelector('.form-sec-title').textContent), firstCollapsed: secs[0].getAttribute('data-collapsed'), hdrH: secs[0].querySelector('.form-sec-hdr').offsetHeight };
   });
   expect(before.n, 'the pocket form has ≥2 collapsible sections').toBeGreaterThanOrEqual(2);
-  expect(before.titles, 'the sections are the declared kinds').toContain('TOOL & CUT');
+  // t2627 — pocket migrated onto the declared group_box tree (contour's/slot's own recipe): resectioned from
+  // the old canonical GEOMETRY/TOOL & CUT split to the shell's own 5 real names (SHAPE/TOOL/TOOL &
+  // STEPOVER/DEPTH & FEED/REST MACHINING, pocket-form-reproduction-2301.spec.js) — 'TOOL & CUT' no longer
+  // exists as a section title for pocket. 'TOOL & STEPOVER' is its closest still-present analog.
+  expect(before.titles, 'the sections are the declared kinds').toContain('TOOL & STEPOVER');
   expect(before.firstCollapsed, 'default = expanded').toBe('0');
   expect(before.hdrH, 'the section header is a ≥44px touch target').toBeGreaterThanOrEqual(44);
 
-  // fold "TOOL & CUT"
-  await page.evaluate(() => { const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & CUT'); s.querySelector('.form-sec-hdr').click(); });
+  // fold "TOOL & STEPOVER"
+  await page.evaluate(() => { const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & STEPOVER'); s.querySelector('.form-sec-hdr').click(); });
   await page.waitForTimeout(450);   // let the fold animate + persist
   const folded = await page.evaluate(() => {
-    const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & CUT');
-    return { collapsed: s.getAttribute('data-collapsed'), pref: (() => { try { return JSON.parse(localStorage.getItem('ddcs_form_sections') || '{}')['TOOL & CUT']; } catch (_) { return null; } })() };
+    const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & STEPOVER');
+    return { collapsed: s.getAttribute('data-collapsed'), pref: (() => { try { return JSON.parse(localStorage.getItem('ddcs_form_sections') || '{}')['TOOL & STEPOVER']; } catch (_) { return null; } })() };
   });
   expect(folded.collapsed, 'the section is folded').toBe('1');
   expect(folded.pref, 'the fold persisted app-wide (panePrefs)').toBe(true);
@@ -42,7 +46,7 @@ test('a LONG form (pocket) renders collapsible sections; folding one survives a 
   await page.reload();
   await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
   await openWiz(page, 'user_pocket_data');
-  const after = await page.evaluate(() => { const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & CUT'); return s ? s.getAttribute('data-collapsed') : null; });
+  const after = await page.evaluate(() => { const s = [...document.querySelectorAll('#wiz_user_form .form-sec')].find((x) => x.querySelector('.form-sec-title').textContent === 'TOOL & STEPOVER'); return s ? s.getAttribute('data-collapsed') : null; });
   expect(after, 'the folded section is remembered across reload').toBe('1');
   // folded ≠ removed: the folded section's fields are still in the DOM (the guards depend on this)
   const stillThere = await page.evaluate(() => document.querySelectorAll('#wiz_user_form .form-sec [data-param]').length);

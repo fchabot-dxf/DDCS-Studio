@@ -27,9 +27,14 @@ import { test, expect } from '@playwright/test';
 // pane-sizer-1353.spec.js's own header comment: `.wiz-visual` (and its stacked-height mechanism this file
 // tests) only exists for a FLAT-rendered op; surfacing is now genuinely tree-rendered (mirroring drill), so
 // it is no longer a valid subject for this mechanism, which is otherwise unchanged.
+//
+// t2627 — SWAPPED AGAIN, same reasoning as pane-sizer-1353.spec.js's own t2627 update: pocket migrated onto
+// the declared group_box tree this turn. `user_corner_data` is the last remaining genuinely classic-rendered
+// op among the 32 registered twins (confirmed: no `split_horizontal`/`split_vertical` in cornerData.js), with
+// a real `form3d+2d` panel — a stable subject as long as it stays the deferred pilot.
 const openTwin = async (page) => {
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate(() => window.openWiz('user_pocket_data'));
+    await page.evaluate(() => window.openWiz('user_corner_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(700);
 };

@@ -121,7 +121,6 @@ test('the registry PARTITIONS on guards, and the inheritance rule covers every t
 });
 
 test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, and nothing is refused', async ({ page }) => {
-    test.setTimeout(300_000);
     const alerts = [];
     page.on('dialog', (d) => { alerts.push(d.message()); d.accept(); });
     await boot(page);
@@ -130,6 +129,14 @@ test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, a
         return U.listUserOps().map((d) => d.opType);
     });
     expect(twins.length, 'the shipped twins are registered').toBeGreaterThanOrEqual(32);
+    // t2627 — MEASURED, not left as the pre-existing fixed 300_000: this is the same all-twin-loop SHAPE
+    // form-kernel-720.spec.js/field-help-798.spec.js both needed a scaling budget for (a real per-op Playwright
+    // sequence — customize + save-as-wizard + 3×30s waits + an emit-compare evaluate — looped over every
+    // registered twin), even though it never relied on a bare default. Uncontended, single-worker: 32 twins,
+    // 2m1s total (~3.8s/op) — the fixed 300_000 gives only ~2.4x headroom over that, tighter than
+    // form-kernel-720's own ~3.7x margin, and this test has never actually failed in three full-suite runs this
+    // session — so this is prevention, not a fix for an observed red. Same pattern, not a bigger flat number.
+    test.setTimeout(Math.max(300_000, twins.length * 15000));
 
     const results = [];
     for (let i = 0; i < twins.length; i++) {

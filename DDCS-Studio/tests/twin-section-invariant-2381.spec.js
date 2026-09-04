@@ -122,6 +122,12 @@ import { test, expect } from '@playwright/test';
  * `MOOT_TWINS` are the only 2 structurally-exempt classes, each with a stated mechanism, not a silent escape
  * hatch. **32 of 32 twins now match their shell exactly OR are deliberately, explicitly ruled** — the arc's
  * registry half is CLOSED.
+ *
+ * ⭐ UPDATED t2627 — `user_pocket_data` MIGRATED onto the declared group_box tree (contour's/slot's own
+ * recipe): the t2403-era GEOMETRY/TOOL & CUT chrome (already-canonical, no exception needed then) is replaced
+ * by the shell's own real 4 names PLUS a genuinely new REST MACHINING group with no shell equivalent, so it
+ * moved from "no exception" to a `VOCABULARY_EXCEPTIONS` `reason:'shell'` entry — the same bucket contour/
+ * slot/surfacing/text already sit in, verified byte-for-byte the same way (pocket-form-reproduction-2301.spec.js).
  */
 
 // t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not
@@ -170,6 +176,11 @@ const VOCABULARY_EXCEPTIONS = {
     user_atc_warmup_data: { reason: 'shell', sections: ['WARM-UP SEQUENCE'] },
     user_contour_data: { reason: 'shell', sections: ['SHAPE', 'SIDE & TOOL', 'DEPTH & FEED'] },
     user_slot_data: { reason: 'shell', sections: ['ENDPOINTS', 'TOOL', 'TOOL & WIDTH', 'DEPTH & FEED'] },
+    // t2627 — pocket migrated onto the declared group_box tree (contour's/slot's own recipe): resectioned from
+    // the old canonical GEOMETRY/TOOL & CUT split to the shell's own 4 real names (SHAPE/TOOL/TOOL &
+    // STEPOVER/DEPTH & FEED, verified byte-for-byte, pocket-form-reproduction-2301.spec.js) plus REST MACHINING
+    // (a genuinely new group with no shell equivalent at all — the shell never had rest-machining UI).
+    user_pocket_data: { reason: 'shell', sections: ['SHAPE', 'TOOL', 'TOOL & STEPOVER', 'DEPTH & FEED', 'REST MACHINING'] },
     user_surfacing_data: { reason: 'shell', sections: ['AREA', 'TOOL', 'TOOL & STEPOVER', 'DEPTH & FEED'] },
     user_text_data: { reason: 'shell', sections: ['TEXT', 'TOOL', 'TOOL & FILL', 'DEPTH & FEED'] },
     // t2383 — fixed THIS turn: the shell (index.html:1036-1074) declares exactly ONE section ("ATC
