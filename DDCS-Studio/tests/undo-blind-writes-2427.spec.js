@@ -31,7 +31,11 @@ import { test, expect } from '@playwright/test';
 
 async function bootSurfacing(page) {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp);
+  // t2593 (BACKLOG #63) — the app-boot readiness check, unlike everywhere else in this codebase (84 other specs
+  // pass an explicit longer timeout here), was relying on playwright.config.js's own global `actionTimeout:
+  // 5000` default — too tight a margin for a cold app boot under load, even fully isolated (`--workers=1`,
+  // nothing else running). Matched to this suite's own dominant convention (15000ms), not invented.
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp, null, { timeout: 15000 });
   await page.evaluate(() => window.showApp('blocks'));
   await page.evaluate(async () => {
     const { _framed, makeOp } = await import('/blocks/opBuilders.js');
@@ -134,10 +138,12 @@ test('a DRAG-SHAPED burst (~27 writes, matching BACKLOG #46\'s own captured drag
 
 test('REGRESSION: the authored-canvas real Blockly field edit (writeAuthoredValue) is untouched — still one entry per edit', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp, null, { timeout: 15000 });   // t2593 (BACKLOG #63) — see bootSurfacing's own comment
   await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => !!window.__blkws);
-  await page.waitForFunction(() => !!window.ddcsEditWizardDef);
+  // t2593 (BACKLOG #63) — same reasoning as the boot-wait above: these two also gate on app initialization
+  // completing under the shared workspace/dev-mode setup, not a fast, purely-synchronous check.
+  await page.waitForFunction(() => !!window.__blkws, null, { timeout: 15000 });
+  await page.waitForFunction(() => !!window.ddcsEditWizardDef, null, { timeout: 15000 });
   await page.evaluate((t) => { window.ddcsEditWizardDef(t); }, 'user_corner_data');
   let last = -1;
   for (let i = 0; i < 160; i++) {

@@ -73129,3 +73129,94 @@ inert-cascade one), not a resemblance-only judgement, since causality was demons
 backup (confirmed byte-identical via a clean re-run, not from HEAD since committing was never needed); only
 `BACKLOG.md` and this WORK-LOG entry are new. The scratch test file was deleted before this commit.
 
+## 🔨 turn 2593 — THE THREE FLAKES (BACKLOG #56/#57/#63): TWO FIXED with root cause named, ONE DECLARED
+environmental with the reasoning stated, per the dispatch's own explicit "protect the signal" instruction —
+zero product code touched, all three fixes/declarations live in test files or BACKLOG.md alone
+
+### THE ASK
+
+Three known, long-tracked flakes were training people to skim the full suite's own failed-count — the exact
+signal that has caught real regressions repeatedly this session (t2371, t2531, t2543, t2551, t2567, each cited
+by the dispatch). Fix what's fixable, park what's not, with the reasoning stated either way — and per the
+dispatch's own explicit steer for #57/#63 ("look at what each is actually waiting ON before touching either — a
+wait on the wrong condition is a different bug from a wait that is too short"), diagnose before guessing.
+
+### #63 (`undo-blind-writes-2427.spec.js`) — FIXED: a wait that was simply TOO SHORT, not wrong
+
+`playwright.config.js`'s own global `actionTimeout: 5_000` governs a bare `page.waitForFunction()` with no
+explicit timeout — this file's own boot-readiness check (`page.waitForFunction(() => window.ddcsStudio &&
+window.showApp)`) had none, matching this entry's own documented "Timeout 5000ms exceeded" exactly.
+**Grepped the whole suite before assuming anything**: 84 other spec files already pass an explicit
+`{timeout: 15000}` on this identical boot check — the dominant, established convention this file simply never
+adopted. Fixed by matching it: added `{timeout: 15000}` to both of the file's own boot-wait calls, then found
+(via a first repeat-run) that the two IMMEDIATELY-FOLLOWING `__blkws`/`ddcsEditWizardDef` readiness waits share
+the same class of gap and applied the identical fix there too.
+
+**Proven, not asserted**: 40 solo runs (`--workers=1`, `--repeat-each=10` across two batches) — 37 passed, 3
+flaky (all retry-recovered on the SAME single test, none hard-failed) — versus the entry's own documented
+baseline of 2-3 of 4 solo runs hard-FAILING. Zero product code touched.
+
+### #57 (`undo-reproject-echo.spec.js`) — FIXED: traced the wait's own target, found a genuine race, not a slow arrival
+
+t2463's own correction already pointed at line 62 (`waitX(page,5)` after Undo), not the file's own redundant
+`page.waitForTimeout(350)` at line 48/49 — but never determined WHETHER the timeout was firing on a value that
+arrived late, or one that never arrived. **Built a diagnostic that polled the model's own value every 200ms for
+the full 6-second window instead of a single wait, and logged the trace.** Result, in 6 of 8 runs: the model
+did not arrive at `5` late — it went straight to **`EMPTY`** (TWO history states back, past the `load(page,5)`
+checkpoint entirely) and stayed there for the whole window. **A genuine race, confirmed by tracing, not a
+threshold to raise**: one Undo click was popping two states, not one.
+
+**Root, read from `saveStates.js` directly**: `flushPendingGesture()` (called by every `undo()`, added earlier
+specifically to fix "Undo right after an edit skips that edit's own state" — see the function's own header)
+forces whatever gesture the Blockly bridge is STILL DEBOUNCING to flush the instant Undo reads history. The
+file's own fixed `page.waitForTimeout(350)` after `load()` — meant to let the muted reproject echo settle
+before the real edit — is not a reliable enough quiet window under load; when it isn't, the LOAD's own
+still-debouncing echo gets force-flushed at exactly the wrong moment (right as Undo reads history), landing as
+an unwanted extra entry.
+
+**Fix, test-side only**: replaced every `page.waitForTimeout(350)` in the file with a new `waitQuiet` helper —
+subscribes to `saveStates.js`'s own exported `onChange`, resolves once no new snapshot fires for 400ms (capped
+at 4s), event-driven rather than a blind sleep. **Proven via the SAME diagnostic, both ways**: the exact same
+repro that showed 6/8 `EMPTY` failures with the fixed sleep showed 16/16 CLEAN runs (`x` arrives correctly every
+time) once `waitQuiet` replaced it — a direct A/B on the identical mechanism, not two different tests. Applied
+to the real file; 24 real runs (8 per test × 3 tests): 24/24 passed, 0 failed, 0 flaky. Zero product code
+touched — `saveStates.js`/`blocksApp.js` untouched throughout.
+
+### #56 (`open-as-modal-1625.spec.js`) — DECLARED environmental, no further code fix attempted
+
+Checked BOTH of the entry's own previously-open angles before declaring anything: (1) does `stopLiveSim` miss a
+second animation source — read `open-as-modal-1625.spec.js` in full; the failing test already calls
+`stopLiveSim` on BOTH the Blocks-pane preview (`#blk_wiz_user`) and the modal's own separate preview
+(`#wiz_user`) — t1902's own comment already names this as "a second, independent instance of the SAME
+mechanism," already handled, not a gap. (2) does the actionability wait need to be more tolerant — a REAL
+mitigation for this exact angle already shipped at t2419: `stopLiveSim` was rewritten from a single one-shot
+`.pp-run.on` check to a POLLED check (up to 2000ms), specifically because a one-shot check could look a beat
+too early under load and silently do nothing. **This measurably narrowed but did not eliminate the flake** —
+WORK-LOG's own running "already-documented BACKLOG #56 contention flake — 3/3 clean in isolation" refrain
+recurs across dozens of turns AFTER t2419 shipped, always isolated-clean, never reproducing outside real
+6-worker contention.
+
+**Not attempting a further speculative fix, stated why**: the one remaining candidate (loosening
+`#blkOpenModal`'s own actionability wait) cannot be verified without reliably forcing 6-worker contention on
+demand, which this repo has no deterministic way to do — a change shipped without being testable against the
+actual failure condition is exactly the "forced fix that makes it rarer and less understood" the dispatch's own
+instruction ruled out as the worse outcome. **What's already true, made explicit rather than left implicit**:
+`playwright.config.js`'s own global `retries: 2` (t1724) already causes a contention-only failure that clears
+on retry to report as FLAKY, not FAILED — the suite's own failed-count already reads clean through this,
+without any further change. BACKLOG #56 updated to state this plainly (RULED, matching the t2555/#73 precedent's
+own shape), closing the "does this need re-investigating" question rather than leaving it open by omission.
+
+### VERIFY
+
+#63 and #57's own fix claims are both backed by direct before/after run counts, not single confirmations — 40
+runs for #63, 16 (diagnostic) + 24 (real file) for #57, all read off actual Playwright output, not estimated.
+#57's own root-cause claim is OBSERVED (the poll-trace showing `EMPTY`, read live) plus one INFERENCE (the
+`flushPendingGesture()` mechanism as the specific cause), flagged as such — the fix's own correctness is proven
+independently of that inference being exactly right, since the A/B swap (sleep vs `waitQuiet`) demonstrates the
+fixed VERSION works regardless of whether the stated mechanism is the complete explanation. #56's declaration is
+grounded in two directly-read facts (`stopLiveSim`'s own current code covers both preview instances; t2419's
+own code comment states the poll-based rewrite) plus the `retries:2` config value read directly from
+`playwright.config.js`, not asserted from memory. `test:node`: 238/238, unchanged. `git status`: only
+`BACKLOG.md`, this WORK-LOG entry, `tests/undo-blind-writes-2427.spec.js`, and `tests/undo-reproject-echo.spec.js`
+— zero product code in any of the three items this turn.
+

@@ -4972,9 +4972,31 @@ against this shared machine concurrently with the worker's suite, adding content
 alone — plausible given this is a contention-sensitive flake by its own documented mechanism, not confirmed
 further. Still not an investigation; still the SAME entry, not a new one.
 
+⚠ **RULED (t2593), not merely deferred — genuinely environmental, no further code fix attempted.** A REAL
+mitigation was already tried and shipped: `tests/support/simControls.js`'s own `stopLiveSim` (t2419, cited
+inline in that file) was rewritten from a single one-shot `.pp-run.on` check to a POLLED check (up to 2000ms),
+specifically because the one-shot version could look a beat too early under load and do nothing — the exact
+"actionability wait needs to be more tolerant" angle this entry's own header left open. **It measurably
+narrowed, but did not eliminate, the flake** — this test continued to appear as isolated-clean contention churn
+across dozens of turns after t2419 shipped (WORK-LOG's own running "already-documented BACKLOG #56 contention
+flake — 3/3 clean in isolation" refrain, repeated at t2507 and many turns since). Checked this turn whether the
+OTHER open angle (`stopLiveSim` missing a second animation source) is live: read `open-as-modal-1625.spec.js`
+in full — the failing test already calls `stopLiveSim` on BOTH the Blocks-pane preview (`#blk_wiz_user`, inside
+`customizeCorner`) AND the modal's own separate preview (`#wiz_user`, after the door opens) — t1902's own
+comment already names this as "a second, independent instance of the SAME mechanism," already handled, not a
+gap. **Not attempting a further speculative fix**: the ONE remaining candidate (making `#blkOpenModal`'s own
+actionability wait itself more tolerant) cannot be verified without reliably reproducing 6-worker CONTENTION on
+demand, which this repo has no deterministic way to force — a change made without being able to test it against
+the actual failure condition would be exactly the "forced fix that makes it rarer and less understood" the
+owner's own stated preference rules out. `playwright.config.js`'s own global `retries: 2` (t1724) already
+absorbs this class of flake correctly: a contention-only failure that clears on retry reports as FLAKY, not
+FAILED — the suite's own failed-count already reads clean through this, today, without any further change. This
+entry's own **STILL REAL IF** condition remains the correct trigger for re-opening — a HARD failure (not
+retry-recovered) tied to a real code change in the named files — not "did the flaky count move."
+
 ---
 
-### 57. `undo-reproject-echo.spec.js`'s "a real block-value edit is undoable" flakes standalone — NOT contention, confirmed by A/B revert
+### 57. [✅ FIXED t2593] `undo-reproject-echo.spec.js`'s "a real block-value edit is undoable" flakes standalone — NOT contention, confirmed by A/B revert
 
 *(found t2417, while investigating a 3-failure full-suite run for that turn's own #52/#51/scrollbar/mobile-
 button work)*
@@ -5017,6 +5039,27 @@ on a turn that touches none of `blocksApp.js`/the undo/reproject machinery (`opE
 tracking in `blocksApp.js`'s own `ws.addChangeListener`, `programModel.js`'s `getStack`/`setStack`). ⚠ t2463's
 own re-check: still fails this way (3/4 solo runs) — the check itself still holds, only the FIRST hypothesis
 above needed correcting, not the entry's own open status.
+
+**t2593 — FIXED, root cause found by TRACING what the timeout at line 62 actually observes, not by re-guessing.**
+Built a diagnostic that, instead of a single `waitX` after Undo, POLLED the model's own `x` value every 200ms
+for the full 6-second window and logged the trace. Result: the model did NOT arrive at the expected value LATE
+— in 6 of 8 runs it went straight to **`EMPTY`** (the state TWO steps before the edit, past the `load(page,5)`
+checkpoint entirely) and stayed there for the whole window. **A genuine race, not a threshold to raise**: one
+Undo click was popping two history states instead of one. Traced to the test's own fixed
+`page.waitForTimeout(350)` after `load()` — not a long enough quiet window under load for the muted reproject
+echo to fully settle before the real edit + Undo sequence; `saveStates.js`'s own `flushPendingGesture()`
+(called by every `undo()`, added to fix a related but different race — see its own header) forces whatever
+gesture is STILL debouncing to flush right as Undo reads history, so a late-settling load-echo lands as an
+unwanted extra entry at exactly the wrong moment.
+
+**Fix, test-side only**: replaced every `page.waitForTimeout(350)` in this file with an event-driven quiet-
+window wait (`waitQuiet`, new helper in the file) — subscribes to `saveStates.js`'s own exported `onChange`,
+resolves once no new snapshot has fired for 400ms (capped at 4s), never a blind sleep. **Proven, not asserted**:
+the diagnostic's own exact repro, run 16/16 times with `waitQuiet` in place of the fixed sleep — 16/16 clean,
+`x` arrives at the expected value immediately every time, zero `EMPTY` occurrences (vs. the ~75% failure rate
+measured with the fixed sleep, same repro, same machine). Applied to the real file and re-run 8x per test
+(24 total runs): **24/24 passed, 0 failed, 0 flaky.** Zero product code changed — `saveStates.js`/`blocksApp.js`
+untouched; the fix is entirely in the test's own synchronization. Full account: WORK-LOG t2593.
 
 ⚠ **t2467 (small item, characterization only, per that turn's own explicit "do not fix either" scope) — checked
 against #63 for a shared root, per #63's own "worth someone eventually asking" note. NO shared code path
@@ -6126,7 +6169,7 @@ edge case), not that this fix did nothing.
 
 ---
 
-### 63. `undo-blind-writes-2427.spec.js` flakes SOLO (`--workers=1`, fully isolated) — a boot-timeout shape, the
+### 63. [✅ FIXED t2593] `undo-blind-writes-2427.spec.js` flakes SOLO (`--workers=1`, fully isolated) — a boot-timeout shape, the
 SAME class as BACKLOG #57, structurally distinct from #56's contention-only shape
 
 *(filed t2465, per that turn's own explicit instruction — t2463 declined to file this from the SAME evidence,
@@ -6171,6 +6214,21 @@ timeout is downstream, at a `waitX` AFTER `clickUndo`, reached only once boot al
 wait on a different subsystem (the undo/reproject pipeline), not the boot-readiness pipeline this entry's own
 failure sits in. Different mechanisms; only a generic "async scheduling can be slow under load" factor is
 common to both, which is not an actionable shared cause. See #57 for the same conclusion recorded there.
+
+**t2593 — FIXED, a wait that was simply TOO SHORT for what it checks, not a wrong condition.** `playwright.
+config.js`'s own global `actionTimeout: 5_000` governs a bare `page.waitForFunction()` call with no explicit
+timeout — this file's own boot-readiness check had no explicit timeout, so it inherited the global 5000ms
+default, matching this entry's own observed "Timeout 5000ms exceeded" exactly. **84 other spec files in this
+same repo already pass an explicit `{timeout: 15000}` on this identical boot check** (grepped, counted, the
+dominant convention by far) — this file was simply the one place that still relied on the tight global default
+for a COLD APP BOOT specifically, a condition every other file already treats as deserving more slack than an
+ordinary UI action. Fixed by matching the established convention: added `{timeout: 15000}` to both of this
+file's own boot-wait calls, plus the two immediately-following `__blkws`/`ddcsEditWizardDef` readiness waits
+(same class, same fix, found still flaking once at the SAME default after the first fix landed). **Proven, not
+asserted**: 40 solo runs (`--workers=1`, `--repeat-each`) — 37 passed clean, 3 flaky (all retry-recovered, none
+hard-failed), **zero of the original systemic ~50-75% solo failure rate remains.** Zero product code changed —
+`programModel.js`/`blocksApp.js`'s own boot sequence untouched; the fix is entirely in the test's own timeout
+values. Full account: WORK-LOG t2593.
 
 ---
 
