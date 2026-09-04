@@ -1227,6 +1227,28 @@ export function wireDerivedFields(host, bindings) {
     applyDerives();   // initial values — the declared expression, not a stored default
 }
 
+// t2611 (BACKLOG #71/#72, parity fix) — the ONE declared "does this form's fields cross the fold threshold"
+// decision, shared by the classic renderOpForm below AND the tree-mode group_box default (renderUiTree's own
+// `traverse()`, 'group_box' branch). Extracted here because they had independently drifted: renderOpForm's own
+// t820 rule (a form sectionizes only past SECTION_THRESHOLD rows AND ≥2 declared sections — "where sensible", a
+// short form stays plain) was never consulted by group_box at all, which defaulted `collapsible` unconditionally
+// true the instant a group_box node was declared — a real, shipped regression (t2605's wcsData.js migration,
+// caught t2609 via form-section-collapse-820.spec.js). Same grouping logic renderOpForm already used (a
+// binding's own `.group` folds MULTI_WIDGET siblings into one row) — exported so a live measurement can call the
+// SAME function the render path uses, not a second reimplementation for counting purposes.
+export function sectionizeFor(bindings) {
+    const units = [], byGroup = {};
+    for (const b of (bindings || [])) {
+        if (!b || b.anchorUnresolved) continue;
+        if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
+        else units.push([b]);
+    }
+    const secList = [];
+    for (const u of units) { const s = (u[0] && u[0].section) || null; if (s && !secList.includes(s)) secList.push(s); }
+    const rowCount = units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
+    return rowCount > SECTION_THRESHOLD && secList.length >= 2;
+}
+
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
@@ -1324,9 +1346,7 @@ export function renderOpForm(host, bindings) {
     const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
     const rankOf = (sec) => { const i = SECTION_RANK.indexOf(String(sec || '').toUpperCase()); return i < 0 ? SECTION_RANK.length : i; };
     units.sort((a, b) => rankOf(sectionOf(a)) - rankOf(sectionOf(b)));   // Array#sort is stable → order WITHIN a section is untouched
-    const secList = []; for (const u of units) { const s = sectionOf(u); if (s && !secList.includes(s)) secList.push(s); }
-    const rowCount = units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
-    const sectionize = rowCount > SECTION_THRESHOLD && secList.length >= 2;
+    const sectionize = sectionizeFor(bindings);   // t2611 — the ONE shared threshold decision (see its own header above)
     if (sectionize) {
         const secEls = {};
         const ensureSec = (s) => {
@@ -1401,6 +1421,10 @@ function paneFlexCss(token) {
 // own comment for why reusing that id directly would be unsafe for an op whose in-place route is already live.
 export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = null, ns = null) {
     const readers = [];
+    // t2611 (BACKLOG #71/#72, parity fix) — computed ONCE, over the WHOLE op's bindings (matching renderOpForm's
+    // own GLOBAL decision — one fold rule for the whole form, not a per-section one), so every group_box below
+    // with no explicit `collapsible` override follows the SAME threshold rule the classic shell always has.
+    const sectionize = sectionizeFor(bindings);
     // t2477 (BACKLOG #67) — the tree's own `sim`/`panel` viz ids need the SAME caller namespace
     // `userOpView.js`'s own `id()`/`elNS()` already apply when LOOKING these ids up (`ns_base` for a
     // namespaced host like the Blocks-tab pane, bare `base` for the un-namespaced standalone modal,
@@ -1768,24 +1792,43 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // a second collapse implementation. `collapsedDefault` seeds the FIRST render only, via
                 // isSectionCollapsed's fallback param — after that the user's own fold choice (keyed by title,
                 // same as any other section) takes over, same as every other form-sec.
+                // t2611 (BACKLOG #71/#72, parity fix) — an EXPLICIT `collapsible` param still wins outright
+                // (always wraps, either collapsible or a static titled card — neither state existed pre-fix
+                // for any SHIPPED op, since none declares `collapsible`, so this is a pure authoring affordance
+                // going forward). With none declared (every migrated op today), whether to wrap AT ALL now
+                // follows the SAME whole-form threshold `renderOpForm` always used — NOT the wrapper's own
+                // `collapsible` flag, which only ever chose the header STYLE, never whether a `.form-sec`
+                // wrapper existed. Before this fix every group_box wrapped (and defaulted to collapsible) the
+                // instant it was declared, regardless of how few total rows the WHOLE form held — the classic
+                // renderer's own "stays plain" branch drops section chrome ENTIRELY below the threshold (no
+                // wrapper, no title, rows go straight into the parent), which group_box had no way to do at
+                // all. A real, shipped regression (t2605's wcsData.js, caught t2609).
                 const gTitle = (node.params && node.params.title) || 'Group';
-                const collapsible = !(node.params && node.params.collapsible === false);
-                const box = document.createElement('div'); box.className = 'form-sec'; box.dataset.section = gTitle;
-                const body = document.createElement('div'); body.className = 'wiz-pane-body';
-                if (collapsible) {
-                    const hdr = document.createElement('button'); hdr.type = 'button'; hdr.className = 'form-sec-hdr';
-                    hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(gTitle)}</span>`;
-                    box.append(hdr, body); container.appendChild(box);
-                    const collapsedDefault = !!(node.params && node.params.collapsedDefault);
-                    applyFold(box, isSectionCollapsed(gTitle, collapsedDefault), false);
-                    hdr.addEventListener('click', () => { const now = !(box.getAttribute('data-collapsed') === '1'); applyFold(box, now, true); setSectionCollapsed(gTitle, now); });
-                } else {
-                    const hdr = document.createElement('div'); hdr.className = 'form-sec-hdr';
-                    hdr.innerHTML = `<span class="form-sec-title">${escHtml(gTitle)}</span>`;
-                    box.append(hdr, body); container.appendChild(box);
-                }
+                const hasExplicitCollapsible = node.params && node.params.collapsible != null;
                 const gChildren = childrenOf(node.children);
-                traverse(gChildren, body);
+                if (!hasExplicitCollapsible && !sectionize) {
+                    // PARITY: below the threshold, the classic renderer shows no title/wrapper at all — just
+                    // the rows, flat, straight into the parent. No explicit override was declared, so this
+                    // group_box's own title is dropped too, exactly matching that branch.
+                    traverse(gChildren, container);
+                } else {
+                    const collapsible = hasExplicitCollapsible ? node.params.collapsible !== false : true;
+                    const box = document.createElement('div'); box.className = 'form-sec'; box.dataset.section = gTitle;
+                    const body = document.createElement('div'); body.className = 'wiz-pane-body';
+                    if (collapsible) {
+                        const hdr = document.createElement('button'); hdr.type = 'button'; hdr.className = 'form-sec-hdr';
+                        hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(gTitle)}</span>`;
+                        box.append(hdr, body); container.appendChild(box);
+                        const collapsedDefault = !!(node.params && node.params.collapsedDefault);
+                        applyFold(box, isSectionCollapsed(gTitle, collapsedDefault), false);
+                        hdr.addEventListener('click', () => { const now = !(box.getAttribute('data-collapsed') === '1'); applyFold(box, now, true); setSectionCollapsed(gTitle, now); });
+                    } else {
+                        const hdr = document.createElement('div'); hdr.className = 'form-sec-hdr';
+                        hdr.innerHTML = `<span class="form-sec-title">${escHtml(gTitle)}</span>`;
+                        box.append(hdr, body); container.appendChild(box);
+                    }
+                    traverse(gChildren, body);
+                }
             } else if (node.type === 'grid_container') {
                 // t1561 STEP 2 — a plain CSS grid; columns/gap come straight from the block's own params.
                 const gridBox = document.createElement('div');

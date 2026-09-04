@@ -74308,3 +74308,72 @@ while the 3 deterministic failures were IDENTICAL across both runs, reinforcing 
 No app/test code changed this turn (diagnostic only, per the dispatch's own "not four fixed tests"). `git
 status`: this WORK-LOG entry only.
 
+## turn 2611 — both regressions fixed AT PARITY, blast radius measured (11/20 migrated ops), interpass-connector
+reclassified as a miss within the existing 73-file census (not a 74th shape); full gate re-confirmed
+
+### PARITY FIX — group_box now consults the SAME threshold rule renderOpForm always used
+
+Root cause (confirmed t2609): `formWidgets.js`'s `group_box` node defaulted `collapsible` to `true`
+unconditionally the instant it was declared — the classic renderer's own t820 rule ("a form sectionizes only
+past `SECTION_THRESHOLD` rows AND ≥2 declared sections — short forms stay plain") had no tree-mode equivalent
+at all. Fixed by extracting the ONE shared decision, `sectionizeFor(bindings)` (exported, `formWidgets.js`),
+computing the exact same `rowCount`/`secList`/threshold math `renderOpForm` already had — `renderOpForm` itself
+now CALLS this shared function instead of carrying its own copy, so the two paths cannot independently drift
+again the way they just did.
+
+**First attempt was wrong, caught before shipping**: making `collapsible` default to `sectionize` still left
+`group_box` UNCONDITIONALLY creating a `.form-sec` wrapper div (only the header's button-vs-static styling
+changed) — `form-section-collapse-820.spec.js` still failed (`expected 0, received 3`), because the classic
+renderer's "stays plain" branch doesn't wrap AT ALL below the threshold (rows go straight into the parent, no
+title, no `.form-sec`). Corrected: below threshold, with no explicit `collapsible` param, `group_box` now
+skips the wrapper entirely and traverses its children straight into the parent container — true byte-for-byte
+parity with `renderOpForm`'s own flat/plain branch. An explicit `node.params.collapsible` (either value) still
+wins outright and always wraps — a pure forward-looking authoring affordance; zero shipped op declares it today
+(confirmed via grep), so this changes nothing for any currently-migrated op except the DEFAULT.
+
+**BLAST RADIUS, measured live** (a scratch spec calling the real exported `sectionizeFor` against every
+tree-mode op's own `def.bindings`, not estimated): of the 20 tree-mode ops, **11 were SHORT and therefore
+wrongly folded before this fix** — atc_warmup, atc_length, atc_check, atc_test, atc_change, atc_table, **drill**,
+wcs, pause_confirm, homing, and this session's own lathe_facing. 9 genuinely cross the threshold and were
+already correctly folded, unaffected: bore, surfacing, edge, middle, rotary_center, rotary_clock, alignment,
+comm, io_step. **More than half the migrated population carried this regression** — drill's own presence in the
+SHORT list is the one that should concern the owner most: it is not an edge-case op, and nobody watching it
+render would necessarily have noticed 1-2 small sections behaving like an accordion that used to be plain.
+
+### INTERPASS-CONNECTOR-1235 — fixed, and classified: NOT a 74th shape
+
+`interpass-connector-1235.spec.js`'s shared `routeFacts` helper (used by CORNER's own tests, unmigrated/classic,
+AND MIDDLE's, tree-mode since t2599) hardcoded a bare `#userVizContainer`/`getElementById('userVizContainer')` —
+the exact TWO shapes the t2599/t2601 sweeps already catalogued and fixed in 34+39 other files respectively. This
+file used BOTH shapes and was simply missed by that sweep's own execution — **not a new pattern, a completeness
+gap in an already-correct census.** Fixed with a single declared selector (`VIZ_CONTAINER_SEL`, module-scope,
+threaded into `page.evaluate` explicitly since an evaluate callback has no closure over outer Node identifiers):
+`[id*="userVizContainer"]:has([data-hid], .fc-handle)` — substring match resolves either the classic or
+`_tree`-suffixed id (and does NOT match `userViz3dContainer`, a different, non-contiguous substring), the
+`:has(...)` content filter is the ALREADY-ESTABLISHED disambiguator (`middle-feature-draw.spec.js`) needed
+because the bare substring also matches `blk_userVizContainer` (the Blocks-tab mini-preview, present-but-inert
+in the DOM) — caught live: my first attempt (no content filter) threw a Playwright strict-mode "resolved to 2
+elements" error immediately, before I ever got to claim it passed.
+
+### VERIFY
+
+Both proven NOT VACUOUS the same way as every fix this session: reverted each file to HEAD individually, re-ran,
+confirmed the ORIGINAL failure reproduces (`form-section-collapse-820`: 2 failed; `interpass-connector-1235`:
+1 failed, the MIDDLE test specifically) — then restored from the saved copy (never `git checkout HEAD` on
+uncommitted work without a backup first). Targeted: both specs individually green (8/8, single-worker, zero
+contention). Broad regression sweep (112 tests: every `*-form-reproduction-*` spec, the t2531 canary, geometry-
+seam-tree-mode-2323, wizard-shapes-1627, form-kernel-720, field-help-798, every middle-*/corner-* spec): 111
+passed, 1 skipped, 0 failed — the parity fix does not disturb any already-correctly-folded op (the 9 "crosses
+threshold" ops are provably unaffected — `sectionize` was already `true` for them either way). Node tier:
+238/238.
+
+**Full suite via `npm test` (the real gate, adopted per t2609's own recommendation and held to this turn too):
+3134 passed, 1 failed, 13 flaky, 28 skipped, e2e exit 1.** The one remaining failure —
+`preview-mutation-manifest-2463.spec.js` — is the SAME test t2609 already classified as a genuine, pre-existing
+load-dependent flake (not deterministic, unrelated to either fix here): re-ran it isolated, single-worker —
+passed clean. Neither `form-section-collapse-820` nor `interpass-connector-1235` reappeared anywhere in this
+run — both regressions are gone at the real gate, not just in a targeted spec.
+
+`git status`: `web/ui/formWidgets.js` (the `sectionizeFor` extraction + `group_box` parity fix),
+`tests/interpass-connector-1235.spec.js` (the `VIZ_CONTAINER_SEL` fix), this WORK-LOG entry.
+

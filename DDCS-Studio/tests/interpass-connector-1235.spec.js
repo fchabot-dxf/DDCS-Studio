@@ -16,6 +16,12 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
+// t2611 — this file's own container id, DECLARED ONCE so both the Playwright locator calls (Node context) and
+// routeFacts' page.evaluate (browser context, passed in explicitly — an evaluate callback has no closure over
+// outer Node identifiers) share the exact same selector. See routeFacts' own comment for why it's a substring
+// match with a content filter, not a bare #userVizContainer.
+const VIZ_CONTAINER_SEL = '[id*="userVizContainer"]:has([data-hid], .fc-handle)';
+
 async function openOp(page, mod, def, opType) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
@@ -30,13 +36,20 @@ async function openOp(page, mod, def, opType) {
 }
 
 /** Read the route + the truths a connector must join, all through the app's own seams. */
-const routeFacts = (page) => page.evaluate(async () => {
+const routeFacts = (page) => page.evaluate(async (sel) => {
     const { passAnchorFor } = await import('/engine/passAnchor.js');
     const { markerWorldOf } = await import('/viz/markerWorld.js');
     const p = window.ddcsStudio.wizardManager._activePanel;
     const segs = p.getSegments() || [], starts = p.getPassStarts() || [], ends = p.getPassEnds() || [];
     const world = (s, k) => { const o = passAnchorFor(starts, ends, s.pass) || { x: 0, y: 0, z: 0 }; return { x: s['x' + k] + o.x, y: s['y' + k] + o.y, z: s['z' + k] + o.z }; };
-    const ov = document.getElementById('userVizContainer') && document.getElementById('userVizContainer').__animOverlay;
+    // t2611 — a substring id match, not a bare #userVizContainer, because this ONE helper is shared by a
+    // classic-shell op (CORNER, un-namespaced id) and a tree-mode op (MIDDLE, migrated t2599, `_tree`-suffixed
+    // id) — the same id-gap class the t2599/t2601 sweeps fixed elsewhere, missed here. `:has([data-hid],
+    // .fc-handle)` is the established disambiguator (middle-feature-draw.spec.js): the bare substring ALSO
+    // matches `blk_userVizContainer` (the Blocks-tab mini-preview, present but inert in the DOM even when
+    // that tab isn't active) — the content filter picks the ONE container that actually rendered handles.
+    const vizContainer = document.querySelector(sel);
+    const ov = vizContainer && vizContainer.__animOverlay;
     return {
         passes: starts.length,
         sources: p.getPassSources ? p.getPassSources() : [],
@@ -47,7 +60,7 @@ const routeFacts = (page) => page.evaluate(async () => {
         overlayCount: ov && ov.tp ? ov.tp.count : -1,
         segCount: segs.length,
     };
-});
+}, VIZ_CONTAINER_SEL);
 
 const near = (a, b, tol = 0.05) => Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0), (a.z || 0) - (b.z || 0)) <= tol;
 
@@ -86,7 +99,7 @@ test('CORNER (manual travel): a connector bridges every adjacent pass pair — r
     expect(r.vizConnectors, 'the 3D got the connectors from the same array').toBe(r.connectors.length);
     expect(r.overlayCount, 'and so did the Layout animation overlay').toBe(r.segCount);
 
-    await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('corner-connector.png') });
+    await page.locator(VIZ_CONTAINER_SEL).screenshot({ path: testInfo.outputPath('corner-connector.png') });
 });
 
 test('MIDDLE inherits it — no per-op work, because it is one route feed', async ({ page }, testInfo) => {
@@ -107,17 +120,17 @@ test('MIDDLE inherits it — no per-op work, because it is one route feed', asyn
         expect(near(c.a, r.ends[c.pass - 1]), `pass ${c.pass}: starts at the runtime end`).toBe(true);
         expect(near(c.b, r.markers[c.pass]), `pass ${c.pass}: ends on the marker`).toBe(true);
     }
-    await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('middle-connector.png') });
+    await page.locator(VIZ_CONTAINER_SEL).screenshot({ path: testInfo.outputPath('middle-connector.png') });
 });
 
 test('DRAG THEN PAINT (manual travel): moving a start marker moves the connector with it — the vanishing traverse is gone', async ({ page }, testInfo) => {
     await openOp(page, '/blocks/dataOps/cornerData.js', 'cornerDataDef', 'user_corner_data');
     await setManualTravel(page);
     const before = await routeFacts(page);
-    await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('drag-before.png') });
+    await page.locator(VIZ_CONTAINER_SEL).screenshot({ path: testInfo.outputPath('drag-before.png') });
 
     // drag the FIRST sim handle a real distance
-    const h = page.locator('#userVizContainer .fc-handle-sim').first();
+    const h = page.locator(`${VIZ_CONTAINER_SEL} .fc-handle-sim`).first();
     const box = await h.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
@@ -126,7 +139,7 @@ test('DRAG THEN PAINT (manual travel): moving a start marker moves the connector
     await page.waitForTimeout(700);
 
     const after = await routeFacts(page);
-    await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('drag-after.png') });
+    await page.locator(VIZ_CONTAINER_SEL).screenshot({ path: testInfo.outputPath('drag-after.png') });
 
     expect(after.connectors.length, 'the connectors SURVIVE the drag — this is the vanishing-traverse symptom').toBe(before.connectors.length);
     for (const c of after.connectors) {
