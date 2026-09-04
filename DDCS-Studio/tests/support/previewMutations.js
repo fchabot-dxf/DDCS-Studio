@@ -135,9 +135,17 @@ const SYNTHETIC_FLYOUT_CORNER = {
 // touches WHERE a handle renders, only WHETHER one does at all). NOT a seed for BACKLOG #62 itself (the
 // missing-pane-sizer report) — that defect has no confirmed-live selector/mechanism to mutate from; this is a
 // different, independently-confirmed affordance chosen specifically because #62 could not be seeded blind. ──
+// t2597 — STALE, caught by the full suite exactly as designed (t2471's own exactly-once find-string check: a
+// legitimate edit to the targeted line fails LOUDLY rather than silently no-op-ing). t2569 (BACKLOG #61 L6,
+// an earlier, unrelated turn) added `emits: true` to this exact push (and every other pk_size/pk_pos push in
+// this same function) — the find-string below is updated to match, verified against the CURRENT line (`shape
+// === 'rect'`'s own branch, the `else` arm — confirmed the correct one of pocketPreviewGeometry's four pk_size
+// pushes by reading the surrounding if/else chain directly: `shape:'ellipse'` gets its own, differently-shaped
+// push with extra ax/ay/ex/ey overrides; this manifest's own seed is `{type:'pocket', shape:'rect'}`, which
+// falls to the plain `else` branch).
 const T2465_POCKET_SIZE_HANDLE_REMOVED = {
     path: '/blocks/dataOps/pocketData.js',
-    find: `        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });`,
+    find: `        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', emits: true, ...hs.size });`,
     replace: `        /* t2465 mutation: pk_size intentionally not pushed */`,
 };
 

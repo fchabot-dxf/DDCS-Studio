@@ -73366,3 +73366,44 @@ not need to re-diagnose this.
 `tests/bore-form-reproduction-2595.spec.js` (new), plus BACKLOG.md and this WORK-LOG entry — `textData.js`
 confirmed reverted to byte-identical HEAD, no trace of the attempted, stopped migration left in the diff.
 
+## 🔨 turn 2597 (small item, own commit) — the stale `pocket-size-handle-presence` manifest find-string, updated
+— t2471's own exactly-once check caught a REAL, legitimate edit exactly as designed, not a defect in the
+manifest
+
+### THE CORRECTION, per the dispatch's own explicit framing
+
+t2595 traced the two `preview-mutation-manifest-2463.spec.js` failures to a stale find-string against
+`pocketData.js`'s own `t2569` edit and reported it as a pre-existing gap, out of scope. The advisor's own
+correction: this is NOT a gap or a defect — `t2471` built the exactly-once find-string check SPECIFICALLY so a
+legitimate later edit to the targeted line fails LOUDLY (a hard test failure) rather than silently no-op-ing
+(the mutation applying to the WRONG line, or applying zero times and the test passing vacuously either way).
+**This is the staleness detector firing correctly, three weeks later, on exactly the case it exists to catch.**
+The alternative design (a fuzzy/partial match, or no exactly-once assertion at all) would have let this drift
+silently and kept "passing" while testing nothing real.
+
+### THE FIX
+
+`T2465_POCKET_SIZE_HANDLE_REMOVED` (`tests/support/previewMutations.js`) updated to match the CURRENT source:
+`t2569` (BACKLOG #61 L6, an earlier turn — "declare emits on pocket/slot/tap/text/rotaryClock's real-writing
+handles") added `emits: true,` into every `pk_pos`/`pk_size` handle push in `pocketPreviewGeometry`
+(`pocketData.js`), including the one this manifest entry mutates. Confirmed, not guessed, which of the
+function's own FOUR `pk_size` pushes is the right target: read the full `if/else` chain directly — `shape ===
+'ellipse'` gets its own differently-shaped push (extra `ax`/`ay`/`ex`/`ey` overrides); this manifest's own seed
+(`{type:'pocket', shape:'rect'}`) falls to the plain `else` branch, matching the OLD find-string's own param
+list exactly except for the missing `emits: true,` — the one, unambiguous correct target.
+
+### VERIFIED — RED-then-GREEN, live, not assumed
+
+Ran the full `preview-mutation-manifest-2463.spec.js` (9 tests, `--workers=1`): all 9 passed, including
+`[pocket-size-handle-presence]` itself (`MUTATED: ok=false missing=[".fc-handle[data-hid=\"pk_size\"]"]` →
+`CLEAN: ok=true missing=[]` — the exact RED-then-GREEN shape every other entry in this manifest already proves)
+and BOTH disk-integrity tests ("no mutation ever reached disk" / "the disk-cleanliness check is non-vacuous")
+that t2595's own full-suite run found failing — both now clean, confirming the staleness was the sole cause,
+nothing else broken alongside it.
+
+### VERIFY
+
+`git diff` on `previewMutations.js`: exactly the one find-string's own `emits: true,` insertion, nothing else
+touched. `git status` clean outside this one file plus this WORK-LOG entry and a BACKLOG addendum. This is a
+SEPARATE commit from t2595's own Phase 1 migration work, per the dispatch's own explicit instruction.
+
