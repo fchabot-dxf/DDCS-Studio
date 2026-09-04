@@ -31,14 +31,60 @@ FORBIDDEN = re.compile(
     r")", re.IGNORECASE)
 
 
-def refuse_if_motion(text):
+# ⛔ PROTECTED PARAMETER BLOCKS — macro-address ranges a write must never touch.
+# "No motion" is NOT "safe": `#807 = 0` rewrites G54 Z, the spoilboard, with no motion word anywhere.
+# Found 2026-08-26 by testing the motion guard against destructive-but-motion-free payloads; it let
+# every one of them through. Ranges are MACRO addresses (setting index + 500).
+PROTECTED = [
+    (800, 844,  "the WCS table -- G54..G59. G54 Z0 IS THE SPOILBOARD AND IS SACRED"),
+    (1390, 1449, "the tool table (X/Y/Z offsets) -- probe-written tool lengths"),
+    (655, 670,  "the software limits"),
+    (622, 626,  "home / machine-zero positions"),
+    (735, 739,  "machine zero offsets"),
+    (575, 577,  "probe input port and level"),
+]
+
+
+def classify(text):
+    """Return a list of warnings describing what this payload could do. Empty list = inert.
+
+    ⭐ THIS ANNOUNCES, IT DOES NOT REFUSE. Owner-ruled 2026-08-26: *"i dont mind you controlling the
+    machine, its just a machine"*, and then *"you can guard by using a warning that youll be using
+    motion or variable that affect motion."* ⇒ The job of this function is that **nothing moves
+    unannounced** — not that nothing moves.
+
+    ⚠ It cannot tell WHERE THE OWNER IS. Presence is not inferable from which seat is talking
+    (context/SEATS.md). Ask before sending anything this flags.
+    """
+    warns = []
     hit = FORBIDDEN.search(text)
     if hit:
-        raise SystemExit(
-            f"⛔ REFUSED: payload contains {hit.group(0)!r}, which could command motion.\n"
-            f"   payload: {text!r}\n"
-            "   This tool sends inert lines only (variable assignments, #1505 messages)."
-        )
+        warns.append("MOTION: contains %r -- this can MOVE THE MACHINE or start the spindle"
+                     % hit.group(0))
+    if re.search(r"#\s*\[", text):
+        warns.append("COMPUTED ADDRESS '#[...]' -- the write target cannot be checked before sending")
+    for m in re.finditer(r"#\s*(\d+)\s*=", text):
+        n = int(m.group(1))
+        for lo, hi, why in PROTECTED:
+            if lo <= n <= hi:
+                warns.append("WRITES #%d (%d-%d) -- %s" % (n, lo, hi, why))
+    return warns
+
+
+def announce(text):
+    """Print what the payload will do. Returns True if it is inert."""
+    warns = classify(text)
+    if not warns:
+        print("   inert: no motion word, no protected write")
+        return True
+    print("   !! " + "=" * 66)
+    for w in warns:
+        print("   !! " + w)
+    print("   !! the owner should be AT the machine before this is sent")
+    print("   !! " + "=" * 66)
+    return False
+
+
 
 
 def crc16(b):
@@ -55,8 +101,16 @@ def frame(body):
 
 
 def main():
-    port, text = sys.argv[1], sys.argv[2]
-    refuse_if_motion(text)
+    args = sys.argv[1:]
+    dry = "--dry-run" in args
+    args = [a for a in args if not a.startswith("--")]
+    port, text = args[0], args[1]
+    print("payload: %r" % text)
+    announce(text)
+    if dry:
+        print("\n   --dry-run: nothing sent")
+        return
+    print()
     payload = (text + "\n").encode("ascii")
     if len(payload) > MAX_PAYLOAD:
         raise SystemExit(f"⛔ {len(payload)} bytes exceeds the firmware's {MAX_PAYLOAD}-byte limit")

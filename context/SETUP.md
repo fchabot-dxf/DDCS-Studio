@@ -44,9 +44,19 @@ the two have different networks, different hardware, and different rules.
 
 ## ⛔ SAFETY, AND IT OUTRANKS EVERY TASK
 
-- **No write operations to a live controller when the owner is not at it.** ⚠ And *"the owner is not at it"* is
-  exactly the thing that **cannot be inferred** from which seat is talking — they are on a phone, in every
-  conversation at once. **Ask.**
+- **No write operations to a live controller when the owner is not at it.**
+- ⭐⭐ **AND THE OWNER RULED HOW TO KNOW, 2026-08-26:** *"if im asking to read or write to the ddcs its because
+  it on and im here, otherwise i shut it down, except the bench machine."*
+  ⇒ **On the Expert, REACHABLE MEANS PRESENT.** They power it down when they leave, so the machine answering
+  a ping IS the presence signal. ⛔ **Stop asking "are you at it?" every time** — that was the old rule and it
+  taxes every single request for a fact the machine already carries.
+  ⚠ **The old caution still holds for the OTHER direction**: presence cannot be inferred from *which seat is
+  talking*. They are on a phone, in every conversation at once. It is the **controller being on** that says
+  they are there — not the fact that Fairy is the one being addressed.
+  ⚠ **This is a discipline, not a physical interlock.** If it were ever left on unattended, the inference
+  breaks — so it is worth re-confirming after any long gap, not before every command.
+- ⭐ **The bench V4.1 is exempt entirely** — it is MOTORLESS and left on 24/7 ([`SEATS.md`](SEATS.md)). Nothing
+  there can crash, so presence is not a question at all.
 - **Read-only is always safe**: file reads over SMB, `eng`/`setting` decoding, ping.
 - ⚠ A **motion-free macro that reports a value** is the right instrument for an offset question — not the
   pendant screen, whose dialog covers the Z row for exactly the window in which a modal offset is live.
