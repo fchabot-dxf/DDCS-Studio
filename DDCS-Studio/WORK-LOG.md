@@ -72953,3 +72953,99 @@ this turn — the advisor's own dispatch did not ask for one, and the finding is
 distinct connection-state class, not just a repro detail) that it reads better as the advisor's own call to
 size and place, matching how t2581's own finding was handled at t2583/t2585 by the advisor, not the worker.
 
+## 🔨 turn 2589 — CHARACTERISE ONLY, zero product code: the four "prior interaction corrupts a later read"
+instances split into TWO PAIRS, not one family — one pair's shared mechanism is fully known (both fixed), the
+other pair's is NOT proven shared despite a real, specific candidate factor being tested and REFUTED live
+
+### THE FOUR, restated precisely before comparing
+
+1. **The search flyout** (t2539) — after a real flyout drag, `blocksApp.js`'s own raw `fl.show(hits)` popup
+   never auto-closes (it bypasses Blockly's own toolbox-category close hook), so its background overlay sits
+   above the canvas and silently swallows the NEXT click landing in its covered area.
+2. **The dropdown/picker popup** (t2575) — `dropdownPopup.js`'s own popup is `position:fixed`, anchored to a
+   field's on-screen box ONLY at open time; it never tracked the workspace's own scroll/pan, so a later scroll
+   leaves it sitting over a DIFFERENT field, silently swallowing THAT field's next click.
+3. **Gesture creation never starts** (t2581) — after a specific authoring sequence (four formfields, their own
+   BINDMODE/ATOMTYPE pickers set), `ws.currentGesture_` stays `null` for a NEW mousedown that would otherwise
+   start a drag — proven general (a control drag of an unrelated block type also failed), root cause not found.
+4. **Connection reads made, serializes as broken** (t2587) — after real-dragged `progstart`→`progend` plus
+   subsequent formfield/`feature_canvas`/`rect_handle` authoring, `progend.previousConnection.targetConnection`
+   reads truthy (genuinely connected) at the exact moment `workspaceToStack()` serializes it as an independent,
+   disconnected top-level block — root cause not found, confirmed not a general `workspaceToStack` bug.
+
+### MECHANICAL COMPARISON — what state, what reads it, what SHAPE
+
+| | state that accumulates | who reads it wrong | when it manifests | mechanism KNOWN? |
+|---|---|---|---|---|
+| 1 search flyout | a DOM overlay (`blocksApp.js`'s own popup), left `visible` | the NEXT real click's own hit-test (elementFromPoint resolves to the overlay) | immediately after ANY flyout drag | YES — a missing lifecycle hook, fixed |
+| 2 dropdown popup | a DOM overlay's OWN stale screen position | the NEXT real click (same shape as #1) | after a scroll/pan while a popup sits open | YES — a missing invalidation hook, fixed |
+| 3 gesture creation | Blockly's OWN internal gesture-tracking (`currentGesture_`/touch state) | Blockly's OWN `mousedown` handler, refusing to start a new gesture | after a picker-heavy formfield sequence, on ANY new drag | NO — investigated, not found |
+| 4 serialization | Blockly's OWN internal top-blocks/connection bookkeeping | `workspaceToStack()`'s own graph walk | after real-dragged connections + later field edits | NO — investigated, not found |
+
+**#1 and #2 share a mechanism, confirmed, not inferred**: both are a custom DOM overlay THIS PROJECT'S OWN code
+opens and positions, that fails to re-run the ONE check ("should this still be showing/positioned here?") on the
+event that actually invalidates it — a block landing (#1) or a viewport change (#2). Both manifest identically
+(the NEXT real click silently hits a stale element, no error, no visual cue) and both were fixed with the exact
+same shape of fix (wire the missing lifecycle listener). This pair is CLOSED, not open research.
+
+**#3 and #4 do NOT share a mechanism by the same standard.** Both are Blockly-CORE internal state (not a
+project-owned overlay), both manifest only after a SEQUENCE of real interactions, and both were independently
+investigated with `page.evaluate`-level inspection and explicitly stopped without finding a cause — but "both
+are unexplained Blockly-internal state after a sequence" is a SHAPE, not a mechanism.
+
+### ONE SPECIFIC, TESTABLE HYPOTHESIS FOR #3/#4 — proposed, tested LIVE this turn, REFUTED
+
+Both #3's own build (t2581) and #4's own build (t2587) went through MULTIPLE real `dropdownPopup.js`-driven
+popup open/select cycles (BINDMODE/ATOMTYPE, FIELD/FIELDH) before their respective failures — and #2 IS
+`dropdownPopup.js` itself, independently proven buggy once already. A plausible, checkable hypothesis: does
+`dropdownPopup.js`'s own popup mechanism, even after the t2575 fix, leave SOME OTHER residue (a listener, a
+touch/gesture side-effect) that corrupts Blockly's own gesture-creation or connection bookkeeping after enough
+real cycles?
+
+**Tested directly, isolated from everything else** (`tests/_t2589-family-check.spec.js`, scratch, deleted):
+built a minimal stack (`user_root`→`progstart`→`progend`, API-connected, known-good per t2587's own control) +
+ONE formfield, then drove 8 REAL `dropdownPopup.js` popup open/click cycles on its own ATOMTYPE field alone — NO
+drags, no other field edits. Checked gesture-creation (a real `page.mouse.down()` on an unrelated flyout block,
+before AND after the 8 cycles) and serialization (`workspaceToStack()` on the untouched progstart→progend pair)
+immediately after.
+
+**RESULT: neither symptom reproduced.** Gesture creation succeeded both before AND after the 8 popup cycles
+(`ws.currentGesture_` genuinely set each time); serialization stayed correct throughout
+(`kidTypes:["progstart","progend"]`, unchanged). **8 real popup cycles, alone, do not corrupt either
+mechanism.** This REFUTES the specific hypothesis, cleanly — not an inconclusive result, a real negative.
+
+**A real methodological trap caught live along the way, worth naming since it nearly produced a false positive**:
+the first version of the gesture-creation check used a synthetic `el.dispatchEvent(new MouseEvent('mousedown'))`
+rather than a real `page.mouse.down()` — and THAT check reported `afterExists:false` even in a BEFORE-any-popups
+control, proving the synthetic-event method itself never creates a Blockly gesture at all (Blockly's own gesture
+start evidently depends on something a synthetic `dispatchEvent` doesn't carry — not confirmed further, out of
+this turn's own scope). Had the control not been run, the popup-cycle result would have read as a false
+confirmation of the hypothesis. Switched to real `page.mouse` actions before trusting any result.
+
+### THE HONEST ANSWER, per the dispatch's own explicit ask
+
+**Two pairs, not one family.** #1/#2 share a confirmed mechanism (stale project-owned overlay, missing
+invalidation hook) and are closed. #3/#4 share only a SHAPE (unexplained Blockly-core internal state, after a
+real-interaction sequence) — the one specific, checkable candidate for a shared root tested this turn
+(repeated real popup cycles alone) does NOT hold up. **The honest state of #3/#4 is: two real, distinct,
+unexplained bugs that RHYME, not two symptoms of one found cause** — matching the dispatch's own explicitly
+anticipated "they may genuinely be unrelated" outcome, for the SPECIFIC hypothesis tested, not asserted as the
+final word on every possible shared cause. What remains untested (raised, not chased, per this turn's own
+CHARACTERISE-ONLY bound): whether the accumulation of MANY REAL DRAGS specifically (as opposed to popups) is
+the shared factor — both #3's own repro and #4's own repro involved real-dragged connections, unlike this
+turn's own popup-only isolation, which used an API-connected pair throughout. Flagged as the next candidate to
+test, not tested this turn.
+
+### VERIFY
+
+Every cell in the comparison table is OBSERVED, cited against the originating turn's own WORK-LOG entry (t2539,
+t2575, t2581, t2587), not re-derived from memory. The #1/#2 shared-mechanism claim is OBSERVED (both fixes read
+directly from the current committed code, `blocksApp.js`/`dropdownPopup.js`). The #3/#4 hypothesis test is
+OBSERVED, live, this turn, with its own negative result reported as a negative, not omitted or reframed as
+inconclusive — including the methodological trap (the synthetic-event false-positive risk) that was caught
+BEFORE it corrupted the conclusion, not after. The "next candidate to test" (real-drag accumulation) is stated
+as an untested INFERENCE from the two source turns' own build shapes, not a finding. `git status`: clean of
+product code — only this WORK-LOG entry; the one scratch test file (`tests/_t2589-family-check.spec.js`)
+deleted before this commit. Per the dispatch's own explicit "fix nothing, including the new serialization
+blocker" — nothing was fixed, the t2587 blocker was read from but not touched.
+
