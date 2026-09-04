@@ -74875,3 +74875,110 @@ pocket and slot stay HARD; corner stays deferred — none touched this turn. Thi
 conversion tier entirely (tap/text/contour all converted+migrated). 29 of 32 built-in-equivalent ops are now on
 `renderUiTree`; the 3 remaining (pocket, slot, corner) are explicitly out of this arc's own current scope.
 
+## t2623 — MEASURE WHY pocket AND slot ARE HARD (no migration this turn, dispatched)
+
+Dispatch: read `pocketWizard.js`/`slotWizard.js` directly, name the REAL predictor (not the "structural-fork"
+label), answer one problem or two, and propose (not necessarily implement) `passes-field-1613.spec.js`'s own
+structural fix for its "moving target" subject. Explicitly: nothing migrated, corner stays deferred, node tier
+only (no full suite for zero code changes).
+
+### THE WIZARDS THEMSELVES — fork shape, read directly
+
+`pocketWizard.js` (367 lines): 5 nested guards — `_refuse` ⊃ `_tooSmall` ⊃ `_para` (× the real user param
+`strategy`, raster/spiral, present in BOTH `_para` arms) with `_rest` nested a 5th level inside `_para:false`
+only. Each arm's block types are ENTIRELY DIFFERENT, not just different values on the same types:
+`refusePlace()` → a bare `assign` (writes `#1505`, no cut geometry at all); `drillPlace()` → `holecycle` (no
+`toolDia` param even exists on this block); `rasterPlace()` → `surfaceraster`(+`wallfinish` if raster
+strategy); `clearPlace()` → `stepdown` wrapping `pocketfill`(+`pocketwall`)(+nested `pocketrest` if
+`_rest`). This is a genuine field-set-changing structural fork, in the sense the label describes.
+
+`slotWizard.js` (167 lines): only 2 forks, and they are NOT nested. `_para` (raster vs literal) is the one
+real guard-resolved fork, same class as pocket's. `pattern` (single vs arrayed) is NOT guard-based at all — the
+array-wrap is baked directly into `litPlace()`'s body off the LIVE param, and — the load-bearing fact —
+`slotData.js`'s own header comment (lines 30–31) says the twin is deliberately scoped to `pattern:'single'`
+only: *"This def is the SINGLE-slot template; pattern stays 'single'. (Array-slot = a future port.)"* The
+harder of slot's two forks was never in scope for the twin to begin with — it isn't blocking anything today.
+
+### THE REAL PREDICTOR — measured, not the fork-count label
+
+Grepped `mergeBindingsByParam` (the multi-spec-per-param collapse fn, `deriveBindings.js:187`) across all of
+`web/blocks/dataOps/*.js`: used ONLY by `pocketData.js` and `slotData.js` — none of the 29 already-migrated ops
+touch it. That looked, at first, like the blocker: a genuinely unexercised mechanism. But `pocketData.js`'s own
+comment (lines 388–391) says plainly: *"guard/pruneGuards... is for STRUCTURAL forks in the BLOCK STACK
+itself... a different layer from FORM-row visibility, which was never blocked here in the first place."* And
+that checks out mechanically — `mergeBindingsByParam` collapses N alternative `{param, match:{type}, optional}`
+specs (one per possible target block) into ONE row per param, which is EXACTLY the flat, uniform array
+`renderOpForm` already consumes today to produce pocket/slot's own currently-correct classic form, and exactly
+what `field_ref`/`bySection` need — `field_ref` just looks up `byParam[name]` from whatever `renderOpForm`
+built; it does not care which `match` a binding resolved through. **The mechanism is proven, in production,
+today — it is unexercised through tree mode, not unproven.**
+
+What IS a real, measured difference in size (grepped `match:{type:...}` + counted `{ param: '...'` entries,
+excluding `when:{param:...}` false positives):
+
+| op | distinct target block types | binding-spec entries | real multi-spec params (2+ alternatives) |
+|---|---|---|---|
+| contour (last migrated) | 5 | 30 | 0 |
+| slot | 5 | 29 | 1 (`clearance`, 2 alternatives) |
+| pocket | 10 | 89 | 21 (`clearance` alone has 7; most have 2–5) |
+
+Slot lands at CONTOUR'S OWN SCALE on every axis that measured cost on this arc before (this is the same
+distinct-target-block-count axis that already replaced raw binding-count as the working predictor). Pocket is
+~2x the type-surface and ~3x the entry-count of anything migrated so far, with a real 21-param, up-to-7-way
+merge surface neither contour nor slot approach. Nesting depth (5 vs 2 guards) is NOT what tracks this — slot's
+2nd fork is out of scope, so its EFFECTIVE fork count is 1, same as several already-migrated value-fork ops
+(edge, wcs-adjacent). **The real predictor stays what t2621 already found for form-kernel-720: distinct
+target-block-type count and binding-surface size — not fork count, not nesting depth, and not (as first
+suspected here) "does it use `mergeBindingsByParam`."**
+
+### ONE PROBLEM OR TWO
+
+**Two, of very different sizes, and "HARD" is the wrong label for one of them.** Slot measures the same size as
+contour, which just migrated cleanly in a single turn; its one complicating fork is already out of scope for
+the twin by the file's own prior design decision, not by anything this arc left undone. It was very likely
+screened as HARD by association with pocket (both use `mergeBindingsByParam`, both were flagged together)
+rather than by its own shape. Pocket is genuinely the largest remaining migration on the measured axis — not
+because anything is structurally blocked, but because ~21 params need their multi-spec alternatives walked and
+placed into `group_box`/`field_ref` nodes by hand, at roughly 3x the volume of contour. That is real labor, not
+a structural wall.
+
+### passes-field-1613.spec.js — the structural answer, proposed not implemented this turn
+
+Re-read the file in full. Only ONE of its 5 tests actually depends on which named op it opens: "the BLOCKS
+Wizard View face" (lines 122–163), which walks the live canvas block tree after a stepper click to prove
+`materializeParamGroup`'s literal per-param `param_field` canvas block receives the write-back (t1605's
+two-way chain). That is a MECHANISM test — it does not care which op it is proven against, only that the op's
+Blocks view still materializes literal `param_field` blocks per bound param (i.e., is not `field_ref`-based).
+Everything else in the file (the 4 other tests) reads `def.bindings`/emits or hand-builds a synthetic
+`[assign, formfield]` stack directly (the file's own last test, line 165) — neither cares about materialization
+mode at all.
+
+Given `every-wizard-becomes-a-data-twin.md`'s own standing rule (no exemptions — all 32 ops eventually migrate),
+the TWINS list will eventually contain ZERO plain-materialized production ops; swapping the subject a 4th time
+only postpones the same failure, it does not fix it. **Proposed fix**: rewrite the Blocks-view test to build its
+own small synthetic block program — a depth/stepdown-shaped pair of fields plus a `formfield`-authored `passes`
+field carrying `PASSES_FIELD`'s own declared `derived`/`writes` expressions — and load it via
+`window.ddcsLoadBlockStack([...])`, the same way the file's own sibling test already proves out a synthetic
+stack for the sockets-parity check. This decouples the mechanism test from every current and future op's
+migration status permanently — no 5th swap, ever. Not implementing it this turn: it is a real Playwright
+rewrite needing its own real-browser verification pass (not vacuous-proof + a live run), which is exactly the
+kind of work this measurement-only, no-full-suite turn was scoped to avoid — flagging it as a small, well-specified
+follow-up task rather than folding it in silently.
+
+### VERIFY
+
+Zero files touched other than this WORK-LOG entry — confirmed no migration, corner untouched, per the dispatch.
+Node tier: 238/238 (unchanged from t2621 — no code changed). No Playwright run this turn: the investigation
+needed no live app checks beyond what prior turns already measured live (pocket/slot's own `hasParamTable`/
+`hasFieldRef` state was already confirmed live at t2545/t2621). `git status` after this entry: WORK-LOG.md only.
+
+### NEXT
+
+pocket and slot both stay unmigrated. If dispatched again: BOTH already use `match:{type}` throughout (grepped
+— 0 real `blockIndex` bindings in either file; pocket's 2 hits are prose in comments), so neither needs the
+tap/text/contour conversion step at all — only `uiChildren` tree authoring + `def.panel` migration remain.
+Slot is contour-sized and could very plausibly close in one turn on that basis alone. Pocket is pure volume
+(21 multi-spec params to place into `group_box`/`field_ref`, no structural blocker) — the biggest remaining
+migration but not a novel one. `passes-field-1613.spec.js`'s Blocks-view test has a concrete, scoped rewrite
+ready to dispatch whenever a turn has room for a real Playwright verification pass.
+
