@@ -74501,3 +74501,67 @@ across the last three runs), consistent with the environmental, not deterministi
 
 `git status`: `context/VERIFICATION-DISCIPLINE.md` (rule 17), this WORK-LOG entry. No other files changed.
 
+## turn 2615 — postGating located, audited, reach measured live: CLEAR, and a stronger reason than "identical
+either path." The bounding argument placed in ARCHITECTURE.md's MIGRATED FACTS. Nothing fixed.
+
+### postGating — located, audited, reach measured
+
+`ui/postGating.js`'s `applyPostGating()` owns the CAPS axis of wizard-field `.disabled` (ARCHITECTURE.md already
+documented the contract: `data-op-gated="true"` survives its cap-ON blanket re-enable). Read it in full
+(70 lines). Its own trigger is a single global scan, `document.querySelectorAll('[data-cap]')` — structurally
+the SAME container-agnostic shape as the already-confirmed-safe `data-when`/`data-gate` mechanisms, so by the
+t2611/t2613 bounding argument it should be immune to a render-path divergence for the SAME reason. But I didn't
+stop at "the mechanism looks safe" — measured whether it's actually REACHABLE at all.
+
+**Exhaustive grep, `data-cap=` across the whole `web/` tree: exactly 2 hits, both permanently `display:none`
+retired classic-shell divs** (`index.html:996,1060` — `#wiz_atc_change`/`#wiz_atc_test`), superseded by their own
+tree-mode twins opening in-place instead — the same one-cap-at-a-time retirement `postGating.js`'s own t1880/
+t1890/t1906 comments already narrate for probePort/toolTable/wcsSync. **Confirmed live, not just by grep, per
+the dispatch's own "measure reach live the way you measured the fold radius" instruction**: opened all 20
+tree-mode ops for real (`openWiz`, one at a time) and queried each one's own rendered `#wiz_user_form` — **0 of
+20 ever contain a `[data-cap]` element.** `data-op-gated` itself (the separate, unrelated opt-out flag) IS live
+— 12 of the 20 ops use it, confirming that adjacent mechanism is genuinely exercised, not just theoretically
+present.
+
+**Verdict: CLEAR — but for a stronger, more complete reason than "behaves identically in both paths."**
+`applyPostGating()`'s own element-level `.disabled` loop is presently DEAD CODE against every live wizard
+field, tree-mode or classic-in-place alike — not because the two render paths happen to agree, but because its
+own trigger condition no longer reaches anything either path renders. Reported as a finding, not fixed
+(`postGating.js`'s own header comment still describes an active mechanism — worth a look whenever anyone next
+touches that file, but that's a separate concern from this turn's parity question and nobody asked for it
+fixed).
+
+### THE BOUNDING ARGUMENT — placed in ARCHITECTURE.md's MIGRATED FACTS, not left only in a turn's own log
+
+Added two entries to `ARCHITECTURE.md` (`MIGRATED FACTS`, the section already carrying verified-by-reading facts
+about this exact subsystem):
+1. Extended the existing `postGating.js` paragraph with this turn's own `[data-cap]` dead-code finding
+   (exact citations: `index.html:996,1060`, `postGating.js:47-56`).
+2. A NEW entry stating the bounding argument itself: `render()` calls `renderOpForm` into a scratch host first
+   (`userOpView.js:433`), builds `byParam` from the resulting rows, then `renderUiTree` RELOCATES those same
+   elements via `field_ref` (`formWidgets.js:1552` — a literal `appendChild`, never a re-render) — so every
+   per-row behavior is immune by construction, and the real risk class is bounded to decisions computed ONCE,
+   outside any row (`sectionizeFor`, `formWidgets.js:1239`; `SECTION_RANK`'s ordering, t2613) — with a
+   forward-pointing question for the next migration ("does the classic path derive something at the WHOLE-FORM
+   level for this concern?") rather than a blanket "audit everything again."
+Placed here rather than only in WORK-LOG because ARCHITECTURE.md is the file the worker skill's own standing
+instruction says to read FIRST before tracing anything in this codebase, and to correct in the SAME act a
+finding proves something in it stale/incomplete — this is exactly that shape (a genuinely new structural fact,
+not a correction of an existing wrong one, but the same "belongs where the next reader will actually open it"
+principle). Verified the citation-checking node test still passes clean after the edit (6/6,
+`architecture-map-1698.test.mjs` — my new prose isn't itself under its automated TRAP/INVARIANT citation check,
+but nothing else in the file broke).
+
+### VERIFY
+
+No app/test code changed (audit only, per the dispatch's "nothing fixed unasked"). The reach measurement itself
+was a scratch Playwright spec calling the real `openWiz`/DOM queries against real op defs, deleted before commit
+(`git status` confirms no stray `t2615-*.spec.js`).
+
+Full suite via `npm test`: **3139 passed, 1 failed, 8 flaky, 28 skipped, e2e exit 1.** The one failure, named:
+`preview-mutation-manifest-2463.spec.js` — the same pre-existing load-dependent flake classified at t2609/
+t2611/t2613 (unrelated; no app code touched this turn). Flaky count moved again (11→14→10→8), continuing to
+confirm the environmental, non-deterministic nature already established rather than any new signal.
+
+`git status`: `ARCHITECTURE.md`, this WORK-LOG entry. No other files changed.
+

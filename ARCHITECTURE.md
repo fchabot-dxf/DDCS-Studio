@@ -875,6 +875,40 @@ support), re-running on load and every `ddcs:settings-changed`; its cap-ON pass 
 in a `[data-cap]` panel unless the element opts out. The contract: `postGating.js:54-55` — `if (ok &&
 c.dataset.opGated === 'true') return;` before `c.disabled = !ok`. An op view greying a field for its own
 method/mode reason must set `data-op-gated="true"`, or postGating silently re-enables it a tick later.
+**t2615 — RE-VERIFIED against the wizards-as-data tree path specifically: `[data-cap]` (the trigger this whole
+mechanism keys on) has ZERO live targets today.** Exhaustive grep (`grep -rn "data-cap=" DDCS-Studio/web`) finds
+it in exactly two places, both permanently `display:none` retired classic-shell divs (`index.html:996,1060` —
+`#wiz_atc_change`/`#wiz_atc_test`, superseded by their own tree-mode twins opening in-place instead) — the SAME
+retirement t1880/t1890/t1906 (above) already describe happening one cap at a time. Confirmed live, not just by
+grep: opened all 20 tree-mode ops and queried their own rendered form host — 0 ever contain a `[data-cap]`
+element (`data-op-gated` itself, the SEPARATE, unrelated opt-out mechanism, IS live — 12 of the 20 use it). So
+`applyPostGating()`'s own element-level disable loop (`postGating.js:47-56`) is presently DEAD CODE against
+every live wizard field, tree-mode or classic-in-place alike — not because it happens to behave identically in
+both render paths, but because its own trigger condition no longer reaches anything either path renders. Not
+removed this turn (a live-behavior finding, not a requested cleanup) — flagged for whoever next touches this
+file, since `postGating.js`'s own header comment still describes an active mechanism.
+
+**t2611–t2613 — a tree-mode migration's real risk surface is BOUNDED to whole-form-level decisions; per-row
+behavior cannot drift, by construction, and does not need re-auditing per bug found.** `userOpView.js`'s real
+`render()` ALWAYS calls `renderOpForm(tempHost, binds)` FIRST, into a detached scratch container
+(`userOpView.js:433`), builds `byParam` by walking the resulting rows, THEN calls `renderUiTree(host,
+uiChildren, bindings, byParam, ...)` (`:447`) — which does not re-render a `field_ref`'d param, it RELOCATES the
+exact same pre-built DOM row (`formWidgets.js:1552` — `container.appendChild(byParam[paramName].row)`). So
+every per-row behavior `renderOpForm`'s own `addRow`/`renderUnit` produces (`.form-row` class, `data-when`/
+`data-whenAll`/`data-gate`, help title, `formHidden` display, the field-link gear, the widget itself) is
+IDENTICAL in both paths — it is the literal same element, just moved — and the `data-when`/`data-gate` runtime
+scans that later act on it (`userOpView.js` — see the `postGating` entry above for the closely related
+`data-op-gated` case) already query `fhost`/`document` globally, not scoped to either render path's own
+container shape, so they inherit this same immunity. **The only real risk class is decisions `renderOpForm`
+computes ONCE, OUTSIDE any single row, that a tree-mode NODE TYPE has no way to see or re-derive** — both bugs
+found in this arc live exactly there: `sectionizeFor` (`formWidgets.js:1239`, extracted t2611 — `group_box`
+originally had no equivalent to `renderOpForm`'s own fold-threshold rule) and `SECTION_RANK`'s auto-ordering
+(t2613 — `group_box`'s own order is 100% author-typed, with nothing consulting the classic sort; measured
+reach: 3 of 13 order-relevant migrated ops mismatch, see WORK-LOG t2613). Before trusting ANY new tree-mode node
+type as a parity-safe migration, ask specifically whether the classic path derives something at the WHOLE-FORM
+level for that concern (a threshold, a canonical order, a default sourced from total shape) — per-row concerns
+don't need this check, whole-form ones always do. Full account + the audit method: WORK-LOG t2613, and
+`context/VERIFICATION-DISCIPLINE.md` rule 17.
 
 **The iPhone Ring/Silent switch silences Web Audio (`AVAudioSessionCategoryAmbient`) but not `<audio>`
 (`...Playback`)** — a platform fact, not an app bug (traceable to WebKit's `AudioSessionIOS.mm`; Apple closed
