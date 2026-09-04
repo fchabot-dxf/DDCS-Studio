@@ -31,15 +31,9 @@ const SUPERSET_PARAMS = {
 
 export const IO_STEP_OPTYPE = 'user_io_step';
 
-/** The wrapped user_root template — the superset (all mode arms + declared/raw forks), byte-transparent wrap. */
-export function ioStepDataStack(params = SUPERSET_PARAMS) {
-    const exec = ioStepStack(params, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [{ type: 'param_group', params: { group: 'I/O Step' }, children: [] }],
-        children: exec,
-    }];
-}
+// t2601 (BACKLOG #71/#72, Phase 1 step 1) — `ioStepDataStack()` (the old flat-render `user_root` wrapper) is
+// REMOVED here — `ioStepDataDef()` below now builds its own tree-shaped stack inline, and grepping the whole
+// repo found no other caller (product code or test) invoking this function by name.
 
 /** deriveGuards — the mode + declared/raw guard keys (the superset collapses to the concrete shape). */
 export function ioStepDeriveGuards(p) {
@@ -66,9 +60,43 @@ function applyIoRecompose(stack, resolved) {
 
 /** Build the I/O-step data-op def — deriveGuards + the declared-I/O recompose. Byte-identical to ioStepStackResolved. */
 export function ioStepDataDef() {
+    // t2601 (BACKLOG #71/#72, Phase 1 step 1) — no derive needed (every binding is a plain form field, no
+    // blockIndex/match). io_step's own panel is `'form'` — `panelType('form')` (panelTypes.js:45) resolves to
+    // `{ viz:false, mode:null }`, and userOpView.js's own render dispatch (`pt.mode === '3d2d'/'3d'/'2d'/
+    // 'commscreen'`) has NO branch matching `mode:null` — CONFIRMED LIVE (not assumed): no viz-mounting code
+    // runs for this panel kind at all, in EITHER render path. So step 2 (the preview3d+feature_canvas adjacency)
+    // does not apply here — this op has no preview to carry across. The RIGHT pane is declared EMPTY
+    // (`RIGHT: []`) — verified live (a scratch open, screenshotted) that `split_horizontal` renders a plain,
+    // harmless empty pane with no console errors, matching the classic shell's own "Form only" intent exactly.
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2601 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../homing already use.
+            // io_step has NO classic shell (never had one — opened in-place from a built-in setup entry, per
+            // this file's own header) — usage_text written fresh.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'I/O Step' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Sets a declared or raw output, waits on a declared or raw input, or dwells — one atomic program step. Pick the mode, then the fields for that mode.' } },
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(IO_STEP_BINDINGS.filter((b) => b.section === 'IDENTITY')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(IO_STEP_BINDINGS.filter((b) => b.section === 'GEOMETRY')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [],
+            },
+        }],
+        children: ioStepStack(SUPERSET_PARAMS, { superset: true }),
+    }];
     // no '*_datawiz' group: the twin is opened IN-PLACE from the built-in I/O Step setup entry (opensAs) and its own menu
     // entry is hidden (wizardLibrary drops opensAs targets), so it never lands in a separate Data Wiz dropdown.
-    const def = userOpFromStack('io_step', 'I/O Step', ioStepDataStack(), IO_STEP_BINDINGS, 'form', undefined, undefined);
+    const def = userOpFromStack('io_step', 'I/O Step', stack, IO_STEP_BINDINGS, 'form', undefined, undefined);
     def.deriveGuards = ioStepDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyIoRecompose(stack, resolved);
     return def;

@@ -73664,3 +73664,217 @@ anywhere else. `git status`: `alignmentData.js`, `edgeData.js`, `middleData.js`,
 row-diff test files; 11 fixed pre-existing test files (id-gap + 1 getElementById variant); this WORK-LOG entry;
 BACKLOG.md.
 
+## turn 2601 (two investigations, before touching the five structural-only ops) — the transitional canvas window,
+tested live not reasoned about; the id-gap shape census
+
+### INVESTIGATION 1 — the ~1s transitional window: WRONG DURATION, REAL AND TREE-MODE-SPECIFIC, NOT DANGEROUS,
+NOT #73, NOT #64/#65
+
+t2599's own framing ("transitional for ~1s... not a product defect") mixed two different claims and got the
+DURATION wrong by roughly 10x. Re-tested live, corrected:
+
+**(a) Is the window visible?** Live-sampled `.fc-stock`'s own `getBoundingClientRect()` via `requestAnimationFrame`
+polling (not periodic `page.evaluate` calls, which themselves yield enough idle time to let the correction
+settle and mask the real duration — the ORIGINAL t2599 test's own methodology). The real curve: an initial paint
+at ~24×14px (t=0), then the SAME element reference goes to a detached `0×0` by t≈28ms — not a smooth resize, a
+DISCRETE RE-RENDER that swaps in fresh SVG content. A second, independent 75ms-interval sample (fresh
+`querySelector` each read) confirms the corrected, full-size geometry (294×178px) is already stable by t≈90ms.
+**The real window is sub-100ms, not ~1s** — the earlier claim came from comparing only two points (immediate vs
++1000ms) without characterizing the curve in between, exactly the "reason about it" the dispatch flagged.
+Screenshot evidence (t≈0 vs t=1200ms, both taken via `page.screenshot`) shows IDENTICAL, already-correct
+geometry in both — the correction completes faster than a screenshot round-trip can capture, so no visible "pop"
+was caught. Given the real duration is sub-100ms (at or below typical human flicker-perception threshold) and no
+screenshot at any point ever caught the tiny state, the honest answer is: **very likely imperceptible to a human
+eye**, not provably zero-risk, but not the "user watches a drawing pop to full size" scenario the question raised.
+
+**(b) If a drag starts inside the window, what gets written?** Tested live, 5/5 runs, geometry read and drag
+executed with ZERO explicit wait (worst case): the drag consistently computed against the transitional (tiny,
+25×15.8px) `.fc-stock` rect, and **wrote NOTHING** — `ax`/`ay` stayed `undefined`, never a wrong or out-of-range
+value. ROOT CAUSE, now identified (not guessed): `featureCanvas.js:121-127` installs a `ResizeObserver` on its
+own container, rAF-throttled, that calls `render()` again once the container's real size is known — the FIRST
+render runs before `split_horizontal`'s own flex layout has resolved the RIGHT pane's final width, computing
+against a too-small transitional container; the observer's correction REPLACES the SVG subtree entirely (not a
+smooth resize) shortly after. A drag started against the stale coordinates has its mousedown/move/up (each a
+real IPC round-trip) land on a canvas that has ALREADY been torn down and rebuilt underneath it by the time the
+gesture executes — the drag misses its target and the gesture handler never registers a start, hence no write.
+**Not a hazard**: no wrong-position value is ever written, just a silently-swallowed gesture.
+
+**Is this the SAME as #64/#65?** No — confirmed by reading both entries, not by resemblance. #64/#65 are about
+`writeSimStartFrac`'s own dependent-marker (`relSpanFrom`) recompute SNAPPING BACK ON RELEASE — a value-
+computation bug in `userOpView.js`, scoped to the two ops that declare a `relSpanFrom` marker pair (alignment,
+rotary_clock), triggered by an already-completed drag's release-time math. This finding is about the INITIAL
+MOUNT render sequence, before any drag happens, rooted in `featureCanvas.js`'s own `ResizeObserver` correction —
+a different file, a different trigger (mount vs release), a different symptom (a torn-down/rebuilt DOM subtree
+vs a value computed against a moving baseline). Genuinely distinct.
+
+**Is this the SAME as #73?** No — confirmed by reading #73's own entry. #73 is a PERSISTENT, steady-state ~11%
+cross-context SCALE ratio (wide Customize modal vs classic shell), rooted in `visualMaxHeight()`'s own height-
+ceiling computation never having been asked to bound a split-nested visual inside an unconstrained wide-modal
+host — a STABLE mismatch that exists for the LIFETIME of an open panel. This finding is a TRANSIENT, sub-100ms
+MOUNT-TIME race that resolves itself via `ResizeObserver` and leaves no persistent trace — a completely different
+shape (a race that self-corrects vs a steady-state ratio that never corrects). Genuinely distinct.
+
+**DIRECT CONTROL, live**: sampled the SAME `.fc-stock`-style geometry on `homing_data` (still classic/flat-
+rendered, no `split_horizontal`) across 10 reads at 75ms intervals — stable, already-correct (176×106px) from
+the FIRST sample (t=2ms) onward, no transitional state at any point. **This confirms the finding is
+tree-mode-specific** (a consequence of `split_horizontal`'s own flex layout not resolving synchronously on
+mount, which classic's simpler DOM structure never has to wait for), not a general property of any freshly-
+mounted canvas — direct evidence, not inference.
+
+**Disposition**: a real, now-precisely-characterized, tree-mode-specific mount-time race in `featureCanvas.js`'s
+own `ResizeObserver` correction sequence — sub-100ms, self-correcting, writes nothing when hit, likely
+imperceptible. Not fixed (out of this turn's own scope — a product-code change to `featureCanvas.js`'s own mount
+sequence, not a test fix); reported here with a corrected duration for BACKLOG so a future turn doesn't inherit
+the wrong "~1s" number. The existing test fix (`waitForTimeout(1000)`, applied at t2599 across 6 files) stays —
+it safely covers a sub-100ms window with large margin; no test code changes needed as a result of this correction,
+only the WORK-LOG's own characterization.
+
+### INVESTIGATION 2 — the id-gap shape census: no genuine third shape found; one look-alike ruled out live
+
+Two known shapes going in: the CSS `#userVizContainer`/`#userViz3dContainer` selector (t2597, originally counted
+44, now 34 files remaining unfixed after t2597/t2599's own 11 fixes) and `document.getElementById('userViz...')`
+(t2599, 39 files). Swept for a third: a raw, unanchored grep for the bare string `VizContainer` across every
+test file, diffed against the two known-shape file lists.
+
+**Everything else found decomposes into the two known shapes** — string-concatenation, a shared id constant, or
+a runtime-built id (the three specific alternatives the dispatch named) were NOT found anywhere in `tests/`.
+
+**One genuine look-alike, checked live rather than assumed either way**: 3 files
+(`pane-visual-host-1760.spec.js`, `pane-visual-host-programmatic-1762.spec.js`,
+`primary-route-real-gesture-1776.spec.js`) use `getElementById('blk_userViz3dContainer')` /
+`'blk_userVizContainer'` — a DIFFERENT, `blk_`-PREFIXED id my anchored getElementById grep missed (it required
+`userViz` immediately after the opening quote). This is the Blocks-tab mini live-preview's own SEPARATE
+container, not the main `#wiz_user` panel's. Live-checked (not assumed): opened `user_alignment_data` (tree-
+mode) and confirmed `blk_userViz3dContainer`/`blk_userVizContainer` exist with those EXACT fixed ids — no
+`_tree` suffix — meaning the Blocks-tab mini-preview does NOT route through `renderUiTree`'s own `nsId(..._tree)`
+naming at all; it has its own stable ids regardless of which render path the main panel uses. **These 3 files
+are NOT at risk** — confirmed live, not inferred from the id's shape alone.
+
+**Corrected running total**: 34 (CSS, unfixed) + 39 (getElementById, unfixed) = **73 files still carry a hardcoded
+classic-container id that will need this exact fix when their own op migrates** — the estimate has moved again
+(t2597: 44; t2599: ~71; now: 73, precisely recounted post-fixes rather than estimated), exactly as the dispatch
+anticipated it might. No new shape to add to the census; the number moves because the fix count and the base
+count are now both being tracked precisely instead of estimated once and reused.
+
+## turn 2601 (main task) — the five "structural-only" ops turned out to be TWO real shapes, not one: homing and
+io_step migrated clean; atc_change/atc_table/atc_test share a genuine, unfixed mechanism gap, found and STOPPED
+on before it could cost three separate attempt-and-revert cycles
+
+### THE MISSED AXIS, caught before migrating rather than after: panel kind was never checked for these 5
+
+t2597/t2599's own screen classified these 5 ops as "structural-only, zero-binding-risk... the LOWEST-risk
+migration candidates" — true for the blockIndex axis (no value bindings at all), but that screen never checked
+PANEL KIND for this bucket specifically (it only checked panel kind for the ops on the match:{type} safe list).
+Reading all 5 ops' own `userOpFromStack(...)` calls before touching any of them: `atcChangeData`/`atcTableData`/
+`atcTestData` all pass panel=`'form3d'` (3D-only, `layout2d:false` on the old sim node) — the SAME unverified
+shape already flagged for `atcCheckData`/`atcLengthData`. `homingData` passes `'form3d+2d'` — the PROVEN shape.
+`ioStepData` passes `'form'` — a THIRD, distinct shape (`panelType('form')` → `{viz:false, mode:null}`, no viz
+at all). So of the "5 lowest-risk" ops, only ONE (homing) actually shared the already-proven shape; the ATC
+three shared an axis that had never been checked for this bucket, and io_step was its own, never-seen shape
+entirely. Caught by reading before migrating, not discovered by three separate failed attempts.
+
+### MIGRATED CLEAN: homing_data (proven shape) and io_step (a genuinely new but SAFE shape, verified live)
+
+**homing_data** — panel `'form3d+2d'`, ONE section (GEOMETRY), zero value bindings (every param a plain bool
+toggle) — no two-phase derive needed at all, the simplest migration in this arc structurally. **A real,
+different complication surfaced here for the first time**: unlike every prior migration, `homingDataStack()`
+(the old flat-render wrapper) is cited BY NAME, verbatim, in THREE places outside this file — a literal-text
+architecture-map canary (`tests/node/architecture-map-1698.test.mjs`'s own "TRAP6"), and two tests
+(`opatline-identity-1842.spec.js`, `export-import-fidelity-1964.spec.js`) documenting that homing's own internal
+id-less `{type:'op',opType:'homing'}` EXEC fragment (built by `homingStack(...)`, nested inside `children`) is
+LOAD-BEARING for `findOpInStack`'s own `user_root` opacity boundary. Read both carefully before touching
+anything: the two structural tests inspect `children` (the EXEC tree), which this migration does NOT touch at
+all (the exact same `homingStack(HOMING_DEFAULTS, {superset:true})` expression, just moved into the new `stack`
+object) — unaffected. Only the architecture-map's own literal `find` string needed updating (the 3rd
+`userOpFromStack(...)` argument changed from `homingDataStack(HOMING_DEFAULTS)` to `stack`) — same "update the
+citation, the underlying claim still holds" precedent as t2597's own manifest fix. `homingDataStack()` itself,
+now genuinely uncalled anywhere (grepped), removed. 4 pre-existing test files needed the `_tree`-id-gap fix
+(`homing-inplace.spec.js`, `homing-inplace-e3.spec.js`, `homing-onopen-layout.spec.js`,
+`homing-preview-package.spec.js` — 2 via the CSS-selector shape, 3 via getElementById, one file had both).
+Targeted run: 78/79 (1 unrelated skip). Node tier (`npm run test:node`): 238/238, confirming the TRAP6 fix.
+
+**io_step** — the genuinely novel case: panel `'form'` means NO viz-mounting code runs in EITHER render path
+(confirmed live via `panelTypes.js:45`'s own `PANEL_TYPES.form = {viz:false, mode:null}` and
+`userOpView.js`'s own render dispatch having no branch matching `mode:null`) — so there is no adjacency pair to
+carry across; the RIGHT pane is declared `[]` (empty). Verified live BEFORE committing to the real migration
+(two scratch probes: a structural row-diff against a hand-built tree, then a real `openWiz` + screenshot) that
+an empty `split_horizontal` RIGHT pane renders a plain, harmless empty column — no console errors, no broken
+layout, the "Form only" panel's own intent honestly reproduced. `ioStepDataStack()` removed (no external
+consumer, confirmed by grep). Targeted run: 14/14, including a live Blocks-tab text dump that independently
+shows the new `group_box`/`field_ref` structure rendering correctly there too.
+
+### STOPPED: atc_change / atc_table / atc_test share a real, unfixed tree-mode mechanism gap — attempted on
+atc_table, root-caused, reverted cleanly, not forced
+
+Attempted `atc_table_data` first (of the three, plausibly the simplest — 3 struct bindings, one section) as the
+mechanism check for the shared `panel:'form3d'` shape. Declared `preview3d` ALONE (no adjacent `feature_canvas`
+sibling) in the RIGHT pane, reasoning by analogy from `formWidgets.js`'s own adjacency-merge code
+(`nextIsPanel`/`prevIsPanel` absent → `buildVizBox(container, false)`, the documented 3D-only fallback branch)
+that this should produce the same 3D-only box the old combined `sim{layout2d:false}` node used to.
+
+**Live testing proved the analogy wrong — ZERO canvases mounted anywhere on the page**, not just a wrong-pane-
+count. ROOT-CAUSED, not left as a mystery: `userOpView.js`'s own render dispatch has THREE separate branches for
+the three panel-arg shapes (`pt.mode==='3d2d'` at line 722, `==='3d'` at line 862, `==='2d'` at line 869), each
+written for the CLASSIC shell's own fixed container ids. The `'3d2d'` branch (`vid('userViz3dContainer')`) is
+what drill/surfacing/bore/.../homing already prove correct — but panel `'form3d'` (this op, atc_change, atc_test)
+routes to the SEPARATE `'3d'` branch, which looks up `vid('userVizContainer')` — the 2D-shaped id — as its OWN
+mount target (the classic shell apparently reuses the "2D" container id as its single shared box in either
+single-panel mode). `formWidgets.js`'s own tree-mode `preview3d`-alone template (`buildVizBox(container,false)`)
+only ever builds `userViz3dBox_tree`/`userViz3dContainer_tree` (the DUAL-mode's own 3D-specific ids) — it has
+NEVER been wired to also produce whatever the classic single-mode `'3d'`/`'2d'` branches actually look up. The
+adjacency-merge mechanism is proven ONLY for `pt.mode==='3d2d'`; the single-panel classic dispatch branches have
+never been connected to tree-mode's own container-building code AT ALL. A REAL, third mechanism gap in the
+tree-render machinery itself (not a test-selector issue, not fixable by a wait) — genuinely different from both
+this turn's own #64/#65/#73 investigation and the `_tree`-id-gap census.
+
+**REVERTED cleanly, verified**: `git checkout --` on `atcTableData.js`, the new test file deleted, re-ran
+`atc-table-*.spec.js` — 5/5 passed against the untouched original, confirming a byte-identical, trace-free
+revert (matching text.js's own t2595 precedent for a genuine "won't go clean" stop).
+
+**Blast radius, checked not assumed**: `atcChangeData`/`atcTestData` share the IDENTICAL `panel:'form3d'` +
+`layout2d:false` shape (confirmed by reading, not re-attempted) — the SAME gap would hit both. Neither attempted
+this turn — one confirmed reproduction of a root-caused mechanism gap is sufficient evidence for the class; a
+second and third attempt-and-revert would cost real time to reconfirm what is now understood. `atcCheckData`/
+`atcLengthData` (t2597's own earlier "unverified panel kind" flag) share this exact `'form3d'` shape too — this
+finding resolves what was previously an open question for them: NOT safe, for the same reason, now named.
+
+**Scoped, not fixed**: closing this needs `formWidgets.js`'s own `preview3d`-alone template (or `userOpView.js`'s
+own `'3d'`-mode branch) to target the SAME container id, for tree-mode — a real, scoped product change (which
+branch adapts to which is a design choice, not obviously either), out of this turn's own "migrate 5 ops" scope.
+A candidate BACKLOG item, not queued as an immediate follow-up.
+
+### PER-OP COST
+
+Panel-kind read-before-touching (all 5, before any migration attempt): ~10 min — this is what turned "5 easy
+ops" into "2 clean + 1 root-caused stop + 2 correctly deferred," for the cost of one read rather than three
+failed attempts. homing: ~40 min (the migration itself was the simplest in the arc; the TRAP6/opatline-identity/
+export-import-fidelity investigation to confirm safety was the real cost). io_step: ~35 min (two scratch
+verification passes before committing to the real edit, given it's a genuinely novel shape with no precedent).
+atc_table attempt + root-cause + revert: ~30 min. Total: ~2h partial-turn cost for 2 shipped ops, 1 root-caused
+mechanism gap (applying to 4 ops total: atc_change/atc_table/atc_test/atc_check/atc_length), and a corrected
+per-op-cost signal for the REMAINING batch — the "5 lowest-risk ops" framing from t2597/t2599 undercounted risk
+by one full axis, the same lesson INVESTIGATION 1/2 already delivered twice this same turn.
+
+### REMAINING SAFE-LIST, corrected
+
+Proven-shape (`form3d+2d`) match:{type} ops from t2599's own list, not yet attempted: none remain — all four
+were migrated. Structural-only: `homing`/`io_step` DONE; `atcChange`/`atcTable`/`atcTest` BLOCKED (this turn's
+own new finding). `pocketData`/`slotData` stay HARD (structural-fork complexity). `atcCheckData`/`atcLengthData`
+now confirmed BLOCKED by the SAME `'form3d'` gap (not just "unverified" as previously flagged) — `commData`
+(`'commscreen'`) remains genuinely unverified, a fourth panel kind never checked. `cornerData` stays the
+deferred trap. The 6 blockIndex ops are unchanged. Phase 1's remaining reachable batch, right now: nothing —
+every currently-known-safe op is migrated; what's left needs either the `preview3d`-alone mechanism fixed (4
+ops), `commData`'s own panel kind checked, or corner/pocket/slot's own larger complexity taken on deliberately.
+
+### VERIFY
+
+Targeted run per op (own pre-existing suite + `param-group-table-separation-2543.spec.js`): homing 78/79 (1
+unrelated skip), io_step 14/14 — both green before moving on. Node tier (`npm run test:node`, confirming the
+TRAP6 architecture-map fix): 238/238. atc_table: 5/5 against the reverted, original file (confirming the clean
+revert, not the attempted migration). Full suite (unconditional per the dispatch's own TIER instruction):
+**3100 passed, 0 failed, 28 skipped (37.6m), exit code 0.** Up from t2599's own 3099 (the 4 new row-diff tests
+across homing/io_step, minus the reverted atc_table attempt's own 3 tests never landing) — zero regressions.
+`git status`: `homingData.js`, `ioStepData.js`, `architecture-map-1698.test.mjs` (the TRAP6 citation fix), 2 new
+row-diff test files, 4 fixed pre-existing homing test files, this WORK-LOG entry, BACKLOG.md — `atcTableData.js`
+and its attempted test file leave NO trace (confirmed via `git status`/`git diff --stat`, both empty).
+

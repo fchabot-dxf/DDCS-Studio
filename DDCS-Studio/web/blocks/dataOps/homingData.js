@@ -52,22 +52,15 @@ export const HOMING_STRUCT_BINDINGS = [
     { param: '_setup', type: 'bool', widget: 'action', action: 'homingSetup', default: false, label: 'Homing Setup…', help: 'Open Homing Setup: the per-axis order, feeds, back-off + the declared home switch.', section: 'GEOMETRY' },
 ];
 
-/** The wrapped user_root template — the E0 superset (all axes guarded), machine-frame sim (homing is G53): FORCED envelope +
- *  the live tool in RAW machine coords (toolMachine, t497) so it homes at the top even with a stock shown. */
-export function homingDataStack(params = HOMING_DEFAULTS) {
-    const exec = homingStack(params, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: false, magazine: false, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
-
-            { type: 'param_group', params: { group: 'Homing' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
+// t2601 (BACKLOG #71/#72, Phase 1 step 1) — `homingDataStack()` (the old flat-render `user_root` wrapper: uiChildren
+// [sim, param_group], children: homingStack(params,{superset:true})) is REMOVED here — `homingDataDef()` below now
+// builds its own tree-shaped stack inline, and grepping the whole repo found no other caller (product code or
+// test) invoking this function by name; WORK-LOG's own t1838/t1842/t1844 entries reference it historically by
+// name but that is documentation of a past state, not a live dependency. The SHAPE those entries call
+// "LOAD-BEARING" — `children` built via `homingStack(params,{superset:true})`, carrying the internal id-less
+// `{type:'op',opType:'homing'}` fragment `applyHomingRecompose`/`findOpInStack`'s own `user_root` opacity
+// boundary (t1958/t1964) depend on — is UNCHANGED: `homingDataDef()`'s own new `stack` still builds `children`
+// via the exact same `homingStack(HOMING_DEFAULTS, { superset: true })` expression, only `uiChildren` differs.
 
 /** The ORDERED axis selection from params — an explicit `axes` list (tests/round-trip) OR the run-ticks sorted by the
  *  settings home ORDER (the run-form path). Order-independent for the guards; ordered for the emit unroll. */
@@ -127,7 +120,43 @@ function applyHomingRecompose(stack, resolved) {
 /** Build the homing-as-data def — the E0 superset template + deriveGuards (the _run ticks) + the unroll/recompose in
  *  postInstantiate. Byte-identical to homingStack across the axis-selection × run-ORDER × settings sweep. NO opensAs yet (E2). */
 export function homingDataDef() {
-    const def = userOpFromStack('homing_data', 'Homing (data)', homingDataStack(HOMING_DEFAULTS), [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');
+    // t2601 (BACKLOG #71/#72, Phase 1 step 1) — no value bindings at all (every param is a plain bool toggle, no
+    // blockIndex/match to derive), so there is no bootstrap/final two-phase derive needed here — the SIMPLEST
+    // migration in this arc. ONE group_box (GEOMETRY, the only section HOMING_STRUCT_BINDINGS declares).
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2601 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/rotaryClock/alignment/edge/middle/
+            // rotaryCenter already use. Homing has NO classic shell (`wiz_homing` — RETIRED at t1730,
+            // index.html:1263) — so, like those, there is no shell usage_text to reproduce verbatim; adapted
+            // from this file's own header description.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Homing' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Homes the selected axes and (optionally) re-enables soft limits afterward. The run order and per-axis feeds/back-off/declared-home switch live in Homing Setup, not here — this op stores only which axes run this pass.' } },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(HOMING_STRUCT_BINDINGS) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2601 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore/rotaryClock/alignment/edge/middle/rotaryCenter
+                // already ship (t2511) — byte-identical DOM to the old combined `sim` node per t2511's own
+                // proof. Params unchanged (toolMachine — the live tool renders in RAW machine coords).
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, magazine: false, toolMachine: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: homingStack(HOMING_DEFAULTS, { superset: true }),
+    }];
+    const def = userOpFromStack('homing_data', 'Homing (data)', stack, [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');
     def.deriveGuards = homingDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyHomingRecompose(stack, resolved);
     // t552 — the draggable machine-frame START anchor (mid-envelope): the in-place preview passes starts[0] as the start,

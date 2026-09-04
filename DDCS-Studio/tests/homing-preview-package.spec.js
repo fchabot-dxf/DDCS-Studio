@@ -52,7 +52,10 @@ test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis
     });
     const r = await page.evaluate(async () => {
         // t1730 — the twin has ONE shared status element (userVizStatus), not the old view's two (homing_status/homingVizStatus).
-        const vizStatus = document.getElementById('userVizStatus');
+        // t2601 — homing_data now migrates onto the declared uiChildren tree, whose status element carries a
+        // `_tree`-suffixed id; matched by id substring (several instances can coexist, pick the non-empty one).
+        const statusEls = [...document.querySelectorAll('[id*="userVizStatus"]')];
+        const vizStatus = statusEls.find((e) => (e.textContent || '').trim()) || statusEls[0] || null;
         const code = document.getElementById('wiz_user_code').textContent || '';
         return { vizStatus: vizStatus ? vizStatus.textContent : '', code };
     });

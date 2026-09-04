@@ -30,14 +30,19 @@ async function openHoming(page, wo) {
 
 async function readLayout(page) {
     return page.evaluate(() => {
-        const box = document.querySelector('#userViz3dContainer');
-        const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
+        // t2601 — homing_data now migrates onto the declared uiChildren tree, whose viz containers carry a
+        // `_tree`-suffixed id (formWidgets.js's own `nsId(...)`), not the classic shell's fixed ids this used
+        // to hardcode; `.wiz-viz3d` is queried directly (a stable class regardless of render path), and the
+        // 2D svg is picked by id-substring, narrowed to the one instance actually carrying grid content (several
+        // container instances — classic/tree/mini-preview — can coexist, only one populated).
+        const host = document.querySelector('.wiz-viz3d');
         const panel = host && host.__panel;
         const segs = panel ? panel.getSegments() : [];
         const ps = panel ? panel.getPassStarts()[0] : null;
         const first = segs[0] || null;
         const ext = (a) => a.length ? { min: Math.min(...a), max: Math.max(...a) } : null;
-        const svg = document.querySelector('#userVizContainer svg');
+        const svgHost = document.querySelector('[id*="userVizContainer"]:has(.fc-grid-major, .fc-grid-minor)') || document.querySelector('[id*="userVizContainer"]');
+        const svg = svgHost && svgHost.querySelector('svg');
         const bb = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
         const env = bb(svg && svg.querySelector('[fill*="rgba(90,140,190"]'));
         const stk = bb(svg && svg.querySelector('.fc-stock'));

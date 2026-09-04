@@ -299,7 +299,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', find: 'canEdit(opType) {' },
     { id: 'TRAP5 FIELD_BIND.corner folded at opSchema.js', file: 'web/blocks/opSchema.js', find: "corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave'" },
     { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', find: "const def = userOpFromStack('comm_data', 'Communication (data)', commDataStack(), bindings, 'commscreen', {}, 'setup_datawiz');" },
-    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', find: "const def = userOpFromStack('homing_data', 'Homing (data)', homingDataStack(HOMING_DEFAULTS), [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');" },
+    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', find: "const def = userOpFromStack('homing_data', 'Homing (data)', stack, [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');" },
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', find: "{ id: 'probe_datawiz', label: 'Probe Data Wiz', section: 'right' }," },
     { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', find: 'return `${sub}<button data-optype="${_escHtml(e.type || e.opensAs || e.id || \'\')}" onclick="${wizItemOnclick(e)}">${wizItemIcon(e)}${_escHtml(e.label)}</button>`;' },
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', find: '// The 3D renderer canvas is z-index 2 (above the 2D canvas), so 2D must HIDE it, not just show the 2D' },

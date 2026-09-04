@@ -7706,6 +7706,41 @@ layout, and either misses the handle or drags too small a screen delta to regist
 proven via a live root-cause chase, not guessed — fixed with a `waitForTimeout(1000)` in the 6 affected files.
 Full account, all findings with citations: WORK-LOG t2599.
 
+> **⚠ CORRECTION (t2601) — the "~1s" duration above is WRONG, by roughly 10x.** Re-tested live with proper
+> frame-by-frame sampling (the t2599 test only compared two points — immediate vs +1000ms — without
+> characterizing the curve, exactly the "reason about it instead of testing it" the correction below caught):
+> the real window is **sub-100ms** (first paint ~24×14px, corrected/rebuilt SVG subtree by ~t90ms). ROOT CAUSE
+> now identified: `featureCanvas.js:121-127`'s own `ResizeObserver`, rAF-throttled, corrects an initial render
+> that ran before `split_horizontal`'s own flex layout resolved the RIGHT pane's real width. Screenshot evidence
+> (t≈0 vs t=1200ms) is IDENTICAL both times — the correction finishes faster than a screenshot round-trip, so
+> likely imperceptible to a human eye. A drag started inside the window (tested live, 5/5) writes NOTHING (not
+> a wrong value) — the stale coordinates miss the torn-down-and-rebuilt canvas entirely. **Confirmed DISTINCT
+> from both #64/#65** (release-time value computation in `userOpView.js`'s `writeSimStartFrac`, a different
+> file/trigger/symptom) **and #73** (a PERSISTENT ~11% cross-context scale ratio, not a self-correcting
+> transient) — read both entries directly to confirm, not by resemblance. **Confirmed tree-mode-specific**: the
+> same geometry sampled on `homing_data` (still classic-rendered at the time) was stable from the first read,
+> no transitional state at all. Not fixed (a `featureCanvas.js` mount-sequence change, out of scope); the
+> existing `waitForTimeout(1000)` fix stays (covers the real sub-100ms window with large margin). Full account:
+> WORK-LOG t2601.
+
+**t2601 — migrated `homing_data` and `io_step`; STOPPED on `atc_table_data`, root-caused a real tree-mode
+mechanism gap affecting FOUR ops.** The "5 structural-only, lowest-risk" ops from t2597/t2599 were never
+screened for PANEL KIND (only for blockIndex) — reading all 5 before touching any found only `homing` shares the
+proven `form3d+2d` shape; `atcChangeData`/`atcTableData`/`atcTestData` share the SAME unverified `form3d`
+(3D-only) shape already flagged for `atcCheckData`/`atcLengthData`; `ioStepData` is a THIRD, novel shape
+(`panel:'form'` → `viz:false`, no preview at all). `homing_data` migrated clean (zero value bindings, simplest
+migration in the arc) — its own `homingDataStack()` is cited BY NAME in a literal-text architecture-map canary
+(TRAP6) and two structural tests; the two structural tests inspect the EXEC tree (untouched by this migration),
+only the canary's own citation string needed updating. `io_step` migrated clean too — verified LIVE, before
+committing, that its `viz:false` panel mounts no viz code in either render path, so its RIGHT pane is safely
+empty. **`atc_table_data` attempted, then REVERTED**: declaring `preview3d` alone (no `feature_canvas` sibling)
+mounted ZERO canvases anywhere — root-caused to `userOpView.js`'s own single-panel `'3d'`-mode branch expecting
+a DIFFERENT container id than tree-mode's `preview3d`-alone template ever builds (the adjacency-merge mechanism
+is proven only for the DUAL `'3d2d'` mode; the classic single-panel branches were never wired to tree-mode's own
+container ids at all). This is the SAME root cause blocking `atcChangeData`/`atcTestData` (identical panel
+shape, not re-attempted — one root-caused reproduction is sufficient) AND resolves `atcCheckData`/`atcLengthData`
+from "unverified" to "confirmed blocked, same reason." Full account: WORK-LOG t2601.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it
@@ -8093,3 +8128,31 @@ Grounded facts that survive the rejection and are worth keeping in mind if a sim
 Expert CAM/param fields are only `-t0` int / `-t1` dec / `-t2` enum; `#` vars are floats; free-typed text entry
 on the controller pendant is impossible — any future "named label on the pendant" idea runs into this same
 wall. (Migrated from memory, t2585.)
+
+### 77. Tree-mode's `preview3d`-alone declaration mounts NO canvas — the 3D-only (`panel:'form3d'`) shape was
+never wired, blocking 4 ops from Phase 1
+
+[OPEN, root-caused t2601, not fixed] `formWidgets.js`'s own tree-mode adjacency-merge (the mechanism that lets a
+`preview3d`+`feature_canvas` sibling pair render the SAME combined box the old `sim` node did) is proven correct
+ONLY for the DUAL-mode case (`panel:'form3d+2d'`, `userOpView.js`'s own `pt.mode==='3d2d'` branch, which mounts
+into `vid('userViz3dContainer')`). A `preview3d` node declared ALONE (no `feature_canvas` sibling, matching
+`panel:'form3d'` — a 3D-only op with no 2D content) falls through to `formWidgets.js`'s own documented fallback
+(`buildVizBox(container, false)`), which builds `userViz3dBox_tree`/`userViz3dContainer_tree` — but
+`userOpView.js`'s own SEPARATE single-panel `'3d'`-mode branch (line ~862) looks up `vid('userVizContainer')`
+instead (the 2D-shaped id — the classic shell apparently reuses it as its shared single-box mount point in
+either single-panel mode). The ids never match, so `mgr.preview3D(...)` gets called against a container that
+doesn't exist in the tree-mode DOM, and literally zero canvases mount anywhere. CONFIRMED LIVE (t2601): attempted
+on `atc_table_data`, reproduced deterministically, root-caused by reading `userOpView.js`'s own three dispatch
+branches directly, not guessed.
+
+**Blocks 4 ops from Phase 1** (BACKLOG #72): `atcChangeData`, `atcTableData`, `atcTestData` (all `panel:'form3d'`,
+attempted-then-reverted on atc_table specifically) and `atcCheckData`/`atcLengthData` (t2597's own "unverified
+panel kind" flag — this finding resolves them to confirmed-blocked, same reason). `commData` (`panel:'commscreen'`)
+remains a SEPARATE, still-genuinely-unverified panel kind — not this defect, not yet checked either way.
+
+**What closing this would take**: either `formWidgets.js`'s own `preview3d`-alone template needs to build
+whatever id the classic `'3d'`-mode branch actually looks up (`userVizContainer_tree`, reusing the 2D-shaped id
+the same way the classic shell does), OR `userOpView.js`'s own `'3d'`-mode branch needs to look up the 3D-shaped
+id tree-mode already builds (`userViz3dContainer_tree`) instead. Either is a real, scoped change to shared
+rendering code (not a five-minute fix, not a test-only fix) — which side adapts to which is a design choice for
+whoever picks this up, not obvious from the investigation alone. Full account: WORK-LOG t2601.

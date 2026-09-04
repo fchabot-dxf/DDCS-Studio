@@ -66,7 +66,12 @@ for (const z of [500, -120]) {
         expect(forced.toolMachine, 'the tool renders in the machine frame (toolMachine intent)').toBe(true);
 
         // play the REAL emit → the tool homes to the top switch (~z-5 for +500; ~-5 for -120), machine frame
-        await page.evaluate(() => { const host = document.getElementById('userViz3dContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
+        // t2601 — `.wiz-viz3d` queried directly (not via `#userViz3dContainer`'s own parent): homing_data now
+        // migrates onto the declared uiChildren tree, whose 3D container carries a `_tree`-suffixed id
+        // (formWidgets.js's own `nsId(...)`), not the classic shell's fixed id this used to climb from — the
+        // same general flat-vs-tree gap named at t2597/t2599/t2601 for the other migrated ops. `.wiz-viz3d`
+        // itself is a stable class regardless of render path (already used unscoped at line 25 above).
+        await page.evaluate(() => { const host = document.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
         await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 25000 });
         const endZ = await page.evaluate(() => +window.ddcsStudio.wizardManager._activePanel.engine.pos.z.toFixed(1));
         const topBackoff = z > 0 ? z - 5 : -5;

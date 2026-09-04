@@ -43,7 +43,14 @@ test('an unset axis travel shows the in-place unset-travel HINT (the t540 behavi
         s.homing = { axes: { z: { enable: true, order: 1 }, x: { enable: true, order: 2 }, y: { enable: true, order: 3 } } };
         s.limits = { zMaxHome: true, xMinHome: true, yMinHome: true };
     });
-    const status = await page.evaluate(() => { const el = document.getElementById('userVizStatus'); return el ? el.textContent : ''; });
+    // t2601 — homing_data now migrates onto the declared uiChildren tree, whose status element carries a
+    // `_tree`-suffixed id (formWidgets.js's own `nsId(...)`), not the classic shell's fixed `userVizStatus` —
+    // several id variants can coexist (classic/tree/mini-preview), only one populated, so pick the non-empty one.
+    const status = await page.evaluate(() => {
+        const els = [...document.querySelectorAll('[id*="userVizStatus"]')];
+        const withText = els.find((e) => (e.textContent || '').trim());
+        return withText ? withText.textContent : (els[0] ? els[0].textContent : '');
+    });
     expect(status.toLowerCase(), 'the panel status shows the unset-travel hint for Z').toContain('set z');
     expect(status.toLowerCase()).toContain('travel');
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_unset_hint.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
@@ -58,12 +65,14 @@ test('the completed in-place homing: form + 3D + the 2D MACHINE layout (envelope
     });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(400);
-    // play the real emit so the tool + trail render
-    await page.evaluate(() => { const host = document.getElementById('userViz3dContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
+    // play the real emit so the tool + trail render. t2601 — `.wiz-viz3d` queried directly (not via a fixed
+    // `#userViz3dContainer` id, which now carries a `_tree` suffix under the migrated tree render).
+    await page.evaluate(() => { const host = document.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
     await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 25000 });
     await page.waitForTimeout(200);
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_complete.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
-    // the 2D is the machine frame (a HOME glyph text is present in the layout SVG)
-    const hasHome = await page.evaluate(() => /HOME/.test((document.querySelector('#userVizContainer') || {}).textContent || '') || [...document.querySelectorAll('#userVizContainer text')].some((t) => /HOME/.test(t.textContent)));
+    // the 2D is the machine frame (a HOME glyph text is present in the layout SVG). t2601 — `[id*="userVizContainer"]`
+    // (id-substring, several instances can coexist) rather than the classic shell's fixed id.
+    const hasHome = await page.evaluate(() => [...document.querySelectorAll('[id*="userVizContainer"] text')].some((t) => /HOME/.test(t.textContent)));
     expect(hasHome, 'the 2D machine layout shows the HOME glyph label').toBe(true);
 });
