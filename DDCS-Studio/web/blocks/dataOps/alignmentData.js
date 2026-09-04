@@ -71,28 +71,25 @@ export const ALIGNMENT_VALUESWAP_BINDINGS = [
 
 export const ALIGNMENT_DATA_OPTYPE = 'user_alignment_data';
 
-/** The wrapped `user_root` template — the superset (all 4 arms), byte-transparent wrap (mirror middle/rotaryClockDataStack).
- *  panel form3d+2d + sim {machine:true} — a fence probe on the DEFAULT BOX (NO rig, NO simStock; the edge/middle pattern). */
-export function alignmentDataStack(params = ALIGNMENT_DEFAULTS) {
-    const exec = alignmentStack(params, { superset: true });
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane, the same
-            // class t2257 already fixed for the six ATC ops (see gridContainer.js/drillData.js's own t2299/
-            // t2301 comments, and t2257's own atcChangeData.js, for the fuller mechanism).
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false, seatStart: true, probeWcs: true } },   // t570 — SEAT the trace/engine start at marker A (AUTO probes A in place) so the drawn path begins at A, not origin; a drag re-seats + re-runs. t714 — machine:false (part-frame probe; the SEAT is the intent, not forceMachine — machine:true was latent-dead)
-            { type: 'param_group', params: { group: 'Alignment' }, children: [] },
-        ],
-        children: exec,
-    }];
+// t2599 (BACKLOG #71/#72, Phase 1 step 1) — mirrors rotaryClockFieldGroups' own header (bore/surfacing's own
+// template): the ordered/grouped field lists this def's own uiChildren tree AND its flat bindings array both
+// need, computed ONCE, called TWICE (once against a bootstrap stack purely to compute field order for BUILDING
+// the tree, once again against the FINAL, already-tree-built stack for the bindings actually shipped). Value
+// bindings are derived over a PRUNED clone (mirroring the original `canonicalPrunedStack()`): all 6 scalars are
+// LINEAR (present under any checkAxis/probeDir arm) so pruning changes nothing about which resolve, but stays
+// consistent with the corner/edge/middle/rotaryClock family's own established shape.
+function prunedClone(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, ALIGNMENT_DEFAULTS); return c; }
+function alignmentFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedClone(stack), ALIGNMENT_BINDING_SPECS);
+    const toolCut = derived.filter((b) => b.section === 'TOOL & CUT');
+    const geomValue = derived.filter((b) => b.section === 'GEOMETRY');
+    return {
+        TOOL_CUT: toolCut,
+        // struct/value-swap GEOMETRY fields carry no match/blockIndex (no value socket) — appended in their own
+        // declared order, matching the flat array's own pre-t2599 order (safeZ, span, travel, checkAxis, probeDir, tolerance).
+        GEOMETRY: [...geomValue, ...ALIGNMENT_STRUCT_BINDINGS, ...ALIGNMENT_VALUESWAP_BINDINGS],
+    };
 }
-
-/** Value bindings DERIVED over a canonical-pruned stack (no optional/when-gated binding — all 6 scalars are present under any
- *  checkAxis/probeDir arm). EMIT re-derives BY IDENTITY over the actual pruned stack each build (via def.bindingSpecs). */
-function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(alignmentDataStack(ALIGNMENT_DEFAULTS))); pruneGuards(c, ALIGNMENT_DEFAULTS); return c; }
-export const ALIGNMENT_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), ALIGNMENT_BINDING_SPECS);
 
 // ── postInstantiate — the value-swaps + source-chips, recomposed from the resolved params (E0 superset UNCHANGED) ──
 
@@ -134,10 +131,50 @@ function applyProbeSources(stack) {
  *  value-swap recompose + source-chips in postInstantiate + the existing BUILT_IN.alignment sim-starts (E2). Byte-identical
  *  to alignmentStack on all scalars + the structural sweep + both profiles. */
 export function alignmentDataDef() {
+    // t2599 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped
+    // param names alignmentFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: alignmentStack(ALIGNMENT_DEFAULTS, { superset: true }) }];
+    const g0 = alignmentFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2599 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/rotaryClock already use. Alignment
+            // has NO classic shell (`wiz_alignment` — RETIRED at t1730, index.html:891) — so, like bore/
+            // rotaryClock, there is no shell usage_text to reproduce verbatim; adapted from this file's own
+            // header description.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Alignment' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Probes two points along a fence (A then B) to find the fence angle relative to the check axis. AUTO probes A in place and steps the declared span to B; MANUAL lets you jog to each point and confirm. Drag handle B in the 2D layout (or type the span) to set the A→B distance; the 3D view verifies clearance.' } },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2599 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore/rotaryClock already ship (t2511) — byte-identical
+                // DOM to the old combined `sim` node per t2511's own proof. Params unchanged from the old sim node.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, seatStart: true, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: alignmentStack(ALIGNMENT_DEFAULTS, { superset: true }),
+    }];
+    // t2599 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors rotaryClockFieldGroups' own two-call pattern.
+    const gFinal = alignmentFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
-    const valueBindings = ALIGNMENT_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...valueBindings, ...ALIGNMENT_STRUCT_BINDINGS, ...ALIGNMENT_VALUESWAP_BINDINGS];
-    const def = userOpFromStack('alignment_data', 'Alignment (data)', alignmentDataStack(ALIGNMENT_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...gFinal.GEOMETRY];
+    const def = userOpFromStack('alignment_data', 'Alignment (data)', stack, bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ALIGNMENT_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     // t544 — inject the EFFECTIVE travel (auto default | manual) into the prune params so the superset collapses to the right
     // travel arm for an UNSET travel (the concrete alignmentStack resolves it identically via alignEffectiveTravel). No stock.

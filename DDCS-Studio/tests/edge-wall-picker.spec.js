@@ -34,7 +34,7 @@ test('edge wall picker: clicking a stock wall sets axis+dir, syncs the dropdowns
 
   const clickWall = async (axis, dir) => {
     await page.evaluate(({ axis, dir }) => {
-      const line = document.querySelector(`#userVizContainer svg .fc-edge-pick[data-axis="${axis}"][data-dir="${dir}"]`);
+      const line = document.querySelector(`[id*="userVizContainer"]:has([data-hid], .fc-handle) svg .fc-edge-pick[data-axis="${axis}"][data-dir="${dir}"]`);
       const svg = line.ownerSVGElement || line.closest('svg');
       const r = line.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;

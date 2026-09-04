@@ -72,28 +72,23 @@ export const ROTARY_CENTER_VALUESWAP_BINDINGS = [
 
 export const ROTARY_CENTER_DATA_OPTYPE = 'user_rotary_center_data';
 
-/** The wrapped `user_root` template — the superset (all guard arms), byte-transparent wrap (mirror middleDataStack).
- *  panel form3d+2d + sim {rotary:true, machine:true} — rotary declares the rig (opSimContext ROTARY_RIG). */
-export function rotaryCenterDataStack(params = ROTARY_CENTER_DEFAULTS) {
-    const exec = rotaryCenterStack(params, { superset: true });
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: true, machine: false, magazine: false, probeWcs: true } },   // t714 — the 4th-axis RIG frames the bar (rotary:true); no forceMachine envelope (machine:true was latent-dead)
-            { type: 'param_group', params: { group: 'Rotary Centreline' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
-
-/** Value bindings DERIVED over a CANONICAL-pruned stack where the #57 diameter socket is present (method='known'). EMIT
- *  re-derives BY IDENTITY over the actual pruned stack each build (via def.bindingSpecs), so the frozen indices never desync. */
+// t2599 (BACKLOG #71/#72, Phase 1 step 1) — mirrors rotaryClockFieldGroups' own header: the ordered/grouped
+// field lists this def's own uiChildren tree AND its flat bindings array both need, computed ONCE, called TWICE
+// (bootstrap stack for tree order, final stack for the bindings actually shipped). Value bindings derived over a
+// PRUNED clone with method='known' (mirrors the original CANONICAL_BIND — makes the #57 diameter socket present
+// so it resolves). Unlike rotary_clock, this op's own module-level `ROTARY_CENTER_BINDINGS`/`rotaryCenterDataStack`
+// had NO external test consumer (grepped repo-wide) — removed as genuinely orphaned by this edit, not kept alive.
 const CANONICAL_BIND = { ...ROTARY_CENTER_DEFAULTS, method: 'known' };
-function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(rotaryCenterDataStack(ROTARY_CENTER_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
-export const ROTARY_CENTER_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), ROTARY_CENTER_BINDING_SPECS);
+function prunedClone(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, CANONICAL_BIND); return c; }
+function rotaryCenterFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedClone(stack), ROTARY_CENTER_BINDING_SPECS);
+    const toolCut = derived.filter((b) => b.section === 'TOOL & CUT');
+    const geomValue = derived.filter((b) => b.section === 'GEOMETRY');
+    return {
+        TOOL_CUT: toolCut,
+        GEOMETRY: [...geomValue, ...ROTARY_CENTER_STRUCT_BINDINGS, ...ROTARY_CENTER_VALUESWAP_BINDINGS],
+    };
+}
 
 // ── postInstantiate — the value-swaps + source-chips, recomposed from the resolved params (E0 superset UNCHANGED) ──
 
@@ -147,10 +142,51 @@ function applyProbeSources(stack) {
 /** Build the rotary-centreline-as-data def — bindingSpecs (re-derive by #var identity) + the structural guards + the
  *  value-swap recompose + source-chips in postInstantiate. Byte-identical to rotaryCenterStack on all scalars + 112 combos + both profiles. */
 export function rotaryCenterDataDef() {
+    // t2599 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped
+    // param names rotaryCenterFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: rotaryCenterStack(ROTARY_CENTER_DEFAULTS, { superset: true }) }];
+    const g0 = rotaryCenterFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2599 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/rotaryClock/alignment/edge/middle
+            // already use. Rotary Centreline has NO classic shell (`wiz_rotary_center` — RETIRED at t1730,
+            // index.html:343) — so, like those, there is no shell usage_text to reproduce verbatim; adapted from
+            // this file's own header description.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Rotary Centreline' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Finds the centreline of a round bar and writes it to a work-coordinate register — Known diameter (probe the top + two flanks) or 3-point Fit (probe 3 points, solve the circle — advanced, verify on machine). Auto runs the flank cycle hands-free; Guided pauses at each flank to verify.' } },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2599 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore/rotaryClock/alignment/edge/middle already ship
+                // (t2511) — byte-identical DOM to the old combined `sim` node per t2511's own proof. Params
+                // unchanged (rotary:true — the 4th-axis RIG frames the bar).
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: true, machine: false, magazine: false, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: rotaryCenterStack(ROTARY_CENTER_DEFAULTS, { superset: true }),
+    }];
+    // t2599 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = rotaryCenterFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
-    const valueBindings = ROTARY_CENTER_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...valueBindings, ...ROTARY_CENTER_STRUCT_BINDINGS, ...ROTARY_CENTER_VALUESWAP_BINDINGS];
-    const def = userOpFromStack('rotary_center_data', 'Rotary Centreline (data)', rotaryCenterDataStack(ROTARY_CENTER_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...gFinal.GEOMETRY];
+    const def = userOpFromStack('rotary_center_data', 'Rotary Centreline (data)', stack, bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CENTER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyDatumWcs(applyHeaderComments(stack, resolved), resolved), resolved);   // t951 park-sweep — applySafeZFrame retired (the built-in now parks via safeRetractNode; no move→machinemove swap)
     // E2 — the per-pass PREVIEW-START provider: reuse BUILT_IN.rotary_center (opSimStarts.js:86) VERBATIM via the sim registry

@@ -32,15 +32,18 @@ test('drag ② on the feature canvas → the probe pass follows (engine + marker
   // `{ type:'diagAim', id:'diagAim', label:'②' }`) — a STABLE `data-hid` identifies each by its bound source
   // (panelTypes.js comment t122), not by class/position. ② is the handle this test drags.
   await page.waitForFunction(() => {
-    const h = document.querySelector('#userVizContainer [data-hid="diagAim"]');
+    const h = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) [data-hid="diagAim"]');
     const p = window.ddcsStudio.wizardManager._activePanel;
     const starts = p && typeof p.getPassStarts === 'function' ? p.getPassStarts() : null;
     return !!h && starts && starts.length === 2;
   });
+  // t2599 — the tree-mode canvas's own auto-fit/rescale is still transitional for ~1s right after a marker first
+  // appears — reading geometry before it settles targets a stale, still-shrinking layout.
+  await page.waitForTimeout(1000);
 
   const before = await page.evaluate(() => {
-    const svg = document.querySelector('#userVizContainer svg').getBoundingClientRect();
-    const h = document.querySelector('#userVizContainer [data-hid="diagAim"]');
+    const svg = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) svg').getBoundingClientRect();
+    const h = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) [data-hid="diagAim"]');
     const starts = window.ddcsStudio.wizardManager._activePanel.getPassStarts();
     return { cx: svg.left + (+h.getAttribute('x') + 6), cy: svg.top + (+h.getAttribute('y') + 6), engX: Math.round(starts[1].x) };
   });

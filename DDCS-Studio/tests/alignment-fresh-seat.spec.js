@@ -95,6 +95,11 @@ test('the twin marker DRAG (2D→3D flow): the drag moves A and the 3D trace FOL
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.setView) p.setView('2d'); });
     await page.waitForSelector('#wiz_user svg [data-hid="__simstart0"]', { timeout: 8000 });
+    // t2599 — the tree-mode canvas's own auto-fit/rescale is still transitional for ~1s right after the handle
+    // first appears (measured live on alignment_data: the stock's own rendered box read ~1/12th its final size
+    // immediately after the handle mounted, settling a second later) — a drag computed against that transitional
+    // geometry lands nowhere meaningful.
+    await page.waitForTimeout(1000);
     const markerWorlds = () => page.evaluate(() => (window.ddcsStudio.wizardManager._activePanel.getPassStarts() || []).map((s) => ({ x: s.x, y: s.y })));
     const before = await markerWorlds();
     const h = await page.evaluate(() => { const el = document.querySelector('#wiz_user svg [data-hid="__simstart0"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });

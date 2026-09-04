@@ -23,11 +23,15 @@ test('drag ② → #21/diagTravel follows + the trans-axial diagonal ends ON ②
   });
   // t1730 — ② is the declared `diagAim` handle (panelTypes.js `{ type:'diagAim', id:'diagAim', label:'②' }`),
   // identified by its STABLE data-hid, not by class/position (see middle-aim-canvas.spec.js port note).
-  await page.waitForFunction(() => !!document.querySelector('#userVizContainer [data-hid="diagAim"]'));
+  await page.waitForFunction(() => !!document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) [data-hid="diagAim"]'));
+  // t2599 — the tree-mode canvas's own auto-fit/rescale is still transitional for ~1s right after a marker first
+  // appears (measured live on alignment_data, the same canvas middle now shares) — reading geometry before it
+  // settles targets a stale, still-shrinking layout.
+  await page.waitForTimeout(1000);
 
   const before = await page.evaluate(() => {
-    const svg = document.querySelector('#userVizContainer svg').getBoundingClientRect();
-    const h = document.querySelector('#userVizContainer [data-hid="diagAim"]');
+    const svg = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) svg').getBoundingClientRect();
+    const h = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) [data-hid="diagAim"]');
     return { cx: svg.left + (+h.getAttribute('x') + 6), cy: svg.top + (+h.getAttribute('y') + 6), diag: +document.querySelector('[data-param="diagTravel"]').value };
   });
 

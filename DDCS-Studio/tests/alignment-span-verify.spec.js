@@ -13,7 +13,7 @@ test('typing the A→B span moves handle B (one source: field ↔ marker) + the 
     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true } }); });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form [data-param="span"]', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => document.querySelector('#userVizContainer [data-hid="__simstart1"]'), null, { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart1"]'), null, { timeout: 8000 });
     await page.waitForTimeout(200);
 
     // marker B's world position for a given span (opSimStarts — the ONE source the canvas reads)

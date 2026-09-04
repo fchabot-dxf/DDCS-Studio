@@ -37,18 +37,22 @@ test('edge wizard: MAX PROBE is editable; dragging the ① start moves the start
   await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_edge_data'));
   await page.waitForSelector('#wiz_user', { state: 'visible' });
-  await page.waitForFunction(() => document.querySelector('#userVizContainer .fc-handle'));
+  await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) .fc-handle'));
 
   // MAX PROBE is a NORMAL EDITABLE field (the V10.46 regression to undo: it must NOT be read-only)
   expect(await page.evaluate(() => document.querySelector('[data-param="dist"]').hasAttribute('readonly')), 'MAX PROBE is editable (not read-only)').toBeFalsy();
   await page.fill('[data-param="dist"]', '37');   // fill would THROW on a read-only input → this also proves editability
   await page.evaluate(() => document.querySelector('[data-param="dist"]').dispatchEvent(new Event('input', { bubbles: true })));
-  await page.waitForFunction(() => document.querySelector('#userVizContainer .fc-handle'));
+  await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) .fc-handle'));
+  // t2599 — the tree-mode canvas's own auto-fit/rescale is still transitional for ~1s right after a marker first
+  // appears (measured live on alignment_data; the same canvas the edge twin now shares) — reading geometry
+  // before it settles targets a stale, still-shrinking layout.
+  await page.waitForTimeout(1000);
 
   // the ① START handle (a 'move' rect: centre = x + w/2) + the world start before the drag
   const before = await page.evaluate(() => {
-    const h = document.querySelector('#userVizContainer .fc-handle');
-    const svg = document.querySelector('#userVizContainer svg').getBoundingClientRect();
+    const h = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) .fc-handle');
+    const svg = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) svg').getBoundingClientRect();
     const cx = h.hasAttribute('cx') ? +h.getAttribute('cx') : +h.getAttribute('x') + 6;
     const cy = h.hasAttribute('cy') ? +h.getAttribute('cy') : +h.getAttribute('y') + 6;
     const s = window.ddcsStudio.wizardManager._activePanel.getPassStarts()[0];

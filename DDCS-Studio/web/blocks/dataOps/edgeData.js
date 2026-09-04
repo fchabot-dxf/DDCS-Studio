@@ -88,10 +88,32 @@ export function edgeDataStack(params = EDGE_DEFAULTS) {
 }
 
 /** Bindings for the value sockets — DERIVED (not hand-counted) over a CANONICAL-pruned stack (X / pos / active → exactly 1×
- *  each socket). EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via def.bindingSpecs). */
+ *  each socket). EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via def.bindingSpecs).
+ *  ⚠ KEPT ALIVE (t2599): `tests/edge-data-emit.spec.js` imports `EDGE_BINDINGS` directly for its own "every scalar
+ *  binding derived a blockIndex" wiring check — a real external consumer, unlike rotary_clock's own now-orphaned
+ *  equivalent (removed at t2599). `edgeDataDef()` below no longer USES this constant for its own actual bindings
+ *  (re-derived fresh against the tree-shaped stack instead, per the bore/t2595 stale-bindings finding) but the
+ *  export itself stays, computed exactly as before, so that external test keeps working unmodified. */
 const CANONICAL_BIND = { ...EDGE_DEFAULTS, axis: 'X', dir: 'pos', wcs: 'active' };
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(edgeDataStack(EDGE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const EDGE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), EDGE_BINDING_SPECS);
+
+// t2599 (BACKLOG #71/#72, Phase 1 step 1) — mirrors rotaryClockFieldGroups'/alignmentFieldGroups' own header: the
+// ordered/grouped field lists this def's own uiChildren tree AND its flat bindings array both need, computed
+// ONCE, called TWICE (bootstrap stack for tree order, final stack for the bindings actually shipped). Unlike
+// alignment/rotaryClock (2 sections), edge has THREE declared sections (TOOL & CUT, IDENTITY, GEOMETRY) — the
+// pre-t2599 flat array order was TOOL & CUT (6 value bindings) then IDENTITY (axis, dir) then GEOMETRY (wcs), so
+// the tree below declares three group_box nodes in that same order, not the usual identity-first convention —
+// faithful reproduction of the existing flat render, not a fresh opinion on section order.
+function prunedFrom(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, CANONICAL_BIND); return c; }
+function edgeFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedFrom(stack), EDGE_BINDING_SPECS);   // all 6 are TOOL & CUT
+    return {
+        TOOL_CUT: derived,
+        IDENTITY: EDGE_STRUCT_BINDINGS.filter((b) => b.section === 'IDENTITY'),
+        GEOMETRY: EDGE_STRUCT_BINDINGS.filter((b) => b.section === 'GEOMETRY'),
+    };
+}
 
 // SOURCE-CHIPS — when the user opts a probe field to 'ctrl' (a profile with a native register, e.g. Expert), emit the
 // CONTROLLER register instead of the literal — EXACT parity with the built-in edge's srcVal/srcNote. Applied POST-emit
@@ -111,11 +133,52 @@ function applyProbeSources(stack) {
 /** Build the edge-as-data def — same userOpFromStack pattern as corner/drill/slot, PLUS `bindingSpecs` (instantiate
  *  re-derives the value sockets by identity over the pruned superset) + the structural axis/dir/wcs toggles. */
 export function edgeDataDef() {
+    // t2599 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped
+    // param names edgeFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: edgeStack(EDGE_DEFAULTS, { superset: true }) }];
+    const g0 = edgeFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2599 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/rotaryClock/alignment already use.
+            // Edge has NO classic shell (`wiz_edge` — RETIRED at t1730, index.html:347) — so, like those, there
+            // is no shell usage_text to reproduce verbatim; adapted from this file's own header description.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Edge' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Probes one wall (a LINE datum, one axis) and writes the found position to a work-coordinate register — a strict subset of Corner (no safe-traverse/reposition/fan-out). Set which axis the wall faces, which way the stylus approaches, and which WCS receives the result.' } },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(g0.IDENTITY) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2599 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore/rotaryClock/alignment already ship (t2511) —
+                // byte-identical DOM to the old combined `sim` node per t2511's own proof. Params unchanged.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: edgeStack(EDGE_DEFAULTS, { superset: true }),
+    }];
+    // t2599 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = edgeFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
-    const bindings = [...EDGE_BINDINGS, ...EDGE_STRUCT_BINDINGS].map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...gFinal.IDENTITY, ...gFinal.GEOMETRY];
     // t339 E4 — NO '*_datawiz' group: the edge twin is opened IN-PLACE from the built-in Edge's Probe slot (opensAs), and its
     // own menu entry is hidden (wizardLibrary drops opensAs targets), so it never lands in a separate Data Wiz dropdown.
-    const def = userOpFromStack('edge_data', 'Edge (data)', edgeDataStack(EDGE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
+    const def = userOpFromStack('edge_data', 'Edge (data)', stack, bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = EDGE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = applyProbeSources;   // source-chips (byte-identical when studio-sourced)
     def.simStartsProvider = edgeSimStartsProvider;   // E2 — the ONE edge-anchor preview marker (sim-only; re-points to the live axis/dir)

@@ -5,6 +5,13 @@ import { test, expect } from '@playwright/test';
  * DRAGGABLE handles bound to the ONE source (def.simStartParams). t544: marker A = the SIM-ONLY start anchor → ax/ay
  * FRACTIONS (never emitted); marker B = A + the span → its drag along the checkAxis fence writes the SPAN field (relSpanFrom
  * pattern, B−A). VERIFY end-to-end in the ACTUAL in-place UI: A drag → ax/ay fraction; B drag → the span field (one source).
+ *
+ * t2599 — alignment_data now migrates onto the declared uiChildren tree (renderUiTree), whose preview3d/
+ * feature_canvas viz container carries a `_tree`-suffixed id (formWidgets.js's own `nsId(...)`), not the
+ * classic shell's fixed 2D container id this test used to hardcode (same general flat-vs-tree gap named at
+ * t2597 for rotary_clock_data — 1 of the 44 files that hardcode it). The `[id*="userVizContainer"]:has([data-hid])`
+ * selector below matches whichever of the (classic / tree / mini-preview) container instances is actually
+ * populated, so it works under either render path without knowing the exact id in advance.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -14,21 +21,25 @@ test('the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor 
     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true } }); });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => document.querySelector('#userVizContainer [data-hid="__simstart0"]'), null, { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]'), null, { timeout: 8000 });
+    // t2599 — the tree-mode canvas's own auto-fit/rescale is still transitional for ~1s right after the handle
+    // first appears (measured live: `.fc-stock` read 25x16px immediately, 296x178px a second later) — reading
+    // geometry before it settles targets a stale, still-shrinking layout and the drag lands nowhere meaningful.
+    await page.waitForTimeout(1000);
 
     // the DECLARED binding — A = {ax,ay} anchor; B = the relSpanFrom SPAN marker (along checkAxis)
     const setup = await page.evaluate(async () => {
         const { alignmentDataDef } = await import('/blocks/dataOps/alignmentData.js');
         const spb = alignmentDataDef().simStartParams;
-        const hids = [...document.querySelectorAll('#userVizContainer [data-hid^="__simstart"]')].map((e) => e.getAttribute('data-hid'));
+        const hids = [...document.querySelectorAll('[id*="userVizContainer"]:has([data-hid]) [data-hid^="__simstart"]')].map((e) => e.getAttribute('data-hid'));
         return { spb, hids };
     });
     expect(setup.spb, 'A = the ax/ay anchor; B = the relSpanFrom span marker (checkAxis, signed)').toEqual([{ x: 'ax', y: 'ay' }, { y: 'span', relSpanFrom: 0, spanAxisFrom: 'checkAxis', signed: true }]);
     expect(setup.hids.sort(), 'both A and B render as draggable Layout handles').toEqual(['__simstart0', '__simstart1']);
 
     // ── DRAG handle A to the stock CENTRE (world ≈ 100,60 for a 200×120 stock → fraction ≈ 0.5, 0.5) — the SIM anchor ──
-    const stockBox = await page.locator('#userVizContainer .fc-stock').first().boundingBox();
-    const hbA = await page.locator('#userVizContainer [data-hid="__simstart0"]').first().boundingBox();
+    const stockBox = await page.locator('[id*="userVizContainer"]:has([data-hid]) .fc-stock').first().boundingBox();
+    const hbA = await page.locator('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]').first().boundingBox();
     await page.mouse.move(hbA.x + hbA.width / 2, hbA.y + hbA.height / 2);
     await page.mouse.down();
     await page.mouse.move(stockBox.x + stockBox.width / 2, stockBox.y + stockBox.height / 2, { steps: 14 });
@@ -42,7 +53,7 @@ test('the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor 
     // ── DRAG handle B along the checkAxis (X) fence → writes the SPAN field = B.x − A.x (relSpanFrom, one source) ──
     // A RELATIVE +X screen drag (the canvas re-fit after the A drag, so an absolute stock-rect target would be stale).
     const spanBefore = await page.evaluate(() => Number(document.querySelector('#wiz_user_form [data-param="span"]').value));
-    const hbB = await page.locator('#userVizContainer [data-hid="__simstart1"]').first().boundingBox();
+    const hbB = await page.locator('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart1"]').first().boundingBox();
     await page.mouse.move(hbB.x + hbB.width / 2, hbB.y + hbB.height / 2);
     await page.mouse.down();
     await page.mouse.move(hbB.x + hbB.width / 2 + 90, hbB.y + hbB.height / 2, { steps: 14 });   // +90px in X → grow the span

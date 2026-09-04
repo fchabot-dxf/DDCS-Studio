@@ -73538,3 +73538,129 @@ own contention, and rotary_clock_data's migration + the two test-file edits intr
 else in the suite. `git status`: `rotaryClockData.js`, `rotary-clock-form-reproduction-2597.spec.js` (new),
 `rotary-clock-handles.spec.js`, `BACKLOG.md`, this WORK-LOG entry — nothing else.
 
+## turn 2599 — the four proven-shape-safe ops migrated: alignment, edge, middle, rotary_center — same two-phase
+pattern, one new mechanism finding (canvas settle-timing), one recurring one (the `_tree` id gap, worse than
+first counted), zero stops
+
+### MIGRATED, all four, same bar as bore/rotary_clock
+
+**alignment_data** (6 match bindings, probe family, panel form3d+2d) — `alignmentFieldGroups(stack)` mirrors
+`rotaryClockFieldGroups` exactly: bootstrap-stack derive for tree order, final-stack re-derive for the shipped
+bindings, both over a `canonicalPrunedStack`-style clone (all 6 scalars are LINEAR under either checkAxis/
+probeDir arm). Two group_box sections (GEOMETRY: safeZ, span, travel, checkAxis, probeDir, tolerance; TOOL & CUT:
+the 5 probe-motion scalars). No classic shell (`#wiz_alignment` RETIRED t1730). `ALIGNMENT_BINDINGS`/
+`alignmentDataStack` had no external test consumer (grepped) — removed as genuinely orphaned, same as
+rotary_clock's own precedent.
+
+**edge_data** (6 match bindings, probe family) — same pattern, but with a genuine NEW shape: edge has THREE
+declared sections (TOOL & CUT, IDENTITY, GEOMETRY), not two — `edgeFieldGroups` builds 3 group_box nodes in the
+pre-existing flat array's own order (TOOL & CUT first, then IDENTITY, then GEOMETRY — not the usual identity-
+first convention, because faithful reproduction of the existing flat render outranks a fresh opinion on order).
+**`EDGE_BINDINGS`/`edgeDataStack` KEPT ALIVE** — unlike alignment/rotary_center, `tests/edge-data-emit.spec.js`
+imports `EDGE_BINDINGS` directly for its own "every binding derived a blockIndex" wiring check, a real external
+consumer (mirrors bore's own `boreDataStack` precedent from t2595) — `edgeDataDef()` no longer uses this constant
+for its own bindings (re-derives fresh against the tree-shaped stack instead) but the export stays computed
+exactly as before, unmodified, so that test keeps passing.
+
+**middle_data** (12 struct + 6 value + 4 prune-gated-optional bindings) — the largest, most structurally involved
+of the four. **A genuine correction to my own first assumption, caught before it produced a wrong test**: the
+pre-t2599 flat array had GEOMETRY split into TWO non-contiguous runs (the 8 struct toggles right after IDENTITY,
+then crossX/crossY/diagTravel/diagPrimary again after the TOOL & CUT run) — I initially assumed `renderOpForm`'s
+own section grouping was "contiguous run" (the OLDER framing from this arc's own intro, before t2545's own
+correction) and nearly declared TWO separate GEOMETRY group_box nodes. Re-reading BACKLOG's own t2545 entry
+first: section grouping is **NAME-KEYED**, not contiguous-run — same-named sections merge into ONE box
+regardless of contiguity, positioned at the section's FIRST array occurrence. Built `middleFieldGroups`
+accordingly: ONE GEOMETRY group_box (not two), carrying all 12 fields (8 struct + 4 optional) in their own
+relative array order, positioned between IDENTITY and TOOL & CUT. The row-diff test's own EXPECTED_ORDER proved
+this correct on the first real run — no revert needed. **`MIDDLE_BINDINGS`/`middleDataStack` KEPT ALIVE**
+(`tests/middle-data-emit.spec.js` imports `MIDDLE_BINDINGS`, same reasoning as edge). Value bindings derived
+over a clone pruned with the pre-existing `CANONICAL_BIND` (forces boss/inAxis-auto/transAxis-auto/twoAxis so
+all 4 optional sockets resolve during derive) — unchanged mechanism, just called fresh per stack now.
+
+**rotary_center_data** (8 value bindings incl. 1 optional, probe family, panel form3d+2d) — same two-box pattern
+as rotary_clock/alignment (GEOMETRY: safeZ, diameter, method, approach, datum, wcs; TOOL & CUT: 6 scalars), all
+GEOMETRY items contiguous in the original array (no middle-style split). `ROTARY_CENTER_BINDINGS`/
+`rotaryCenterDataStack` had no external test consumer — removed as orphaned, same as rotary_clock/alignment.
+
+All four: no classic shell, so all four get a standalone row-diff test file (not
+`registerFormReproductionSuite`) mirroring `bore-form-reproduction-2595.spec.js`'s own two-test shape, and a
+fresh `usage_text` written in each op's own voice. All four verified against their OWN full pre-existing test
+file set plus `param-group-table-separation-2543.spec.js` (the t2531 dual-ownership-collision canaries, per the
+dispatch's own explicit VERIFY ask) before moving to the next op.
+
+### FINDING #1 (recurring, worse than counted at t2597): the `_tree`-id gap has a SECOND shape —
+`getElementById`, not just a CSS selector
+
+t2597 found 44 test files hardcoding `#userViz3dContainer`/`#userVizContainer` as a CSS selector. This turn found
+and fixed **11 more** of those across the four ops (4 in alignment, 2 in edge, 4 in middle — rotary_center needed
+none), using a container-id-agnostic pattern refined from t2597's own fix: `[id*="userVizContainer"]:has([data-hid],
+.fc-handle)` — matches whichever of the (classic / tree / mini-preview "blk_"-prefixed) container instances is
+actually populated with real markers, regardless of which one's id the running op happens to route to.
+
+**A genuinely NEW discovery this turn**: `middle-diag-aim.spec.js` used `document.getElementById('userVizContainer')`
+— a DIFFERENT JS call shape than the CSS-selector pattern t2597's own grep searched for, so it was invisible to
+that grep entirely and only surfaced when the test actually failed. A repo-wide grep for this second shape
+(`getElementById(['"]userViz`) found **39 MORE files** carrying it — mostly corner (the deferred trap) and
+not-yet-migrated ops, none in this turn's own 4-op scope beyond the one fixed. **The real count of tests that
+will need this exact fix, one migration at a time, is now 44 + 39 − 12 (the 11 fixed this turn + rotary_clock's
+own 1 from t2597) ≈ 71 remaining** — a materially bigger number than t2597's own "44" first reported, because
+that count only ever measured ONE of the (at least) two ways a test can hardcode the classic container id.
+Recorded here so the next migration's own screen starts from the corrected number, not the stale one.
+
+### FINDING #2 (new this turn): the tree-mode canvas's own auto-fit/rescale is transitional for ~1 second after
+a marker first mounts — reading geometry before it settles targets a stale, still-shrinking layout
+
+Surfaced on `alignment-fork1-handles.spec.js`, which timed out / read `undefined` ax/ay after a drag that LOOKED
+correctly targeted. This is the finding that came closest to a STOP this turn — the dispatch itself named this
+exact shape ("a stop would most likely mean a FIFTH axis exists, which is worth more than the migration it
+interrupts") and for a while it looked like one. Root-caused live, not guessed, across several scratch
+reproductions: `.fc-stock`'s own measured `boundingBox()` read **25×15.8px** immediately after the drag handle's
+own `[data-hid]` appeared, but **295×178px** (≈12× larger on each axis) one second later — the SAME stock, still
+mid auto-fit/rescale transition. A drag computed against the transitional (tiny) geometry either misses the
+handle's own true on-screen position entirely or covers too small a screen delta to register as a genuine drag
+(ruled out as a separate "minimum drag distance" theory — a deliberately-armed two-phase drag with a large first
+move ALSO failed against the stale geometry, isolating the cause to the geometry READ itself, not the drag
+gesture). **Not a product defect** — `writeSimStartFrac`'s own fraction math (`userOpView.js:328-329`,
+`ax = worldX/stockX`) is untouched by this migration and proven correct once given real geometry (a fixed-offset
+drag with no precomputed target wrote real, sane ax/ay values even while `.fc-stock` was still measuring tiny).
+**Fixed by adding `await page.waitForTimeout(1000)` before the first geometry read**, in the 6 files this turn's
+own four ops actually exercise the pattern in: `alignment-fork1-handles.spec.js`, `alignment-fresh-seat.spec.js`,
+`edge-probe-vector.spec.js`, `middle-aim-tie.spec.js`, `middle-aim-canvas.spec.js`, `middle-manual-markers.spec.js`.
+This is a DIFFERENT mechanism than Finding #1 (a timing race, not a stale selector) and will very likely recur on
+any future op whose own test computes a drag target from measured geometry read immediately after a handle
+appears — named here so it costs one wait line, not a fresh multi-scratch-test investigation, next time.
+
+### PER-OP COST (measurement, continuing t2597's own table)
+
+alignment: ~35 min (migration + 4 id-gap test fixes + row-diff test). edge: ~20 min (migration + 2 id-gap fixes +
+row-diff test — no new mechanism finding, cheapest of the four). middle: ~50 min (migration + the NAME-KEYED
+section-merge correction + 5 id-gap test fixes incl. the getElementById variant + row-diff test — the most
+structurally involved op in this arc so far). rotary_center: ~20 min (migration + row-diff test, zero id-gap
+fixes needed — cheapest, matching rotary_clock's own prior cost). Finding #2's own investigation (the settle-
+timing root-cause): ~40 min, mostly spent on alignment before the fix generalized cheaply to the other three.
+Total this turn: ~2h45m for four ops + two mechanism findings, vs t2595/t2597's combined ~1h10m for two ops (bore,
+rotary_clock) — NOT a sign the pattern is getting harder; three of the four findings this turn (both id-gap
+variants, the settle-timing gap) are now KNOWN and will cost a fix, not a fresh investigation, on every future op.
+
+### STOPPED NOWHERE this turn — all four completed to the same bar
+
+Every op that looked like it might need a stop (middle's own section-merge question, alignment's own drag
+failure) resolved to either a correction caught before it shipped wrong, or a root-caused, fixable test issue —
+neither was a genuine "this op's diff will not go clean" the way text was at t2595. Remaining safe-list
+candidates for a future turn: `pocketData`/`slotData` (still HARD per the original survey's own structural-fork
+criterion, unrelated to any axis this arc has screened for), the 5 structural-only zero-binding-risk ops
+(`atcChangeData`/`atcTableData`/`atcTestData`/`homingData`/`ioStepData` — genuinely the lowest-risk remaining,
+still not attempted), and the 3 unverified-panel-kind ops (`atcCheckData`/`atcLengthData`/`commData`) which need
+their own panel-kind mechanism checked before they can be called safe at all.
+
+### VERIFY
+
+Targeted run per op (own pre-existing suite + `param-group-table-separation-2543.spec.js`): alignment 41/41,
+edge 12/12, middle 50/50 (2 skipped, unrelated), rotary_center 27/27 — all green before moving to the next op.
+Full suite (unconditional per the dispatch's own TIER instruction, launched after all four targeted runs went
+green): **3099 passed, 0 failed, 28 skipped (39.5m), exit code 0.** Up from t2597's own 3090 passed (the 8 new
+row-diff tests across the 4 ops, plus one more from the suite's own normal count drift) — zero regressions
+anywhere else. `git status`: `alignmentData.js`, `edgeData.js`, `middleData.js`, `rotaryCenterData.js`; 4 new
+row-diff test files; 11 fixed pre-existing test files (id-gap + 1 getElementById variant); this WORK-LOG entry;
+BACKLOG.md.
+

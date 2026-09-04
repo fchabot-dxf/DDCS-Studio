@@ -131,10 +131,36 @@ export function middleDataStack(params = MIDDLE_DEFAULTS) {
 
 /** Bindings for the value sockets — DERIVED (not hand-counted) over a CANONICAL-pruned stack that makes ALL bound sockets
  *  present exactly once: boss + inAxis-auto (→ #19/#20) + transAxis-auto + twoAxis (→ #21/#22). EMIT re-derives BY IDENTITY
- *  over the actual PRUNED stack each build (via def.bindingSpecs), so the frozen indices below never desync. */
+ *  over the actual PRUNED stack each build (via def.bindingSpecs), so the frozen indices below never desync.
+ *  ⚠ KEPT ALIVE (t2599): `tests/middle-data-emit.spec.js` imports `MIDDLE_BINDINGS` directly (a `.length` check).
+ *  `middleDataDef()` below no longer USES this constant for its own actual bindings (re-derived fresh against the
+ *  tree-shaped stack instead, per the bore/t2595 stale-bindings finding) but the export stays, computed exactly
+ *  as before, so that external test keeps working unmodified — same precedent as edge's own EDGE_BINDINGS. */
 const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, axisOrder: 'XY', dir1: 'pos', dir2: 'neg', featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true };   // t1237 — pin the DIRECTION arms too (order × dir1 × dir2 duplicates every bound socket 8×; the derive must see exactly one)   // t1211 — PIN the order too: the fork duplicates every bound socket per arm, so the derive must see ONE arm (mirrors cornerData pinning corner/probeSeq)
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(middleDataStack(MIDDLE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const MIDDLE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), MIDDLE_BINDING_SPECS);
+
+// t2599 (BACKLOG #71/#72, Phase 1 step 1) — mirrors edgeFieldGroups' own header: the ordered/grouped field lists
+// this def's own uiChildren tree AND its flat bindings array both need, computed ONCE, called TWICE (bootstrap
+// stack for tree order, final stack for the bindings actually shipped). Value bindings derived over a stack
+// pruned with the SAME CANONICAL_BIND the pre-existing MIDDLE_BINDINGS uses (forces boss/inAxis-auto/
+// transAxis-auto/twoAxis so all 4 prune-gated optionals — crossX/crossY/diagTravel/diagPrimary — resolve).
+// ⚠ NAME-KEYED, NOT CONTIGUOUS-RUN (t2545's own measured correction, not the earlier "contiguous run" framing):
+// the pre-t2599 flat array had GEOMETRY split into TWO separate runs (the 8 struct toggles right after IDENTITY,
+// then crossX/crossY/diagTravel/diagPrimary again after the TOOL & CUT run) — renderOpForm's own section
+// grouping MERGES same-named sections regardless of contiguity, into ONE box positioned at the section's FIRST
+// array occurrence. So the declared tree below merges them the same way: one GEOMETRY group_box, positioned
+// where GEOMETRY first appeared (right after IDENTITY, before TOOL & CUT), carrying all 12 fields in their own
+// relative array order.
+function prunedFrom(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, CANONICAL_BIND); return c; }
+function middleFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedFrom(stack), MIDDLE_BINDING_SPECS);
+    return {
+        IDENTITY: MIDDLE_STRUCT_BINDINGS.filter((b) => b.section === 'IDENTITY'),
+        GEOMETRY: [...MIDDLE_STRUCT_BINDINGS.filter((b) => b.section === 'GEOMETRY'), ...derived.filter((b) => b.section === 'GEOMETRY')],
+        TOOL_CUT: derived.filter((b) => b.section === 'TOOL & CUT'),
+    };
+}
 
 /** E2 — the per-pass PREVIEW-START provider, PORTING BUILT_IN.middle (opSimStarts.js) into a declared provider on the twin.
  *  Middle's pass count is VARIABLE (1→5) with COMPOUND gates (boss ∧ inAxisManual ∧ twoAxis) + OPPOSITE-dir walls (!dir1) —
@@ -182,13 +208,49 @@ export function middleSimStartsProvider(params, stock) {
  *  NO postInstantiate: the built-in middle bakes no scalar-interpolated comment text (no header recompose needed) and does NOT
  *  source #5/#3/#2 (no source-chips — a hook here would DIVERGE on an Expert profile; see the header NOTE) → byte-identical on ALL profiles. */
 export function middleDataDef() {
-    // t1213 (USER RULING — [[op-defining-fields-at-top]]): the op-DEFINING fields come FIRST. Probe Order / Feature /
-    // travel mode are what the op IS; the scalars (probe distance, feeds, retract) are how it is tuned. The form renders
-    // in BINDING ORDER and buckets by `section`, so putting the STRUCT rows first makes GEOMETRY render above TOOL & CUT —
-    // identity → geometry → tool/cut. Declared ordering only: no per-wizard CSS, and the emit is untouched (bindings drive
-    // the FORM; the value-socket derivation reads MIDDLE_BINDING_SPECS, which is unchanged).
-    const bindings = [...MIDDLE_STRUCT_BINDINGS, ...MIDDLE_BINDINGS];
-    const def = userOpFromStack('middle_data', 'Middle (data)', middleDataStack(MIDDLE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
+    // t1213 (USER RULING — [[op-defining-fields-at-top]]): the op-DEFINING fields come FIRST — identity → geometry →
+    // tool/cut. t2599 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the
+    // ordered/grouped param names middleFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: middleStack(MIDDLE_DEFAULTS, { superset: true }) }];
+    const g0 = middleFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2599 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/rotaryClock/alignment/edge already
+            // use. Middle has NO classic shell (`wiz_middle` — RETIRED at t1730, index.html:338) — so, like
+            // those, there is no shell usage_text to reproduce verbatim; adapted from this file's own header.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Middle' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Finds the centre of a pocket or boss by probing opposite walls (one axis, or both) and writes it to a work-coordinate register. Pocket probes from inside; Boss crosses over the outside of the part. Auto travel crosses hands-free between walls; Manual pauses for you to jog.' } },
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(g0.IDENTITY) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2599 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore/rotaryClock/alignment/edge already ship (t2511) —
+                // byte-identical DOM to the old combined `sim` node per t2511's own proof. Params unchanged.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: middleStack(MIDDLE_DEFAULTS, { superset: true }),
+    }];
+    // t2599 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = middleFieldGroups(stack);
+    const bindings = [...gFinal.IDENTITY, ...gFinal.GEOMETRY, ...gFinal.TOOL_CUT];
+    const def = userOpFromStack('middle_data', 'Middle (data)', stack, bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     // t1211 — fill in `axisOrder` for the guard when an op stored only the legacy `axis` (middleAxes normalises), so a
     // pre-existing saved op still prunes to exactly one order arm instead of losing both.

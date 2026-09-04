@@ -70,8 +70,11 @@ test('② diagAim: the in-place Middle shows the ② handle for boss+probe-both+
     // byte-identical when UNTOUCHED: the twin default emit (diagTravel 50) == the built-in default (#21=50) — the handle is preview-only
     const twin = emitMapped(builderOf(MIDDLE_DATA_OPTYPE)({ featureType: 'boss', twoAxis: true, transAxis: 'auto' })).text;
     const builtin = emitMapped(middleStack({ featureType: 'boss', twoAxis: true, transAxis: 'auto' })).text;
-    // the LIVE 2D canvas (from the configured form) renders the ② handle (an SVG <text> label)
-    const c = document.getElementById('userVizContainer');
+    // the LIVE 2D canvas (from the configured form) renders the ② handle (an SVG <text> label). t2599 — middle_data
+    // now migrates onto the declared uiChildren tree, whose viz container carries a `_tree`-suffixed id
+    // (formWidgets.js's own `nsId(...)`), not the classic shell's fixed id this getElementById lookup assumed —
+    // same general flat-vs-tree gap named at t2597/t2599 for the other migrated ops; matched by id substring here.
+    const c = document.querySelector('[id*="userVizContainer"]:has(svg text)') || document.querySelector('[id*="userVizContainer"]');
     const svg = c && c.querySelector('svg');
     const liveTexts = svg ? Array.from(svg.querySelectorAll('text')).map((t) => (t.textContent || '').trim()) : [];
     return {

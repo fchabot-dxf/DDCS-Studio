@@ -7688,6 +7688,24 @@ value bindings at all) — genuinely the lowest-risk candidates, not yet attempt
 already on the safe list above; each will need the same fix `rotary-clock-handles.spec.js` got here the day its
 own op migrates. Full account: WORK-LOG t2597.
 
+**t2599 — migrated the four proven-shape-safe ops: alignment, edge, middle, rotary_center.** Same
+`xFieldGroups` two-phase pattern throughout. `edge`/`middle` needed their OWN legacy `*_BINDINGS`/`*DataStack`
+exports KEPT ALIVE (real external test consumers, `edge-data-emit.spec.js`/`middle-data-emit.spec.js` import
+them directly) — `alignment`/`rotary_center` had none and were removed as genuinely orphaned. `edge` is the
+first op with THREE declared sections (not two); `middle` corrected a wrong first assumption before it shipped —
+its own GEOMETRY section is split into two non-contiguous array runs, and `renderOpForm`'s section grouping is
+NAME-KEYED (t2545's own measured finding), not contiguous-run, so both runs merge into ONE group_box, not two.
+⚠ **Two mechanism findings, one recurring and materially bigger than first counted, one genuinely new:**
+(1) the `_tree`-id gap (t2597) has a SECOND shape — `document.getElementById('userVizContainer')`, not just a
+CSS selector — invisible to t2597's own grep. A repo-wide grep for this second shape found **39 more files**;
+combined with the original 44, roughly **71 test files remain** that will need this exact fix, one migration at
+a time (11 fixed this turn, across alignment/edge/middle). (2) NEW: the tree-mode canvas's own auto-fit/rescale
+is transitional for ~1s after a marker first mounts — a test that reads drag-target geometry immediately after
+the handle appears (rather than waiting for the canvas to settle) computes against a stale, ~12×-too-small
+layout, and either misses the handle or drags too small a screen delta to register. Not a product defect —
+proven via a live root-cause chase, not guessed — fixed with a `waitForTimeout(1000)` in the 6 affected files.
+Full account, all findings with citations: WORK-LOG t2599.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it

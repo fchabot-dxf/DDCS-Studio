@@ -32,15 +32,18 @@ test('the 2D canvas reads stock.shape (matches 3D): a pocket cavity draws, and a
   // t1730 — 'middle' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_middle_data'));
   await page.waitForSelector('#wiz_user', { state: 'visible' });
-  await page.waitForFunction(() => document.querySelector('#userVizContainer svg'));
+  await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) svg'));
 
   // set an EXPLICIT stock.shape (bypassing preselection entirely — see fixme above) and read what the 2D draws.
   // t1730 — old m_* ids retired; the twin's generic form renders every declared param as [data-param="<name>"], and
-  // the Layout 2D canvas mounts in the shared #userVizContainer (form3d+2d panel mode), not a per-wizard id.
+  // the Layout 2D canvas mounts in the shared viz container (form3d+2d panel mode). t2599 — that container's own
+  // id now varies by render path (classic vs tree-mode's `_tree` suffix, formWidgets.js's own `nsId(...)`), so the
+  // selector below matches by id substring rather than a fixed id (same fix as the other middle-*/alignment-*
+  // drag tests this turn).
   const setShape = (shape) => page.evaluate((shape) => {
     window.ddcsGetSettings().stock.shape = shape;
     window.ddcsStudio.wizardManager.update();
-    const svg = document.querySelector('#userVizContainer svg');
+    const svg = document.querySelector('[id*="userVizContainer"]:has([data-hid], .fc-handle) svg');
     const r = svg.querySelector('rect.fc-feature-pocket');
     return { stockShape: window.ddcsGetSettings().stock.shape, hasPocketCavity: !!r, cls: r ? r.getAttribute('class') : null, rectW: r ? +r.getAttribute('width') : null, stockW: (svg.querySelector('rect.fc-stock') || {}).getAttribute ? +svg.querySelector('rect.fc-stock').getAttribute('width') : null };
   }, shape);

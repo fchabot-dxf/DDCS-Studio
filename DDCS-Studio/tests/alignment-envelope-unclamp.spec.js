@@ -34,12 +34,12 @@ test('a REAL drag past the stock edge writes a fraction >1, bounded by the machi
     });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => document.querySelector('#userVizContainer [data-hid="__simstart0"]'), null, { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]'), null, { timeout: 8000 });
     await page.waitForTimeout(200);
 
     // DRAG handle A far to the RIGHT (well past the stock's right edge) — world clamps at the 220 envelope → ax → 1.10
-    const cont = await page.locator('#userVizContainer').boundingBox();
-    const hb = await page.locator('#userVizContainer [data-hid="__simstart0"]').first().boundingBox();
+    const cont = await page.locator('[id*="userVizContainer"]:has([data-hid])').boundingBox();
+    const hb = await page.locator('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]').first().boundingBox();
     await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
     await page.mouse.down();
     await page.mouse.move(cont.x + cont.width - 12, hb.y + hb.height / 2, { steps: 18 });   // far right → past the stock, into the envelope cap

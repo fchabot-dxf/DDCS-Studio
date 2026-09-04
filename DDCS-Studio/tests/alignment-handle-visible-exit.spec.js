@@ -24,13 +24,13 @@ test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (
     });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => document.querySelector('#userVizContainer [data-hid="__simstart0"]'), null, { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]'), null, { timeout: 8000 });
     await page.waitForTimeout(300);
 
     const rectOf = (sel) => page.locator(sel).first().boundingBox();
-    const stock0 = await rectOf('#userVizContainer .fc-stock');
-    const hb0 = await rectOf('#userVizContainer [data-hid="__simstart0"]');
-    const cont = await rectOf('#userVizContainer');
+    const stock0 = await rectOf('[id*="userVizContainer"]:has([data-hid]) .fc-stock');
+    const hb0 = await rectOf('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]');
+    const cont = await rectOf('[id*="userVizContainer"]:has([data-hid])');
 
     // DRAG handle A hard to the RIGHT — toward + BEYOND the canvas edge (past where the frozen viewBox used to strand it).
     // Many steps so the edge auto-pan accumulates (each near-edge step pans the view to keep following the handle).
@@ -42,11 +42,11 @@ test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (
 
     // DURING the drag (before mouse.up) — the auto-pan must keep the marker VISIBLE in the canvas + far past the stock edge
     const during = await page.evaluate(() => {
-        const h = document.querySelector('#userVizContainer [data-hid="__simstart0"]');
-        const s = document.querySelector('#userVizContainer .fc-stock');
+        const h = document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]');
+        const s = document.querySelector('[id*="userVizContainer"]:has([data-hid]) .fc-stock');
         if (!h || !s) return null;
         const hr = h.getBoundingClientRect(), sr = s.getBoundingClientRect();
-        const cr = document.querySelector('#userVizContainer').getBoundingClientRect();
+        const cr = document.querySelector('[id*="userVizContainer"]:has([data-hid])').getBoundingClientRect();
         const hCx = hr.x + hr.width / 2;
         return { hCx, stockRight: sr.x + sr.width, contRight: cr.x + cr.width, hVisibleInCanvas: hr.width > 0 && hCx >= cr.x - 2 && hCx <= cr.x + cr.width + 2 };
     });
@@ -56,8 +56,8 @@ test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (
 
     // AFTER mouse.up (the view re-fits) — where is the marker vs the stock rect on-screen?
     const after = await page.evaluate(() => {
-        const h = document.querySelector('#userVizContainer [data-hid="__simstart0"]');
-        const s = document.querySelector('#userVizContainer .fc-stock');
+        const h = document.querySelector('[id*="userVizContainer"]:has([data-hid]) [data-hid="__simstart0"]');
+        const s = document.querySelector('[id*="userVizContainer"]:has([data-hid]) .fc-stock');
         if (!h || !s) return null;
         const hr = h.getBoundingClientRect(), sr = s.getBoundingClientRect();
         return { hCx: hr.x + hr.width / 2, stockRight: sr.x + sr.width, stockLeft: sr.x, outside: (hr.x + hr.width / 2) > (sr.x + sr.width) };
