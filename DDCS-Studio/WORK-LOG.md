@@ -74201,3 +74201,110 @@ formWidgets.js fix (already shipped, not per-op). Not attempted this turn per th
 instruction. `interpass-connector-1235.spec.js`'s possible stale `#userVizContainer` id is a loose thread worth
 naming to the advisor, not silently fixed mid-scope.
 
+## turn 2609 — the gate audit: my own t2607 run violated "never override the reporter"; the 2 deterministic
+failures are NOT retry-masked (retries structurally cannot mask a deterministic failure) — they are real,
+root-caused regressions from t2599/t2605 that a "0 failed" summary line failed to preserve enough detail to catch
+
+### MY OWN ERROR, NAMED FIRST
+
+t2607's own full-suite run used `npx playwright test --reporter=list`, which OVERRIDES `playwright.config.js`'s
+declared `reporter:` array (`progressReporter.mjs` + the JSON reporter, `test-results/summary.json`,
+UNCONDITIONAL per its own t1724 comment) — the exact violation `worker-never-override-reporter.md` exists to
+prevent. `retries:2` still ran (it's a top-level config field, independent of reporter choice — this is why
+t2607's own list-reporter tail still correctly showed 4 failed/11 flaky, computed by the SAME reporter-agnostic
+base class), but `scripts/test-all.cjs`'s own declared "FLAKY COUNT (the health metric)" line, and the JSON file
+a future check could read back, never ran. This turn re-ran the suite via `npm test` (the real gate) to get an
+authoritative capture — see VERIFY below.
+
+### Q1 — did t2599/2601/2603/2605 really report 0 flaky, or was it just not printed?
+
+Checked the REPORTER'S OWN CODE, not inference: `node_modules/playwright/lib/reporters/base.js:199` —
+`generateSummaryMessage` pushes the `"N flaky"` line only `if (flaky.length)`. Every built-in reporter (list,
+dot, line) shares this one base summary generator — **when flaky.length === 0, NO flaky line is emitted at
+all, by any of them, unconditionally.** So "N passed, 0 failed, 28 skipped" with no flaky mention is EXACTLY
+what a genuinely-clean run's own tail prints — not a worker's omission, IF the worker copied the tail verbatim
+(the established, observed convention this whole session — every prior turn's WORK-LOG entry reads as a direct
+paraphrase of the reporter's own summary block). **I cannot go further than this**: `test-results/` is
+gitignored (`.gitignore:8`) and gets overwritten by every subsequent local run — t2599/2601/2603/2605's own raw
+`summary.json` no longer exists anywhere, including in this conversation's own history. The code-level proof
+above is the strongest evidence obtainable now; it cannot distinguish "genuinely 0 flaky" from "the worker typed
+a made-up line" for those 4 past turns specifically — only that a genuinely clean run *would* print exactly what
+they recorded.
+
+### Q2/Q3 — interpass-connector-1235 / form-section-collapse-820: root-caused, NOT retry-masked
+
+**Retries cannot mask a deterministic failure** — a test that fails identically on every attempt fails the SAME
+way on retry #1 and #2 too (that is the whole point of the flaky/failed split: `flaky` = healed on SOME retry,
+`unexpected`/failed = never healed). Both were run **single-worker, in total isolation, twice each** — 100%
+reproducible, zero variance, not contention:
+
+- **`interpass-connector-1235.spec.js`** (unchanged since long before t2599 — `git log` shows its last edit at
+  `a2d42d99`, the t1670 era): screenshots the bare, un-namespaced `#userVizContainer`. MIDDLE went tree-mode at
+  t2599 (`7ed2c1ed`), whose own container carries the `_tree`-suffixed id (`nsId('userVizContainer_tree')`) —
+  this file was evidently MISSED by the t2599/t2601 id-gap sweeps (which fixed 34+39 other files for the exact
+  same CSS-selector/getElementById shapes). It has been broken, deterministically, since t2599 itself.
+- **`form-section-collapse-820.spec.js`** (unchanged since t820, long before t2605): asserts `user_wcs_data`
+  renders 0 `.form-sec` elements ("a short form stays plain"). Root-caused precisely: `formWidgets.js:1772`'s
+  `group_box` node defaults `collapsible = !(params.collapsible === false)` — **TRUE unless explicitly opted
+  out**, unconditionally, regardless of row count. The CLASSIC flat renderer's own section logic (this test's
+  own header comment: "a long form (> threshold rows AND ≥2 sections)") gates on a length THRESHOLD before
+  sectionizing; **the tree-mode `group_box` node has no equivalent threshold check at all** — it always wraps
+  in collapsible chrome the instant it's declared. t2605's `wcsData.js` migration declared 3 `group_box` nodes
+  (FEATURE CONTEXT/WCS/OPTIONS) with no `collapsible:false`, so WCS now renders exactly 3 `.form-sec` elements
+  where the invariant expects 0 — the failing assertion's own numbers (`expected 0, received 3`) match the 3
+  group_box nodes exactly. **This is an architectural gap in `group_box` itself, not a WCS-specific mistake** —
+  any op migrated to tree mode with multiple small group_box sections trips the same invariant; WCS is simply
+  the first migrated op small enough (6 fields) for it to matter.
+
+Confirmed via `git log 9955676c..HEAD` (9955676c = t2605's own commit): only 2 commits sit between it and this
+turn — my own t2607 diff, and `cee135a3` (`release: V2026.09.04.3`), which `git show --stat` proves touched
+ONLY `index.html`+`version.json` (a pure version string bump, zero app/test code). **The application code these
+2 tests exercise has been byte-identical since t2605's own commit.** A 100%-deterministic failure against
+byte-identical code cannot have been "healed by retries" in an earlier run without ALSO failing identically in
+that earlier run — retries execute the SAME code, so if it fails now, it must have failed then too, unless that
+run's report was for some other reason not accurate for these two specs. I cannot reconstruct why (Q1's own
+limit applies again) — but I can rule out "retries masked it" as the mechanism, on the reporter's own logic.
+
+### Q4 — does the 73-file census become a live-degradation list?
+
+**Reframed, not "yes" as asked.** Both regressions are NOT retry-masked breakage (that mechanism is structurally
+impossible for a deterministic failure) — they are **invariants that lived ONLY in the classic renderer's own
+logic** (a container-id convention; a length-threshold before sectionizing) that the tree renderer does not
+automatically inherit, and that per-op row-diff/canvas-mount tests (this session's own established bar) do not
+check, because they are GENERAL, cross-op invariants, not per-op ones. The 73-file census is a correct
+*population* to track, but the actual risk it should flag isn't "will this specific op's own test degrade under
+retries" — it's "does ANY general/cross-op invariant test (form-section-collapse-820 is one; there may be
+others) implicitly depend on classic-renderer-only behavior that a migrated op will silently stop providing."
+**Recommendation: before calling a migration verified, grep the FULL SUITE (not just the migrated op's own
+specs) for the op's own `opType`/container ids, in addition to running it — a full-suite pass is necessary but,
+on this evidence, was not sufficient twice in the last four turns.**
+
+### GATE WORDING — recommended
+
+Two concrete changes: (1) **Run the full suite via `npm test`** (the declared gate, `scripts/test-all.cjs`) —
+never `npx playwright test --reporter=list` again; its own unconditional JSON reporter + "FLAKY COUNT" line is
+exactly the named health metric this turn was asked to produce, and I should have used it the first time.
+(2) **State the flaky count explicitly, every time, even at 0** — `"N passed, 0 failed, 0 flaky, 28 skipped"`,
+never `"N passed, 0 failed, 28 skipped"` — Q1's own finding is that the reporter itself omits a zero flaky line,
+so a WORK-LOG entry that also omits it is indistinguishable from one that never checked. (3) **Name the failed
+test TITLES, not just the count**, in the WORK-LOG entry when failed > 0 — a bare number is exactly what made
+this turn's audit necessary; the titles are what let a future reader (or turn) recognize "wait, that one again"
+instead of re-discovering it from scratch.
+
+### VERIFY
+
+Re-ran the full suite via the ACTUAL declared gate this time: `npm test` → `test:node` 238/238 (exit 0), then
+`test:e2e` (exit 1). Reporter's own JSON (`test-results/summary.json`, unconditional): **expected 3130, skipped
+28, unexpected 4, flaky 14.** `scripts/test-all.cjs`'s own printed health-metric line: `FLAKY COUNT: expected
+3130, flaky 14, unexpected 4, skipped 28`. The 4 unexpected (failed), by name: `form-section-collapse-820.spec.js`
+×2 (both root-caused above), `interpass-connector-1235.spec.js` ×1 (root-caused above), and
+`preview-mutation-manifest-2463.spec.js` ×1 — this FOURTH one is genuinely load-dependent, not deterministic: it
+failed in BOTH full-suite runs (t2607's own and this turn's) but passed clean when re-run in isolation
+alongside only 2 other files (t2607's own investigation) — a real contention flake, unlike the other three.
+14 flaky (vs t2607's own list-reporter tail showing 11) — the flaky POPULATION varies run to run (expected,
+matches this repo's own extensively pre-documented worker-count contention findings in playwright.config.js),
+while the 3 deterministic failures were IDENTICAL across both runs, reinforcing they are not contention-driven.
+
+No app/test code changed this turn (diagnostic only, per the dispatch's own "not four fixed tests"). `git
+status`: this WORK-LOG entry only.
+
