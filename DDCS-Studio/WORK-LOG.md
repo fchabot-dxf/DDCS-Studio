@@ -73049,3 +73049,83 @@ product code — only this WORK-LOG entry; the one scratch test file (`tests/_t2
 deleted before this commit. Per the dispatch's own explicit "fix nothing, including the new serialization
 blocker" — nothing was fixed, the t2587 blocker was read from but not touched.
 
+## 🔨 turn 2591 — BACKLOG #69 RE-OPENED, RE-RUN LIVE, CONFIRMED FIXED — the cheapest outcome the dispatch
+predicted, root cause found retroactively from the OTHER side (BACKLOG #72's own t2547 fix), causality proven
+not just correlated
+
+### THE ASK, and the lead that made it worth checking
+
+BACKLOG #69 (filed t2481): `drill`'s own `dr_pos` handle, once reachable (post-#68), didn't move under a real
+drag — `elementFromPoint` at the drag's own start coordinate resolved to `DIV.wiz-controls` instead of the SVG
+handle, despite the two panes' own rects confirmed NOT overlapping. Root cause was never found; one candidate
+(a sticky/z-index rule on `.ui-split-pane2`) was tried, measured to have zero effect, and reverted. The
+dispatch's own lead: since #69 was filed, this session found and fixed four drag-related defects it could not
+have recognised at the time — among them, `inert` cascading from a placed op's own form host onto the drawing
+beside it, killing every handle in the subtree (BACKLOG #72, t2547). Per rule 8b, run #69's own STILL REAL IF
+check FIRST — it may already be fixed, the cheapest possible outcome.
+
+### THE MATCH, read from the code before touching anything
+
+`blocks/blocksApp.js`'s own `applyBlkReadOnly` (t2547's own comment, read in full before live-testing) states
+the exact mechanism: HTML's `inert` attribute cascades to an ENTIRE subtree with no per-descendant opt-out — a
+descendant cannot un-inert itself under an inert ancestor. The PRE-t2547 code marked the WHOLE form host inert
+for a placed op in read-only contexts; t2547 scoped that marking to `.ui-split-pane1` alone (the form-field
+column), leaving `.ui-split-pane2` (the visualization column, where drag handles for tree-mode twins live)
+genuinely interactive. t2547's own comment even NAMES the confirmed symptom: "`elementFromPoint`... reporting
+`.wiz-controls` (an ANCESTOR) intercepting the click meant for the handle, on BOTH surfacing and drill." This is
+`dr_pos`'s own exact reported symptom, word for word — and it explains WHY #69's own original investigation
+never found it: that investigation checked whether `.ui-split-pane1` and `.ui-split-pane2` overlapped
+geometrically (they don't), which was the wrong axis — an `inert` ancestor removes the ENTIRE subtree from
+hit-testing regardless of geometry, so no rect-overlap check could ever have found it.
+
+### RE-RUN LIVE — #69's own STILL REAL IF, verbatim, against current HEAD
+
+Built a scratch test (`tests/_t2591-backlog69-still-real.spec.js`, deleted before this commit) reusing
+`bootDrillPattern` (`tests/preview-mutation-manifest-2463.spec.js`, `_framed`+`makeOp`+`ddcsLoadBlockStack`,
+the same boot convention #69's own original diagnosis used) and the `movedMid`/`movedAfter` drag-distance
+measurement (`tests/commit-on-release-2429.spec.js`'s own established pattern). One harness snag, unrelated to
+the product: the project's own default viewport is too short for `dr_pos`'s own on-screen position in the
+narrow-pane stacked layout — `elementFromPoint` at the handle's own (correctly-found) coordinate returned
+`null` (out of viewport), not `.wiz-controls`; fixed with a taller `test.use({viewport})`, same class of harness
+gotcha this session has hit repeatedly on unrelated turns.
+
+**RESULT: `elementFromPoint` at `dr_pos`'s own centre resolves to the SVG handle itself**
+(`rect.fc-handle.fc-handle-move`, `data-hid="dr_pos"`) — not `.wiz-controls`. **A real drag moves it
+substantially and it stays moved**: `movedMid ≈ 216px`, `movedAfter ≈ 216px` (no snap-back), comfortably past
+the `>100px` bar the reference test's own precedent uses to mean "tracked the pointer, not frozen." #69 is
+FIXED.
+
+### CAUSALITY, not correlation — proven by reverting the SUSPECTED fix and re-observing the SAME failure
+
+Backed up `blocksApp.js`, temporarily forced `applyBlkReadOnly`'s own `target` back to the host-wide,
+pre-t2547 scope (`const target = host;`, discarding the `pane1 ||` fallback), and re-ran the IDENTICAL live
+check against the SAME `user_drill_data` boot: `elementFromPoint` reproduced `DIV.wiz-controls` EXACTLY, and
+`movedMid`/`movedAfter` were BOTH `0` — matching #69's own originally-filed symptom precisely, not
+approximately. Restored `blocksApp.js` from the backup immediately after, re-ran clean (handle resolves
+correctly, `movedMid/movedAfter ≈216px` again), confirmed `git status` shows zero diff on the file. This is a
+direct causal demonstration, not an inference from two turns' own dates lining up — flipping the ONE line t2547
+changed flips the symptom in both directions, live, on demand.
+
+### BACKLOG.md UPDATED — marked FIXED, not left standing on its own stale "not fixed" framing
+
+Appended #69's own entry (not rewritten) with the t2591 finding: confirmed fixed, root cause identified
+retroactively (the inert-cascade mechanism, matching BACKLOG #72/t2547 exactly), causality demonstrated via a
+live revert-and-reobserve, not just a plausible-sounding correlation. #69's own title line updated to
+`[✅ FIXED, confirmed t2591 — as a SIDE EFFECT of BACKLOG #72's own t2547 fix, not a separate act]`, matching
+this file's own established convention for a backfilled resolution (the entry's own body is APPENDED to, not
+rewritten, preserving the original honest "root cause not understood" account as the historical record of what
+was actually known at the time).
+
+### VERIFY
+
+The STILL REAL IF check ran against the SAME boot method and the SAME drag-measurement shape #69's own original
+diagnosis and this session's own established precedent both use — not a new, differently-shaped test that
+could beg the question. The causality claim is the strongest form of evidence available short of reading
+Blockly/browser-internals source: a controlled revert-and-reobserve on the SAME live page, both directions,
+both confirmed. OBSERVED vs INFERRED: every number and DOM read in this account is OBSERVED, live, this turn —
+the "which of the four mechanisms" comparison the dispatch asked for resolves to an exact, confirmed MATCH (the
+inert-cascade one), not a resemblance-only judgement, since causality was demonstrated rather than argued.
+`git status`: clean of product code — `blocksApp.js` was temporarily edited then restored from a scratch
+backup (confirmed byte-identical via a clean re-run, not from HEAD since committing was never needed); only
+`BACKLOG.md` and this WORK-LOG entry are new. The scratch test file was deleted before this commit.
+

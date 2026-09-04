@@ -6955,8 +6955,9 @@ escaped content).
 
 ---
 
-### 69. `drill`'s `dr_pos` handle no longer tracks the pointer during a drag — surfaced ONLY once BACKLOG #68's
-reachability fix landed; a different, unrelated defect. REPORT ONLY, one candidate tried and reverted, not fixed
+### 69. [✅ FIXED, confirmed t2591 — as a SIDE EFFECT of BACKLOG #72's own t2547 fix, not a separate act]
+`drill`'s `dr_pos` handle no longer tracks the pointer during a drag — surfaced ONLY once BACKLOG #68's
+reachability fix landed; a different, unrelated defect at the time it was filed
 
 *(filed t2481, discovered as a side effect of fixing #68 — explicitly sanctioned by that turn's own dispatch:
 "It may come back RED — that is a FINDING not a failure of the fix." Fixing reachability finally let L4's own
@@ -6987,6 +6988,23 @@ despite the rects not overlapping — check for a stacking-context/transform on 
 
 **STILL REAL IF**: dragging `dr_pos` on a live `user_drill_data` boot (Blocks tab, narrow pane, post-#68-fix)
 still shows `movedMid`/`movedAfter` near zero despite the handle being on-screen and hit-testable in principle.
+
+**t2591 — RE-RUN LIVE, CONFIRMED FIXED, root cause found (retroactively, from the OTHER side).** BACKLOG #72's
+own t2547 fix — `blocksApp.js`'s `applyBlkReadOnly`, which scoped a placed op's `inert`/read-only marking to
+`.ui-split-pane1` alone instead of the WHOLE host — turns out to be the SAME mechanism this entry's own mystery
+was hitting: HTML's `inert` cascades to an entire subtree with no per-descendant opt-out, so the pre-t2547
+host-wide marking made `.wiz-controls` (an ANCESTOR of both panes) swallow every click meant for a handle
+nested in `.ui-split-pane2` — `elementFromPoint` doesn't need to literally "resolve to an overlapping rect," an
+`inert` ancestor removes the whole subtree from hit-testing regardless of geometry, which is exactly why the
+`.ui-split-pane1`/`.ui-split-pane2` NON-overlap this entry's own investigation confirmed never explained the
+symptom (the wrong axis was checked — z-order/geometry, not the inert cascade). **Re-ran this entry's own STILL
+REAL IF against a live `user_drill_data` boot**: `elementFromPoint` at `dr_pos`'s own on-screen centre now
+resolves to the SVG handle itself (`rect.fc-handle.fc-handle-move`, `data-hid="dr_pos"`), and a real drag moves
+it substantially (`movedMid`/`movedAfter` both ≈216px, no snap-back). **Causality confirmed, not just
+correlation**: temporarily reverted t2547's own scoping (`target = host` unconditionally, matching this entry's
+own original pre-fix code) and re-ran the identical check — `elementFromPoint` reproduced `DIV.wiz-controls`
+exactly, `movedMid`/`movedAfter` both 0, matching this entry's own original filed symptom word for word.
+Restored immediately after. Full account: WORK-LOG t2591.
 
 ---
 
