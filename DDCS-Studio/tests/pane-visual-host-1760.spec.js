@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 // t1760 — the Blocks tab's "Wizard View" pane (createUserOpView('blk', ...), distinct from the "Open as
 // modal" overlay) rendered the FORM but never the 3D/2D VISUALIZATION: onShow/refresh only build the form
@@ -8,17 +9,22 @@ import { test, expect } from '@playwright/test';
 // (which writes --viz-stack-h) left the visual host at ~0 width / ~122px height. This pins all four fixed:
 // non-zero, correctly-proportioned canvases in the pane itself, not the modal.
 
-async function setupCornerInPane(page, viewport) {
+// t2629 — DECOUPLED from `user_corner_data`: this needed "some classic-rendered (form3d+2d) op placed on the
+// canvas" as a subject, not corner's own content specifically — but corner is the last classic op left, one
+// migration away from a third swap with nowhere left to go. `registerClassicFixture` (tests/support/
+// classicFixture.js), the same fix `passes-field-1613.spec.js` (t2625) proved for a different mechanism.
+async function setupFixtureInPane(page, viewport) {
   await page.setViewportSize(viewport);
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram && window.showApp);
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => !!window.__blkws);
-  await page.evaluate(async () => {
+  const opType = await registerClassicFixture(page);
+  await page.evaluate(async (opType) => {
     const U = await import('/blocks/userOps.js');
-    const def = U.getUserDef('user_corner_data');
-    window.ddcsLoadBlockStack([{ id: 'x1', type: 'op', opType: 'user_corner_data', label: def.label, params: {}, children: [] }]);
-  });
+    const def = U.getUserDef(opType);
+    window.ddcsLoadBlockStack([{ id: 'x1', type: 'op', opType, label: def.label, params: {}, children: [] }]);
+  }, opType);
   let last = -1;
   for (let i = 0; i < 120; i++) {
     const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);
@@ -29,8 +35,8 @@ async function setupCornerInPane(page, viewport) {
   await page.waitForTimeout(600);
 }
 
-test('mobile 393px drawer: the pane draws a real 3D scene AND a real 2D probe path, not empty canvases', async ({ page }) => {
-  await setupCornerInPane(page, { width: 393, height: 800 });
+test('mobile 393px drawer: the pane draws a real 3D scene AND a real 2D host, not empty canvases', async ({ page }) => {
+  await setupFixtureInPane(page, { width: 393, height: 800 });
   const handle = page.locator('#blkDrawerHandle');
   if (await handle.count()) { await handle.click(); await page.waitForTimeout(500); }
 
@@ -63,7 +69,7 @@ test('mobile 393px drawer: the pane draws a real 3D scene AND a real 2D probe pa
 });
 
 test('desktop width: the pane visual column is not squeezed to zero width', async ({ page }) => {
-  await setupCornerInPane(page, { width: 1400, height: 1000 });
+  await setupFixtureInPane(page, { width: 1400, height: 1000 });
 
   const rect = await page.evaluate(() => {
     const v = document.querySelector('#blk_wiz_user .wiz-visual');

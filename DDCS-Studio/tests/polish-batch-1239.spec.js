@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 /**
  * t1239 — THE POLISH BATCH (all user-ruled). Each item is small; what they share is that a green suite could not have
@@ -20,8 +21,27 @@ async function openCornerTwin(page) {
     await page.waitForTimeout(700);
 }
 
+// t2629 — test (1) below checks the WHOLE-FORM `.wiz-visual`/`.viz-pane-sizer` chrome (classic-render-only —
+// tree mode uses a completely different split_horizontal structure, per userOpView.js's own `hasTreeLayout`
+// branch), so it needed "some classic op", not corner's own content — decoupled via `registerClassicFixture`
+// (tests/support/classicFixture.js), the same fix `passes-field-1613.spec.js` (t2625) proved for a different
+// mechanism. `openCornerTwin` above stays AS-IS for tests (3)+(4)/(6)+(7)/(7b): those check PER-ROW mechanisms
+// (the field-link gear, the identity-field order) that render identically in both classic and tree mode
+// (t2611-t2613's own finding — "every per-row behavior... IDENTICAL in both paths, it is the literal same
+// element, just moved") — genuinely about corner's own declared content (gear/source-link fields, the
+// Corner/Probe-Order identity pair), not a borrowed "any classic op" stand-in, so they are NOT part of this
+// turn's own moving-target disease and stay on corner.
+async function openFixtureTwin(page) {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+    const opType = await registerClassicFixture(page);
+    await page.evaluate((t) => window.openWiz(t), opType);
+    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 10000 });
+    await page.waitForTimeout(700);
+}
+
 test('(1) the feature canvas resizes from BOTH edges — a second handle below, and both grips are slim', async ({ page }) => {
-    await openCornerTwin(page);
+    await openFixtureTwin(page);
     // one .wiz-visual per wizard exists in the DOM; take the VISIBLE one (the open wizard's)
     const split = page.locator('.wiz-visual:visible .viz-split').first();
     await expect(split.locator('.viz-pane-splitter')).toHaveCount(2);          // the ratio handle + the new sizer

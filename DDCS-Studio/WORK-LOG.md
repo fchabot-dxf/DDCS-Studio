@@ -75215,3 +75215,112 @@ the dispatch's own framing it deserves a turn where it is the only thing happeni
 need a structural answer (a synthetic classic-mode fixture, matching the `passes-field-1613` precedent) rather
 than a 3rd subject swap with nothing left to swap to.
 
+## t2629 — DECOUPLE pane-sizer BEFORE corner (dispatched, explicit ordering)
+
+Dispatch: the exact trap flagged at the end of t2627's own entry above HAD ALREADY recurred once (t2545,
+surfacing→pocket) before I swapped it a second time to corner this same arc — corner is now the last classic
+op, meaning a third swap has nowhere to go. Fix it structurally, the same way `passes-field-1613.spec.js`
+(t2625) was fixed: a synthetic, permanently-classic fixture, not a borrowed real op. Then census every OTHER
+spec with the same disease (not just the two named), check `twin-section-invariant-2381`/
+`pocket-form-reproduction-2301` too. Do not migrate corner this turn.
+
+### THE FIXTURE — one shared helper, one real debugging detour
+
+Built `tests/support/classicFixture.js` (`registerClassicFixture`), the same shape as `passes-field-1613`'s own
+inline fixture but shared and reusable: `userOpFromStack` + register, `panel:'form3d+2d'` (not `'form'`, which
+that fixture used — this one specifically needs the classic `.wiz-visual`/`.viz-pane-sizer` chrome, driven by
+`def.panel` alone outside the op's own uiChildren), no `split_horizontal` anywhere so `hasTreeLayout()` stays
+false forever.
+
+**First attempt used `registerUserOp` (matching passes-field-1613's own call) and silently failed**:
+`window.openWiz`/`wizardManager.open()` opened an EMPTY, hidden form — `#wiz_user_form` existed with zero
+children. Traced live (a scratch diagnostic spec, deleted after): `wizardManager.open()`'s own def resolution
+calls `listUserOps().find(d => d.opType === t)`, and `listUserOps()` reads `readStore()` — **PERSISTED
+`localStorage`**, not the live `USER_DEFS` map `registerUserOp` alone populates. `passes-field-1613`'s own
+mechanism (`ddcsEditWizardDef`, the Blocks-tab customize flow) apparently resolves through the live registry
+directly, which is why `registerUserOp` alone was sufficient THERE and silently insufficient here — two
+different entry points, two different sources of truth, never noticed until this turn actually needed the
+`openWiz` path. Fixed with `createUserOp` (persists to `ddcs_user_ops` THEN calls `registerUserOp` for the live
+registry) — confirmed live via the same diagnostic (`REG:{"found":true}`) before wiring it into any real test.
+Made idempotent (skip creation if already in the persisted store) since a `page.reload()` mid-test needs the
+SAME fixture to still resolve afterward — persistence is what makes that survive at all (a real app boot
+re-registers every persisted op live, `web/blocks/userOps.js`'s own `for (const def of listUserOps())
+registerUserOp(def)` loop), the exact behavior `pane-sizer-1353`'s own "a PERSISTED oversize heals on open"
+test needs.
+
+**Proven not vacuous, twice, at two different levels**: (1) the fixture itself — temporarily set
+`panel:'form'` (no viz), re-ran `pane-sizer-1353.spec.js`, watched all 4 tests fail (`measured 0px` instead of
+≥24), restored, confirmed green again. (2) one specific caller's own added assertion — flipped
+`open-as-modal-1625.spec.js`'s new `expect(st.rows,...).toBe(2)` to `.toBe(99)`, confirmed it failed for the
+right reason, restored.
+
+### THE CENSUS — 7 files found, all 7 decoupled, 2 checked and clean
+
+Grepped every test referencing `.wiz-visual`/`.viz-pane-sizer` (17 files), then read each one to separate the
+disease (borrowing WHICHEVER op happens to still be classic, at risk the instant that op migrates) from a
+LOOK-ALIKE (a test that opens a specific real op because it's about THAT op's own declared content, which
+would need updating when the op's content changes but was never at risk from "no classic op left"):
+
+**7 files had the disease, all now decoupled via `registerClassicFixture`**: `pane-sizer-1353.spec.js` +
+`pane-sizer-mobile-1468.spec.js` (the two named, dispatched explicitly), `open-as-modal-1625.spec.js` (also
+needed its own `st.rows >= 20` threshold loosened to `=== 2` — an arbitrary corner-sized number, not a
+meaningful product requirement, so the fixture wasn't inflated just to hit it), `pane-visual-host-1760.spec.js`
++ `pane-visual-host-programmatic-1762.spec.js` (both mount via `ddcsLoadBlockStack`/`openWiz`/`ddcsEditWizardDef`
+respectively — confirmed the fixture's minimal 2D host renders even with no `previewGeometry` hook, so `has2d`
+still passes; the 2D SVG/canvas element mounts unconditionally off `panel`, drawn content or not),
+`polish-batch-1239.spec.js` (only test (1) — the `.viz-pane-sizer`/`.viz-pane-splitter` geometry check; a
+SEPARATE `openFixtureTwin` helper added alongside the existing `openCornerTwin`, not a blanket swap), and
+`wizard-sticky-preview.spec.js`.
+
+**10 more files matched the grep but do NOT have the disease** (already decoupled by construction, or testing
+tree-mode-only content that a real op's own migration status can't touch): `atc-table-form-reproduction-2601`,
+`collapsible-panes-752`, `geometry-seam-tree-mode-2323`, `pane-container-2355`, `pane-ratchet-2353`,
+`pane-ratio-slam-2357`, `pane-splitter-790`, `panel-types` (ALREADY uses its own synthetic `mk()` helper — a
+second, independent instance of the exact pattern this turn generalized), `path-anchor-contour-slot-text-2371`
+(about the flat-mount mechanism itself, permanently flat by design, not which op is classic).
+
+**One deliberate NON-fix, named rather than silently smoothed over**: `polish-batch-1239.spec.js`'s own tests
+(3)+(4)/(6)+(7)/(7b) [the field-link gear position, corner's own identity-field order, the derived-mirror
+bindings] stay on `user_corner_data` directly — these check corner's own DECLARED CONTENT (gear/source-link
+fields, the Corner/Probe-Order identity pair), not "some classic op." Per `ARCHITECTURE.md`'s own t2611-t2613
+finding ("every per-row behavior... IDENTICAL in both paths, it is the literal same element, just moved"),
+these are PER-ROW mechanisms that render the same whether corner is classic or tree — they will need normal
+content-maintenance work when corner's own fields change, same as any op's dedicated test, but they were never
+actually at risk from corner running out of classic siblings to fall back to. Distinguishing this from the real
+7 is the finding this census exists to produce, not a corner cut.
+
+**`twin-section-invariant-2381.spec.js` and `pocket-form-reproduction-2301.spec.js` — checked, clean, no
+disease.** Neither borrows an arbitrary op: the first is `listUserOps()`-driven and classifies each registered
+twin by its OWN live `hasTreeLayout()` state (its exception lists are PER-OP entries updated as each op
+migrates — exactly what happened to the `user_pocket_data` entry two turns ago); the second is pocket's own
+dedicated reproduction test, about pocket's own content specifically, not an interchangeable stand-in.
+
+**N = 0.** Corner can migrate whenever it is dispatched without breaking any of the 7 spec files that used to
+depend on it staying classic. The only corner-dependent tests left (`polish-batch-1239`'s own three) will need
+normal content updates when corner's own fields change — the same maintenance any op's dedicated test needs,
+not a structural swap-with-nowhere-to-go.
+
+### VERIFY
+
+All 7 decoupled files + the 2 checked files run together: 25/25. Cross-op guards (section-order-parity-2617,
+section-count-rule20-2621, form-kernel-720, field-help-798, fork-parity-1593): 11/11 — corner untouched this
+turn (confirmed: `git diff --stat -- cornerData.js` empty), so no re-verification of corner's own content was
+needed. Node tier: 238/238.
+
+**Full suite via `npm test`: 3168 passed, 1 failed (`preview-mutation-manifest-2463.spec.js`, the same
+pre-existing load-dependent flake classified at every prior gate this session), 8 flaky, 28 skipped, e2e exit
+1.**
+
+`git status`: `tests/support/classicFixture.js` (new, the shared fixture), `tests/pane-sizer-1353.spec.js` +
+`tests/pane-sizer-mobile-1468.spec.js` + `tests/open-as-modal-1625.spec.js` + `tests/pane-visual-host-1760.spec.js`
++ `tests/pane-visual-host-programmatic-1762.spec.js` + `tests/polish-batch-1239.spec.js` +
+`tests/wizard-sticky-preview.spec.js` (all 7 decoupled). No product code touched this turn — `web/` is
+untouched entirely.
+
+### NEXT
+
+Corner is now genuinely free to migrate whenever dispatched — the class this turn existed to close is closed,
+and the census is the answer: N=0 spec files depend on "some op stays classic" anymore. Corner's OWN migration
+turn still needs `polish-batch-1239`'s own three content tests (3)+(4)/(6)+(7)/(7b) updated to match whatever
+its post-migration field order/content looks like — normal per-op maintenance, not a structural blocker.
+

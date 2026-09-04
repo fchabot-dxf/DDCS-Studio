@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { stopLiveSim, dismissToasts } from './support/simControls.js';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 /**
  * t1625 — "OPEN AS MODAL": the Blocks tab's live Wizard View at FULL SIZE, in the REAL modal chrome, rendered
@@ -20,8 +21,14 @@ const boot = async (page) => {
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
 };
 
-const customizeCorner = async (page) => {
-    await page.evaluate(() => window.ddcsEditWizardDef('user_corner_data'));
+// t2629 — DECOUPLED from `user_corner_data`: this test needed "some classic-rendered (form3d+2d), real op" as
+// a subject, not corner's own content specifically — but corner is the last classic op left, one migration
+// away from a third swap with nowhere left to go (the exact dead end passes-field-1613.spec.js's own t2625 fix
+// avoided for a different mechanism). `registerClassicFixture` (tests/support/classicFixture.js) is the same
+// fix applied here.
+const customizeFixture = async (page) => {
+    const opType = await registerClassicFixture(page);
+    await page.evaluate((t) => window.ddcsEditWizardDef(t), opType);
     await page.waitForFunction(() => {
         const op = (window.ddcsGetBlockProgram() || []).find((x) => x && x.type === 'op');
         return !!(op && (op.children || []).length);
@@ -62,7 +69,7 @@ const snapshot = (page) => page.evaluate(async () => {
 
 test('THE GESTURE — the current canvas stack opens in the real chrome, full width, and close persists NOTHING', async ({ page }) => {
     await boot(page);
-    await customizeCorner(page);
+    await customizeFixture(page);
     const before = await snapshot(page);
 
     const btn = page.locator('#blkOpenModal');
@@ -98,10 +105,10 @@ test('THE GESTURE — the current canvas stack opens in the real chrome, full wi
     expect(st.active && st.visible, 'the REAL overlay is open and actually visible from the Blocks tab').toBe(true);
     expect(st.onBody, 'the overlay was adopted onto body (it was invisible inside the hidden #studio-app)').toBe(true);
     expect(st.title, 'the title says what this is').toMatch(/PREVIEW/);
-    expect(st.twoPane, 'corner (form3d+2d) gets its REAL two-pane layout').toBe(true);
+    expect(st.twoPane, 'the fixture (form3d+2d) gets its REAL two-pane layout').toBe(true);
     expect(st.boxW, 'at full size — not the drawer width').toBeGreaterThan(1200);
     expect(st.sideBySide, 'form and visualization sit SIDE BY SIDE — the product layout, not the narrow stack').toBe(true);
-    expect(st.rows, 'the full corner form rendered').toBeGreaterThanOrEqual(20);
+    expect(st.rows, 'the fixture form rendered its real fields').toBe(2);
     expect(st.previewing && st.insertHidden, 'INSERT is hidden — the preview’s one exit is close').toBe(true);
 
     // t1902 — the MODAL's own preview ALSO auto-plays/loops once open (simControls.js: "both the modal's AND
@@ -126,7 +133,7 @@ test('NO WIZARD → NO DOOR: on a plain program the button is hidden', async ({ 
 
 test('A REAL OPEN AFTER A PREVIEW gets its INSERT back — the preview chrome cannot leak', async ({ page }) => {
     await boot(page);
-    await customizeCorner(page);
+    await customizeFixture(page);
     await page.click('#blkOpenModal');
     await page.waitForFunction(() => document.getElementById('wizard').classList.contains('active'), null, { timeout: 8000 });
     // t1902 — same second instance as test 1: the modal's own preview auto-plays once open.

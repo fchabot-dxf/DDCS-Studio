@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 /**
  * t1468 (USER DEFECT, live deploy) — "dragging the feature preview's bottom handle just opens grey".
@@ -29,12 +30,17 @@ import { test, expect } from '@playwright/test';
 // it is no longer a valid subject for this mechanism, which is otherwise unchanged.
 //
 // t2627 — SWAPPED AGAIN, same reasoning as pane-sizer-1353.spec.js's own t2627 update: pocket migrated onto
-// the declared group_box tree this turn. `user_corner_data` is the last remaining genuinely classic-rendered
-// op among the 32 registered twins (confirmed: no `split_horizontal`/`split_vertical` in cornerData.js), with
-// a real `form3d+2d` panel — a stable subject as long as it stays the deferred pilot.
+// the declared group_box tree this turn. `user_corner_data` was the last remaining genuinely classic-rendered
+// op among the 32 registered twins — but corner is the deferred pilot, one migration away from a third swap
+// with nowhere left to go.
+//
+// t2629 — DECOUPLED instead, same fix as pane-sizer-1353.spec.js's own t2629 update: a synthetic,
+// permanently-classic op (`registerClassicFixture`, tests/support/classicFixture.js), so this mechanism no
+// longer depends on which of the 32 registered twins happens to still be classic.
 const openTwin = async (page) => {
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate(() => window.openWiz('user_corner_data'));
+    const opType = await registerClassicFixture(page);
+    await page.evaluate((t) => window.openWiz(t), opType);
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(700);
 };

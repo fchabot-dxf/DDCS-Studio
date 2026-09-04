@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { registerClassicFixture } from './support/classicFixture.js';
+
+// t2629 — DECOUPLED from `user_corner_data`: both routes below needed "some classic-rendered (form3d+2d) op",
+// not corner's own content specifically — corner is the last classic op left, one migration away from a third
+// swap with nowhere left to go. `registerClassicFixture` (tests/support/classicFixture.js), the same fix
+// `passes-field-1613.spec.js` (t2625) proved for a different mechanism.
 
 // t1762 — t1760's own pane-visual-host-1760.spec.js proved the visual host via a SYNTHETIC
 // ddcsLoadBlockStack([{type:'op',opType,params:{}}]) call, not the shape a real gesture actually produces.
@@ -16,11 +22,12 @@ import { test, expect } from '@playwright/test';
 // and it does not; see tests/primary-route-real-gesture-1776.spec.js for the one that actually drives the
 // bar entry, the form fill, the INSERT button, and the Blocks tab via real Playwright clicks.
 
-test('placed-op route (openWiz -> insertWiz -> showApp) draws the real 3D scene + 2D path at 393px', async ({ page }) => {
+test('placed-op route (openWiz -> insertWiz -> showApp) draws the real 3D scene + 2D host at 393px', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 800 });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram && window.showApp && window.openWiz && window.insertWiz);
-  await page.evaluate(() => window.openWiz('user_corner_data'));
+  const opType = await registerClassicFixture(page);
+  await page.evaluate((t) => window.openWiz(t), opType);
   await page.waitForTimeout(400);
   await page.evaluate(() => window.insertWiz());
   await page.evaluate(() => window.showApp('blocks'));
@@ -49,13 +56,14 @@ test('placed-op route (openWiz -> insertWiz -> showApp) draws the real 3D scene 
   expect(info.has2d).toBe(true);
 });
 
-test('authoring/Customize route (ddcsEditWizardDef -> showApp) draws the real 3D scene + 2D path at 393px', async ({ page }) => {
+test('authoring/Customize route (ddcsEditWizardDef -> showApp) draws the real 3D scene + 2D host at 393px', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 800 });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram && window.showApp && window.ddcsEditWizardDef);
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => !!window.__blkws);
-  await page.evaluate(async () => { await window.ddcsEditWizardDef('user_corner_data'); });
+  const opType = await registerClassicFixture(page);
+  await page.evaluate(async (t) => { await window.ddcsEditWizardDef(t); }, opType);
   await page.waitForTimeout(800);
   const handle = page.locator('#blkDrawerHandle');
   if (await handle.count()) { await handle.click(); await page.waitForTimeout(500); }

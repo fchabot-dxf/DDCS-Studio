@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 /**
  * t1353 (USER-LIVE) — "the preview goes grey while I drag the bottom handle".
@@ -23,13 +24,19 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 // exercised here, on pocket, exactly as before), just no longer a valid subject for THIS particular twin.
 //
 // t2627 — SWAPPED AGAIN: pocket migrated onto the declared group_box tree this turn, so it stops being a
-// valid subject for the SAME reason surfacing did. `user_corner_data` is now the LAST remaining genuinely
-// classic-rendered op among the 32 registered twins (confirmed directly: grepped cornerData.js for
-// `split_horizontal`/`split_vertical`, zero hits — `hasTreeLayout()` is false), and it has a real `form3d+2d`
-// panel (a real `.wiz-visual` pane to resize) — a stable subject as long as it stays the deferred pilot.
+// valid subject for the SAME reason surfacing did. `user_corner_data` was the LAST remaining genuinely
+// classic-rendered op among the 32 registered twins at the time — but corner is the deferred pilot, meaning
+// this file was one migration away from a THIRD swap with nowhere left to go.
+//
+// t2629 — DECOUPLED instead, the `passes-field-1613.spec.js` (t2625) structural fix applied here: a synthetic,
+// permanently-classic op registered fresh on the page (`registerClassicFixture`, tests/support/
+// classicFixture.js) rather than a borrowed real op whose migration status can change under this test. No
+// further swap, ever — this mechanism (the `.wiz-visual`/`.viz-pane-sizer` resize handle, classic-render-only
+// by construction) no longer depends on which of the 32 registered twins happens to still be classic.
 const openTwin = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
-    await page.evaluate(() => window.openWiz('user_corner_data'));
+    const opType = await registerClassicFixture(page);
+    await page.evaluate((t) => window.openWiz(t), opType);
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
 };
