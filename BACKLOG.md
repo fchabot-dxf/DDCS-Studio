@@ -7654,6 +7654,23 @@ only two of its fields carried `section:` at all, both named `'COORDINATES'`, a 
 rendering silently). This entry is the sweep for more of that CLASS: declared details either unsayable in
 blocks, or sayable two different ways.
 
+**t2595 — PHASE 1 (steps 1+2, every op) begun: surfacing's step 2 shipped, bore fully migrated (both steps),
+text ATTEMPTED and STOPPED at a genuine mismatch.** Surfacing's own RIGHT pane split from the combined `sim`
+node into adjacent `preview3d`+`feature_canvas` (t2511's own mechanism) — the cheap half, ~6 lines, zero new
+tests needed. Bore migrated from scratch (both steps): new `boreFieldGroups` helper, `group_box`/`field_ref`
+tree, a new standalone test file. **Text was attempted and reverted**: its own `TEXT_EXEC_BINDINGS` use a
+hand-counted `blockIndex` (the exact "corner defect #1" class `deriveBindings.js`'s own header names), which a
+uiChildren restructuring silently desyncs — NOT one of the axes the pre-migration survey screened for (it
+checked section-tag complexity, not binding-resolution mechanism). Fixing text needs converting it to
+`match:{type}`-based resolution first, a separate, larger, unsized task. A second, related mechanism finding
+caught live on bore BEFORE shipping: even SAFE `match:{type}`-based bindings bake a concrete `blockIndex` at
+DERIVE time and must be RE-DERIVED against the final, tree-shaped stack — reusing a module-level bindings
+constant computed against the old shape breaks identically to text's own failure. Also found: bore is the
+first migrated op with NO classic shell page, exposing a real `.wiz-usage` selector ambiguity between a
+declared `usage_text` node and the generic `#wiz_user` container's own always-present `#wiz_user_usage`
+"seamless title" element — a genuine test-harness/product boundary, not fixed (out of this arc's own scope).
+Full account, all four findings with citations: WORK-LOG t2595.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it

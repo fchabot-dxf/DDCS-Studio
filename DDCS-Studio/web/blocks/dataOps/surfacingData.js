@@ -338,14 +338,16 @@ export function buildSurfacingTwinStack() {
                         { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
                     ],
                 }],
-                // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-                // drillData.js's own t2301 comment for the full mechanism). Kept as the single combined `sim`
-                // node (NOT split into preview3d+feature_canvas like drill/t2511) — that split was explicitly
-                // deferred FROM surfacing once t2511 found surfacing wasn't tree-rendered, and is unrelated to
-                // this turn's own scope (the section migration only); both shapes render byte-identical DOM
-                // per t2511's own proof, so this stays exactly what it already was.
+                // t2595 (BACKLOG #71/#72, Phase 1 step 2) — surfacing is now tree-rendered (t2545), so the
+                // combined `sim` node this comment used to defer is no longer inert here: split into the same
+                // adjacency-merge shape drill already ships (t2511), `preview3d` + `feature_canvas` as ADJACENT
+                // RIGHT-pane siblings — byte-identical DOM to the combined shape per t2511's own proof (same
+                // ids, same VISUALIZATION label, same pane order, same starting display:none on 3D). `panel:
+                // 'form3d+2d'` matches drill's own value (PANEL_TYPES, panelTypes.js) — BOTH panes, matching
+                // surfacing's own pre-existing `want2d:true` (the sim node's own default, unchanged behavior).
                 RIGHT: [
-                    { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
                 ],
             },
         }],

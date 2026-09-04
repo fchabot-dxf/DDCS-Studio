@@ -73220,3 +73220,149 @@ own code comment states the poll-based rewrite) plus the `retries:2` config valu
 `BACKLOG.md`, this WORK-LOG entry, `tests/undo-blind-writes-2427.spec.js`, and `tests/undo-reproject-echo.spec.js`
 — zero product code in any of the three items this turn.
 
+## 🔨 turn 2595 — PHASE 1 BEGINS: surfacing's step 2 shipped; bore fully migrated (both steps); text ATTEMPTED
+and STOPPED at a genuine mismatch (a hand-counted `blockIndex` binding mechanism, not the section-metadata
+complexity the survey screened for) — reported, not forced
+
+### THE ASK
+
+Owner-ruled Phase 1: steps 1 (declare `split_horizontal` + migrate `section:` tags to `group_box` nodes) and 2
+(the combined `sim` node → adjacent `preview3d`+`feature_canvas` siblings, t2511's own mechanism) for every op,
+strict dependency (2 needs 1). Start with surfacing's own step 2 (cheap — it already has step 1 from t2545),
+then work outward picking ops closest in shape to surfacing, STOP at the first op whose diff won't go clean and
+report which/why. Corner is a known trap, avoid leading with it. Full suite, unconditional.
+
+### SURFACING STEP 2 — SHIPPED, the cheap half proven cheap
+
+`surfacingData.js`'s own RIGHT pane (`{type:'sim', params:{...}}`, deliberately left combined at t2545's own
+scope boundary) swapped for `{type:'preview3d',...}` + `{type:'feature_canvas', params:{panel:'form3d+2d'}}` —
+the exact one-line-shaped change t2511's own header predicted for every `isTree` op. Verified: the row-diff
+gate (`surfacing-form-reproduction-2377.spec.js`, `surfacing-section-reorder-2545.spec.js`) 4/4 green unchanged;
+a live structural check confirms `paneKinds:["preview3d","layout2d"]`, matching drill's own proven shape
+exactly (ORDER differs from surfacing's own classic-shell markup — layout2d first there — confirmed this is
+NOT a regression: drill's own already-shipped, already-proven migration ALSO declares the opposite order from
+ITS OWN classic shell, since a tree-mode op's classic shell page is dead markup once `hasTreeLayout()` routes
+around it — order-agnostic per t2511's own documented adjacency-merge convention); the full 23-test
+surfacing-specific regression sweep (including REAL drags on the pos/rect/skim-rect handles) — 23/23 green,
+confirming interactivity survived the pane restructuring, not just the DOM shape.
+
+### TEXT — ATTEMPTED, STOPPED: a genuine mismatch the survey's own screening criteria didn't check for
+
+Delegated a survey (Explore agent) ranking the 8 non-lathe, non-trap Mill ops still on the combined `sim` node
+by structural similarity to surfacing's own pre-migration shape (uniform sections, no `when:`-gating, no
+sub-`group:` tagging, no dead placeholders). Ranked `textData.js` easiest, `boreData.js` second. Built text's
+own full migration (group_box tree + preview3d/feature_canvas split) — `test:node` immediately threw "binding
+(block 9.text) does not resolve in the template" across all 32 params.
+
+**Root, traced not guessed**: text's own `TEXT_EXEC_BINDINGS` use the OLDER, hand-counted `blockIndex` scheme
+(`deriveBindings.js`'s own header, line 4, names this EXACT class as "the shipped corner break, defect #1") —
+a raw positional index into a FULL-STACK flatten (uiChildren AND children together, confirmed live), computed
+ONCE via a hardcoded `WRAP_PREFIX_COUNT` constant at module load. Restructuring uiChildren (my new tree has 11
+nodes where the old shape had 3) shifts every execution-chain block's own flatten position, and the OLD
+`WRAP_PREFIX_COUNT=4` no longer indexes correctly — exactly the class of bug this project's own memory names
+("hardcoded-wrap-offset-drift" — a WRAP_PREFIX_COUNT-style constant silently desyncs when the wrapper shape
+changes). This was NOT one of the complexity axes the survey screened for (it checked `when:`-gating,
+sub-`group:` tagging, dead placeholders, structural forks — never raw positional binding resolution), so text
+looked EASY by every axis actually checked and was genuinely NOT.
+
+**Not fixed this turn, correctly**: recomputing a NEW magic `WRAP_PREFIX_COUNT` by hand would be the exact
+fragile, error-prone anti-pattern `deriveBindings.js`'s own header already warns against reintroducing;
+converting text's own binding array to `match:{type}`-based resolution (the SAFE, modern convention every op
+surveyed as EASY/MEDIUM already uses) is real, separate, larger work — a genuinely different, riskier task than
+"wrap in split_horizontal + add group_box nodes," not a same-shaped extension of it. `git checkout --
+web/blocks/dataOps/textData.js`, confirmed byte-identical to HEAD, `test:node` re-confirmed 238/238 clean.
+**Text is Phase 1's own "diff will not go clean" op** — reported per the dispatch's own explicit instruction,
+not forced through.
+
+### BORE — FULLY MIGRATED (both steps), one real mechanism finding along the way, caught and fixed BEFORE shipping
+
+Second attempt: `boreData.js` (`match:{type}`-based bindings via `deriveBindingsFor`, explicitly rebuilt away
+from positional `blockIndex` at t1385 for an unrelated reason — "positional cannot survive the holecycle
+collapse" — confirmed safe from text's own trap by reading the file's own header before writing a line).
+
+**A second, related-but-distinct mechanism finding, also caught live before shipping**: even `match:{type}`-
+based `deriveBindingsFor` bakes a concrete `blockIndex` AT DERIVE TIME (`deriveBindings.js:63`) — it does not
+re-resolve later. My first bore attempt reused the STALE module-level `BORE_BINDINGS` constant (derived against
+the OLD, smaller uiChildren) directly against the NEW tree-shaped stack — `test:node` threw the identical class
+of "does not resolve" error, all 32 params. Root: `match:{type}` avoids the POSITIONAL-COUNTING fragility text
+hit, but a binding array computed against one stack shape is still NOT automatically valid against a
+DIFFERENTLY-uiChildren-shaped one — it must be RE-DERIVED. Fixed by mirroring `surfacingDataDef`'s own exact
+two-phase pattern (a bootstrap stack to compute field order for BUILDING the tree; a second, fresh derivation
+against the FINAL, already-tree-built stack for the bindings actually shipped) — confirmed this is EXACTLY what
+`surfacingDataDef` already does, re-read to be sure rather than assumed. `test:node`: 238/238 after the fix.
+
+**A genuine, useful side-finding, reported not fixed**: bore has NO classic hand-written shell page at all
+(`wiz_bore` — zero hits in index.html; it was born a pure data-op, always auto-rendered through the generic
+`#wiz_user` container) — the FIRST migrated op in this shape. Diagnosed live (not guessed) why
+`formReproduction.js`'s own shared "usage text matches the live shell" test failed even after a real, deliberate
+`usage_text` node was added: the generic `#wiz_user` container carries its OWN always-present
+`#wiz_user_usage` element (`userOpView.js:491-494`, the "seamless title" mechanism — always shows the op's own
+recognized built-in label, e.g. "Bore," REGARDLESS of any declared uiChildren) which ALSO carries
+`class="wiz-usage"` — the SAME class a declared `usage_text` node's own div uses. A blind `.wiz-usage` query is
+genuinely ambiguous for a shell-less op — it can find either element depending on DOM order. This is a real,
+pre-existing test-harness/product boundary, invisible until an op without a dedicated shell was migrated; NOT
+fixed this turn (out of Phase 1's own scope — a selector/DOM-identity question, not a section-migration one).
+Worked around by NOT using `registerFormReproductionSuite`'s shared 3-test bundle for bore — wrote a standalone
+file (`tests/bore-form-reproduction-2595.spec.js`) copying its own test-1 (row/order parity) and test-3
+(edit-reaches-model) logic verbatim (both fully self-contained, no shell dependency), omitting test-2 with a
+header explaining exactly why, rather than forcing a false assertion or silently skipping without saying so.
+
+**Verified, four ways**: the new standalone row-diff test (2/2, including the emit-equivalence round-trip); the
+pre-existing `bore-as-data.spec.js` (byte-diff ZERO against `drillStack(helical)` across the full pattern×ramp×
+cut×placement×wcs sweep, unaffected — bore's own EMIT path never touches uiChildren) and `bore-in-place.spec.js`
+(both tests, including the live "DRIVE" test — a real 37-field form + confirmed 3D toolpath render);
+`twin-section-invariant-2381.spec.js`'s own registry-wide section survey, unaffected.
+
+### PER-OP COST, measured not estimated, for sizing the remaining batch
+
+**Surfacing step 2 alone** (already had step 1): ~6 lines changed (one `RIGHT:` array entry → two), zero new
+files, zero new tests needed (existing gates already covered it) — genuinely the "cheap half" the dispatch
+named. **Bore, full Phase 1** (both steps, from scratch): ~90 new/changed lines in `boreData.js` (the
+`boreFieldGroups` helper + the tree construction + the two-phase re-derivation fix), one new 155-line test file
+(`bore-form-reproduction-2595.spec.js`, largely copied logic, not bore-specific design work),  ~1.5 hours of
+turn time including the text detour and the two live-diagnosed mechanism findings. **Text, attempted, not
+shipped**: the group_box/tree authoring itself was cheap (mirrors surfacing almost exactly, ~60 lines) — the
+actual cost is the UNBUILT `blockIndex`→`match:{type}` conversion, not sized this turn (a separate task).
+
+### THE STANDING LESSON for whoever picks up the next op in this batch
+
+Before authoring a migration, check the op's OWN binding mechanism, not just its section-metadata shape: (1)
+does it use raw `blockIndex` (search for `WRAP_PREFIX_COUNT` or a `blockIndex:` literal in its own
+`*_BINDING_SPECS`/`*_EXEC_BINDINGS` array) — if so, STOP, this is a different, larger task, matching text's own
+finding; (2) even a SAFE `match:{type}`-based op needs its own bindings RE-DERIVED against the FINAL,
+tree-shaped stack, never reused from a module-level constant computed against the old shape — mirror
+`surfacingDataDef`'s/`boreDataDef`'s own two-phase (bootstrap-stack-for-ordering, then re-derive-for-real)
+pattern exactly; (3) an op with no classic shell page needs its own standalone test file, not
+`registerFormReproductionSuite`'s shared 3-test bundle, since its own "usage matches shell" test assumes a
+dedicated shell exists.
+
+### VERIFY
+
+Every claim above is OBSERVED: the `blockIndex` failure (text), the stale-bindings failure (bore's first
+attempt), and the `#wiz_user_usage` collision were each read directly from a live error message or a live DOM
+query, not inferred from reading code alone — each diagnosis is grounded in the ACTUAL error/DOM state
+encountered, then traced to its source in the relevant file. The "surfacing pane order differs from its own
+classic shell, matching drill's own precedent" claim is OBSERVED (both shells' own index.html markup read
+directly, both migrated defs' own declared order read directly). `test:node`: 238/238 throughout (checked after
+every fix, not just once at the end).
+
+**Full `--workers=4` suite: 3087 passed, 3 failed, 14 flaky, 28 skipped (37m4s).** All 3 failures are in
+`preview-mutation-manifest-2463.spec.js` — traced individually, neither caused by this turn's own changes.
+`[sf-pos-snapback]`: re-ran isolated (`--workers=1`) — PASSED clean, matching this session's own long-documented
+"contention-sensitive under 4-worker load, clean in isolation" pattern for this exact entry (its own comment
+already names the SAME fix, `ab59b869`/t2447, as its own historical root). `[pocket-size-handle-presence]` +
+the disk-cleanliness check ("no mutation ever reached disk"): BOTH re-ran isolated, BOTH failed consistently
+(3/3 retries) — traced to a genuine, PRE-EXISTING staleness, NOT from this turn: the manifest's own find-string
+(`previewMutations.js`'s `T2465_POCKET_SIZE_HANDLE_REMOVED`, `... label: 'W×H', ...hs.size });`, no `emits:`)
+no longer matches ANY of the four `pk_size` handle-push variants now in `pocketData.js` (`git log` confirms
+`t2569`, an EARLIER, unrelated turn in this session — "declare emits on pocket/slot/tap/text/rotaryClock's
+real-writing handles" — added `emits: true,` into every one of them). `git status`/`git diff` on
+`pocketData.js`: confirmed empty, byte-identical to HEAD — this turn never touched it. **Not fixed here** (out
+of Phase 1's own scope, a manifest-maintenance question unrelated to surfacing/bore/text) — reported for the
+advisor to route, with the exact stale string and its own replacement citation above so a fix, if wanted, does
+not need to re-diagnose this.
+
+`git status`: `web/blocks/dataOps/surfacingData.js`, `web/blocks/dataOps/boreData.js`,
+`tests/bore-form-reproduction-2595.spec.js` (new), plus BACKLOG.md and this WORK-LOG entry — `textData.js`
+confirmed reverted to byte-identical HEAD, no trace of the attempted, stopped migration left in the diff.
+

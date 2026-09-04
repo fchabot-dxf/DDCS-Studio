@@ -128,16 +128,91 @@ function boreDataStack(p = BORE_DEFAULTS) {
 
 export const BORE_BINDINGS = deriveBindingsFor(boreDataStack(BORE_DEFAULTS), BORE_BINDING_SPECS);
 
+// t2595 (BACKLOG #71/#72, Phase 1 step 1) — the ordered/grouped field lists this def's own uiChildren tree AND
+// its flat bindings array both need, computed ONCE (mirrors surfacingFieldGroups' own header: one computation,
+// not two hand-kept copies that could drift). ⚠ DIAGNOSED LIVE: `deriveBindingsFor`'s own `match:{type}`
+// resolution bakes a concrete `blockIndex` at DERIVE time (deriveBindings.js:63) — it does NOT re-resolve
+// later, so reusing the STALE module-level `BORE_BINDINGS` (derived against the OLD, smaller uiChildren)
+// directly against the NEW, bigger tree-shaped stack breaks every binding (confirmed: registerUserOp threw
+// "does not resolve in the template" for all 32 params on the first attempt). Fixed by re-deriving fresh here,
+// against whatever `stack` is actually passed — mirrors surfacingDataDef's own exact two-call pattern (once
+// against a bootstrap stack to compute field order for BUILDING the tree, once again against the FINAL,
+// already-tree-built stack for the bindings actually passed to `userOpFromStack`). Unlike drill's own PATTERN
+// section (which needed per-pattern grid_container sub-groups purely for COLUMN LAYOUT — a cosmetic concern,
+// not a `when:`-visibility requirement), bore's own `when:`-gated pattern fields (cols/rows/dx/dy, count/
+// spacing/angle, dia/startAngle, w/h/nx/ny) are declared as PLAIN field_ref rows inside ONE GEOMETRY group_box,
+// in their own binding-array order — `field_ref`'s own renderer already reads each binding's `when` to hide/
+// show, the SAME mechanism drill's own pattern fields already rely on regardless of which grouping node wraps
+// them (confirmed by reading drillData.js's own uiChildren: the visibility logic lives in `field_ref`/the
+// binding's own `when`, never in the wrapper node type).
+function boreFieldGroups(stack) {
+    const derived = deriveBindingsFor(stack, BORE_BINDING_SPECS);
+    const geometryFields = derived.filter((b) => b.section === 'GEOMETRY');
+    const toolCutFields = derived.filter((b) => b.section === 'TOOL & CUT');
+    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL & CUT' }));
+    const entryXY = entryBindingsFor(stack);
+    return {
+        GEOMETRY: [...geometryFields, ...entryXY],
+        TOOL_CUT: [toolNum[0], ...toolCutFields],   // toolNum FIRST, matching boreDataDef's own pre-existing [...toolNum, ...BORE_BINDINGS] flat order
+    };
+}
+
 export const BORE_DATA_OPTYPE = 'user_bore_data';
 
 /** Build the bore-as-data def — the template is drillStack(BORE_DEFAULTS) (method='helical' → the bore leaf); the
  *  hand-authored BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/bore-as-data.spec.js. */
 export function boreDataDef() {
-    const stack = boreDataStack(BORE_DEFAULTS);   // t1385 — ONE stack builder, shared with the binding derivation above
-    // t2401 — toolNum (toolBindingsFor) carries no `section:` in its own shared spec (deriveBindings.js) — every
-    // consumer sections it locally (contourData.js's own precedent). Bore's own tool belongs with its other TOOL & CUT fields.
-    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'TOOL & CUT' }));
-    const def = userOpFromStack('bore_data', 'Bore (data)', stack, [...toolNum, ...BORE_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    // t2595 — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped param names
+    // boreFieldGroups derives — see that function's own header for why this first pass is safe (it is
+    // RE-DERIVED again below, against the real, final stack, for the bindings actually shipped).
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: appendToolSel(appendEntry(drillStack(BORE_DEFAULTS))) }];
+    const g = boreFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2595 (BACKLOG #71/#72, Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout()
+            // (userOpView.js) routes this twin onto renderUiTree, the SAME mechanism drill/surfacing already
+            // use (t2299/t2341, t2545) — NOT a widened predicate, a real declared split, same guardrail held.
+            // Bore has NO classic hand-written shell page (`wiz_bore` — grepped index.html, zero hits; it was
+            // born a pure data-op, "fan-out port," auto-rendered from bindings) — so, unlike surfacing/text,
+            // there is no shell usage_text to reproduce verbatim. DIAGNOSED LIVE (not guessed): the generic
+            // `#wiz_user` container carries its OWN always-present `#wiz_user_usage` element, defaulting to
+            // the op's bare LABEL ("Bore") when no `usage_text` node is declared — a real, harmless fallback,
+            // but thin, and it does not reach `renderUiTree`'s own direct-call path the same way a DECLARED
+            // usage_text node does (found via the row-diff gate's own usage-parity check). Given a real
+            // description, matching every other tree-mode op's own guidance quality bar, in bore's own voice
+            // (drillData.js's own shell text — this file's header calls bore "the Drill wizard's HELICAL
+            // variant" — adapted for the ring-step/helix-only case, not copied verbatim since no shell exists).
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Bore' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Bores a hole pattern in the active WCS with an end mill (hole Ø ≥ tool Ø), ring-stepping or helixing out to size rather than plunging. Drag the handles in the 2D layout to set the pattern; the 3D view verifies the cut. Spindle start + end-of-program come from Settings.' } },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g.TOOL_CUT) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2595 (BACKLOG #71/#72, Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane
+                // siblings, the SAME adjacency-merge shape drill/surfacing already ship (t2511) — byte-identical
+                // DOM to the old combined `sim` node per t2511's own proof.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: appendToolSel(appendEntry(drillStack(BORE_DEFAULTS))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
+    }];
+    // t2595 — re-derived over the FINAL, real stack (safe — see boreFieldGroups' own header on why uiChildren's
+    // shape DOES affect blockIndex resolution here, unlike surfacing's own case), the SAME computation the tree
+    // above already used, so the flat binding array below and the declared tree can never disagree.
+    const gFinal = boreFieldGroups(stack);
+    const def = userOpFromStack('bore_data', 'Bore (data)', stack, [...gFinal.GEOMETRY, ...gFinal.TOOL_CUT], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = (p) => drillPatternGeometry(p, true);   // t716 — bore pattern + pos + pattern handles + a draggable Ø (holeDia)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', depthOnly: true };   // t1026 — the depth-only ruler (helical bore has no stepdown): axis + total-depth grip, no pass ticks
