@@ -92,7 +92,7 @@ test('(3) LIVE form — the emitted dog-leg #23/#24 flips per corner INSTANTLY (
   const setCornerRead = (c) => page.evaluate((cc) => {
     const f = [...document.querySelectorAll('#wiz_user_form select')].find((s) => [...s.options].some((o) => o.value === cc));
     f.value = cc; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true }));
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const g = (host && host.__gcode) || '';
     const m = (v) => (g.match(new RegExp('#' + v + '\\s*=\\s*([^\\n(]+)')) || [])[1];

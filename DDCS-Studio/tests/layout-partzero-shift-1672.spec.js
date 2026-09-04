@@ -192,18 +192,18 @@ test('live drag while WCS-pinned writes the correct un-shifted param (the _disp/
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(700);
 
   const read = () => page.evaluate(() => {
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     return { start0: (panel && panel.getPassStarts()[0]) || null };
   });
   const before = await read();
 
-  const handle = page.locator('#userVizContainer .fc-handle-sim').first();
+  const handle = page.locator('#userVizContainer_tree .fc-handle-sim').first();
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.mouse.down();

@@ -58,24 +58,33 @@ test.use({ viewport: { width: 1500, height: 950 } });
 
 /** Settle a MODAL's own visualization (if it has one) before a screenshot: stop the live sim, wait, drop any
  *  toast. Mirrors `screenshot-baselines-1792.spec.js`'s own steps exactly (reused, not reimplemented). Returns
- *  the mask array to use (empty if this op declares no 3D box — pause_confirm's panel is `form`). */
+ *  the mask array to use (empty if this op declares no 3D box — pause_confirm's panel is `form`).
+ *
+ * t2631 — corner is now tree-rendered (formWidgets.js's own nsId), so its real 3D box id is `userViz3dBox_tree`,
+ * not the bare classic `userViz3dBox` this helper originally hardcoded — but ALSO, corner's own LAYOUT-2D pane
+ * (formWidgets.js's `buildVizBox`, the `has2d` combined-box shape) is a SEPARATE, UNNAMED `.viz-container`
+ * sibling next to the 3D one inside ONE shared `.viz-split` wrapper — masking only the 3D box's own id, as
+ * this helper originally did, leaves that 2D pane's real (now non-empty, previously always-empty) content
+ * unmasked, which is what actually produced the live pixel diff (verified against the diff image, not
+ * assumed). Masking the whole `.viz-split` covers both panes, tree-mode or classic, 2D-and-3D or 3D-only,
+ * matching the SAME box `stopLiveSim` already searches inside for its own `.pp-run.on` button. */
 async function settleModal(page) {
-    await stopLiveSim(page, '#userViz3dBox');
+    await stopLiveSim(page, '.wiz-box .viz-split');
     await page.waitForTimeout(600);
     await dismissToasts(page);
-    const hasVizBox = await page.evaluate(() => !!document.getElementById('userViz3dBox') && getComputedStyle(document.getElementById('userViz3dBox')).display !== 'none');
-    return hasVizBox ? [page.locator('#userViz3dBox')] : [];
+    const hasVizBox = await page.evaluate(() => { const el = document.querySelector('.wiz-box .viz-split'); return !!el && getComputedStyle(el).display !== 'none'; });
+    return hasVizBox ? [page.locator('.wiz-box .viz-split')] : [];
 }
 
-/** Settle the PANE's own visualization before a screenshot — same shape as `settleModal`, for `#blk_*` ids. */
+/** Settle the PANE's own visualization before a screenshot — same shape as `settleModal`, for `#blk_wiz_user`. */
 async function settlePane(page) {
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
     await page.waitForTimeout(1000);
-    await stopLiveSim(page, '#blk_userViz3dBox');
+    await stopLiveSim(page, '#blk_wiz_user .viz-split');
     await page.waitForTimeout(600);
     await dismissToasts(page);
-    const hasVizBox = await page.evaluate(() => !!document.getElementById('blk_userViz3dBox') && getComputedStyle(document.getElementById('blk_userViz3dBox')).display !== 'none');
-    return hasVizBox ? [page.locator('#blk_userViz3dBox')] : [];
+    const hasVizBox = await page.evaluate(() => { const el = document.querySelector('#blk_wiz_user .viz-split'); return !!el && getComputedStyle(el).display !== 'none'; });
+    return hasVizBox ? [page.locator('#blk_wiz_user .viz-split')] : [];
 }
 
 /** Compare a live screenshot buffer (path A) against a live locator (path B) via Playwright's own comparator —

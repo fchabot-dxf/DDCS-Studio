@@ -19,14 +19,14 @@ async function openCorner(page, beforeOpen) {
   if (typeof beforeOpen === 'function') await beforeOpen();
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
-  await page.waitForSelector('#userVizContainer .fc-anim-overlay', { timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-anim-overlay', { timeout: 6000 });
   await page.waitForTimeout(500);
 }
 
 // Map the stock world corners through the OVERLAY's published view, and read the SVG stock rect corners — compare in SCREEN px.
 const alignment = (page) => page.evaluate(() => {
-  const cont = document.getElementById('userVizContainer');
+  const cont = document.getElementById('userVizContainer_tree');
   const canvas = cont.querySelector('.fc-anim-overlay');
   const svg = cont.querySelector('svg');
   const v = canvas.__t2view;                                   // { ox, oy, scale } — set by setViewTransform in overlay paint
@@ -53,7 +53,7 @@ test('INC-1: the overlay is PIXEL-EXACT under the SVG (stock corners coincide) a
   expect(d(a0.br.ovl, a0.br.svg), 'AT REST: overlay bottom-right maps onto the SVG stock BR').toBeLessThan(2);
 
   // zoom the SVG (wheel) → the overlay must re-pin via onTransform and stay aligned
-  const svgBox = await page.$eval('#userVizContainer svg', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const svgBox = await page.$eval('#userVizContainer_tree svg', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   await page.mouse.move(svgBox.x, svgBox.y);
   await page.mouse.wheel(0, -300);
   await page.waitForTimeout(300);
@@ -110,7 +110,7 @@ test('INC-2: the shared engine feeds MOVING live positions to the overlay head (
   // stage a clear mid-path frame for the human (the live sim is too fast/brief to race): drive the head onto the path,
   // then confirm the overlay drew a LIVE red head there — this is the same setToolPosition path the engine drives.
   const shot = await page.evaluate(() => {
-    const p = document.querySelector('.wiz-viz3d').__panel; const ov = document.getElementById('userVizContainer').__animOverlay;
+    const p = document.querySelector('.wiz-viz3d').__panel; const ov = document.getElementById('userVizContainer_tree').__animOverlay;
     const segs = p.getSegments() || []; if (!segs.length || !ov) return null;
     const len = (s) => Math.hypot((s.x2 || 0) - (s.x1 || 0), (s.y2 || 0) - (s.y1 || 0));
     let idx = 0; for (let i = 1; i < segs.length; i++) if (len(segs[i]) > len(segs[idx])) idx = i;   // the LONGEST segment (a visible arm, clear of the markers)
@@ -126,7 +126,7 @@ test('INC-2: the shared engine feeds MOVING live positions to the overlay head (
 test('INC-3: the handles are still drag-writable through the pointer-events:none overlay', async ({ page }) => {
   await openCorner(page);
   const cx0 = await page.evaluate(() => { const i = document.querySelector('#wiz_user_form [data-param="cross1_x"]'); return i ? i.value : null; });
-  const start = await page.$eval('#userVizContainer [data-hid="__simstart0"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const start = await page.$eval('#userVizContainer_tree [data-hid="__simstart0"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   await page.mouse.move(start.x, start.y); await page.mouse.down();
   await page.mouse.move(start.x + 60, start.y + 40, { steps: 8 }); await page.mouse.up();
   await page.waitForTimeout(400);

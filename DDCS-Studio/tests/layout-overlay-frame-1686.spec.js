@@ -95,7 +95,7 @@ const setStock = async (page, pin) => {
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-stock', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-stock', { timeout: 8000 });
   await page.waitForTimeout(600);
 };
 
@@ -105,7 +105,7 @@ test('(B) REAL: the part-zero crosshair coincides with the stock`s datum corner,
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram && window.openWiz);
   const measure = () => page.evaluate(() => {
-    const svg = document.querySelector('#userVizContainer svg.feature-canvas');
+    const svg = document.querySelector('#userVizContainer_tree svg.feature-canvas');
     const stockBox = svg.querySelector('rect.fc-stock').getBoundingClientRect();
     const axisXBox = svg.querySelector('.fc-axis-x').getBoundingClientRect();
     return {

@@ -93,7 +93,7 @@ test('③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-st
   // (computePassStarts reflects it) but the EMIT is BYTE-IDENTICAL (Option-B — userStarts never touches params/emit).
   const beforeCode = await page.evaluate(() => (document.getElementById('wiz_user_code') || {}).textContent || '');
   const drag = await page.evaluate(() => {
-    const c = document.getElementById('userViz3dContainer');
+    const c = document.getElementById('userViz3dContainer_tree');
     const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     if (!panel || typeof panel.onStartDrag !== 'function' || typeof panel.getPassStarts !== 'function') return { wired: false };

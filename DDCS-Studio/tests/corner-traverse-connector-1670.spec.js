@@ -30,7 +30,7 @@ test('corner AUTO reposition: no synthesized connector duplicates the real trave
   await page.waitForTimeout(900);
 
   const readPass1 = () => page.evaluate(() => {
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     const segs = panel.getSegments();

@@ -86,7 +86,7 @@ test('(3) LIVE form — the emitted Z→wall1 start #21/#22 (+ dog-leg #23/#24) 
   const setSeqRead = (seq) => page.evaluate((sq) => {
     const s = [...document.querySelectorAll('#wiz_user_form select')].find((x) => [...x.options].some((o) => o.value === 'YX'));
     s.value = sq; s.dispatchEvent(new Event('change', { bubbles: true }));
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const g = (host && host.__gcode) || '';
     const m = (v) => ((g.match(new RegExp('#' + v + '\\s*=\\s*([^\\n(]+)')) || [])[1] || '').trim();

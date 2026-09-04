@@ -128,6 +128,13 @@ import { test, expect } from '@playwright/test';
  * by the shell's own real 4 names PLUS a genuinely new REST MACHINING group with no shell equivalent, so it
  * moved from "no exception" to a `VOCABULARY_EXCEPTIONS` `reason:'shell'` entry — the same bucket contour/
  * slot/surfacing/text already sit in, verified byte-for-byte the same way (pocket-form-reproduction-2301.spec.js).
+ *
+ * ⭐⭐⭐ UPDATED t2631 — `user_corner_data` MIGRATED, THE LAST OP. Unlike pocket, corner's own sections
+ * (IDENTITY/GEOMETRY/TOOL & CUT) were ALREADY the canonical `SECTION_RANK` names before this turn (corner had
+ * no live shell to diverge FROM — retired at t1670) — so it simply moved from "classic, complete, canonical, no
+ * exception" straight to `TREE_MODE_TWINS` (exempt from the completeness check by the SAME mechanism drill/
+ * edge/etc already use), never touching `VOCABULARY_EXCEPTIONS` at all. Every registered built-in-equivalent
+ * twin is now tree-rendered — corner was the last one, deliberately deferred to be the gated pilot.
  */
 
 // t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not

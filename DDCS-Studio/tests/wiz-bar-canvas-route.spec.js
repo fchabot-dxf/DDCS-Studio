@@ -55,11 +55,11 @@ test('B3c/B3d: clicking the IN-PLACE Corner slot in the wiz-bar opens the twin â
   });
 
   // verify-real-symptom (B3d): BOTH the 2D drag handle AND the 3D sim pane RENDER TOGETHER (never either/or).
-  await page.waitForSelector('#userVizContainer .fc-handle-move', { state: 'visible', timeout: 6000 });
-  await page.waitForSelector('#userViz3dBox .wiz-viz3d', { state: 'visible', timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-move', { state: 'visible', timeout: 6000 });
+  await page.waitForSelector('#userViz3dBox_tree .wiz-viz3d', { state: 'visible', timeout: 6000 });
   const ok = await page.evaluate(async () => {
-    const c = document.getElementById('userVizContainer');
-    const box3d = document.getElementById('userViz3dBox');
+    const c = document.getElementById('userVizContainer_tree');
+    const box3d = document.getElementById('userViz3dBox_tree');
     const CD = await import('/blocks/dataOps/cornerData.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
     const starts = opSimStarts(CD.CORNER_DATA_OPTYPE, CD.CORNER_DEFAULTS, window.ddcsGetSettings().stock) || [];

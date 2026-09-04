@@ -209,6 +209,41 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'syncA', type: 'bool', tokenRefusal: 'Turns the whole dual-gantry sync block on or off — changes how many lines the program contains.', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', help: 'Dual-gantry: also write the found corner to the slave A-axis WCS, keeping a twin-motor gantry squared. A WCS write only — no extra motion.', section: 'GEOMETRY' },
 ];
 
+/** t2631 (BACKLOG #71/#72, THE GATED PILOT, LAST OP) — CANONICAL_BIND moved up here (was declared right before
+ *  `canonicalPrunedStack`, further down) so `cornerFieldGroups` below can use it: the corner×probeSeq 8-way
+ *  guard duplicates the bound reposition sockets 8× in the raw superset, so both the FORM's own field groups
+ *  and the exported `CORNER_BINDINGS` derive over this SAME canonical-pruned stack — one source, the proven
+ *  edge/t2599 shape (`prunedFrom` + `CANONICAL_BIND`), not two independent derivations that could disagree. */
+const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX', travelShape: 'dogleg' };   // t328 — pin dogleg so the canonical prune keeps the wall1→wall2 traverse at 1× (the diagonal arm's duplicate #23/#24 move is pruned away)
+function prunedFrom(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, CANONICAL_BIND); return c; }
+
+/** t2631 — the ordered/grouped field lists both the tree's own group_box children AND the flat bindings array
+ *  need, computed ONCE, called TWICE (bootstrap stack for tree order, final stack for the bindings actually
+ *  shipped) — mirrors edgeFieldGroups'/boreFieldGroups' own two-call pattern (t2599/t2595). Corner's own
+ *  sections (IDENTITY/GEOMETRY/TOOL & CUT) are ALL canonical `SECTION_RANK` names, so — unlike pocket/slot/
+ *  contour's own shell-vocabulary sections — the classic render's `units.sort(sectionRankOf)` ALREADY reorders
+ *  them correctly regardless of array position (t2613's own measurement); no array reorder was needed here,
+ *  only the group_box tree itself, in IDENTITY -> GEOMETRY -> TOOL & CUT order (edge's own t2617-fixed order). */
+function cornerFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedFrom(stack), CORNER_BINDING_SPECS);
+    return {
+        IDENTITY: CORNER_STRUCT_BINDINGS.filter((b) => b.section === 'IDENTITY'),
+        // struct GEOMETRY fields (the big structural forks) lead, matching CORNER_STRUCT_BINDINGS' own array
+        // order; the value-socket GEOMETRY fields (travelDist/safeZ/.../startY) follow, matching
+        // CORNER_BINDING_SPECS' own array order — no shell to reproduce, so this is the sensible default
+        // (structure-first, then the magnitudes that tune it), same discretion alignment/edge/middle already
+        // exercised for their own no-shell ops.
+        GEOMETRY: [...CORNER_STRUCT_BINDINGS.filter((b) => b.section === 'GEOMETRY'), ...derived.filter((b) => b.section === 'GEOMETRY')],
+        TOOL_CUT: derived.filter((b) => b.section === 'TOOL & CUT'),
+    };
+}
+// t2631 — the BOOTSTRAP stack (children-only, no uiChildren) used ONLY to compute the field groups the tree
+// below authors from — `cornerFieldGroups` doesn't care about layout, the same shortcut every other migration
+// this arc used. `cornerDataStack` (below) re-derives against the FINAL, real, uiChildren-bearing template for
+// the bindings actually shipped (`CORNER_BINDINGS`, further down) — never reused stale against the final shape.
+const CORNER_FIELDS0 = cornerFieldGroups([{ type: 'user_root', params: {}, children: cornerStack(CORNER_DEFAULTS, { superset: true }) }]);
+const cornerFieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
  *  are the value-sockets the bindings drive. The `simstart` rows declare the per-pass preview markers (canonical over
  *  def.sim.starts). Exported so the emit spec can build a probeZFirst=on variant to prove the derive helper re-finds #23/#24. */
@@ -220,48 +255,62 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // t132 — CONCERN COLOUR (item h): each section declares its Blockly block colour (authoring-only — rides in `data`, never
     // a field, never emitted). VIEW family = a blue set (LAYOUT-2D / 3D-SIM / PROJECTED-GCODE read as related views);
     // STRUCTURAL / VARIABLES / FORM / G-CODE each a distinct hue. Palette is easily tweaked (the human can adjust).
-    const sec = (title, color, children) => ({ type: 'section', params: { title, color }, children });
-    // t2301 (BACKLOG 20) — 'panel' removed from the FORM section below: formWidgets.js's `sim` and `panel`
-    // branches hardcode the SAME DOM ids for their own layout2d pane, a real id collision wherever both are
-    // declared anywhere in ONE tree — regardless of which `section` nests them, since traverse() walks the
-    // whole tree into one DOM. `sim` (declared in the 3D-SIM section below) already renders everything panel
-    // did, per t2257's own systemic check (atcChangeData.js). See drillData.js's own t2301 comment for the
-    // fuller mechanism.
-    const sim = { type: 'sim', params: { rotary: false, machine: false, magazine: false, probeWcs: true } };   // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock); machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent = no forceMachine.
-    const paramGroup = { type: 'param_group', params: { group: 'Corner' }, children: [] };
-    const simstarts = simStartsToBlocks(CORNER_SIM_STARTS);   // per-pass preview markers (canonical; SIM only, emit nothing)
+    const sec = (title, color, children) => ({ type: 'section', params: { title, color }, children });   // STILL used below, EXECUTION mouth only (STRUCTURAL/VARIABLES/G-CODE) — transparent for emit, unrelated to this migration
+    const simstarts = simStartsToBlocks(CORNER_SIM_STARTS);   // per-pass preview markers (canonical; SIM only, emit nothing) — kept, placed in the RIGHT pane below (traverse() silently skips `simstart` nodes — inert for the live form, present for Blockly round-trip)
 
-    // PRESENTATION mouth — FORM (input) + one peer per VIEW of the program (t119). All emit ∅. The per-pass sim-start
-    // markers are the SHARED anchor source (fed to BOTH the 2D + 3D views by cornerSimStartsProvider — ONE source, never
-    // re-declared per view; the one-source guard); they ride 3D-SIM.
+    // t2631 (BACKLOG #71/#72, THE GATED PILOT, LAST OP) — PRESENTATION mouth REPLACED: the old FORM/LAYOUT-2D/
+    // 3D-SIM/PROJECTED-GCODE 4-section shape (t130, Option B — corner-redivide.spec.js) predates this arc's own
+    // `split_horizontal`/`preview3d`/`feature_canvas`/`code_preview` convention (t2511/t2599 onward) — the
+    // mechanism that ACTUALLY hosts live content in each of those roles.
     //
-    // t1724 — LAYOUT-2D + PROJECTED-GCODE stay EMPTY, TRACED, not "a later follow-up" (that framing is retired — this
-    // is the trace, cycle 856 ACT 3's amendment). Corner's own preview content was checked live against the two
-    // primitive vocabularies this follow-up meant to use:
-    //   - `shape_rect/circle/line/marker` (vizBlocks.js) HAS a real, working consumer (panelTypes.js:293, flattens
-    //     def.template and draws every shape it finds) — but corner has NOTHING to feed it. Its whole 2D vocabulary is
-    //     either INTERACTIVE (the per-pass sim-start markers above, and the corner-pick handle — panelTypes.js's
-    //     name-sniffed `cornerBind`) or TRACE-DERIVED (the toolpath overlay, correctly staying trace-only per this
-    //     cycle's Fork-2 ruling: geometry with G-code behind it must never gain a second, declared copy). Shape
-    //     primitives are deliberately non-interactive static drawing (vizBlocks.js's own doc: "no transform blocks");
-    //     corner draws no static shape at all, so there is nothing to port, not an unfinished port.
-    //   - `layout_2d_canvas`/`sim_3d_box`/`code_preview_panel` (the CONTAINER blocks this follow-up would have used)
-    //     were THEMSELVES unfinished, independent of corner: grep confirmed zero readers anywhere in the app — their
-    //     `minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields were inert, `kind:'uibox'` only wired the
-    //     Blockly round-trip, never the real rendered panel. Placing one here would have misrepresented inert
-    //     machinery as functional — exactly the declared-but-unread shape this project already named four times
-    //     (`emits`/`modalPre`/`noSnap`/`mouth`) and the fifth this act's trace found.
-    //     ALL THREE now DELETED — sim_3d_box/code_preview_panel at t1734, layout_2d_canvas at t2507 (BACKLOG #61
-    //     L7) — so this whole paragraph is now history, not a live constraint: there is nothing left to place here
-    //     even in principle. Left as-written (past tense) rather than erased, since it still explains WHY corner
-    //     never grew a static shape.
-    // Reported, not invented: no new block, no placeholder block. See WORK-LOG t1724.
-    const uiChildren = [
-        sec('FORM', '#d946ef', [paramGroup]),                  // form input — magenta (panel removed, t2301 — see the const `sim`'s own comment above)
-        sec('LAYOUT-2D', '#3b82f6', []),                       // view family — blue
-        sec('3D-SIM', '#6366f1', [sim, ...simstarts]),         // view family — indigo
-        sec('PROJECTED-GCODE', '#0ea5e9', []),                 // view family — sky
-    ];
+    // ⚠ TRIED restoring REDIVIDE's 4 sections nested inside split_horizontal's own LEFT/RIGHT (mirroring
+    // drillData.js's PATTERN/TOOL/DEPTH & FEED precedent) and PROVED it doesn't compose, not assumed: (1)
+    // corner-redivide.spec.js's own mouth check walks getSurroundParent() expecting each `section` as a DIRECT
+    // PRESENTATION child — nested one level deeper under split_horizontal, `byMouth('PRESENTATION')` returns
+    // [] (verified live); (2) splitting `preview3d`/`feature_canvas` into separate LAYOUT-2D/3D-SIM sections
+    // breaks their own adjacency-merge (formWidgets.js's traverse(), t2511 — they must be ADJACENT SIBLINGS in
+    // ONE array to render as the combined box) — canvasCount dropped to 0 (verified live). Reverted; this is a
+    // genuine, PROVEN architectural fork (REDIVIDE's flat-peer Blockly structure vs the split_horizontal 2-pane
+    // convention every other migrated op uses), not a mechanical gap — flagged to the advisor rather than
+    // picked unilaterally. corner-redivide.spec.js tests (3)/(4) are LEFT RED, on purpose, pending that call.
+    //
+    // LAYOUT-2D and PROJECTED-GCODE stayed empty since t1724 not because corner has nothing to show (it has
+    // real 2D drag-handles via the sim-start markers, and real G-code via the shared classic wrapper) but
+    // because NEITHER declared child (`shape_*` primitives, `code_preview`) had a real consumer wired to THIS
+    // twin's own view family — this migration is what wires it: `feature_canvas` (2D, hosts the SAME sim-start
+    // marker content the old "3D-SIM" section only fed to 3D) + `preview3d` (3D) fill what LAYOUT-2D/3D-SIM
+    // were reaching for; a REAL `code_preview` node fills what PROJECTED-GCODE never actually got. No new
+    // geometry invented — corner still draws no static shape (t1724's own finding stands: the sim-start
+    // markers + the toolpath trace are the whole 2D vocabulary) — this wires the SAME content through the
+    // mechanism that renders it, closing the exact gap named at t1724.
+    const uiChildren = [{
+        type: 'split_horizontal', params: { ratio: '360px:*' },
+        children: {
+            LEFT: [{
+                type: 'param_group',
+                params: { group: 'Corner' },
+                children: [
+                    // t2629 — no live shell for corner (RETIRED, t1670's own comment above) — adapted from this
+                    // file's own header description, the same precedent edge's own t2599 usage_text set.
+                    { type: 'usage_text', params: { text: 'Probes a stock corner (two walls) and writes the found position to a work-coordinate register. Set which corner and which wall to probe first; optionally probe the top surface for Z before the walls. Choose how the tool travels between probes (auto or a manual jog-and-wait) and which WCS receives the result.' } },
+                    { type: 'group_box', params: { title: 'IDENTITY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.IDENTITY) },
+                    { type: 'group_box', params: { title: 'GEOMETRY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.GEOMETRY) },
+                    { type: 'group_box', params: { title: 'TOOL & CUT' }, children: cornerFieldRefsOf(CORNER_FIELDS0.TOOL_CUT) },
+                    { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                ],
+            }],
+            RIGHT: [
+                // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock);
+                // machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain
+                // forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent =
+                // no forceMachine. The per-pass sim-start markers (cornerSimStartsProvider) are the SHARED
+                // anchor source for both panes below — ONE source, never re-declared per view.
+                { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
+                { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ...simstarts,
+            ],
+        },
+    }];
 
     // EXECUTION mouth. ② B4 step 4a — cornerStack emits the SUPERSET (both probeZFirst arms wrapped in `guard`s; instantiate()
     // prunes to the chosen shape). STRUCTURAL = a ∅ LABELED GROUPING (the structural knobs are the deferred item-d follow-up).
@@ -295,9 +344,10 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
 /** Bindings for the value sockets — DERIVED (not hand-counted). The corner×probeSeq 8-way guard DUPLICATES the bound reposition
  *  sockets (#21-#24) 8× in the raw superset, so we derive over a CANONICAL-PRUNED stack (probeZFirst:1 · FL · YX → exactly 1×
  *  each socket, all 13 present incl the Z-first #21/#22). The frozen blockIndex is over this canonical stack (validateUserOp
- *  skips it for bindingSpecs defs); EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via bindingSpecs). */
-const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX', travelShape: 'dogleg' };   // t328 — pin dogleg so the canonical prune keeps the wall1→wall2 traverse at 1× (the diagonal arm's duplicate #23/#24 move is pruned away)
-function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(cornerDataStack(CORNER_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
+ *  skips it for bindingSpecs defs); EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via bindingSpecs).
+ *  t2631 — re-derived here against the FINAL, real, tree-shaped `cornerDataStack` (via the shared `prunedFrom`,
+ *  CANONICAL_BIND both declared above `cornerFieldGroups`) — never reused stale against the pre-migration shape. */
+function canonicalPrunedStack() { return prunedFrom(cornerDataStack(CORNER_DEFAULTS)); }
 export const CORNER_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), CORNER_BINDING_SPECS);
 
 // t87 — SOURCE-CHIPS: when the user opts a probe field to 'ctrl' (on a profile that has a native register, e.g. Expert), emit the

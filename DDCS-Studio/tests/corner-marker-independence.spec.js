@@ -30,9 +30,9 @@ async function openCorner(page, probeZ) {
       const cb = span && span.parentElement && span.parentElement.querySelector('input[type="checkbox"]');
       if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
     });
-    await page.waitForFunction(() => document.querySelectorAll('#userVizContainer .fc-handle-move').length >= 2, { timeout: 6000 });
+    await page.waitForFunction(() => document.querySelectorAll('#userVizContainer_tree .fc-handle-move').length >= 2, { timeout: 6000 });
   } else {
-    await page.waitForSelector('#userVizContainer .fc-handle-move', { timeout: 6000 });
+    await page.waitForSelector('#userVizContainer_tree .fc-handle-move', { timeout: 6000 });
   }
 }
 
@@ -40,10 +40,10 @@ async function openCorner(page, probeZ) {
 const readMachine = (page) => page.evaluate(() => {
   const R = (n) => Math.round(n * 1000) / 1000;
   const handles = {};
-  for (const el of document.querySelectorAll('#userVizContainer [data-hid]')) {
+  for (const el of document.querySelectorAll('#userVizContainer_tree [data-hid]')) {
     const b = el.getBoundingClientRect(); handles[el.getAttribute('data-hid')] = { cx: R(b.x + b.width / 2), cy: R(b.y + b.height / 2) };
   }
-  const b3 = document.getElementById('userViz3dContainer'); const host = b3 && b3.parentElement && b3.parentElement.querySelector('.wiz-viz3d'); const panel = host && host.__panel;
+  const b3 = document.getElementById('userViz3dContainer_tree'); const host = b3 && b3.parentElement && b3.parentElement.querySelector('.wiz-viz3d'); const panel = host && host.__panel;
   const passEnds = (panel && panel.getPassEnds) ? panel.getPassEnds() : null;
   const code = (document.getElementById('wiz_user_code') || {}).textContent || '';
   const pv = (v) => { const m = code.split('\n').find((l) => new RegExp('#' + v + '\\s*=').test(l)); if (!m) return null; const mm = m.match(new RegExp('#' + v + '\\s*=\\s*(-?[0-9.]+)\\b')); return mm ? parseFloat(mm[1]) : 'EXPR'; };
@@ -142,7 +142,7 @@ test('(5) re-opening a corner after a drag emits byte-identical (no cross-instan
   expect(dragged, 'the drag actually changed the emit').not.toBe(pristine);
   // re-open the wizard (instance #2, same opType) — onShow clears the spot store
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-move', { timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-move', { timeout: 6000 });
   const reopened = (await readMachine(page)).code;
   expect(reopened, 'a freshly-opened corner is byte-identical to the default (no leaked spot)').toBe(pristine);
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));

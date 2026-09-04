@@ -22,11 +22,11 @@ test('corner-pick circles stay on the physical corners at any datum; the crossha
   const inspect = async (datum, corner) => {
     await setDatum(page, datum);
     await page.evaluate(() => window.openWiz('user_corner_data'));
-    await page.waitForSelector('#userVizContainer .fc-corner-pick', { timeout: 8000 });
+    await page.waitForSelector('#userVizContainer_tree .fc-corner-pick', { timeout: 8000 });
     await page.evaluate((c) => { const s = document.querySelector('#wiz_user_form [data-param="corner"]'); if (s && s.value !== c) { s.value = c; s.dispatchEvent(new Event('change', { bubbles: true })); } }, corner);
     await page.waitForTimeout(300);
     return page.evaluate(() => {
-      const svg = document.querySelector('#userVizContainer svg');
+      const svg = document.querySelector('#userVizContainer_tree svg');
       const circles = {};
       svg.querySelectorAll('.fc-corner-pick').forEach((c) => { circles[c.getAttribute('data-corner')] = { x: Math.round(+c.getAttribute('cx')), y: Math.round(+c.getAttribute('cy')), cur: c.classList.contains('fc-corner-pick-cur') }; });
       const sr = svg.querySelector('.fc-stock');
@@ -46,13 +46,13 @@ test('corner-pick circles stay on the physical corners at any datum; the crossha
   for (const c of ['FL', 'FR', 'BL', 'BR']) expect({ x: br.circles[c].x, y: br.circles[c].y }, `circle ${c} sits on the physical corner (datum-independent)`).toEqual(br.phys[c]);
   expect(br.circles.FR.cur, 'FR (bottom-right) is the selected probe corner').toBe(true);
   expect(br.cross, 'the crosshair follows the datum → the BR corner (NOT FL)').toEqual(br.phys.BR);
-  await page.locator('#userVizContainer').screenshot({ path: 'scratchpad/corner_datum_br.png' });
+  await page.locator('#userVizContainer_tree').screenshot({ path: 'scratchpad/corner_datum_br.png' });
 
   // DEFAULT front-left datum — crosshair back at FL (unchanged); circles still physical
   const fl = await inspect('nnp', 'FR');
   for (const c of ['FL', 'FR', 'BL', 'BR']) expect({ x: fl.circles[c].x, y: fl.circles[c].y }).toEqual(fl.phys[c]);
   expect(fl.cross, 'front-left datum → crosshair at FL (the prior default, unshifted)').toEqual(fl.phys.FL);
-  await page.locator('#userVizContainer').screenshot({ path: 'scratchpad/corner_datum_fl.png' });
+  await page.locator('#userVizContainer_tree').screenshot({ path: 'scratchpad/corner_datum_fl.png' });
 
   // CENTRE datum — crosshair at the block centre; circles still physical
   const cc = await inspect('ccp', 'FR');

@@ -46,13 +46,13 @@ test('the Layout renders the labels + the auto-square / manual-circle glyphs (re
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(400);
 
   const r = await page.evaluate(() => {
-    const labels = [...document.querySelectorAll('#userVizContainer .fc-handle-label')].map((t) => t.textContent);
-    const sim = document.querySelector('#userVizContainer .fc-handle-sim[data-hid="__simstart0"]');
-    const repos = document.querySelector('#userVizContainer [data-hid="reposition_pos"]');
+    const labels = [...document.querySelectorAll('#userVizContainer_tree .fc-handle-label')].map((t) => t.textContent);
+    const sim = document.querySelector('#userVizContainer_tree .fc-handle-sim[data-hid="__simstart0"]');
+    const repos = document.querySelector('#userVizContainer_tree [data-hid="reposition_pos"]');
     const fill = (el) => el && getComputedStyle(el).fill;
     return { labels, simTag: sim && sim.tagName, simFill: fill(sim), reposTag: repos && repos.tagName, reposFill: fill(repos) };
   });

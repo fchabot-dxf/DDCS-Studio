@@ -84,7 +84,7 @@ test('(C) corner Layout: the wall-2 reposition handle carries the DECLARED emits
   await page.evaluate(() => { const t = document.querySelector('[data-tab="layout"], [data-viz-mode="2d"], .viz-tab-2d'); if (t) t.click(); });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
-    const svg = document.querySelector('#userVizContainer svg, .wiz-layout svg');
+    const svg = document.querySelector('#userVizContainer_tree svg, .wiz-layout svg');
     const el = svg && svg.querySelector('[data-hid$="_pos"]');
     return el ? { found: true, fill: getComputedStyle(el).fill } : { found: false };
   });

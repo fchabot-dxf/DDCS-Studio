@@ -116,11 +116,16 @@ test('the Layout sim-only ◇ renders and is distinct from the (now correctly-pl
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 6000 });
+  // t2631 — the feature canvas's ResizeObserver-driven viewBox is rAF-throttled (featureCanvas.js:122); the
+  // element existing does not mean it has caught up to its settled container size yet (the tree pane-bodies'
+  // own settling lag). A screen-PIXEL distance (unlike this file's other tests, which read world-space x/y
+  // straight from layoutSpecFromOp) is sensitive to that race, so wait for it to settle before measuring.
+  await page.waitForTimeout(600);
 
   const info = await page.evaluate(() => {
-    const sim = document.querySelector('#userVizContainer .fc-handle-sim');
-    const move = document.querySelector('#userVizContainer .fc-handle-move');
+    const sim = document.querySelector('#userVizContainer_tree .fc-handle-sim');
+    const move = document.querySelector('#userVizContainer_tree .fc-handle-move');
     const box = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { cx: b.x + b.width / 2, cy: b.y + b.height / 2 }; };
     return { sim: box(sim), move: box(move), hasBoth: !!sim && !!move };
   });

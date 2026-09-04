@@ -45,8 +45,10 @@ async function bootCustomize(page, opType = 'user_corner_data') {
   // opened just before that fires can have its own context menu wiped out by the resulting re-render.
 }
 
+// t2631 — corner now declares `field_ref` rows (group_box), not `param_field` — the same FROZEN_MARKER_TYPES
+// set blocksApp.js's own boundParamOf uses (userOps.js:1154), not just this test's original 'param_field'.
 async function paramFieldBlockId(page, param) {
-  return page.evaluate((p) => window.__blkws.getAllBlocks(false).find((b) => b.type === 'param_field' && b.getFieldValue('PARAM') === p).id, param);
+  return page.evaluate((p) => window.__blkws.getAllBlocks(false).find((b) => (b.type === 'param_field' || b.type === 'field_ref') && b.getFieldValue('PARAM') === p).id, param);
 }
 
 test.use({ viewport: { width: 1600, height: 1000 } });
@@ -57,14 +59,18 @@ test('unit: freezing a param leaves emit byte-identical, and instantiate() marks
   const r = await page.evaluate(async () => {
     const { getUserDef, instantiate, defaultParams } = await import('/blocks/userOps.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { childrenOf } = await import('/blocks/userOps.js');
     const def = getUserDef('user_corner_data');
     const base = defaultParams(def);
     const unfrozenTree = instantiate(def, base);
     const frozenTree = instantiate(def, { ...base, frozenParams: ['radius'] });
+    // t2631 — childrenOf (not a bare `for...of`), same ARCHITECTURE.md INVARIANT #18 fix corner-wall-collapse-
+    // 1664's own strip() needed: children/uiChildren can be a mouth-keyed {LEFT,RIGHT} object, not always an
+    // array — corner's own split_horizontal (new this migration) is what first exercises this helper against one.
     const findNode = (nodes, param) => {
-      for (const b of (nodes || [])) {
+      for (const b of childrenOf(nodes)) {
         if (!b) continue;
-        if (b.type === 'param_field' && b.params && b.params.param === param) return b;
+        if ((b.type === 'param_field' || b.type === 'field_ref') && b.params && b.params.param === param) return b;
         const found = findNode(b.children, param) || findNode(b.uiChildren, param);
         if (found) return found;
       }
@@ -89,14 +95,15 @@ test('unit: the FULL round-trip through opFromMarker — a reload reconstructs t
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const { opFromMarker } = await import('/blocks/programModel.js');
-    const { defaultParams, getUserDef } = await import('/blocks/userOps.js');
+    const { defaultParams, getUserDef, childrenOf } = await import('/blocks/userOps.js');
     const def = getUserDef('user_corner_data');
     const params = { ...defaultParams(def), frozenParams: ['radius'] };
     const op = opFromMarker('user_corner_data', params);
+    // t2631 — childrenOf, same INVARIANT #18 fix as the test above.
     const findNode = (nodes, param) => {
-      for (const b of (nodes || [])) {
+      for (const b of childrenOf(nodes)) {
         if (!b) continue;
-        if (b.type === 'param_field' && b.params && b.params.param === param) return b;
+        if ((b.type === 'param_field' || b.type === 'field_ref') && b.params && b.params.param === param) return b;
         const found = findNode(b.children, param) || findNode(b.uiChildren, param);
         if (found) return found;
       }
@@ -153,7 +160,7 @@ test('live: freezing (via the same .data.params.frozenParams the gesture writes)
   expect(frozen).toBe(true);
   await page.waitForFunction(() => !document.querySelector('[data-param="radius"]'), null, { timeout: 5000 });
   const collapsedAfterReload = await page.evaluate((id) => {
-    const blk = window.__blkws.getAllBlocks(false).find((b) => b.type === 'param_field' && b.getFieldValue('PARAM') === 'radius');
+    const blk = window.__blkws.getAllBlocks(false).find((b) => (b.type === 'param_field' || b.type === 'field_ref') && b.getFieldValue('PARAM') === 'radius');
     return blk ? blk.isCollapsed() : null;
   }, radiusId);
   expect(collapsedAfterReload, 'a full reload through ddcsLoadBlockStack independently reconstructs the collapsed visual too').toBe(true);

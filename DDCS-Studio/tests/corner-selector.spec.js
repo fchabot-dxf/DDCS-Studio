@@ -26,9 +26,9 @@ test('the 4 stock-corner pick targets render on the Layout canvas; the current c
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-corner-pick', { state: 'visible' });
+  await page.waitForSelector('#userVizContainer_tree .fc-corner-pick', { state: 'visible' });
   const info = await page.evaluate(() => {
-    const picks = [...document.querySelectorAll('#userVizContainer .fc-corner-pick')];
+    const picks = [...document.querySelectorAll('#userVizContainer_tree .fc-corner-pick')];
     return { codes: picks.map((p) => p.getAttribute('data-corner')).sort(), cur: (picks.find((p) => p.classList.contains('fc-corner-pick-cur')) || {}).getAttribute && picks.find((p) => p.classList.contains('fc-corner-pick-cur')).getAttribute('data-corner') };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
@@ -46,16 +46,16 @@ test('clicking each stock corner SETS the corner param → the emit dog-leg + th
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-corner-pick', { state: 'visible' });
+  await page.waitForSelector('#userVizContainer_tree .fc-corner-pick', { state: 'visible' });
 
   const readState = () => page.evaluate(() => {
     const sel = [...document.querySelectorAll('#wiz_user_form select')].find((s) => [...s.options].some((o) => o.value === 'BR'));
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const g = (host && host.__gcode) || '';
     const m = (v) => (g.match(new RegExp('#' + v + '\\s*=\\s*([^\\n(]+)')) || [])[1];
-    const cur = (document.querySelector('#userVizContainer .fc-corner-pick-cur') || {}).getAttribute
-      && document.querySelector('#userVizContainer .fc-corner-pick-cur').getAttribute('data-corner');
+    const cur = (document.querySelector('#userVizContainer_tree .fc-corner-pick-cur') || {}).getAttribute
+      && document.querySelector('#userVizContainer_tree .fc-corner-pick-cur').getAttribute('data-corner');
     return { cornerSel: sel && sel.value, curPick: cur, g23: (m(23) || '').trim(), g24: (m(24) || '').trim() };
   });
   const markers = () => page.evaluate(async () => {
@@ -68,7 +68,7 @@ test('clicking each stock corner SETS the corner param → the emit dog-leg + th
 
   // click AROUND the corners (incl. back to FL) — proves the pick SETS + the emit/markers TRACK, not stick
   for (const c of ['BR', 'FR', 'BL', 'FL', 'BR']) {
-    await page.locator(`#userVizContainer .fc-corner-pick[data-corner="${c}"]`).click();
+    await page.locator(`#userVizContainer_tree .fc-corner-pick[data-corner="${c}"]`).click();
     await page.waitForTimeout(150);
     const s = await readState();
     expect(s.cornerSel, `click ${c} → the corner <select> = ${c}`).toBe(c);

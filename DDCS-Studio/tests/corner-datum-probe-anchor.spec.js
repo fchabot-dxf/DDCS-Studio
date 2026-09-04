@@ -18,7 +18,7 @@ test('the 3D probe lands on the physical corner at any datum (path/tool/markers 
   const measure = async (datum) => {
     await page.evaluate(async (d) => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 100, y: 80, z: 20, shape: 'boss', show: true, datum: d, pin: 'origin' } }); }, datum);
     await page.evaluate(() => window.openWiz('user_corner_data'));
-    await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+    await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
     await page.evaluate(() => { const s = document.querySelector('#wiz_user_form [data-param="corner"]'); if (s) { s.value = 'FL'; s.dispatchEvent(new Event('change', { bubbles: true })); } });
     await page.waitForTimeout(400);
     return page.evaluate(() => {

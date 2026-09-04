@@ -89,10 +89,10 @@ test('(3) Layout canvas: the Start marker is a HOLLOW amber circle (t1688 — it
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 6000 });
   const info = await page.evaluate(() => {
-    const h = document.querySelector('#userVizContainer .fc-handle-sim');
-    const move = document.querySelector('#userVizContainer .fc-handle-move');   // an emitting handle (filled)
+    const h = document.querySelector('#userVizContainer_tree .fc-handle-sim');
+    const move = document.querySelector('#userVizContainer_tree .fc-handle-move');   // an emitting handle (filled)
     // t89 — read the COMPUTED colour (fill/stroke are now set via INLINE STYLE so they beat the .fc-handle class rule; the
     // old getAttribute check saw the right value while the class silently overrode the paint). Computed cyan #22d3ee = rgb(34, 211, 238).
     const cs = h && getComputedStyle(h);
@@ -124,12 +124,16 @@ test('(4) the emitting reposition handle owns its own drag (writes cross1_x); th
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });   // the sim marker renders (visual)
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 6000 });   // the sim marker renders (visual)
+  // t2631 — the feature canvas's ResizeObserver-driven viewBox is rAF-throttled (featureCanvas.js:122); grabbing
+  // a handle's boundingBox() before it settles reads a stale pre-resize position (the tree pane-bodies' own
+  // settling lag — see corner-data-repos-handle.spec.js's own note), so the drag below can miss the handle.
+  await page.waitForTimeout(600);
 
   const cx = () => page.evaluate(() => document.querySelector('#wiz_user_form [data-param="cross1_x"]').value);
   const before = await cx();
   // dragging the EMITTING reposition handle writes cross1_x; the visual ◇ (excluded from the hit-test) never steals it.
-  const handle = page.locator('#userVizContainer .fc-handle-move').first();
+  const handle = page.locator('#userVizContainer_tree .fc-handle-move').first();
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.mouse.down();

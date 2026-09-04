@@ -37,7 +37,7 @@ const freshCorner = async (page) => {
 test('THE CORNER PILOT HAS ITS DRAG HANDLE — the reposition marker the whole op is steered by', async ({ page }) => {
     await freshCorner(page);
     const r = await page.evaluate(() => {
-        const c = document.getElementById('userVizContainer');
+        const c = document.getElementById('userVizContainer_tree');
         return {
             move: c.querySelectorAll('.fc-handle-move').length,        // the AUTO reposition square (wall 2)
             sim: c.querySelectorAll('.fc-handle-sim').length,          // the operator START circle (pass 0)
@@ -73,7 +73,7 @@ test('AND DRAGGING IT WRITES THE PARAM — a handle that moves pixels and not th
     });
     // drag the reposition square a real distance across the canvas
     const box = await page.evaluate(() => {
-        const h = document.querySelector('#userVizContainer .fc-handle-move');
+        const h = document.querySelector('#userVizContainer_tree .fc-handle-move');
         const b = h.getBoundingClientRect();
         return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     });

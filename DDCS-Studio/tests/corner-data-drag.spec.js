@@ -60,13 +60,13 @@ test('Corner (data): dragging the reposition handle writes the CORRECT increment
 
   // drag the reposition handle to the STOCK CENTRE — a KNOWN world point W = (stock.x/2, stock.y/2). The move handle snaps
   // to stock anchors, so the centre lands the handle at exactly the world centre; the expected DELTA = W − wall1.
-  const stockBox = await page.locator('#userVizContainer .fc-stock').first().boundingBox();
+  const stockBox = await page.locator('#userVizContainer_tree .fc-stock').first().boundingBox();
   const W = { x: stock.x / 2, y: stock.y / 2 };
   const expectDx = +(W.x - wall1.x).toFixed(2);
   const expectDy = +(W.y - wall1.y).toFixed(2);
   expect(Math.abs(expectDx - expectDy), 'expected deltas distinct → an x/y swap is detectable').toBeGreaterThan(1);
 
-  const handle = page.locator('#userVizContainer .fc-handle-move').first();
+  const handle = page.locator('#userVizContainer_tree .fc-handle-move').first();
   await handle.waitFor({ state: 'visible' });
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);

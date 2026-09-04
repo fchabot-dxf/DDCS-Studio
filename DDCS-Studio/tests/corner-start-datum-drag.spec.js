@@ -11,7 +11,7 @@ async function openCorner(page) {
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(400);
 }
 async function setSel(page, param, value) {
@@ -24,11 +24,11 @@ async function setProbeZ(page, on) {   // the structural checkbox has no data-pa
     const cb = span && span.parentElement && span.parentElement.querySelector('input[type="checkbox"]');
     if (cb && !!cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); }
   }, on);
-  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer .fc-handle-move').length >= 2, { timeout: 6000 });
+  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer_tree .fc-handle-move').length >= 2, { timeout: 6000 });
   await page.waitForTimeout(300);
 }
 // screen centre of a Layout handle by its data-hid
-const hid = (page, id) => page.evaluate((id) => { const e = document.querySelector(`#userVizContainer [data-hid="${id}"]`); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
+const hid = (page, id) => page.evaluate((id) => { const e = document.querySelector(`#userVizContainer_tree [data-hid="${id}"]`); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
 // the emitted G91 increment params (empty string when unset = formula default)
 const paramVal = (page, p) => page.evaluate((p) => { const i = document.querySelector(`#wiz_user_form [data-param="${p}"]`); return i ? i.value : null; }, p);
 
@@ -154,7 +154,7 @@ test('flicker + screenshot: the LAYOUT wall holds through the whole Start drag (
   await page.waitForTimeout(400);
   console.log('FLICKER Layout-wall max-deviation-during-drag = ' + Math.round(maxDev) + 'px (0 = no on-Layout flicker)');
   const OUT = 'scratchpad/';
-  const lay = await page.$('#userVizContainer'); if (lay) await lay.screenshot({ path: OUT + 'startdrag-layout.png' });
+  const lay = await page.$('#userVizContainer_tree'); if (lay) await lay.screenshot({ path: OUT + 'startdrag-layout.png' });
   const wiz = await page.$('#wizard'); if (wiz) await wiz.screenshot({ path: OUT + 'startdrag-wizard.png' });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   // the Layout wall never deviated more than a couple px through the drag → no on-Layout flicker (the sub-frame top-panel transient is the scout's noted item, judged live)

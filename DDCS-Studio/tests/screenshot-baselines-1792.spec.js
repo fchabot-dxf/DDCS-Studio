@@ -79,12 +79,18 @@ test('baseline: the MODAL (corner, form3d+2d)', async ({ page }) => {
 
     await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
     await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '741' });
-    await stopLiveSim(page, '#userViz3dBox');
+    // t2631 — corner is now tree-rendered (formWidgets.js's own nsId): its real 3D box id carries a `_tree`
+    // suffix, AND its LAYOUT-2D pane (formWidgets.js's `buildVizBox`, has2d shape) is a SEPARATE, unnamed
+    // `.viz-container` sibling next to the 3D one inside ONE shared `.viz-split` — masking only the 3D box's
+    // own id leaves that 2D pane (previously always-empty, now real content) unmasked (same finding, same fix,
+    // as render-equivalence-1796.spec.js's own settleModal/settlePane — see that file's header for the diff-
+    // image verification). Masking the whole `.viz-split` covers both panes regardless of render mode.
+    await stopLiveSim(page, '.wiz-box .viz-split');
     await page.waitForTimeout(600);
     await dismissToasts(page);
 
     await expect(page.locator('.wiz-box')).toHaveScreenshot('modal-corner.png', {
-        mask: [page.locator('#userViz3dBox')],
+        mask: [page.locator('.wiz-box .viz-split')],
         maxDiffPixelRatio: 0,
     });
 });
@@ -100,12 +106,13 @@ test('baseline: the BLOCKS WIZARD-VIEW PANE (corner, form3d+2d)', async ({ page 
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
     await page.waitForTimeout(1000);
-    await stopLiveSim(page, '#blk_userViz3dBox');
+    // t2631 — same `.viz-split` fix as the MODAL test above.
+    await stopLiveSim(page, '#blk_wiz_user .viz-split');
     await page.waitForTimeout(600);
     await dismissToasts(page);
 
     await expect(page.locator('#blk_wiz_user')).toHaveScreenshot('pane-corner.png', {
-        mask: [page.locator('#blk_userViz3dBox')],
+        mask: [page.locator('#blk_wiz_user .viz-split')],
         maxDiffPixelRatio: 0,
     });
 });

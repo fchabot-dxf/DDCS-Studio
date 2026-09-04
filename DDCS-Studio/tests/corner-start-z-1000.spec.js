@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 
 const panelStarts = (page) => page.evaluate(() => {
-  const c = document.getElementById('userViz3dContainer');
+  const c = document.getElementById('userViz3dContainer_tree');
   const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
   const panel = host && host.__panel;
   return panel && typeof panel.getPassStarts === 'function' ? { ok: true } : { ok: false };
@@ -21,7 +21,7 @@ async function openCorner(page) {
 test('dragging the corner start X/Y keeps the sim start Z (the on-open approach-Z)', async ({ page }) => {
   await openCorner(page);
   const r = await page.evaluate(() => {
-    const c = document.getElementById('userViz3dContainer');
+    const c = document.getElementById('userViz3dContainer_tree');
     const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     if (!panel || typeof panel.onStartDrag !== 'function') return { wired: false };

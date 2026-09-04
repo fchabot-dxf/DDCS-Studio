@@ -75324,3 +75324,159 @@ and the census is the answer: N=0 spec files depend on "some op stays classic" a
 turn still needs `polish-batch-1239`'s own three content tests (3)+(4)/(6)+(7)/(7b) updated to match whatever
 its post-migration field order/content looks like — normal per-op maintenance, not a structural blocker.
 
+## 🔨 turn 2631 — CORNER, THE GATED PILOT, THE LAST OP (BACKLOG #71/#72)
+
+Migrated `corner_data` onto `renderUiTree` (`split_horizontal`/`group_box`/`field_ref`) and filled the two
+empty PRESENTATION mouths (LAYOUT-2D, PROJECTED-GCODE) that motivated this whole arc — closes BACKLOG #71/#72's
+conversion tier, 32/32 built-in-equivalent ops now tree-rendered.
+
+### THE MIGRATION ITSELF — clean on the first try
+
+`cornerFieldGroups(stack)` (bootstrap-then-final, mirroring bore/edge/rotary_clock's own two-phase pattern):
+IDENTITY/GEOMETRY/TOOL & CUT — all three canonical `SECTION_RANK` names, so (per t2613's own finding, confirmed
+again here) no array reorder was needed, only the group_box tree itself. `CANONICAL_BIND`/`prunedFrom` moved
+earlier so both the field-group derivation and the exported `CORNER_BINDINGS` derive over the SAME
+canonical-pruned stack — one source, the proven edge/t2599 shape, not two independent derivations that could
+disagree. The 8-way corner×probeSeq guard's own prune mechanism: verified via an independent 16-combination
+sweep (probeZFirst × corner × probeSeq × syncA) — correct binding counts, zero errors, every combo. All 21
+pre-existing corner emit/structural tests (`corner-data-emit`, `corner-structctl`) passed unchanged on the
+first run, confirming the EXECUTION mouth (STRUCTURAL/VARIABLES/G-CODE, left byte-for-byte untouched) never
+needed touching at all.
+
+New: `corner-form-reproduction-2631.spec.js` (row-diff + edit-reaches-model, following edge's own standalone
+precedent — corner's own built-in view was retired at t1670, no live shell to reproduce from) and
+`corner-canvas-mount-2631.spec.js` (real-symptom: both mouths render REAL content, not an unwired placeholder —
+the exact screenshot the owner originally pointed at).
+
+### FINDING 1 (real, fixed) — the settling-lag class hits a PIXEL-DISTANCE assertion for the first time
+
+`corner-data-repos-handle.spec.js`'s own "◇ vs □ visibly separated" test measures `getBoundingClientRect()`
+screen distance, unlike every other corner test (which reads world-space x/y straight from
+`layoutSpecFromOp`) — the ONE test in the whole corner suite sensitive to the feature canvas's own
+ResizeObserver-driven `viewBox` (featureCanvas.js:122, rAF-throttled) not having caught up to its settled
+container size yet. PROVED, not assumed: a diagnostic dump showed `viewBox="0 0 40 340"` against an actual
+rendered box of `874×323` — a stale pre-settle capture — and a `waitForTimeout(600)` before measuring
+resolved it to `viewBox="0 0 874 323"`, distance 190.9px (was 19.6, a hair under the 20px threshold). Same fix
+applied to `corner-layout-sim-drag.spec.js`'s test (1), which grabbed a handle's `boundingBox()` the same way
+(pre-settle: `null`, `TypeError` on `.x`).
+
+### FINDING 2 (real, fixed) — the `_tree`-id gap, at a MUCH bigger scale than the t2597 estimate
+
+BACKLOG t2597 predicted "44 test files hardcode fixed classic ids… each will need the same fix the day its own
+op migrates." Rule-17 census: **130 files** reference corner's own identifiers. Ran the whole census in
+batches; **~30 files** needed the `userVizContainer`→`_tree` (and `userViz3dContainer`/`userVizBox`/
+`userViz3dBox`/`userViz3dStatus`/`userVizStatus`) suffix fix, applied via the established, PROVEN idiom
+(`rotary-clock-handles.spec.js`'s own precedent) — direct `sed` substitution across the batch, verified no
+double-suffix artifacts, each batch re-run to green. **One file reverted, not fixed**:
+`interpass-connector-1235.spec.js`'s own `[id*="userVizContainer"]` substring match was ALREADY
+render-path-agnostic by design (shared between a classic op and a tree op, header comment explains why) — the
+blind sed turned it into an over-narrow `_tree`-only match; caught via `git diff`, reverted before it landed.
+**A second blind spot found late**: my own census grep (`cornerData|user_corner_data|CORNER_DATA_OPTYPE`)
+missed every file that opens corner via the SHORT form (`openWizardViaBar(page, {optype:'corner'})`) —
+`modal-real-gesture-1790`, `primary-route-real-gesture-1776`, `screenshot-baselines-1792` all hit the SAME
+class through this path, found only once the FULL SUITE gate (not the census) surfaced them. A follow-up sweep
+for `optype: 'corner'` found 9 files total; the other 4 (`canvas-handle-writable-1804`,
+`layout-singleton-reparent-1814`, `multi-op-import-1916`, `multi-op-progend-1828`) were already clean.
+
+**A THIRD-LEVEL trap inside the id-gap class, found via `modal-real-gesture-1790`**: `bare || tree` is the
+WRONG order. The classic shell's own static markup is ALWAYS present in the DOM (unpopulated, `display:none`,
+dead once an op is tree-rendered) — `getElementById('userViz3dBox') || getElementById('userViz3dBox_tree')`
+finds the DEAD node first (non-null, so the `||` short-circuits) and never reaches the real one. Measured
+live: rect `{0,0}` with the wrong order, a real `1004×305` rect once flipped to `_tree` first. Same trap for a
+`document.querySelector('#a, #b')` selector LIST — it resolves by DOCUMENT ORDER, not left-to-right priority,
+so a comma-list hits the same dead node if the static shell sits earlier in the DOM (which it does) —
+`assertContainerHasDrawing` calls were switched to the bare `_tree` id directly instead.
+
+### FINDING 3 (real, fixed, application code) — `blockEmitter.js`'s own title-detector never learned the
+### post-t2511 presentation vocabulary
+
+`op-title-2363.test.mjs`'s own buried-title canary (node tier) failed: corner's real rich banner comment
+(`( Corner | FL OUTSIDE | ... )`) stopped winning over the generic `( Corner data )` label — the exact
+doubling bug t2363 exists to prevent. Root cause: `firstRealLeaf` (blockEmitter.js:68) walks a `user_root`'s
+`uiChildren` BEFORE `children`, treating anything neither in `TRANSPARENT_CONTAINERS` nor
+`METADATA_ONLY_LEAVES` as "the real content" — and `split_horizontal`/`split_vertical`/`group_box` (containers)
+and `usage_text`/`code_preview`/`field_ref` (leaves), the WHOLE t2617+ presentation vocabulary this arc
+introduced, were never added to either set. `firstRealLeaf`'s very first call returned the split node (or a
+`usage_text` leaf under it) as "found," short-circuiting the walk into `children` before it ever reached
+corner's own buried banner. **This is a PRE-EXISTING, systemic gap** (every already-migrated op using this
+vocabulary has the same hole) that simply never surfaced as an OBSERVABLE bug until corner — the one op left
+that both uses the new tree AND carries a real hand-pushed title. Fixed by adding all 6 missing types to their
+correct set, and (t2599's own `prunedFrom`-adjacent gotcha, same class) switching `firstRealLeaf`'s own
+`children` walk to `childrenOf` (userOps.js) instead of a bare `for...of`, since a split's own `children` is a
+mouth-keyed `{LEFT,RIGHT}` object, not a plain array — the SAME ARCHITECTURE.md INVARIANT #18 hand-rolled-
+iteration class, independently found a SECOND and THIRD time this turn in two different test files'
+OWN local helpers (`corner-wall-collapse-1664.spec.js`'s `strip()`, `freeze-value-2425.spec.js`'s `findNode()`)
+— both fixed the same way. Full node tier re-run after the fix: 238/238.
+
+### FINDING 4 (real, fixed) — `freeze-value-2425.spec.js` + `param-group-rows-1605.spec.js`, two more "moving
+### target" survivors t2629's own census (scoped to `.wiz-visual`/`.viz-pane-sizer`) never reached
+
+`freeze-value-2425`'s own local helpers (`findNode`/`paramFieldBlockId`) hardcoded `b.type === 'param_field'`
+only — corner's own bound params now materialize as `field_ref` blocks (the app's OWN `FROZEN_MARKER_TYPES`,
+blocksApp.js:1301, already anticipates this — `field_ref` was already in that set), so the test's own type
+check just needed widening to match, not the app. `param-group-rows-1605`'s own "values are LIVE both ways"
+test was DELIBERATELY pointed at corner at t2545 specifically because it was "still a plain hand-authored
+param_group" at the time — now field_ref-based like every other op, its own premise (a `param_field`'s
+settable `DFLT` field — `field_ref` has no such field, it references a live binding row instead) has no
+remaining built-in subject at all. Switched to `classicFixture` (t2629's synthetic, PERMANENTLY-classic op),
+adapting the two exercised param names (`dist`→`depth`, `radius`→`stepdown`) to the fixture's own shape.
+
+### FINDING 5 (real, fixed) — `render-equivalence-1796` + `screenshot-baselines-1792`: the mask gap a
+### previously-EMPTY pane could never have exposed
+
+Both files' own `settleModal`/`settlePane`-style helpers masked only the 3D sub-box (`userViz3dBox`) before
+screenshotting, missing that corner's `has2d` combined-box shape (`formWidgets.js`'s `buildVizBox`) puts the
+LAYOUT-2D pane in a SEPARATE, unnamed `.viz-container` sibling inside the SAME `.viz-split` wrapper — masking
+only the 3D id left the 2D pane (previously always-empty, hence never a diff surface; now real feature_canvas
+content) unmasked, which is what a diff-image inspection (not assumed) actually showed leaking through.
+Widened both files' masks to the whole `.viz-split` (covers both panes, tree-mode or classic, 2D+3D or 3D-only
+— render-path-agnostic by construction, not a corner-specific patch). `screenshot-baselines-1792`'s own
+committed baseline PNGs were then regenerated (`--update-snapshots`) — corner's form is legitimately taller
+now (group_box sections + usage_text + code_preview add real height versus the old flat form), confirmed via a
+live diagnostic (23 fields present, pane height 1817px matching the new "received" screenshot) before treating
+the size change as intentional rather than a bug.
+
+### FINDING 6 (real, NOT fixed — architectural, flagged not resolved) — REDIVIDE vs `split_horizontal`,
+### PROVEN incompatible as built, left red on purpose
+
+`corner-redivide.spec.js` (t130, Option B, corner-piloted) declares corner's PRESENTATION mouth as 4 named,
+COLOURED, Blockly-visible `section` blocks — FORM/LAYOUT-2D/3D-SIM/PROJECTED-GCODE — direct peers under one
+PRESENTATION mouth. My migration's `split_horizontal` tree replaces that flat-peer shape entirely. **Tried
+restoring REDIVIDE by nesting the 4 sections INSIDE `split_horizontal`'s own LEFT/RIGHT (mirroring
+`drillData.js`'s own PATTERN/TOOL/DEPTH & FEED precedent) and PROVED, live, that it does not compose:** (1)
+`corner-redivide.spec.js`'s own mouth-detection walks `getSurroundParent()` expecting each `section` as a
+DIRECT PRESENTATION child — nested one level deeper under the split, `byMouth('PRESENTATION')` returned `[]`;
+(2) splitting `preview3d`/`feature_canvas` into separate LAYOUT-2D/3D-SIM sections broke their own
+ADJACENCY-MERGE (t2511 — they must be adjacent siblings in ONE array to render as the combined box) —
+canvas-mount's own `canvasCount` dropped to 0. Reverted cleanly (verified: canvas-mount/form-reproduction/
+emit/structctl/wall-collapse all still green afterward). This is a genuine fork between two real, deliberate,
+PAST design decisions (REDIVIDE's Blockly-authoring concern-sections vs the split_horizontal 2-pane convention
+every other migrated op uses) — not a mechanical gap with an obvious fix, and not mine to resolve
+unilaterally. `corner-redivide.spec.js` tests (3)+(4) are LEFT RED on purpose; the finding (with both
+options and the live proof) is documented directly in `cornerData.js`'s own comment at the PRESENTATION mouth,
+for the advisor to rule on.
+
+### VERIFY
+
+Both empty mouths filled and shown to render (canvas-mount-2631: 1/1). The 8-way prune verified via an
+independent 16-combo sweep, not assumed. Row diffs + canvas-mount: form-reproduction-2631 (2/2) +
+canvas-mount-2631 (1/1). Cross-op guards green: section-order-parity-2617, section-count-rule20-2621,
+form-kernel-720, field-help-798, fork-parity-1593 (11/11); twin-section-invariant-2381 (moved to
+`TREE_MODE_TWINS`, no vocabulary exception needed — corner's sections were already canonical).
+
+**Node tier: 238/238** (was 237/238 before the blockEmitter.js fix). **Full suite via `npm test`/`playwright
+test`, TWO complete runs (the second to confirm the first run's fixes actually landed): first run 3122
+passed/11 failed/47 flaky; second (final) run 3164 passed / 3 failed / 13 flaky / 28 skipped, e2e exit 1.**
+Flaky count on the final run is within the normal parallel-contention range for this suite size (compare: 8
+flaky on the pocket-migration turn's own full run). The 3 remaining failures: `corner-redivide.spec.js` ×2
+(Finding 6, deliberately red) + `preview-mutation-manifest-2463.spec.js` ×1 (surfacing sf_pos, a PRE-EXISTING
+load-dependent flake already classified at every prior gate this session per t2629's own WORK-LOG entry above
+— confirmed again here, passes clean in isolation). `git status`: clean except this turn's own files.
+
+### NEXT
+
+Corner's REDIVIDE fork (Finding 6) needs an owner/advisor ruling: retire REDIVIDE's flat 4-section Blockly
+structure for corner (the split_horizontal convention wins, corner-redivide.spec.js tests (3)+(4) get
+rewritten to match), or find a THIRD structural shape neither tried here. BACKLOG #71/#72's conversion tier is
+otherwise closed — 32/32 built-in-equivalent ops tree-rendered, no op left holding an empty PRESENTATION mouth.
+

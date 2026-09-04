@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { getBlkFormHost } from './support/blkFormHost.js';
 import { stopLiveSim } from './support/simControls.js';
+import { registerClassicFixture } from './support/classicFixture.js';
 
 /**
  * t1605 — renderUiTree renders a `param_group`'s rows.
@@ -97,17 +98,19 @@ test('values are LIVE both ways on the wizard-view face', async ({ page }) => {
     test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
     await boot(page);
-    // t2545 — switched from surfacing to CORNER. Surfacing itself is no longer a valid subject for this specific
-    // mechanism: this turn's own section migration (BACKLOG #71/#72) moved surfacing onto the field_ref/group_box
-    // tree, and `materializeParamGroup`'s own field_ref-presence skip (t2543) means a field_ref-declaring twin no
-    // longer gets `param_field` canvas blocks materialized at all — the SAME, already-established outcome
-    // `cam-block-native-params-s52.spec.js`'s own `drillSame` test pins for drill, the one other field_ref twin.
-    // That's not a regression this test should chase: the two-way param_field<->form sync it exercises is a
-    // property of the MATERIALIZE mechanism generically, not of surfacing specifically, and corner (untouched
-    // this turn, still a plain hand-authored param_group with no group_box/field_ref) is exactly as valid a
-    // subject — test 2 above ("Customize Corner") already establishes corner's own rows render correctly on
-    // this same face.
-    await customize(page, 'user_corner_data');
+    // t2545 — switched from surfacing to CORNER, since `materializeParamGroup`'s own field_ref-presence skip
+    // (t2543) means a field_ref-declaring twin gets NO `param_field` canvas blocks materialized at all, and
+    // surfacing had just moved onto the field_ref/group_box tree. t2631 — corner ITSELF is now field_ref-based
+    // (BACKLOG #71/#72's own last op), and by then every built-in twin is — this test's whole premise (a
+    // canvas `param_field` block whose own DFLT field is the thing under test) has no remaining built-in
+    // subject at all, not because the two-way sync broke, but because `field_ref` doesn't carry a settable
+    // default field the way `param_field` does (it references a live binding row, it doesn't declare one) —
+    // this mechanism and that node type are simply not the same question. Switched to `classicFixture`
+    // (t2629's synthetic, PERMANENTLY-classic op, built for exactly this "borrowed a real op that migrated out
+    // from under the test" disease — passes-field-1613/pane-sizer-1353/pane-visual-host-1760/&c.) instead of
+    // chasing a moving target a third time.
+    const opType = await registerClassicFixture(page);
+    await customize(page, opType);
 
     // form → block: editing a row writes the canvas declaration (the param_field's dflt) — the two-way pair of
     // the face READING row dflts. Drive the real gesture: fill + input event on the rendered field.
@@ -120,23 +123,23 @@ test('values are LIVE both ways on the wizard-view face', async ({ page }) => {
     // whole pane rather than the sibling convention's narrower '#blk_userViz3dBox', because a plain form3d op
     // (no explicit `panel:`) mounts its preview through the layout2d slot's own parent instead — see WORK-LOG.
     await stopLiveSim(page, '#blk_wiz_user');
-    const dist = page.locator('#blk_wiz_user_form [data-param="dist"]');
-    await expect(dist, 'the dist row rendered').toHaveCount(1);
-    await dist.fill('42');
-    await dist.dispatchEvent('input');
+    const depth = page.locator('#blk_wiz_user_form [data-param="depth"]');
+    await expect(depth, 'the depth row rendered').toHaveCount(1);
+    await depth.fill('42');
+    await depth.dispatchEvent('input');
     await page.waitForFunction(() => {
         const walk = (bs, out = []) => { for (const b of bs || []) { if (!b) continue; out.push(b); walk(Array.isArray(b.children) ? b.children : Object.values(b.children || {}).flat(), out); walk(Array.isArray(b.uiChildren) ? b.uiChildren : Object.values(b.uiChildren || {}).flat(), out); } return out; };
-        const pf = walk(window.ddcsGetBlockProgram() || []).find((b) => b.type === 'param_field' && b.params && b.params.param === 'dist');
+        const pf = walk(window.ddcsGetBlockProgram() || []).find((b) => b.type === 'param_field' && b.params && b.params.param === 'depth');
         return pf && Number(pf.params.dflt) === 42;
     }, null, { timeout: 10_000 });
 
     // block → form: a canvas edit of another row's dflt reaches the (non-focused) form field. setFieldValue fires
     // the real Blockly change event → reproject → the tree face's structure-unchanged value sync.
     await page.evaluate(() => {
-        const blk = window.__blkws.getAllBlocks().find((b) => b.type === 'param_field' && b.getFieldValue('PARAM') === 'radius');
+        const blk = window.__blkws.getAllBlocks().find((b) => b.type === 'param_field' && b.getFieldValue('PARAM') === 'stepdown');
         blk.setFieldValue('0.75', 'DFLT');
     });
-    await expect(page.locator('#blk_wiz_user_form [data-param="radius"]'), 'the canvas dflt edit lands in the form row').toHaveValue('0.75', { timeout: 10_000 });
-    // …and the dist edit above survived (the sync did not clobber the earlier write with a stale rebuild).
-    await expect(dist).toHaveValue('42');
+    await expect(page.locator('#blk_wiz_user_form [data-param="stepdown"]'), 'the canvas dflt edit lands in the form row').toHaveValue('0.75', { timeout: 10_000 });
+    // …and the depth edit above survived (the sync did not clobber the earlier write with a stale rebuild).
+    await expect(depth).toHaveValue('42');
 });

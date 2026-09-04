@@ -58,8 +58,24 @@ const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 // (isStructCtlType, corner's own struct-param dropdowns — its OWN header calls these out: "EMIT NOTHING") —
 // together a twin's form-authoring presentation mouth, which must never be mistaken for "the real first
 // content" ahead of the execution mouth that actually carries it.
-const TRANSPARENT_CONTAINERS = new Set(['param_group', 'guard', 'section', 'setup', 'safetraverse', 'opunit']);
-const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'length_handle', 'point_handle', 'rect_handle', 'radial_handle', 'scale_handle', 'shear_handle', 'proj_length_handle', 'probe_vector_handle', 'diag_aim_handle', 'cross_aim_handle', 'cam_field', 'sim', 'preview3d', 'feature_canvas', 'simstart', 'param_table']);   // t2511 — preview3d: the 3D-only half of the sim/panel split, same metadata-only shape as sim; t2515 — 'panel' renamed 'feature_canvas'; t2517 — length_handle: BACKLOG #71 pilot, same metadata-only shape as layoutwidget; t2521 — point_handle/rect_handle/radial_handle: same shape; t2533 — scale_handle/shear_handle: same shape; t2543 — param_table: materializeParamGroup's own new SEPARATE injection target (BACKLOG #71 owner ruling) is NOT in TRANSPARENT_CONTAINERS the way the old param_group was, so without this it stops firstRealLeaf cold on every twin materialize now reaches (corner/homing etc.) — caught live by op-title-2363.test.mjs's own buried-title canary, not assumed; t2573 — diag_aim_handle: same metadata-only shape as probe_vector_handle; t2583 — cross_aim_handle: same metadata-only shape as diag_aim_handle
+// t2631 — split_horizontal/split_vertical added: never in this set since their own introduction (t2311), which
+// went unnoticed until corner (a real hand-pushed-title op, BACKLOG #71/#72's own last migration) adopted them
+// in its uiChildren — firstRealLeaf's very first call then returned the split node ITSELF as "the first real
+// leaf" (neither transparent nor metadata-only), stopping the walk into `children` before it ever reached
+// corner's own buried banner comment (caught live by op-title-2363.test.mjs's own buried-title canary, the
+// same class of catch its own t2543 entry already names for param_table). A split's own `children` is a
+// mouth-keyed {LEFT,RIGHT} object, not a plain array — firstRealLeaf below now walks it via childrenOf
+// (userOps.js, already imported), same as every other {LEFT,RIGHT}-safe walker this file already uses.
+// t2631 — group_box added too: the SAME gap, same discovery path — a group_box (rendered by MANY already-
+// migrated ops, e.g. edge/bore/drill) is a real container (has children), never previously added either;
+// firstRealLeaf never noticed because none of ITS occupants happened to be an op with a hand-pushed title
+// buried behind one until corner.
+const TRANSPARENT_CONTAINERS = new Set(['param_group', 'guard', 'section', 'setup', 'safetraverse', 'opunit', 'split_horizontal', 'split_vertical', 'group_box']);
+// t2631 — usage_text/code_preview/field_ref added: the SAME gap as group_box just above, same discovery path —
+// all three are `emit: () => []` presentation leaves (usage_text/code_preview: static UI text; field_ref:
+// references a binding's row, carries no content of its own) used by MANY already-migrated ops, never added
+// to this set either, for the same reason — no other op happened to combine them with a hand-pushed title.
+const METADATA_ONLY_LEAVES = new Set(['param_field', 'formfield', 'layoutwidget', 'length_handle', 'point_handle', 'rect_handle', 'radial_handle', 'scale_handle', 'shear_handle', 'proj_length_handle', 'probe_vector_handle', 'diag_aim_handle', 'cross_aim_handle', 'cam_field', 'sim', 'preview3d', 'feature_canvas', 'simstart', 'param_table', 'usage_text', 'code_preview', 'field_ref']);   // t2511 — preview3d: the 3D-only half of the sim/panel split, same metadata-only shape as sim; t2515 — 'panel' renamed 'feature_canvas'; t2517 — length_handle: BACKLOG #71 pilot, same metadata-only shape as layoutwidget; t2521 — point_handle/rect_handle/radial_handle: same shape; t2533 — scale_handle/shear_handle: same shape; t2543 — param_table: materializeParamGroup's own new SEPARATE injection target (BACKLOG #71 owner ruling) is NOT in TRANSPARENT_CONTAINERS the way the old param_group was, so without this it stops firstRealLeaf cold on every twin materialize now reaches (corner/homing etc.) — caught live by op-title-2363.test.mjs's own buried-title canary, not assumed; t2573 — diag_aim_handle: same metadata-only shape as probe_vector_handle; t2583 — cross_aim_handle: same metadata-only shape as diag_aim_handle; t2631 — usage_text/code_preview/field_ref: same class, see the header comment above
 /** The first REAL (non-transparent-container, non-metadata-only) leaf block reachable by walking the SAME
  *  structural chain emit() itself walks — so "does this op already open on a hand-pushed title" is answered by
  *  a block's own declared TYPE, never by its position in `.children` (a twin's title can sit two wrappers
@@ -74,7 +90,7 @@ function firstRealLeaf(list) {
             continue;
         }
         if (TRANSPARENT_CONTAINERS.has(b.type)) {
-            const found = firstRealLeaf(b.children);
+            const found = firstRealLeaf(childrenOf(b.children));
             if (found) return found;
             continue;
         }

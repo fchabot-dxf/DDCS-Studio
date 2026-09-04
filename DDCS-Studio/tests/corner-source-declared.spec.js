@@ -20,7 +20,7 @@ test('per-pass source is DECLARED from travelApproach — toggling auto↔manual
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   const read = () => page.evaluate(() => {
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     // the travelApproach SEGMENTED control (t323): the selected value = the highlighted (.seg-on) segment

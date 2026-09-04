@@ -45,19 +45,32 @@ test('the modal: corner (hasTree, form3d+2d) — form value, both visual contain
 
     // Both visual containers exist and are meaningfully sized (the exact incoherent-measurement shape t1788's
     // own investigation had to rule out first: a 0×0 wrapper around a correctly-sized child is not "exists").
+    // t2631 — corner is now tree-rendered (formWidgets.js's own nsId), so its real ids carry a `_tree` suffix;
+    // querying both the bare classic id and the `_tree` one is render-path-agnostic (harmless for any op that
+    // stays classic — the bare id alone matches for those, unchanged). Also settle: the 3D box starts
+    // `display:none` (formWidgets.js's buildVizBox) until its own mount toggles it visible, and the feature
+    // canvas's own ResizeObserver-driven viewBox is rAF-throttled (featureCanvas.js:122) — the tree pane-
+    // bodies' own settling lag (see corner-data-repos-handle.spec.js's own note), measuring immediately after
+    // fillField can catch either mid-settle. `_tree` MUST be checked FIRST: the classic shell's own bare-id
+    // markup is ALWAYS present in the DOM (unpopulated, `display:none`, dead once an op is tree-rendered) —
+    // `bare || tree` finds that dead node first and never reaches the real one (measured live: rect {0,0}).
+    await page.waitForTimeout(600);
     const geometry = await page.evaluate(() => {
-        const box3d = document.getElementById('userViz3dBox');
-        const cont3d = document.getElementById('userViz3dContainer');
-        const cont2d = document.getElementById('userVizContainer');
+        const box3d = document.getElementById('userViz3dBox_tree') || document.getElementById('userViz3dBox');
+        const cont3d = document.getElementById('userViz3dContainer_tree') || document.getElementById('userViz3dContainer');
+        const cont2d = document.getElementById('userVizContainer_tree') || document.getElementById('userVizContainer');
         const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
         return { box3d: r(box3d), cont3d: r(cont3d), cont2d: r(cont2d) };
     });
     expect(geometry.box3d && geometry.box3d.w > 50 && geometry.box3d.h > 50, `3D box must be meaningfully sized (got ${JSON.stringify(geometry.box3d)})`).toBe(true);
     expect(geometry.cont2d && geometry.cont2d.w > 50 && geometry.cont2d.h > 50, `2D container must be meaningfully sized (got ${JSON.stringify(geometry.cont2d)})`).toBe(true);
 
-    // Both actually contain a DRAWING, not just a canvas element (Addition 4's technique, reused).
-    await assertContainerHasDrawing(page, '#userViz3dContainer', 'modal 3D visual host');
-    await assertContainerHasDrawing(page, '#userVizContainer', 'modal 2D visual host');
+    // Both actually contain a DRAWING, not just a canvas element (Addition 4's technique, reused). `_tree`
+    // directly (not a `#a, #b` selector list) — corner is tree-mode, and a comma-list's querySelector picks
+    // whichever matches FIRST IN DOCUMENT ORDER, which is the dead classic-shell node here (same trap as the
+    // geometry check above, verified live for that one).
+    await assertContainerHasDrawing(page, '#userViz3dContainer_tree', 'modal 3D visual host');
+    await assertContainerHasDrawing(page, '#userVizContainer_tree', 'modal 2D visual host');
 
     // The modal's own surface (.wiz-box) is painted — the same family of check as Addition 5, on the surface
     // those t1764/t1766 CSS rules were ORIGINALLY written for (`.wiz-box, #blk_wiz_user { ... }` — .wiz-box is

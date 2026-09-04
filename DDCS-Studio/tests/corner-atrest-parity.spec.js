@@ -16,7 +16,7 @@ async function openCorner(page) {
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(400);
 }
 async function setSel(page, param, value) {
@@ -29,7 +29,7 @@ async function setProbeZ(page, on) {
     const cb = span && span.parentElement && span.parentElement.querySelector('input[type="checkbox"]');
     if (cb && !!cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); }
   }, on);
-  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer .fc-handle-move').length >= 2, { timeout: 6000 });
+  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer_tree .fc-handle-move').length >= 2, { timeout: 6000 });
   await page.waitForTimeout(300);
 }
 
@@ -41,7 +41,7 @@ const snapshot = (page) => page.evaluate(() => {
     return { p, hex, x: +m.position.x, y: +m.position.y };
   });
   // Layout px → world via the largest fc-stock rect (world [0,w]×[0,h], y flipped)
-  const cont = document.getElementById('userVizContainer'); const svg = cont.querySelector('svg');
+  const cont = document.getElementById('userVizContainer_tree'); const svg = cont.querySelector('svg');
   const rects = [...svg.querySelectorAll('rect')].map((r) => ({ r, b: r.getBoundingClientRect() }));
   const stock = rects.filter((o) => o.b.width > 40 && o.b.height > 40).sort((a, b) => b.b.width * b.b.height - a.b.width * a.b.height)[0];
   const sk = window.ddcsGetSettings().stock; const W = sk.x, H = sk.y;
@@ -96,7 +96,7 @@ test('ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST acro
 const stressSnap = (page) => page.evaluate(() => {
   const panel = window.ddcsStudio.wizardManager._activePanel; const viz = panel && panel.viz;
   const markers = (viz && viz.spindleMarkers || []).map((m) => ({ x: +m.position.x, y: +m.position.y }));
-  const cont = document.getElementById('userVizContainer'); const svg = cont.querySelector('svg');
+  const cont = document.getElementById('userVizContainer_tree'); const svg = cont.querySelector('svg');
   const rects = [...svg.querySelectorAll('rect')].map((r) => ({ r, b: r.getBoundingClientRect() }));
   const stock = rects.filter((o) => o.b.width > 40 && o.b.height > 40).sort((a, b) => b.b.width * b.b.height - a.b.width * a.b.height)[0];
   const sk = window.ddcsGetSettings().stock; const W = sk.x, H = sk.y;

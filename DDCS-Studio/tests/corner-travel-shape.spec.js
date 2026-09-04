@@ -127,7 +127,7 @@ test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (the rapi
   const r = await page.evaluate(async () => {
     const { segColor, typeOf, dashFor } = await import('/viz/toolpath2d.js');   // t1241 — typeOf/dashFor: the discriminators colour can no longer be
     const { PATH_TYPES, hexCss } = await import('/viz/pathStyle.js');
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     const segs = (panel && panel.getSegments && panel.getSegments()) || [];
@@ -137,7 +137,7 @@ test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (the rapi
 
     // real paint — sample the Layout overlay canvas: the diagonal draws LIFTED safe-travel pixels in the RAPID hue
     // (#ffcc00, t1203), NOT source-cyan. A count of that band proves the traverse is actually rendered, not just classified.
-    const c = document.querySelector('#userVizContainer .fc-anim-overlay');
+    const c = document.querySelector('#userVizContainer_tree .fc-anim-overlay');
     const ctx = c && c.getContext('2d');
     let lifted = 0;
     if (ctx) {

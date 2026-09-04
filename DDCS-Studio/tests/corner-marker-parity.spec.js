@@ -13,7 +13,7 @@ async function openCorner(page) {
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(500);
 }
 
@@ -28,7 +28,7 @@ const worlds = (page) => page.evaluate(() => {
     if (hex === 0x22d3ee) wall3d = { x: p.x, y: p.y }; else if (hex === 0xffb300) start3d = { x: p.x, y: p.y };
   });
   // Layout: reposition_pos + __simstart0 SVG px → world via the fc-stock rect (world [0,w]×[0,h])
-  const cont = document.getElementById('userVizContainer'); const svg = cont.querySelector('svg');
+  const cont = document.getElementById('userVizContainer_tree'); const svg = cont.querySelector('svg');
   const rects = [...svg.querySelectorAll('rect')].map((r) => ({ r, b: r.getBoundingClientRect() }));
   const stock = rects.filter((o) => o.b.width > 40 && o.b.height > 40).sort((a, b) => b.b.width * b.b.height - a.b.width * a.b.height)[0];
   const sk = window.ddcsGetSettings().stock; const W = sk.x, H = sk.y;
@@ -53,7 +53,7 @@ test('ANTI-GREEN: the wall marker is COINCIDENT in both panels at rest AND held 
 
   const cx0 = await paramVal(page, 'cross1_x'), cy0 = await paramVal(page, 'cross1_y');
   // real Start-drag
-  const start = await page.$eval('#userVizContainer [data-hid="__simstart0"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const start = await page.$eval('#userVizContainer_tree [data-hid="__simstart0"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   await page.mouse.move(start.x, start.y); await page.mouse.down();
   await page.mouse.move(start.x + 70, start.y + 45, { steps: 10 }); await page.mouse.up();
   await page.waitForTimeout(600);

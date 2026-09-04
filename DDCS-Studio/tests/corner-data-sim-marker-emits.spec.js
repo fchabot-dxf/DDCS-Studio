@@ -54,7 +54,7 @@ test('(B) end-to-end: the emits flag reaches the shared passStarts + the 3D rend
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   const r = await page.evaluate(() => {
-    const c = document.getElementById('userViz3dContainer');
+    const c = document.getElementById('userViz3dContainer_tree');
     const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     if (!panel || typeof panel.getPassStarts !== 'function') return { wired: false };
@@ -166,7 +166,7 @@ test('(F) cross-pane agreement: the lead pass renders HOLLOW in the Layout pane,
   await page.evaluate(() => { const t = document.querySelector('[data-tab="layout"], [data-viz-mode="2d"], .viz-tab-2d'); if (t) t.click(); });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
-    const svg = document.querySelector('#userVizContainer svg, .wiz-layout svg');
+    const svg = document.querySelector('#userVizContainer_tree svg, .wiz-layout svg');
     const el = svg && svg.querySelector('[data-hid="__simstart0"]');
     return el ? { found: true, fill: getComputedStyle(el).fill, tag: el.tagName.toLowerCase() } : { found: false };
   });

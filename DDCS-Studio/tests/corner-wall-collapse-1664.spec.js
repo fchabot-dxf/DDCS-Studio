@@ -94,11 +94,15 @@ test('BYTE-IDENTICAL EMIT: collapsing is rendering-only — Corner emits the exa
     const r = await page.evaluate(async () => {
         const DM = await import('/blocks/devMode.js');
         const BE = await import('/blocks/blockEmitter.js');
+        const { childrenOf } = await import('/blocks/userOps.js');
         const rec = await DM.reconstructUserOpBlock('user_corner_data');   // collapsed:true is now set on its guards
         const collapsedEmit = BE.emitMapped([rec.opC], {}).text;
 
         // the SAME op, with collapsed forced OFF everywhere — the counterfactual "as if this act never shipped"
-        const strip = (b) => { if (!b) return; delete b.collapsed; (b.children || []).forEach(strip); (b.uiChildren || []).forEach(strip); };
+        // t2631 — childrenOf (not a bare `.forEach`), same ARCHITECTURE.md INVARIANT #18 fix drill's own header
+        // documents: `children`/`uiChildren` can be a mouth-keyed {LEFT,RIGHT} object, not always an array —
+        // corner's own split_horizontal (new this migration) is what first exercises this helper against one.
+        const strip = (b) => { if (!b) return; delete b.collapsed; childrenOf(b.children).forEach(strip); childrenOf(b.uiChildren).forEach(strip); };
         strip(rec.opC);
         const uncollapsedEmit = BE.emitMapped([rec.opC], {}).text;
 

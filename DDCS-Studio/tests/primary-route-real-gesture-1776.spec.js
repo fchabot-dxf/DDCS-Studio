@@ -64,6 +64,9 @@ test('the primary route: bar entry -> fill -> Insert -> Blocks tab -> the Wizard
     expect(found.fieldMatch || found.codeMatch, `the Wizard View must show ${DISTINCTIVE} somewhere (field=${found.fieldMatch}, code=${found.codeMatch}, fields seen=${found.fieldCount}, code line=${found.codeSnippetAround})`).toBe(true);
 
     // 6) t1782 ADDITION 4 — the visual host must contain a DRAWING, not just a <canvas> element.
-    await assertContainerHasDrawing(page, '#blk_userViz3dContainer', '3D visual host');
-    await assertContainerHasDrawing(page, '#blk_userVizContainer', '2D visual host');
+    // t2631 — corner is now tree-rendered (formWidgets.js's own nsId), so its real pane ids carry a `_tree`
+    // suffix (modal-real-gesture-1790.spec.js's own note: a `#a, #b` selector list is unsafe here — the dead
+    // classic-shell node sits earlier in document order — so `_tree` directly, not a combined selector).
+    await assertContainerHasDrawing(page, '#blk_userViz3dContainer_tree', '3D visual host');
+    await assertContainerHasDrawing(page, '#blk_userVizContainer_tree', '2D visual host');
 });

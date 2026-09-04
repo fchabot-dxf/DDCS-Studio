@@ -20,17 +20,21 @@ test('(1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the e
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 6000 });
+  // t2631 — the feature canvas's ResizeObserver-driven viewBox is rAF-throttled (featureCanvas.js:122); grabbing
+  // a handle's boundingBox() before it settles can read a stale pre-resize (zero/detached) box (the tree
+  // pane-bodies' own settling lag — see corner-data-repos-handle.spec.js's own note).
+  await page.waitForTimeout(600);
 
   const read = () => page.evaluate(() => {
-    const box = document.getElementById('userViz3dContainer');
+    const box = document.getElementById('userViz3dContainer_tree');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
     return { start0: (panel && panel.getPassStarts()[0]) || null, code: (document.getElementById('wiz_user_code') || {}).textContent || '' };
   });
   const before = await read();
 
-  const handle = page.locator('#userVizContainer .fc-handle-sim').first();
+  const handle = page.locator('#userVizContainer_tree .fc-handle-sim').first();
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.mouse.down();

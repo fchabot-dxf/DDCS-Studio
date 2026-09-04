@@ -20,7 +20,7 @@ async function openCorner(page) {
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+  await page.waitForSelector('#userVizContainer_tree .fc-handle-sim', { timeout: 8000 });
   await page.waitForTimeout(400);
 }
 async function setSel(page, param, value) {
@@ -33,7 +33,7 @@ async function setProbeZ(page, on) {
     const cb = span && span.parentElement && span.parentElement.querySelector('input[type="checkbox"]');
     if (cb && !!cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); }
   }, on);
-  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer .fc-handle-move').length >= 2, { timeout: 6000 });
+  if (on) await page.waitForFunction(() => document.querySelectorAll('#userVizContainer_tree .fc-handle-move').length >= 2, { timeout: 6000 });
   await page.waitForTimeout(300);
 }
 const paramNum = (page, p, dflt) => page.evaluate(({ p, dflt }) => { const i = document.querySelector(`#wiz_user_form [data-param="${p}"]`); const v = i ? parseFloat(i.value) : NaN; return Number.isFinite(v) ? v : dflt; }, { p, dflt });
