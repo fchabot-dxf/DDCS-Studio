@@ -38,36 +38,19 @@ export const ATC_CHECK_BINDING_SPECS = [
 
 export const ATC_CHECK_DATA_OPTYPE = 'user_atc_check_data';
 
-/** The wrapped `user_root` template. Static shape → the template IS atcToolCheckStack(defaults). panel form3d + sim
- *  forceMachine — the built-in atcCheckView is twoPane with a 3D machine preview (preview3D + previewMachine). */
-export function atcCheckDataStack(params = ATC_CHECK_DEFAULTS) {
-    const exec = atcToolCheckStack(params);
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
-            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
-            // building the pane ATC never had content for.
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false, layout2d: false } },
-            // t2269 (wizards-as-data E2 measurement, PILOT) — the top-of-form instructional paragraph.
-            // atc_check's own static shell (index.html:901) uses .settings-hint (style: 'plain') — the SAME
-            // ATC-family class all 6 ATC shells share, genuinely different in rendered result from the
-            // majority .wiz-usage 'callout' style the 8 non-ATC shells use (see formWidgets.js's own
-            // 'usage_text' branch comment) — text copied verbatim from the shell, not paraphrased.
-            { type: 'usage_text', params: { style: 'plain', text: 'A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.' } },
-            { type: 'param_group', params: { group: 'Tool Check' }, children: [] },
-            // t2263 (wizards-as-data E2 measurement, PILOT) — the ONE node type formWidgets.js's traverse()
-            // was missing: a live code preview. atc_check's own static shell (index.html:908-911) uses the
-            // STANDARD label+tag pair every non-ATC-Table built-in shares — see formWidgets.js's own
-            // 'code_preview' branch comment for the full survey of the 15 hardcoded blocks this generalizes.
-            { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
-        ],
-        children: exec,
-    }];
+// t2603 (BACKLOG #71/#72, Phase 1 step 1) — mirrors the probe-family xFieldGroups pattern (bore/edge/rotary_*):
+// the ordered/grouped field lists this def's own uiChildren tree AND its flat bindings array both need,
+// computed ONCE, called TWICE (bootstrap stack for tree order, final stack for the bindings actually shipped).
+// Static shape (no superset/guards, per this file's own header) — derive directly, no prune wrapper needed.
+// THREE sections (TOOL & CUT, GEOMETRY, TOLERANCE), all contiguous in ATC_CHECK_BINDING_SPECS' own array order.
+function atcCheckFieldGroups(stack) {
+    const derived = deriveBindingsFor(stack, ATC_CHECK_BINDING_SPECS);
+    return {
+        TOOL_CUT: derived.filter((b) => b.section === 'TOOL & CUT'),
+        GEOMETRY: derived.filter((b) => b.section === 'GEOMETRY'),
+        TOLERANCE: derived.filter((b) => b.section === 'TOLERANCE'),
+    };
 }
-
-export const ATC_CHECK_BINDINGS = deriveBindingsFor(atcCheckDataStack(ATC_CHECK_DEFAULTS), ATC_CHECK_BINDING_SPECS);
 
 // SOURCE-CHIPS (the atcLength/corner precedent): on Expert, rewrite #5 (setterPort) + #6 (blockHeight) to the controller
 // register via the SAME srcVal/srcNote the built-in uses. Studio / no native register → resolve returns {} → byte-identical.
@@ -103,9 +86,52 @@ function applyAtcCheckRecompose(stack, resolved) {
 
 /** Build the tool-check-as-data def — the atcLengthData recipe (bindingSpecs + full recompose + source-chips). */
 export function atcCheckDataDef() {
+    // t2603 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/
+    // grouped param names atcCheckFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: atcToolCheckStack(ATC_CHECK_DEFAULTS) }];
+    const g0 = atcCheckFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2603 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../atc_change already use.
+            // Unlike atc_change/table/test, atc_check's own classic shell (`#wiz_atc_check`, index.html:915)
+            // stays retired for THIS twin's own purposes: `usage_text` reproduces its `style:'plain'` .settings-
+            // hint verbatim (the SAME ATC-family style all 6 ATC shells share, per this file's own t2269 note),
+            // matching the row-diff gate's own "reproduce the shell exactly" standard.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Tool Check' },
+                    children: [
+                        { type: 'usage_text', params: { style: 'plain', text: 'A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.' } },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOLERANCE' }, children: fieldRefsOf(g0.TOLERANCE) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2603 (Phase 1 step 2) — panel='form3d' (no 2D pane). preview3d declared ALONE — the SAME
+                // shape BACKLOG #77 found broken and t2603 fixed. Verified via atc_table's own row-diff first;
+                // this op shares the identical mechanism, not re-verified from scratch.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: true, magazine: false } },
+                ],
+            },
+        }],
+        children: atcToolCheckStack(ATC_CHECK_DEFAULTS),
+    }];
+    // t2603 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = atcCheckFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
-    const bindings = ATC_CHECK_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const def = userOpFromStack('atc_check_data', 'Tool Check (data)', atcCheckDataStack(ATC_CHECK_DEFAULTS), bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const geometry = gFinal.GEOMETRY.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...geometry, ...gFinal.TOLERANCE];
+    const def = userOpFromStack('atc_check_data', 'Tool Check (data)', stack, bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_CHECK_BINDING_SPECS;
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcCheckRecompose(stack, resolved));
     return def;

@@ -49,25 +49,9 @@ export const ATC_TEST_STRUCT_BINDINGS = [
     { param: 'descend', type: 'bool', default: ATC_TEST_DEFAULTS.descend, label: 'Descend to pocket Z', help: 'Also descend to each pocket’s taught Z at the stop (a full-height alignment check), then retract.', section: 'ATC COMMISSIONING TEST' },
 ];
 
-/** The wrapped `user_root` template — the E0 superset (both mode arms guarded), machine-frame sim (ATC = G53): FORCE the
- *  envelope + render the tool in RAW machine coords (toolMachine, like homing — atc_test is a G53 machine op, not a local
- *  probe) + the ATC magazine tiles (WITH_MAGAZINE). The pockets arm is seeded with a sample magazine so the Blocks view shows
- *  real visit-arms; instantiation recomposes it from the live magazine. */
-export function atcTestDataStack(params = ATC_TEST_DEFAULTS) {
-    const exec = atcTestStack({ ...params, magazine: (params.magazine || TEMPLATE_MAGAZINE) }, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [
-            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
-            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
-            // building the pane ATC never had content for.
-            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true, layout2d: false } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
-
-            { type: 'param_group', params: { group: 'ATC Test' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
+// t2603 (BACKLOG #71/#72/#77) — `atcTestDataStack()` (the old flat-render `user_root` wrapper) is REMOVED here —
+// `atcTestDataDef()` below now builds its own tree-shaped stack inline, and grepping the whole repo found no
+// other caller (product code or test) invoking this function by name.
 
 /** The DERIVED guard key — the EFFECTIVE mode, so pruneGuards collapses the superset to the chosen arm (an unset mode →
  *  'drawbar', the concrete default). ONE source with the concrete build (atcTestEffectiveMode). */
@@ -170,7 +154,44 @@ function applyAtcTestRecompose(stack, resolved) {
 /** Build the atc-test-as-data def — the E0 superset template + deriveGuards (the mode) + the unroll/recompose in
  *  postInstantiate. Byte-identical to atcTestStack across the mode × magazine-size × drawbar-count sweep. NO opensAs yet (E2). */
 export function atcTestDataDef() {
-    const def = userOpFromStack('atc_test_data', 'ATC Test (data)', atcTestDataStack(ATC_TEST_DEFAULTS), [...ATC_TEST_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
+    // t2603 (BACKLOG #71/#72, Phase 1 step 1) — no value bindings (every param is a plain form field, no
+    // blockIndex/match), so no two-phase derive is needed — same shape as homing/atc_table. ONE group_box
+    // (the shell's own single section, "ATC COMMISSIONING TEST").
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2603 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../atc_table already use.
+            // Like atc_table, atc_test's own CLASSIC shell (`#wiz_atc_test`, index.html:1060) is NOT retired —
+            // a real, separate, currently-live UI (atcViews.js's own panel class); this twin is simply "NOT
+            // registered/opened in-place yet (E2)" per this file's own header, so the two surfaces coexist
+            // unlinked. No usage_text precedent to reproduce from that shell — written fresh.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'ATC Test' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Commissioning test: cycle the drawbar release/lock N times and verify the sensors, or dry-run the magazine (visit each taught pocket at clearance Z, optionally descending to the taught Z at each stop). Reads the drawbar/sensor codes and the magazine from Settings → ATC.' } },
+                        { type: 'group_box', params: { title: 'ATC COMMISSIONING TEST' }, children: fieldRefsOf(ATC_TEST_STRUCT_BINDINGS) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2603 (Phase 1 step 2) — panel='form3d' (no 2D pane — layout2d:false on the old sim node).
+                // preview3d declared ALONE — the SAME shape BACKLOG #77 found broken and t2603 fixed
+                // (formWidgets.js's own preview3d-alone template now builds the box name userOpView.js's
+                // single-panel '3d'-mode branch actually mounts into). Verified via atc_table's own row-diff +
+                // targeted suite first; this op shares the identical mechanism, not re-verified from scratch.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, magazine: true, toolMachine: true } },
+                ],
+            },
+        }],
+        children: atcTestStack({ ...ATC_TEST_DEFAULTS, magazine: TEMPLATE_MAGAZINE }, { superset: true }),
+    }];
+    const def = userOpFromStack('atc_test_data', 'ATC Test (data)', stack, [...ATC_TEST_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
     def.deriveGuards = atcTestDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyAtcTestRecompose(stack, resolved);
     return def;

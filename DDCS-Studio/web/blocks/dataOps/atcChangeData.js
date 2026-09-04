@@ -65,25 +65,9 @@ export const ATC_CHANGE_STRUCT_BINDINGS = [
     { param: 'orient', type: 'bool', default: ATC_CHANGE_DEFAULTS.orient, label: 'M19 orient before unclamp', help: 'Orient the spindle (M19) before the firmware push unclamps.', section: 'TOOL CHANGE', when: { param: 'method', is: 'firmware' } },
 ];
 
-/** The wrapped `user_root` template — the E0 superset (all 5 method arms guarded), machine-frame sim (ATC = G53): FORCE the
- *  envelope + the tool in RAW machine coords (toolMachine, like atc_test/homing) + the ATC magazine tiles (WITH_MAGAZINE). */
-export function atcChangeDataStack(params = ATC_CHANGE_DEFAULTS) {
-    const exec = atcChangeStack(params, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [
-            // t2257 (BACKLOG 20) — the 'panel' node this used to carry alongside 'sim' was inert (params.panel
-            // isn't read by formWidgets.js's panel branch, which always builds a generic 2D-only box) AND
-            // collided on id with sim's own layout2d pane (both hardcode userVizContainer_tree) — removed;
-            // layout2d: false tells 'sim' to skip building that pane at all, since ATC has no param_field/
-            // block that ever declares 2D geometry for it to hold.
-            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true, layout2d: false } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
-
-            { type: 'param_group', params: { group: 'Tool Change' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
+// t2603 (BACKLOG #71/#72/#77) — `atcChangeDataStack()` (the old flat-render `user_root` wrapper) is REMOVED
+// here — `atcChangeDataDef()` below now builds its own tree-shaped stack inline, and grepping the whole repo
+// found no other caller (product code or test) invoking this function by name.
 
 /** The DERIVED guard key — the EFFECTIVE arm (from method × callMacro), so pruneGuards collapses the superset to the routed
  *  arm. ONE source with the concrete build (atcChangeEffectiveArm). */
@@ -153,7 +137,42 @@ function applyAtcChangeRecompose(stack, resolved) {
 /** Build the tool-change-as-data def — the E0 superset template + deriveGuards (the routed arm) + the M2 recompose in
  *  postInstantiate. Byte-identical to atcChangeStack across the method × callMacro × config sweep. NO opensAs yet (E2). */
 export function atcChangeDataDef() {
-    const def = userOpFromStack('atc_change_data', 'Tool Change (data)', atcChangeDataStack(ATC_CHANGE_DEFAULTS), [...ATC_CHANGE_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
+    // t2603 (BACKLOG #71/#72, Phase 1 step 1) — no value bindings (every param is a plain form field, no
+    // blockIndex/match), so no two-phase derive is needed — same shape as homing/atc_table/atc_test. ONE
+    // group_box (the shell's own single section, "TOOL CHANGE").
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2603 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../atc_table/atc_test
+            // already use. Like those two, atc_change's own CLASSIC shell (`#wiz_atc_change`, index.html:996)
+            // is NOT retired — a real, separate, currently-live UI (atcViews.js's own panel class); this twin
+            // is simply "NOT registered/opened in-place yet (E2)" per this file's own header. No usage_text
+            // precedent to reproduce from that shell — written fresh.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Tool Change' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'How the tool change happens: delegate to the controller (M6), a manual hand swap, the firmware push station, or an inline magazine/disk change. Automatic methods call your installed T.nc macro by default; uncheck to source Settings → ATC I/O inline instead.' } },
+                        { type: 'group_box', params: { title: 'TOOL CHANGE' }, children: fieldRefsOf(ATC_CHANGE_STRUCT_BINDINGS) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2603 (Phase 1 step 2) — panel='form3d' (no 2D pane). preview3d declared ALONE — the SAME
+                // shape BACKLOG #77 found broken and t2603 fixed. Verified via atc_table's own row-diff +
+                // targeted suite first; this op shares the identical mechanism, not re-verified from scratch.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, magazine: true, toolMachine: true } },
+                ],
+            },
+        }],
+        children: atcChangeStack(ATC_CHANGE_DEFAULTS, { superset: true }),
+    }];
+    const def = userOpFromStack('atc_change_data', 'Tool Change (data)', stack, [...ATC_CHANGE_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
     def.deriveGuards = atcChangeDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyAtcChangeRecompose(stack, resolved);
     // t566 — the CHOREOGRAPHY sim: the AUTOMATIC methods emit a bare `T# M6` (macroCall) or the inline body, but the preview

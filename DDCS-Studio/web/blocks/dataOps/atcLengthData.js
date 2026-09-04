@@ -43,25 +43,17 @@ export const ATC_LENGTH_BINDING_SPECS = [
 
 export const ATC_LENGTH_DATA_OPTYPE = 'user_atc_length_data';
 
-/** The wrapped `user_root` template. Static shape (no superset) → the template IS atcLengthStack(defaults), wrapped byte-
- *  transparently. panel form3d + sim forceMachine — the built-in atcLengthView is twoPane with a 3D machine preview. */
-export function atcLengthDataStack(params = ATC_LENGTH_DEFAULTS) {
-    const exec = atcLengthStack(params);
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
-            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
-            // building the pane ATC never had content for.
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false, layout2d: false } },
-            { type: 'param_group', params: { group: 'Tool Length' }, children: [] },
-        ],
-        children: exec,
-    }];
+// t2603 (BACKLOG #71/#72, Phase 1 step 1) — mirrors atcCheckFieldGroups' own header: the ordered/grouped field
+// lists this def's own uiChildren tree AND its flat bindings array both need, computed ONCE, called TWICE
+// (bootstrap stack for tree order, final stack for the bindings actually shipped). Static shape (no superset/
+// guards) — derive directly, no prune wrapper needed. TWO sections (TOOL & CUT, GEOMETRY), both contiguous.
+function atcLengthFieldGroups(stack) {
+    const derived = deriveBindingsFor(stack, ATC_LENGTH_BINDING_SPECS);
+    return {
+        TOOL_CUT: derived.filter((b) => b.section === 'TOOL & CUT'),
+        GEOMETRY: derived.filter((b) => b.section === 'GEOMETRY'),
+    };
 }
-
-export const ATC_LENGTH_BINDINGS = deriveBindingsFor(atcLengthDataStack(ATC_LENGTH_DEFAULTS), ATC_LENGTH_BINDING_SPECS);
 
 // SOURCE-CHIPS (the corner/edge precedent): on Expert (window.ddcsResolveProbeSources present), rewrite #5 (setterPort) +
 // #6 (blockHeight) to the controller register via the SAME srcVal/srcNote the built-in uses. Applied POST-instantiate
@@ -106,10 +98,52 @@ function applyAtcLengthRecompose(stack, resolved) {
  *  recompose + source-chips in postInstantiate, so the twin is byte-identical to atcLengthStack BY CONSTRUCTION,
  *  on ALL scalars, BOTH profiles, AND every dialect (t1894 — the recompose is what makes THAT last one true). */
 export function atcLengthDataDef() {
+    // t2603 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/
+    // grouped param names atcLengthFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: atcLengthStack(ATC_LENGTH_DEFAULTS) }];
+    const g0 = atcLengthFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2603 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../atc_check already use.
+            // Unlike atc_check, this op's own classic shell (`#wiz_atc_length`, index.html:894) has NO real
+            // input fields at all (per this file's own t2383 note — just a settings-hint + a button) — so
+            // there is no shell usage_text to reproduce verbatim; written fresh, matching every other twin's
+            // own quality bar.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Tool Length' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Touches off the tool setter to write the current tool\'s length into the tool-length table. Setter pin/level, block height, feeds, safe Z, and max distance all live in Settings → ATC / Probes, not here.' } },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2603 (Phase 1 step 2) — panel='form3d' (no 2D pane). preview3d declared ALONE — the SAME
+                // shape BACKLOG #77 found broken and t2603 fixed. Verified via atc_table's own row-diff first;
+                // this op shares the identical mechanism, not re-verified from scratch.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: true, magazine: false } },
+                ],
+            },
+        }],
+        children: atcLengthStack(ATC_LENGTH_DEFAULTS),
+    }];
+    // t2603 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = atcLengthFieldGroups(stack);
     // tag the source-chip bindings so the form greys them when 'ctrl'-sourced (the value then comes from the register).
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
-    const bindings = ATC_LENGTH_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const def = userOpFromStack('atc_length_data', 'Tool Length (data)', atcLengthDataStack(ATC_LENGTH_DEFAULTS), bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const geometry = gFinal.GEOMETRY.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...geometry];
+    const def = userOpFromStack('atc_length_data', 'Tool Length (data)', stack, bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_LENGTH_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcLengthRecompose(stack, resolved));
     return def;

@@ -1432,14 +1432,25 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
                 <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
             </div>
-        </div>` : `
+        </div>` : (
+        // t2603 (BACKLOG #77) — the 3D-only (no 2D pane) box is named `userVizBox`/`userVizContainer`
+        // (the "2D" base), NOT `userViz3dBox`/`userViz3dContainer`, on purpose: userOpView.js's own
+        // single-panel `pt.mode==='3d'` branch (the ONLY consumer of a standalone `preview3d` node — it hides
+        // `userViz3dBox` and mounts into `vid('userVizContainer')` instead, reusing the "2D" box as its one
+        // shared single-pane target in EITHER single-panel mode — the SAME thing the classic shell's own
+        // static markup has always done). Both sides already run every id through the SAME `vizBase`/`vid`
+        // resolver (t2323) — this was never a missing resolver, it was the two sides picking DIFFERENT
+        // logical box names for the identical case. Matching the branch's own existing choice here (rather
+        // than changing the branch to match this template) keeps the fix local to this never-yet-shipped
+        // template and untouched in the shared classic/flat render path multiple already-live ops still use.
+        `
         <span class="section-label">VISUALIZATION</span>
         <div class="viz-split">
-            <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d">
-                <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
-                <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
+            <div class="viz-container" id="${nsId('userVizBox_tree')}" data-viz-pane="preview3d">
+                <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
+                <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
             </div>
-        </div>`;
+        </div>`);
         container.appendChild(box);
         import('./paneAccordion.js').then((m) => m.makePanesCollapsible(box)).catch(() => {});
     };
@@ -1603,11 +1614,16 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                         <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
                     </div>
                 </div>` : `
+                <!-- t2603 (BACKLOG #77) — same fix as buildVizBox's own has2d:false branch above: named
+                     userVizBox/userVizContainer (not userViz3dBox/userViz3dContainer), matching what
+                     userOpView.js's single-panel '3d' branch actually mounts into. Dead in practice today
+                     (a migrated op replaces this whole 'sim' node with preview3d+feature_canvas, per Phase 1's
+                     own convention), fixed anyway so the SAME latent bug isn't left for whoever next reads it. -->
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d">
-                        <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
-                        <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
+                    <div class="viz-container" id="${nsId('userVizBox_tree')}" data-viz-pane="preview3d">
+                        <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
+                        <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
                     </div>
                 </div>`;
 

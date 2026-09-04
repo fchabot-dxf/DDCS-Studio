@@ -50,25 +50,9 @@ function liveTable() {
     return { tools: Array.isArray(a.tools) ? a.tools : [], magazine: Array.isArray(a.magazine) ? a.magazine : [] };
 }
 
-/** The wrapped `user_root` template — the E0 superset (both include sections guarded), machine-frame sim (envelope + the
- *  magazine tiles; a no-motion op → the preview is the bare envelope + rack). Seeded with the live table so the Blocks view
- *  shows real rows; instantiation regenerates from the live table. */
-export function atcTableDataStack(params = ATC_TABLE_DEFAULTS) {
-    const t = liveTable();
-    const exec = atcTableStack({ ...params, tools: params.tools || t.tools, magazine: params.magazine || t.magazine }, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [
-            // t2257 (BACKLOG 20) — 'panel' removed (inert + id-collided with sim's own layout2d pane — see
-            // atcChangeData.js's own comment for the full reasoning); layout2d: false tells 'sim' to skip
-            // building the pane ATC never had content for.
-            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true, layout2d: false } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
-
-            { type: 'param_group', params: { group: 'Tool Table' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
+// t2601/t2603 (BACKLOG #71/#72/#77) — `atcTableDataStack()` (the old flat-render `user_root` wrapper) is
+// REMOVED here — `atcTableDataDef()` below now builds its own tree-shaped stack inline, and grepping the whole
+// repo found no other caller (product code or test) invoking this function by name.
 
 /** The DERIVED guard keys — the include sections (+ the post-dependent pockets/no-ATC fork), so pruneGuards collapses the
  *  superset to the chosen toggles. ONE source with the concrete build (atcTableGuardKeys). */
@@ -87,7 +71,49 @@ function applyAtcTableRecompose(stack, resolved) {
 /** Build the tool-table-as-data def — the E0 superset template + deriveGuards + the live-view recompose. Byte-identical to
  *  atcTableStack across the toggle × table-size sweep. NO opensAs yet (E2). */
 export function atcTableDataDef() {
-    const def = userOpFromStack('atc_table_data', 'Tool Table (data)', atcTableDataStack(ATC_TABLE_DEFAULTS), [...ATC_TABLE_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
+    // t2601 (BACKLOG #71/#72, Phase 1 step 1) — no value bindings (every param is a plain bool toggle or the
+    // `_setup` action button), so no two-phase derive is needed — same shape as homing. ONE group_box (the
+    // shell's own single section, "TOOL TABLE → CONTROLLER").
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2601 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../homing already use.
+            // Unlike every op migrated so far, atc_table's own CLASSIC shell (`#wiz_atc_table`, index.html:967)
+            // is NOT retired — it is a real, separate, currently-live UI (atcViews.js's own panel class); this
+            // twin is simply "NOT registered/opened in-place yet (E2)" per this file's own header, so the two
+            // surfaces coexist unlinked rather than one having replaced the other. No usage_text precedent to
+            // reproduce from that shell (it renders its own bespoke markup, an unrelated code path) — written
+            // fresh, matching every other twin's own quality bar.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Tool Table' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'A live view over Settings → ATC: writes the tool-length table and/or the magazine pocket positions from whatever the tool library and magazine currently hold — edit the table in Settings, not here. This op stores only which sections to write.' } },
+                        { type: 'group_box', params: { title: 'TOOL TABLE → CONTROLLER' }, children: fieldRefsOf(ATC_TABLE_STRUCT_BINDINGS) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2601 (Phase 1 step 2) — panel='form3d' (no 2D pane — layout2d:false on the old sim node,
+                // since ATC has no param_field/block that ever declares 2D geometry). preview3d declared ALONE,
+                // with NO adjacent feature_canvas sibling. t2603 (BACKLOG #77) — this is the case that was
+                // FOUND BROKEN and FIXED this turn: formWidgets.js's own preview3d-alone template now builds
+                // the SAME logical box name (`userVizBox`/`userVizContainer`) userOpView.js's own single-panel
+                // `'3d'`-mode branch already mounts into, instead of the `userViz3dBox`/`userViz3dContainer`
+                // name that branch never looked up. Verified live before shipping (a scratch probe, 2 real
+                // canvases mounted, zero console errors) — not re-attempted blind.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, magazine: true, toolMachine: true } },
+                ],
+            },
+        }],
+        children: atcTableStack({ ...ATC_TABLE_DEFAULTS, tools: liveTable().tools, magazine: liveTable().magazine }, { superset: true }),
+    }];
+    const def = userOpFromStack('atc_table_data', 'Tool Table (data)', stack, [...ATC_TABLE_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
     def.deriveGuards = atcTableDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyAtcTableRecompose(stack, resolved);
     return def;

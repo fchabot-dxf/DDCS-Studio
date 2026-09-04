@@ -7741,6 +7741,18 @@ container ids at all). This is the SAME root cause blocking `atcChangeData`/`atc
 shape, not re-attempted — one root-caused reproduction is sufficient) AND resolves `atcCheckData`/`atcLengthData`
 from "unverified" to "confirmed blocked, same reason." Full account: WORK-LOG t2601.
 
+**t2603 — BACKLOG #77 FIXED; all 5 blocked ATC ops migrated.** The advisor's own first-drafted diagnosis ("`vid()`
+needs a declared resolver") was checked against the code before dispatch and found wrong — `vizBase`/`vid`
+(t2323) already IS that resolver, on both sides. The real gap: `formWidgets.js`'s `preview3d`-alone fallback and
+`userOpView.js`'s single-panel `'3d'`-mode branch each correctly ran their own id through the SAME resolver, but
+picked DIFFERENT logical box names for the identical case — a naming disagreement, not a missing declaration,
+invisible to the `_tree`-id census because neither side hardcoded a raw id. Fixed by making the (never-yet-
+shipped) tree fallback build the name the branch already asks for — verified live first (0→2 canvases, zero
+errors) before shipping — rather than changing the branch and reaching classic mode's own shared, already-
+working dispatch for multiple live ops. Migrated all 5: `atc_table_data`, `atc_test_data`, `atc_change_data`,
+`atc_check_data`, `atc_length_data` — each with its own row-diff test, a live canvas-mount proof, and its own
+full pre-existing suite green. Full account: WORK-LOG t2603.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it
@@ -8129,30 +8141,41 @@ Expert CAM/param fields are only `-t0` int / `-t1` dec / `-t2` enum; `#` vars ar
 on the controller pendant is impossible — any future "named label on the pendant" idea runs into this same
 wall. (Migrated from memory, t2585.)
 
-### 77. Tree-mode's `preview3d`-alone declaration mounts NO canvas — the 3D-only (`panel:'form3d'`) shape was
-never wired, blocking 4 ops from Phase 1
+### 77. [✅ FIXED t2603] Tree-mode's `preview3d`-alone declaration mounted NO canvas — the 3D-only
+(`panel:'form3d'`) shape was never wired, blocking 5 ops from Phase 1 (the entry's own count was wrong when
+first filed — reconciled below)
 
-[OPEN, root-caused t2601, not fixed] `formWidgets.js`'s own tree-mode adjacency-merge (the mechanism that lets a
+**t2601 — root-caused, not fixed.** `formWidgets.js`'s own tree-mode adjacency-merge (the mechanism that lets a
 `preview3d`+`feature_canvas` sibling pair render the SAME combined box the old `sim` node did) is proven correct
-ONLY for the DUAL-mode case (`panel:'form3d+2d'`, `userOpView.js`'s own `pt.mode==='3d2d'` branch, which mounts
-into `vid('userViz3dContainer')`). A `preview3d` node declared ALONE (no `feature_canvas` sibling, matching
-`panel:'form3d'` — a 3D-only op with no 2D content) falls through to `formWidgets.js`'s own documented fallback
-(`buildVizBox(container, false)`), which builds `userViz3dBox_tree`/`userViz3dContainer_tree` — but
-`userOpView.js`'s own SEPARATE single-panel `'3d'`-mode branch (line ~862) looks up `vid('userVizContainer')`
-instead (the 2D-shaped id — the classic shell apparently reuses it as its shared single-box mount point in
-either single-panel mode). The ids never match, so `mgr.preview3D(...)` gets called against a container that
-doesn't exist in the tree-mode DOM, and literally zero canvases mount anywhere. CONFIRMED LIVE (t2601): attempted
-on `atc_table_data`, reproduced deterministically, root-caused by reading `userOpView.js`'s own three dispatch
-branches directly, not guessed.
+ONLY for the DUAL-mode case (`panel:'form3d+2d'`). A `preview3d` node declared ALONE (no `feature_canvas`
+sibling, matching `panel:'form3d'` — a 3D-only op) mounted zero canvases. CONFIRMED LIVE: attempted on
+`atc_table_data`, reproduced deterministically.
 
-**Blocks 4 ops from Phase 1** (BACKLOG #72): `atcChangeData`, `atcTableData`, `atcTestData` (all `panel:'form3d'`,
-attempted-then-reverted on atc_table specifically) and `atcCheckData`/`atcLengthData` (t2597's own "unverified
-panel kind" flag — this finding resolves them to confirmed-blocked, same reason). `commData` (`panel:'commscreen'`)
-remains a SEPARATE, still-genuinely-unverified panel kind — not this defect, not yet checked either way.
+**t2603 — CORRECTED DIAGNOSIS, then fixed.** The advisor's own first-drafted framing ("`vid()` is missing a
+declaration") was checked against the code before being sent and found wrong: `vizBase`/`vid` (`userOpView.js:
+699-702`, added t2323) already IS that one-declaration resolver, and BOTH sides already run every id through it.
+The real shape: `formWidgets.js`'s `preview3d`-alone fallback built `userViz3dBox_tree`/`userViz3dContainer_tree`
+(the 3D-named base); `userOpView.js`'s own single-panel `'3d'`-mode branch (`vid('userVizContainer')`, reusing
+the "2D" box as its one shared single-pane target — the SAME thing the classic shell's own static markup has
+always done) asked for `userVizBox_tree`/`userVizContainer_tree` instead. Both correctly suffixed, both run
+through the same resolver — the two sides simply picked DIFFERENT logical box names for the identical case, and
+neither side hardcoded a raw id, which is exactly why the 73-file `_tree`-id census never caught it.
 
-**What closing this would take**: either `formWidgets.js`'s own `preview3d`-alone template needs to build
-whatever id the classic `'3d'`-mode branch actually looks up (`userVizContainer_tree`, reusing the 2D-shaped id
-the same way the classic shell does), OR `userOpView.js`'s own `'3d'`-mode branch needs to look up the 3D-shaped
-id tree-mode already builds (`userViz3dContainer_tree`) instead. Either is a real, scoped change to shared
-rendering code (not a five-minute fix, not a test-only fix) — which side adapts to which is a design choice for
-whoever picks this up, not obvious from the investigation alone. Full account: WORK-LOG t2601.
+**FIX, measured not argued**: two forks were possible — (a) make the tree fallback build the base the branch
+already asks for (local to `formWidgets.js`'s own never-yet-shipped template), or (b) make the `'3d'` branch ask
+for the 3D-named box (reaches `userOpView.js`'s shared dispatch, used by every op — classic AND tree — with
+`panel:'form3d'`, several of them already shipped and working). Fork (a) was implemented and verified live
+first (a scratch probe: 0 canvases → 2 canvases, zero console errors) before being written into the real
+migration — fork (b)'s own blast radius (touching working classic-mode rendering for multiple shipped ops) was
+never worth risking once (a) was proven sufficient and fully local. Applied the identical fix to the analogous
+`sim`-node branch (dead code today — no migrated op keeps a `sim` node — fixed anyway for consistency, so the
+same latent bug isn't left for whoever next reads it).
+
+**Reconciled count**: the entry's own heading said "4 ops," its own body named 5 (`atcChangeData`/`atcTableData`/
+`atcTestData`/`atcCheckData`/`atcLengthData`) — 5 was correct, the heading undercounted. **All 5 are now
+migrated and green** (t2603): `atc_table_data`, `atc_test_data`, `atc_change_data` (the "hardest of the ATC
+set" per its own file header — no additional complexity survived the migration, since only the FORM tree was
+touched, not the recompose/emit machinery), `atc_check_data`, `atc_length_data` — each verified with its own
+row-diff test plus a live "does a real canvas mount" proof, plus its own full pre-existing test suite. `commData`
+(`panel:'commscreen'`) remains a SEPARATE, still genuinely unverified panel kind — not this defect, not yet
+checked either way. Full account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).

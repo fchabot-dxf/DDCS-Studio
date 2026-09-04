@@ -73878,3 +73878,121 @@ across homing/io_step, minus the reverted atc_table attempt's own 3 tests never 
 row-diff test files, 4 fixed pre-existing homing test files, this WORK-LOG entry, BACKLOG.md — `atcTableData.js`
 and its attempted test file leave NO trace (confirmed via `git status`/`git diff --stat`, both empty).
 
+## turn 2603 — BACKLOG #77 fixed (a naming disagreement, not a missing declaration — the advisor's own first
+diagnosis was checked against the code and corrected before it cost a turn); all 5 blocked ATC ops migrated;
+zero registry/panel-shape machinery built
+
+### THE ADVISOR'S OWN CORRECTION, held to the same standard as anything else — checked, not repeated
+
+The dispatch arrived already carrying a self-correction: the advisor's OWN first-drafted theory (#77 and the
+73-file `_tree`-id gap are one mechanism, fixable by declaring the id resolution once) was read against the code
+before being sent, and found wrong — `vizBase`/`vid` (`userOpView.js:699-702`, added t2323, proven byte-identical
+in flat mode by `geometry-seam-tree-mode-2323.spec.js`) already IS that one-place resolver. Re-read the same
+three lines this turn to confirm independently rather than take the correction on faith: `vizBase`/`vid`/`vel`
+are called by EVERY branch (`'3d2d'`, `'3d'`, `'2d'`, `commscreen`), no branch bypasses them, no raw id is ever
+looked up directly. Confirmed: the resolver was never the gap.
+
+### WHAT #77 ACTUALLY IS — read precisely, not just re-described
+
+`formWidgets.js`'s `buildVizBox(container, has2d=false)` (the `preview3d`-alone template) builds
+`userViz3dBox_tree`/`userViz3dStatus_tree`/`userViz3dContainer_tree` — the SAME 3D-named ids the DUAL-mode
+(`has2d=true`) branch uses for its own 3D half. `userOpView.js`'s own single-panel `pt.mode==='3d'` branch
+(line 862-868) does something genuinely different from the dual-mode branch: it explicitly HIDES `viz3dBox`
+(`vel('userViz3dBox')`, line 863) and mounts into `vid('userVizContainer')` instead — the "2D"-named base,
+reused as the single shared box in EITHER single-panel mode (`'3d'` or `'2d'`), matching what the classic
+shell's own static markup has always done (one shared box, repurposed by mode, not two separate boxes). BOTH
+sides run their own chosen base through the identical `vizBase`/`vid` resolver — the resolver did its job on
+both. **The two sides simply picked DIFFERENT logical box names for the identical `panel:'form3d'` case** — a
+naming disagreement between two pieces of code that agree on EVERYTHING except which string to call the box —
+and it is invisible to the 73-file `_tree`-id census specifically BECAUSE neither side hardcodes a raw id; the
+census greps for hardcoded ids in TESTS, and this bug lives entirely in PRODUCT code that already does the
+right general thing (run everything through the resolver) while disagreeing on the one input to it.
+
+### THE FORK, measured not argued
+
+**(a)** Make the tree fallback build the base the `'3d'` branch already asks for (`userVizBox_tree`/
+`userVizContainer_tree` instead of `userViz3dBox_tree`/`userViz3dContainer_tree`) — local to `formWidgets.js`'s
+own `has2d:false` template, a branch NO shipped op has ever exercised (confirmed: the only prior attempt,
+t2601's own atc_table try, was reverted before landing) — so this fork touches literally zero working code.
+
+**(b)** Make the `'3d'` branch ask for the 3D-named box instead — reaches `userOpView.js`'s own SHARED dispatch,
+used by every op with `panel:'form3d'` regardless of render path, including several ALREADY-SHIPPED classic-mode
+ops (`atcCheckData`/`atcLengthData`/`atcWarmupData` and, before this turn, atc_change/table/test themselves) —
+the dispatch's own TIER instruction ("full suite, unconditional — fork (b) reaches flat mode") named this risk
+correctly before I'd even picked.
+
+**Measured, not merely reasoned about**: implemented fork (a) and verified it live BEFORE writing it into any
+real migration — a scratch probe against a hand-built `atc_table_data` template went from the KNOWN-BROKEN
+0-canvases symptom to 2 real canvases mounted, zero console errors. Did NOT implement fork (b) to compare
+symmetrically — its own blast radius (shared dispatch code, multiple already-working classic-mode consumers) was
+established by reading `userOpView.js` directly (the `'3d'` branch's own explicit `viz3dBox.style.display='none'`
++ `vid('userVizContainer')` pairing, and confirming via `panelType('form3d')` that this dispatch path is NOT
+gated on `isTree` — it runs for classic-rendered ops too), which is sufficient evidence that (a)'s near-zero risk
+(a template branch nothing has ever shipped through) dominates without needing to also build (b) and watch it
+pass, just to prove the more-obviously-risky option was in fact riskier. **Recommendation, with the measurement
+behind it: fork (a).** Applied to BOTH `formWidgets.js`'s own `has2d:false` templates — `buildVizBox`'s own
+(the one every future `preview3d`-alone migration reaches) and the legacy `sim`-node's own analogous branch
+(dead code today, since a migrated op replaces `sim` with `preview3d`+`feature_canvas` by convention — fixed
+anyway so the same latent bug isn't rediscovered cold by whoever next reads that branch).
+
+**No registry, no panel-shape map** — per the dispatch's own explicit prohibition and matching this project's
+own declare-vs-handroll discipline in the OTHER direction for once: the resolver already exists (`vizBase`/
+`vid`), this was one case of two pieces of code disagreeing on an input to it, not a missing abstraction. Two
+`id`-string literal changes, four lines total.
+
+### #77's OWN COUNT, reconciled
+
+The entry's heading said "blocks 4 ops," its own body named 5 (`atcChangeData`/`atcTableData`/`atcTestData`/
+`atcCheckData`/`atcLengthData`). 5 was correct — the heading undercounted, most likely a copy-edit slip from an
+earlier draft that named 4 before `atcCheckData`/`atcLengthData` were folded in. Fixed in place at BACKLOG #77.
+
+### ALL 5 BLOCKED OPS MIGRATED — same bar, same per-op verification, none needed a second stop
+
+`atc_table_data` (already attempted at t2601, now completed): 3 struct bindings, one section, no derive needed.
+`atc_test_data`: 7 struct bindings, one section ("ATC COMMISSIONING TEST"), no derive. `atc_change_data` — "THE
+HARDEST of the ATC set" per its own file header (5 routed method arms, a static-arm edit-graft recompose, a
+declared live-view arm) — turned out to cost NO extra migration effort: the complexity lives entirely in
+`children`/`postInstantiate`, untouched by a pure `uiChildren` restructuring; 9 struct bindings, one section
+("TOOL CHANGE"). `atc_check_data`: the FIRST of the five with real value bindings (8, `match:{type}`-based,
+static shape — no superset/guards) — needed the full `atcCheckFieldGroups` two-phase pattern (bore/edge/
+rotary_* precedent), THREE contiguous sections (TOOL & CUT/GEOMETRY/TOLERANCE). `atc_length_data`: 7 value
+bindings, TWO sections, same two-phase pattern — its own classic shell has NO real input fields at all (per a
+pre-existing t2383 note in the file), so unlike every other op this turn there was no shell text to reproduce;
+`usage_text` written fresh anyway, matching this arc's own established quality bar. All five: `atcXDataStack()`
+removed (no external consumer, confirmed by grep, same as t2601's own precedent) and a THIRD test added per op
+beyond the usual row-diff pair — a live "does a real canvas mount, is the 2D pane genuinely invisible" proof,
+directly exercising BACKLOG #77's own fix rather than assuming the row-diff pair covers it (row-diff never opens
+a real page, so it could not have caught the original bug on its own).
+
+**A real Playwright gotcha caught and fixed while writing that third test**: the first draft checked
+`getComputedStyle(el).display !== 'none'` for "is the 2D pane visible" and got a FALSE POSITIVE — the classic
+shell's own static 2D pane element reports `display:flex` on ITSELF while its ANCESTOR `.wiz-visual` is
+`display:none` (t2323's own hiding mechanism) — `getComputedStyle` on a leaf only ever reports THAT element's
+own CSS property, never accounting for an ancestor collapsing the whole subtree. Fixed by checking
+`element.offsetParent !== null` instead (a real "does this actually paint" check). Applied identically across
+all 5 ops' own third test once found on the first (`atc_table_data`).
+
+### PER-OP COST
+
+The fork measurement + BOTH `formWidgets.js` fixes: ~30 min (including re-reading `userOpView.js`'s own three
+dispatch branches fresh, not from memory, to independently confirm the advisor's own correction). `atc_table_data`
+(already scaffolded from t2601's own reverted attempt): ~15 min. `atc_test_data`: ~15 min (same shape, no new
+finding). `atc_change_data`: ~15 min (same shape despite the file's own "hardest" framing — the complexity
+never touches the form tree). `atc_check_data`: ~25 min (first WITH value bindings — the two-phase pattern +
+the `offsetParent` visibility-check gotcha, found and fixed once, reused for free on the remaining ops).
+`atc_length_data`: ~15 min (same shape as atc_check, gotcha already known). Total: ~2h for one root-caused
+product fix (4 lines) plus 5 full op migrations — cheap relative to t2599/t2601's own per-op costs specifically
+BECAUSE each new mechanism finding this arc keeps getting reused rather than rediscovered.
+
+### VERIFY
+
+Per-op targeted run (own pre-existing suite + `param-group-table-separation-2543.spec.js`, the t2531 canaries):
+atc_table 10/10, atc_test 14/14, atc_change 12/12, atc_check 9/9, atc_length 9/9 — all green, including the new
+canvas-mount proof, before moving to the next op. Node tier (`npm run test:node`): 238/238 (confirming the
+`formWidgets.js` edit didn't disturb anything the architecture-map or node-tier suite cites). Full suite
+(unconditional per the dispatch's own TIER instruction): **3120 passed, 0 failed, 28 skipped (37.6m), exit code
+0.** Up from t2601's own 3100 (5 new row-diff files × ~4 tests each) — zero regressions, confirming fork (a)'s
+own containment claim held under the real shared-suite check, not just the targeted runs. `git status`:
+`atcChangeData.js`/`atcCheckData.js`/`atcLengthData.js`/`atcTableData.js`/`atcTestData.js`/`formWidgets.js`, 5
+new row-diff test files, this WORK-LOG entry, BACKLOG.md (the #77 rewrite + its own #72 sub-note).
+
