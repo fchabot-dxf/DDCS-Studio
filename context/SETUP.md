@@ -53,8 +53,9 @@ the two have different networks, different hardware, and different rules.
   ⚠ **The old caution still holds for the OTHER direction**: presence cannot be inferred from *which seat is
   talking*. They are on a phone, in every conversation at once. It is the **controller being on** that says
   they are there — not the fact that Fairy is the one being addressed.
-  ⚠ **This is a discipline, not a physical interlock.** If it were ever left on unattended, the inference
-  breaks — so it is worth re-confirming after any long gap, not before every command.
+  ⭐ **Reaffirmed, unprompted:** *"im never leaving the expert on if im away."* ⇒ Treat it as reliable, not
+  as a probably. ⛔ **Do not re-litigate it, and do not add a "just checking you're there" to requests** —
+  that is the exact tax this rule removes, and asking again reads as not having listened.
 - ⭐ **The bench V4.1 is exempt entirely** — it is MOTORLESS and left on 24/7 ([`SEATS.md`](SEATS.md)). Nothing
   there can crash, so presence is not a question at all.
 - **Read-only is always safe**: file reads over SMB, `eng`/`setting` decoding, ping.
