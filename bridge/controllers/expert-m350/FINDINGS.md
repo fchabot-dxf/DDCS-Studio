@@ -1728,3 +1728,48 @@ the rapid `G53 Z#637` descent **through** the setter before any `G31` runs. It a
 `fndY.nc`, so homing stops syncing A to Y and **racks the gantry** (observed: A `−5.178` vs Y `−5.000`).
 ⇒ ⛔ **After ANY flash, assume every system macro is factory until verified** — and verify by content, not by
 file size or a hash against a stale capture.
+
+### 28. ⭐⭐⭐ THE WHOLE PARAMETER TABLE IS READABLE OVER MODBUS — one formula `[CONFIRMED 2026-08-26]`
+*(Firmware `2026-09-02-00`, read-only FC03, slave 1, COM6 @ 115200 8N1.)*
+
+```
+Modbus register = 6500 + 2 × (setting index)        word-swapped float32, LOW WORD FIRST
+```
+
+**Verified on 21 parameters, 21/21 exact**, spread across the whole table and checked against
+`SYSDISK/setting` decoded independently:
+
+| param | reg | value | | param | reg | value |
+|---|---|---|---|---|---|---|
+| `#64` Maximum speed | 6628 | 12000 | | `#166` X positive soft limit | 6832 | 756 |
+| `#82` Max spindle speed | 6664 | 24000 | | `#279` Modbus RTU | 7058 | 2 |
+| `#122-124` home positions | 6744-48 | 5 / −5 / −5 | | `#295` Feed rate max | 7090 | 300 |
+| `#131/132` probe count/speed | 6762/64 | 2 / 800 | | `#305` **G54 X** | 7110 | 50.130 |
+| `#135-137` fixed probe XYZ | 6770-74 | 682 / −775 / −3 | | `#400` H01 tool length | 7300 | 0 |
+| `#155` soft limits enabled | 6810 | 1 | | `#930` **T01 Z offset** | 8360 | −68.336 |
+
+⭐⭐ **THIS CLOSES THE ADDRESS CHAIN.** Every representation of a controller value is now one index:
+```
+macro #N   ↔   setting[N−500]   ↔   eng entry #(N−500)   ↔   Modbus reg 6500 + 2×(N−500)
+```
+⇒ The `7080` / `7260` / `10002` position registers were never special — `7080 = 6500 + 2×290` and
+`7260 = 6500 + 2×380`. They are **the same flat space**, and `7100` is `setting[300]`, the WCS table's
+row 0, which reads `47.650` over Modbus exactly as it does in the file.
+
+⇒ ⭐ **The bridge can read the entire machine state live over serial** — WCS table, tool table, soft limits,
+probe config, positions — with **no SMB, no file, no staleness question**. That is a materially better
+instrument than the file for anything the app pulls.
+
+⚠ **NOT yet established:** whether the position slots TRACK during motion or only reflect the last flush.
+The machine was stationary, and the file happened to agree with Modbus on every slot, so the two cannot be
+separated from this session. ⇒ **One jog while polling settles it** — a bench item, human present.
+
+### The flash did NOT move anything `[CONFIRMED]`
+`2026-09-02-00`'s only release note is *"Expanded Modbus register address mapping."* Re-probed after the
+flash: `7080` / `7260` / `10002` return **identical values** to the pre-flash baseline (§26). ⇒ the release
+**ADDED** reach, it did not relocate what existed. ⛔ Do not treat a Modbus firmware note as a reason to
+re-derive addresses without measuring first.
+
+⚠ **A discovery trap worth keeping:** the slave answers **every** address, returning zeros for unmapped
+ones — no exception frames. So "does it answer?" maps nothing; only **non-zero content** does. The populated
+region is roughly `6600`–`9101`.
