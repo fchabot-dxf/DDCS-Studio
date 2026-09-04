@@ -74377,3 +74377,127 @@ run — both regressions are gone at the real gate, not just in a targeted spec.
 `git status`: `web/ui/formWidgets.js` (the `sectionizeFor` extraction + `group_box` parity fix),
 `tests/interpass-connector-1235.spec.js` (the `VIZ_CONTAINER_SEL` fix), this WORK-LOG entry.
 
+## turn 2613 — THE PARITY AUDIT: renderOpForm vs renderUiTree/traverse compared behaviour by behaviour, reach
+measured live per candidate. One more REAL, measured divergence found (group_box order has no SECTION_RANK
+equivalent — 3/13 order-relevant ops mismatch). List only, nothing fixed. Verify-rule placed in
+`context/VERIFICATION-DISCIPLINE.md` as rule 17.
+
+### WHY MOST OF renderOpForm'S OWN BEHAVIOUR IS STRUCTURALLY SHARED, NOT AT RISK
+
+Read both functions in full before listing anything. The key architectural fact that shapes this whole audit:
+`userOpView.js`'s real render call (`render()`, line ~433) ALWAYS calls `renderOpForm(tempHost, binds)` FIRST,
+into a detached scratch container, THEN builds `byParam` from the resulting rows, THEN calls `renderUiTree(host,
+uiChildren, bindings, byParam, ...)` — which RELOCATES those SAME pre-built DOM row elements via `field_ref`
+(`container.appendChild(byParam[paramName].row)`), it never re-renders them. So every PER-ROW behaviour
+`addRow`/`renderUnit` produces — `.form-row` class, `data-when`/`data-whenAll`/`data-gate`, help title, the
+`formHidden` display/marker, the field-link gear, the widget itself — is IDENTICAL by construction in both
+paths, because it's the literal same element, just moved. **The only real risk surface is what renderOpForm
+decides at the WHOLE-FORM level, outside any one row**, since that logic runs once over the flat `units` array
+and has no reason to be consulted again once rows get relocated into a tree.
+
+### THE LIST
+
+1. **⭐ CONFIRMED DIVERGENCE, MEASURED LIVE — `group_box` has NO equivalent to `renderOpForm`'s own
+   `SECTION_RANK` auto-ordering.** `renderOpForm` always `units.sort((a,b) => rankOf(sectionOf(a)) -
+   rankOf(sectionOf(b)))` — `SECTION_RANK = ['IDENTITY','FEATURE CONTEXT','GEOMETRY','TOOL & CUT']` — regardless
+   of the bindings array's own declaration order. `group_box`'s own order in the tree is 100% whatever the
+   migration author typed; nothing computes or verifies it against `SECTION_RANK` at all.
+   **REACH, measured by calling the REAL exported `renderOpForm` directly with each op's own current
+   `def.bindings`** (not estimated, not reasoned from source order — literally executed): of 20 tree-mode ops,
+   13 have 2+ sections where order is even meaningful. Of those 13, **3 have a REAL, confirmed mismatch**:
+   `atc_length_data` (authored TOOL & CUT→GEOMETRY; classic would render GEOMETRY→TOOL & CUT), `atc_check_data`
+   (authored TOOL & CUT→GEOMETRY→TOLERANCE; classic GEOMETRY→TOOL & CUT→TOLERANCE), `edge_data` (authored TOOL &
+   CUT→IDENTITY→GEOMETRY; classic IDENTITY→GEOMETRY→TOOL & CUT).
+   **edge's own case is a confirmed, named INSTANCE of exactly the failure mode rule 17 (below) now names**:
+   its t2599 migration comment claims "faithful reproduction of the EXISTING FLAT RENDER... not the usual
+   identity-first convention" — but that claim was never actually verified against a real render. Reconstructed
+   the pre-migration array (`[...EDGE_BINDINGS, ...EDGE_STRUCT_BINDINGS]`, matching the comment's own claimed
+   declaration order) and fed it to the real `renderOpForm`: the RAW ARRAY order is indeed TOOL & CUT→IDENTITY→
+   GEOMETRY (the comment's premise was right about the SOURCE), but the ACTUAL RENDERED order is
+   IDENTITY→GEOMETRY→TOOL & CUT (SECTION_RANK always re-sorts, regardless of array order) — the OPPOSITE of what
+   was shipped. The migration author read the source array's own declared sequence and inferred that was the
+   render order, never called `renderOpForm` to observe it. **Is it a gap or intentional?** Genuinely
+   AMBIGUOUS, and that ambiguity is exactly why this is reported, not fixed: it could be a bug (edge should
+   follow `SECTION_RANK` like every other multi-section op) or a deliberate product choice this arc simply never
+   surfaced as a choice (edge's identity IS "which wall, which axis" — arguably TOOL & CUT-first reads fine for
+   a probe op). atc_length/atc_check's own mismatch is lower-visibility since both are in the SHORT bucket
+   (t2611: `sectionize` false, no chrome) — the divergence there is a silently-reordered ROW SEQUENCE with no
+   section header to make it visible at all, not a wrong-looking title bar.
+
+2. **NOT A GAP, confirmed safe — source-chip decoration (`decorateInputEl`) runs twice.** Once inside
+   `renderOpForm`'s own call (on the scratch `tempHost` rows), once again in `renderUiTree`'s own tail (on the
+   real host, same loop, same bindings). `decorateInputEl`'s own doc comment states it directly: "Decorate one
+   input ELEMENT (idempotent)" — confirmed by reading the implementation (checks for an existing `.psrc-wrap`
+   before creating one). Harmless double-call, not a divergence.
+
+3. **NOT A GAP, already correctly handled — `wireDerivedFields` also runs twice**, for the SAME structural
+   reason (once in `renderOpForm` on the scratch host, where a delegated listener would go inert the moment its
+   rows are reparented; once again in `renderUiTree`'s own tail, on the real host). Already explicitly
+   documented at the call site (t1613's own comment: "the rows were rendered in the caller's scratch container,
+   so renderOpForm's own wiring sits there inert once the tree extracts them... wire the derived/writes engine
+   on the REAL host") — this was a real instance of the SAME class of bug rule 17 now names, but it was already
+   caught and fixed during the tree-mode architecture's own design, not something this turn found new.
+
+4. **THEORETICAL, 0 reach today — `group_box`'s own `title` param is independently authored, not derived from
+   its children's `binding.section`.** Nothing enforces they match; a rename of one without the other would
+   silently mislabel a section (and, since fold-state persistence keys off the TITLE string — `isSectionCollapsed(title)`
+   — a mismatched title also means a DIFFERENT persisted fold-state slot than the section's own binding-derived
+   identity would suggest). Measured live across all 20 ops: 0 mismatches exist today. Not a live bug; a
+   structural footgun worth naming since nothing catches it if it ever happens.
+
+5. **NOT A GAP, additive-only — `collapsible`/`collapsedDefault` group_box params have no classic equivalent.**
+   `renderOpForm` has no notion of "start this section folded" or "force this section's chrome regardless of the
+   whole-form threshold" — these are pure tree-mode-only authoring capabilities. Grepped `dataOps/`: 0 ops use
+   either param today. Purely forward-looking, not a regression risk (classic never claimed to do this, so
+   there's nothing for tree mode to have dropped).
+
+6. **THEORETICAL, 0 reach today — a MULTI_WIDGET group (`xy-pad`/`rect`, multiple bindings sharing one
+   `b.group`) rendered as ONE row could be double-placed/double-read if a migration author declares separate
+   `field_ref`s for more than one of its member params.** `container.appendChild()` on an already-mounted row
+   just moves it (no duplication), but `readers.push()` would fire twice for the same row — redundant, likely
+   harmless (the second read just re-overwrites the same key with the same value) but never actually exercised.
+   Measured live: 0 tree-mode ops currently have a MULTI_WIDGET group with >1 member split across separate
+   `field_ref`s.
+
+7. **Not investigated further this turn, flagged as a loose thread**: whether any GLOBAL post-render gating
+   pass (referenced in project memory as "postGating") behaves identically regardless of render path. The
+   row-level `data-when`/`data-whenAll`/`data-gate` mechanism itself is confirmed container-agnostic (a global
+   `fhost.querySelectorAll('[data-when], [data-when-all]')` scan in `userOpView.js`, run identically after
+   either path) — but I did not locate or audit the specific `postGating` function this session's own memory
+   names, and cannot rule it in or out without doing so.
+
+### FIX NOTHING — as instructed, and why #1 doesn't qualify as trivial+safe
+
+Every item above is either 0-reach-today (no fix needed) or, for #1, a genuine judgment call about which order
+is actually CORRECT for atc_length/atc_check/edge — not a mechanical parity restoration, because the "classic"
+order itself may not be the intended one (see edge's own ambiguity above). Reordering a form's own visible
+section sequence is a real, user-visible UI change in whichever direction it goes; picking wrong ships a NEW
+divergence instead of fixing one. This is squarely a call for the owner, not a trivial/provably-safe fix.
+
+### THE VERIFY-RULE, PLACED
+
+`context/VERIFICATION-DISCIPLINE.md`, new rule 17 (the file's own numbered list, same voice/format as the other
+16): states the `group_box`/`sectionize` regression as the concrete instance, generalizes it to "a migration
+onto `renderUiTree` can silently drop a general, cross-op invariant only the classic path ever provided," and
+gives the three-step how-to-apply (full suite via `npm test` reading failed TITLES not just the count; grep the
+op's own ids/opType across the WHOLE `tests/` directory, not just its own spec files; for any new node type,
+ask explicitly whether the classic renderer does something conditional/derived it has no way to see). Chosen
+over `BACKLOG.md` (a rolling task log, not a standing-rule home — the exact "docs own frontier list goes stale"
+shape) specifically because `VERIFICATION-DISCIPLINE.md` is the ALREADY-ESTABLISHED, CLAUDE.md-indexed home for
+"what green has to mean here," read by every seat, every session, unconditionally.
+
+### VERIFY
+
+No app/test code changed this turn (audit only, per the dispatch's own "the deliverable is a list, not fixes").
+Every measurement above was produced by a scratch Playwright spec that imported and called the REAL exported
+functions (`renderOpForm`, `sectionizeFor`, `listUserOps`) against REAL op defs — never a reimplementation of
+their logic — then deleted before commit (none shipped; `git status` confirms no stray `t2613-audit*.spec.js`).
+
+Full suite via `npm test` (adopted gate wording held to again): **3137 passed, 1 failed, 10 flaky, 28 skipped,
+e2e exit 1.** The one failure, named: `preview-mutation-manifest-2463.spec.js` — the same pre-existing
+load-dependent flake classified at t2609/t2611 (unrelated to this turn, which touched no app code) — exactly the
+outcome expected since nothing this turn changed the code under test; the flaky COUNT itself moved (11→14→10
+across the last three runs), consistent with the environmental, not deterministic, nature already established.
+
+`git status`: `context/VERIFICATION-DISCIPLINE.md` (rule 17), this WORK-LOG entry. No other files changed.
+

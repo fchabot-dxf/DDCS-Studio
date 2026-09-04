@@ -201,3 +201,34 @@ claiming to guard a user-reachable feature is not evidence of that unless its ow
 in — `openWiz`/`insertWiz`/`showApp`/an actual mouse gesture — not just a pure function or emitter, which
 programmatic state-construction IS legitimate evidence for. Before trusting a green spec as proof a feature
 works for a real user, check which kind of evidence it actually is.
+
+## 17. Migrating an op onto a NEW render path can silently drop a general, cross-op invariant that only the OLD
+path ever provided — and a full-suite "0 failed" is not proof it didn't, because the invariant's own test can
+sit unnoticed-red for turns if nobody is specifically watching its title
+
+`wcsData.js`'s move onto `renderUiTree` (t2605) shipped with `group_box` defaulting its fold-chrome to
+unconditionally ON — the classic `renderOpForm`'s own threshold rule ("a form sectionizes only past
+`SECTION_THRESHOLD` rows AND ≥2 sections — a short form stays plain") had no equivalent in the new render path
+at all. `form-section-collapse-820.spec.js` (a GENERAL invariant test, not this op's own row-diff/canvas-mount
+pair) caught it immediately and failed, deterministically, for FOUR consecutive turns — but nobody was looking
+at that specific title, so four straight "full suite, 0 failed"-style summaries reported past it (t2609/t2611
+root-caused why: `retries:2` cannot mask a deterministic failure, so this was never about retries — the
+reported number simply didn't reflect what the run produced). A per-op row-diff test structurally CANNOT catch
+this class of gap: it only proves the migrated op's OWN fields land in the OWN declared tree, never that some
+general, classic-renderer-only behavior (a threshold, an ordering rule, a fold-state default, a container-id
+convention) survived the move onto the new path for every op it now also has to cover.
+**How to apply, before calling ANY op's migration to `renderUiTree` verified:**
+1. Run the FULL suite via `npm test` (the real gate — `scripts/test-all.cjs`, never a bare `npx playwright test
+   --reporter=list`, which silently skips the unconditional JSON summary this whole rule depends on being
+   trustworthy) and read the FAILED **titles**, not just the count — the count alone is what let this sit for
+   four turns.
+2. Separately, grep the op's own new ids/`opType`/container-id strings across the WHOLE `tests/` directory, not
+   just its own dedicated spec files — a shared cross-op test (like `interpass-connector-1235.spec.js`, which
+   bridges a classic op and a tree-mode one in one file) can reference the op by an id or opType that its own
+   migration author never thought to search for, because it isn't the op's own test.
+3. When a migration touches a NODE TYPE (`group_box`, `feature_canvas`, a new one entirely) rather than just an
+   op's own bindings, ask explicitly: does the CLASSIC renderer do anything conditional/derived here (a
+   threshold, a default sourced from total form shape, a cross-field rule) that this node type's own isolated,
+   per-node logic has no way to see? If yes, that is exactly this class of gap — extract the decision as ONE
+   shared, exported function both paths call (see `sectionizeFor` in `formWidgets.js`), never reimplement it
+   locally for the new path — a second copy is how it drifts again.
