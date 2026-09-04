@@ -910,6 +910,39 @@ level for that concern (a threshold, a canonical order, a default sourced from t
 don't need this check, whole-form ones always do. Full account + the audit method: WORK-LOG t2613, and
 `context/VERIFICATION-DISCIPLINE.md` rule 17.
 
+**The real predictor of tree-mode conversion cost, measured three times across this arc, is a binding-surface
+SIZE, not a complexity LABEL — read this table before screening any remaining op as "hard."** t2605 first
+disproved raw binding count (`wcs`: 6 bindings, cheap; `atc_warmup`: 4 bindings, more expensive — two pairs of
+structurally-identical sibling blocks needed a real `deriveBindings.js` extension) and replaced it with DISTINCT
+TARGET BLOCK count. t2623 measured pocket/slot against that same axis directly, by reading `pocketWizard.js`/
+`slotWizard.js` and grepping `match:{type:...}` + `{ param: '...'` in their twins (excluding `when:{param:...}`
+false positives):
+
+| op | distinct target block types | binding-spec entries | real multi-spec params (2+ alternatives) |
+|---|---|---|---|
+| contour (migrated t2621) | 5 | 30 | 0 |
+| slot | 5 | 29 | 1 |
+| pocket | 10 | 89 | 21 (up to 7-way each) |
+
+**Slot measures CONTOUR-SIZED on every column — it is not actually hard.** It had been carrying pocket's
+"structural-fork complexity" label since t2597 purely from being screened next to it (`BACKLOG.md` #72, t2597
+entry: *"`pocketData`/`slotData` stay HARD (structural-fork complexity, unrelated to either axis)"* — nobody
+re-derived that line for slot alone across 5 subsequent turns). Read directly, slot has exactly ONE real guard
+fork (`_para`, raster vs literal — the same value-fork class already migrated on `edge`/`wcs`); its OTHER fork
+(`pattern`, array-wrapping) is not a live blocker at all — `slotData.js`'s own header comment says the twin is
+deliberately scoped to `pattern:'single'` only ("array-slot = a future port"). Pocket IS the large one: ~2x the
+type-surface and ~3x the entry-count of anything migrated so far, with a genuine 21-param multi-spec merge
+surface. That said, the merge MECHANISM itself (`optional:true` alternatives + `mergeBindingsByParam`,
+`dataOps/deriveBindings.js:187`) is not a novel risk — it is what already renders pocket's own CLASSIC form
+correctly today (`pocketData.js:388-391` states plainly that its structural guards are "a different layer from
+FORM-row visibility, which was never blocked here in the first place"); it has simply never been run through
+`renderUiTree` before. So pocket's cost is volume to place into `group_box`/`field_ref` nodes, not a structural
+wall. **The general lesson, restated for whoever screens the next batch:** a fork-count or "structural" label
+assigned once, without re-deriving it against the op actually in front of you, silently outlives the reason it
+was assigned — this is the fifth time this exact failure mode has been caught on this arc (t2511's
+`hasTreeLayout` grep, t2597's panel-kind screen, t2619's `section:` framing, t2621's form-kernel-720 op-count
+theory, now this). Full account: WORK-LOG t2623.
+
 **The iPhone Ring/Silent switch silences Web Audio (`AVAudioSessionCategoryAmbient`) but not `<audio>`
 (`...Playback`)** — a platform fact, not an app bug (traceable to WebKit's `AudioSessionIOS.mm`; Apple closed
 WebKit#237322 as "configuration changed"). `ui/sound.js:28-34` ships an unrelated Android-scheduling-race fix

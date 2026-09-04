@@ -74982,3 +74982,115 @@ Slot is contour-sized and could very plausibly close in one turn on that basis a
 migration but not a novel one. `passes-field-1613.spec.js`'s Blocks-view test has a concrete, scoped rewrite
 ready to dispatch whenever a turn has room for a real Playwright verification pass.
 
+## t2625 — DECOUPLE THE TEST FIRST, THEN SLOT (dispatched, in that order)
+
+Dispatch: fix `passes-field-1613.spec.js`'s own moving-target problem BEFORE migrating slot (migrating first
+would knowingly ship the regression the fix was proposed for), then migrate slot using contour's own proven
+recipe, place the t2623 predictor table somewhere durable, gate on the full suite (real code + a shared test
+harness touched). NOT pocket this turn — a different size of job, deserves its own turn.
+
+### PART 1 — passes-field-1613.spec.js decoupled from every named production op
+
+Re-read the file in full: only ONE of its 5 tests (the "BLOCKS Wizard View face" test) actually depends on
+materialization mode — it walks the live canvas for `materializeParamGroup`'s literal `param_field` write-back
+(t1605's two-way chain), a MECHANISM check, not a content check. Rewrote it to register a tiny synthetic def
+LIVE on the page (`userOpFromStack`+`registerUserOp`, the exact same path every real twin boots through —
+validate + materializeParamGroup + builder/spec/label registration) instead of opening a named catalog op —
+module state resets on the next `page.goto`, so nothing here touches the real catalog or any other test.
+Precedent for a synthetic stack already existed in this same file (its own last test, `[assign, formfield]`).
+
+**One real bug caught building the fixture, before it ever ran**: derived the specs' `blockIndex` against the
+BARE `[stepdown]` stack instead of the FULL `user_root`-wrapped template — `flattenBlocks` walks `user_root`
+itself (+ `uiChildren`) BEFORE `children`, so the stepdown block sits at index 3 in the real template, not 0.
+`registerUserOp` refused it outright (`"binding (block 0.to) does not resolve in the template"`) — the exact
+"re-derive against the FINAL tree-shaped stack" gotcha BACKLOG.md's own t2595 entry names for bore. Fixed by
+deriving against the wrapped template, not the bare body.
+
+**Proven not vacuous**: ran the rewritten test green (3 passes / ceil(4/1.5)), then flipped the expected value
+to `'99'` and confirmed it failed for the right reason (`unexpected value "3"`), then restored. The rewrite
+genuinely asserts against the live DOM, not a tautology.
+
+### PART 2 — slot migrated: contour's own recipe (t2621), unchanged in shape
+
+Read contour's own `contourDataDef()` line by line as the template. Slot's own two-phase pattern: a BOOTSTRAP
+stack (`children` only, no `uiChildren` — `deriveBindingsFor` never looks at layout) pruned to the canonical
+(`_para:false`) arm derives `SLOT_FIELDS0` (sectioned, merged), which `slotBySection`/`slotFieldRefsOf` turn
+into the `group_box`/`field_ref` tree; `slotDataStack()`'s own `uiChildren` becomes a `split_horizontal` (LEFT:
+`usage_text` + `path_anchor` + 4 `group_box`es [ENDPOINTS/TOOL/TOOL & WIDTH/DEPTH & FEED, matching
+SLOT_BINDING_SPECS' own already-shell-verified array order, t2375] + `code_preview`; RIGHT: `preview3d` +
+`feature_canvas`, replacing the old bare `sim` node). `usage_text` reproduced verbatim from the live shell
+(index.html:664). No `blockIndex`→`match:{type}` conversion needed — already fully identity-based, confirmed
+at t2623.
+
+**A second real bug, caught by the shared `formReproduction.js` harness on the FIRST tree-mode run**: 1 orphan.
+`passes` (`withPassesField`, no `match`, spliced by param name) was only added to `def.bindings` at the very
+end, AFTER the tree was already built from `SLOT_FIELDS0` — so it had no `field_ref` anywhere. Contour dodges
+this because its own `fieldsOf` applies `withPassesField` before returning `bindings0`; ported the same fix —
+but `SLOT_BINDINGS`/`SLOT_DERIVED` is a real EXTERNAL test dependency (`slot-as-data.spec.js` iterates it
+expecting every entry to own a real emit socket; `passes` deliberately has none, and applying `withPassesField`
+there broke that test's own `unowned` check with `["passes"]`). Resolved by applying `withPassesField` in TWO
+separate places that both need it (`SLOT_FIELDS0`, for the tree; `slotDataDef()`'s own existing
+`withPassesField(SLOT_BINDINGS)` call, for the shipped `def.bindings`) while leaving the exported
+`SLOT_BINDINGS` constant untouched, preserving its pre-migration shape exactly.
+
+Also switched `slot-form-reproduction-2375.spec.js` from `mode:'flat'` to the shared tree default (dropped —
+`expectedFrontierSections` kept, still real in tree mode) — it had been silently testing the inert classic
+path this whole time; new canvas-mount test (`slot-canvas-mount-2625.spec.js`, contour's own t2621 shape).
+
+**Targeted verification, before the full suite**: `slot-as-data.spec.js` + `slot-twin-repoint-1500.spec.js` +
+`cutting-rpm-996.spec.js` + `passes-field-1613.spec.js` + `slot-form-reproduction-2375.spec.js` +
+`slot-canvas-mount-2625.spec.js`: 32/32. Cross-op section-order guard: 30/30 (29 prior + slot). Rule 17's own
+census (grepped the whole `tests/` dir for `slotData`/`SLOT_DATA_OPTYPE`/`user_slot_data`/etc — 24 files): 84
+tests, 83 passed + 1 flaky-then-passed (`wizard-face-1599.spec.js`'s own pre-existing t1766 reproject-echo
+race, unrelated to slot). Node tier: 238/238.
+
+### THE PREDICTOR TABLE, PLACED DURABLY
+
+t2623's own "slot measures contour-sized, pocket doesn't" finding, plus the general lesson (a fork-count/
+"structural" label assigned once, never re-derived, silently outlives the reason it was assigned — the fifth
+time this exact failure mode hit this arc), placed in `ARCHITECTURE.md`'s MIGRATED FACTS section (a new t2623
+entry, right after the t2611–t2613 render-path bounding argument) — the doc a future migration actually reads
+before starting, not just this turn's own WORK-LOG. Also corrected the wrong claim AT ITS SOURCE: `BACKLOG.md`
+#72's own t2597 entry ("`pocketData`/`slotData` stay HARD — structural-fork complexity, unrelated to either
+axis") got a `⚠ CORRECTION (t2623)` blockquote immediately after it, matching the file's own established
+correction convention (t2601's transitional-duration correction) rather than silently rewriting history.
+
+### A SECOND REAL REGRESSION, FOUND BY THE FULL SUITE ITSELF — NOT A CONTENT GAP
+
+First full run: 1 known pre-existing flake (`preview-mutation-manifest-2463.spec.js`, named at every prior
+gate this session) + 1 NEW failure, `field-help-798.spec.js`'s own P5.3 coverage test. Ran it isolated first
+(2/2 clean) — inconclusive on its own, so per this repo's own "an actually-green run, not an argued one"
+discipline, RE-RAN THE FULL SUITE rather than concluding flake from a clean isolated pass. Second full run:
+the SAME test failed again, at the SAME ~14m mark both times — not obviously random, so pulled the real error
+from `test-results/summary.json` (JSON reporter output survives past the terminal tail) rather than guessing:
+all 3 attempts (original + 2 retries) show `"status":"timedOut"`, `"Test timeout of 60000ms exceeded"` at
+60.9–63.1s — never a content ("help gaps") failure. **The exact same class of flake
+`form-kernel-720.spec.js`'s own (e) test had before its t2621 fix**: an open/close loop over all ~32 registered
+twins with NO scaling budget, inheriting Playwright's DEFAULT 60s test timeout — fine uncontended, tight under
+the full suite's real 4-worker contention. Slot's own tree-mode open (group_box/field_ref/split_horizontal +
+preview3d/feature_canvas mount, replacing a flat param_group+bare-sim open) is measurably heavier per-op than
+before, and this loop was already running close to its ceiling. Fixed with the IDENTICAL pattern
+form-kernel-720 already uses — `test.setTimeout(Math.max(90_000, ops.length * 6000))`, called after `ops` is
+known — not a bigger magic number. **Confirmed by a THIRD full suite run**: `field-help-798.spec.js` did not
+reappear; only the known `preview-mutation-manifest-2463.spec.js` flake remained.
+
+### VERIFY
+
+Node tier: 238/238 (all three full runs). Cross-op section-order guard: 30/30. Rule 17 census: 84 tests, 0 real
+regressions (1 known unrelated flake). **Full suite via `npm test`, final (3rd) run: 3162 passed, 1 failed
+(`preview-mutation-manifest-2463.spec.js`, the same pre-existing load-dependent flake classified at every
+prior gate this session), 13 flaky, 28 skipped, e2e exit 1.** `field-help-798.spec.js` — the one real
+regression this turn's own migration surfaced — fixed and confirmed gone under real contention, not argued.
+
+`git status`: `web/blocks/dataOps/slotData.js` (the migration), `tests/passes-field-1613.spec.js` (the
+decouple), `tests/slot-form-reproduction-2375.spec.js` (mode switch), `tests/field-help-798.spec.js` (the
+scaling-budget fix), `tests/slot-canvas-mount-2625.spec.js` (new), `ARCHITECTURE.md` + `BACKLOG.md` (the
+predictor table + its correction).
+
+### NEXT
+
+30 of 32 built-in-equivalent ops are now on `renderUiTree`; only pocket and corner remain. Pocket is next in
+line if dispatched — pure volume (21 multi-spec params, `group_box`/`field_ref` placement, no conversion pass
+needed, no structural blocker per t2623/t2625's own measurement) rather than a novel mechanism. Corner stays
+the deferred trap, untouched this arc.
+

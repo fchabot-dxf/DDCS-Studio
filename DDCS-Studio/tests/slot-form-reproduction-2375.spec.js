@@ -8,6 +8,14 @@ import { registerFormReproductionSuite } from './support/formReproduction.js';
  * for the full account of the fix (the same array-reorder-plus-section mechanism contourData.js's own t2375
  * fix used, plus retiring the now-superseded t1500 TOOL_ANCHOR splice).
  *
+ * t2625 (BACKLOG #71/#72) — MIGRATED onto the declared `split_horizontal`/`group_box`/`field_ref` tree
+ * (slot's field-set-changing forks already resolved at the binding-declaration layer via `mergeBindingsByParam`
+ * — see slotData.js's own new header comment above `SLOT_FIELDS0`). Switched to `mode:'tree'` (the shared
+ * default) to test the REAL render path, mirroring contour's (t2621) own precedent exactly. EXPECTED_ORDER is
+ * UNCHANGED from t2375: the four `group_box`es place every field explicitly (see slotData.js's own
+ * `slotBySection`/tree declaration), so there are still zero orphans. `expectedFrontierSections` stays —
+ * 'REPEAT (array)' is still a real shell section title with nothing bound in the twin (`pattern` frontier).
+ *
  * EXPECTED_ORDER is hand-derived from index.html's own `#wiz_slot` shell (lines 642-716): ENDPOINTS (ax, ay,
  * bx, by, offX, offY, offZ — pathDatum/stockAttach re-parented behind the path_anchor picker; stockDatum/
  * stockW/stockH/stockZ formHidden) → TOOL (rpm — `sl_tool` in the shell is the library picker, unbound; the
@@ -34,7 +42,6 @@ const EXPECTED_ORDER = [
 ];
 
 registerFormReproductionSuite({
-  mode: 'flat',
   wizardLabel: 'slot',
   dataModule: '/blocks/dataOps/slotData.js',
   defFactory: 'slotDataDef',

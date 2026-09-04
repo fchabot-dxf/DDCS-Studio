@@ -7688,6 +7688,14 @@ value bindings at all) — genuinely the lowest-risk candidates, not yet attempt
 already on the safe list above; each will need the same fix `rotary-clock-handles.spec.js` got here the day its
 own op migrates. Full account: WORK-LOG t2597.
 
+> **⚠ CORRECTION (t2623) — the "`pocketData`/`slotData` stay HARD" line above is only half right, and it stayed
+> unquestioned for 5 turns purely because it had a name.** Read both wizards directly and measured against the
+> t2605 predictor (distinct target block types / binding-spec entries / real multi-spec params): contour
+> (migrated t2621, clean) is 5/30/0; **slot is 5/29/1 — CONTOUR-SIZED, not hard**; pocket is 10/89/21 — genuinely
+> the large one. Slot's one complicating fork (pattern → array-wrap) was never actually in play: `slotData.js`'s
+> own header comment scopes the twin to `pattern:'single'` only ("array-slot = a future port"). Full table +
+> the general lesson: `ARCHITECTURE.md`'s MIGRATED FACTS, t2623 entry. Full account: WORK-LOG t2623.
+
 **t2599 — migrated the four proven-shape-safe ops: alignment, edge, middle, rotary_center.** Same
 `xFieldGroups` two-phase pattern throughout. `edge`/`middle` needed their OWN legacy `*_BINDINGS`/`*DataStack`
 exports KEPT ALIVE (real external test consumers, `edge-data-emit.spec.js`/`middle-data-emit.spec.js` import

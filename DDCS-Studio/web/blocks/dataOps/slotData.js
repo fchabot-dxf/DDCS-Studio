@@ -194,39 +194,17 @@ export function slotPreviewGeometry(p) {
     return { paths, handles };
 }
 
-/** The wrapped SUPERSET template: slotStack(DEFAULTS, {superset:true}) under the user_root/panel/sim/param_group prefix. */
-function slotDataStack(defaults) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            // t2371 — the dual stock-attach/path-datum corner picker. Slot's own static shell (index.html:654)
-            // mounts it at prefix "sl_" — copied verbatim, not re-derived (a wrong prefix binds the picker to
-            // another wizard's mount — the exact collision class pinned at t2367,
-            // `pa-mount-scope-2367.spec.js`). See surfacingData.js's own t2271 comment (the arc's pilot) for how
-            // formWidgets.js's 'path_anchor' branch reproduces the widget's getElementById convention without
-            // touching ui/pathAnchorField.js, and for why the stockAttach/pathDatum dropdown rows (this file's
-            // own declared bindings, below) end up hidden rather than left visible — the shell shows the
-            // picker only, no text fallback.
-            { type: 'path_anchor', params: { prefix: 'sl_' } },
-            {
-                type: 'param_group',
-                params: { group: 'Slot' },
-                children: [],
-            },
-        ],
-        children: appendToolSel(appendEntry(slotStack(defaults, { superset: true }))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
-    }];
-}
-
 /**
- * The FORM bindings are DERIVED over a CANONICAL-pruned stack, then deduped by param (fan-out yields N specs per
- * param; the form wants ONE — merged so a widget/label can never be lost to ordering).
+ * t2625 (BACKLOG #71/#72) — group_box/field_ref tree, contour's own recipe (t2621). Slot ALREADY bound by
+ * `match:{type}` throughout (0 real `blockIndex`, confirmed t2623) so no conversion pass was needed — only the
+ * uiChildren tree. Field groups are computed against a `pruneToCanonical` of a BOOTSTRAP stack (`children` only,
+ * no uiChildren — deriveBindingsFor doesn't care about layout, the same shortcut contour/tap/text used) so the
+ * group_box tree can be authored from `bySection` BEFORE the real, uiChildren-bearing template exists (the
+ * uiChildren the tree needs cannot be built from bindings the tree itself would have to already contain).
+ * `canonicalPrunedStack`/`SLOT_DERIVED` below then re-derive a SECOND time over the FINAL wrapped template, so
+ * the shipped bindings' blockIndex values are relative to what actually ships, not the bootstrap stand-in.
  *
- * ⚠ `_para: false` PINS THE CANONICAL STACK TO THE LITERAL ARM, and that is deliberate rather than incidental. The
+ * ⚠ `_para: false` PINS THE CANONICAL STACK TO THE LITERAL ARM, unchanged from before this migration. The
  * canonical stack is what the FORM's labels, units, help and defaults derive from, and only the literal arm carries a
  * socket for every param — the re-pointed arm has no `slot` leaf at all. Deriving the form over the parametric arm
  * would silently DROP the whole geometry cluster from the wizard: a feature loss dressed as a binding detail. The
@@ -234,7 +212,67 @@ function slotDataStack(defaults) {
  * (Pocket pins its canonical stack the same way, for the same stated reason.)
  */
 const CANONICAL_BIND = { ...SLOT_DEFAULTS, _para: false };
-function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(slotDataStack(SLOT_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
+function pruneToCanonical(template) { const c = JSON.parse(JSON.stringify(template)); pruneGuards(c, CANONICAL_BIND); return c; }
+function slotBootstrapStack(defaults) {
+    return [{ type: 'user_root', params: {}, children: appendToolSel(appendEntry(slotStack(defaults, { superset: true }))) }];
+}
+// withPassesField applied HERE (not just at the very end, in slotDataDef) — a field_ref tree can only place a
+// param that's already IN the section groups it's built from, and `passes` (no `match`, spliced by param name
+// alone) would otherwise land in def.bindings after the tree was already authored, becoming an orphan (the
+// same gap contour's own `fieldsOf` closes the same way, t2621).
+const SLOT_FIELDS0 = withPassesField(mergeBindingsByParam(deriveBindingsFor(pruneToCanonical(slotBootstrapStack(SLOT_DEFAULTS)), SLOT_BINDING_SPECS)));
+const slotFieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+const slotBySection = (name) => SLOT_FIELDS0.filter((b) => b.section === name);
+
+/** The wrapped SUPERSET template: slotStack(DEFAULTS, {superset:true}) under the user_root/split_horizontal
+ *  prefix — group_box order ENDPOINTS -> TOOL -> TOOL & WIDTH -> DEPTH & FEED, matching SLOT_BINDING_SPECS'
+ *  own array order (shell-verified, t2375's own account); no reordering needed for these four names. */
+function slotDataStack(defaults) {
+    return [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Slot' },
+                    children: [
+                        // t2625 — REPRODUCED verbatim from the live shell (index.html:664's own `.wiz-usage`
+                        // text for `#wiz_slot`), not restated from memory.
+                        { type: 'usage_text', params: { text: 'Mills a straight slot from point A to point B in the active WCS. Drag the A / B / width handles in the 2D layout; the 3D view verifies the cut. The tool centre travels A→B, so the slot ends are rounded a tool-radius beyond each point. Width = tool → one pass; width > tool → parallel passes. Spindle start + end-of-program come from Settings.' } },
+                        // t2371 — the dual stock-attach/path-datum corner picker. Slot's own static shell (index.html:654)
+                        // mounts it at prefix "sl_" — copied verbatim, not re-derived (a wrong prefix binds the picker to
+                        // another wizard's mount — the exact collision class pinned at t2367,
+                        // `pa-mount-scope-2367.spec.js`). See surfacingData.js's own t2271 comment (the arc's pilot) for how
+                        // formWidgets.js's 'path_anchor' branch reproduces the widget's getElementById convention without
+                        // touching ui/pathAnchorField.js, and for why the stockAttach/pathDatum dropdown rows (this file's
+                        // own declared bindings, below) end up hidden rather than left visible — the shell shows the
+                        // picker only, no text fallback.
+                        { type: 'path_anchor', params: { prefix: 'sl_' } },
+                        { type: 'group_box', params: { title: 'ENDPOINTS' }, children: slotFieldRefsOf(slotBySection('ENDPOINTS')) },
+                        { type: 'group_box', params: { title: 'TOOL' }, children: slotFieldRefsOf(slotBySection('TOOL')) },
+                        { type: 'group_box', params: { title: 'TOOL & WIDTH' }, children: slotFieldRefsOf(slotBySection('TOOL & WIDTH')) },
+                        { type: 'group_box', params: { title: 'DEPTH & FEED' }, children: slotFieldRefsOf(slotBySection('DEPTH & FEED')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: appendToolSel(appendEntry(slotStack(defaults, { superset: true }))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
+    }];
+}
+
+function canonicalPrunedStack() { return pruneToCanonical(slotDataStack(SLOT_DEFAULTS)); }
+// ⚠ NO withPassesField here (unlike SLOT_FIELDS0 above) — SLOT_DERIVED/SLOT_BINDINGS is a real external test
+// dependency (tests/slot-as-data.spec.js iterates it expecting every entry to own a real emit socket; `passes`
+// deliberately has none). `passes` is spliced in ONLY where a field_ref tree or a real def.bindings needs it
+// (SLOT_FIELDS0 for the tree; slotDataDef's own withPassesField(SLOT_BINDINGS) call for the shipped def) —
+// never into this exported constant, preserving its pre-migration shape.
 const SLOT_DERIVED = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), SLOT_BINDING_SPECS));
 
 // t2375 — the t1500 TOOL_ANCHOR splice (below, now removed) used to relocate toolNum to sit immediately
@@ -250,7 +288,7 @@ export const SLOT_BINDINGS = SLOT_DERIVED;
 
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {
-    const def = userOpFromStack('slot_data', 'Slot (data)', slotDataStack(SLOT_DEFAULTS), withPassesField(SLOT_BINDINGS), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
+    const def = userOpFromStack('slot_data', 'Slot (data)', slotDataStack(SLOT_DEFAULTS), withPassesField(SLOT_BINDINGS), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown (SLOT_FIELDS0 splices its own copy for the tree — see that constant's own comment for why they're kept separate)
     def.bindingSpecs = SLOT_BINDING_SPECS;   // t1500 — re-derive the value sockets BY IDENTITY over the PRUNED stack each build
     /**
      * t1500 — `_para`: does THIS slot's clearing ride `surfaceraster`? GEOMETRY-, ENTRY- and ENVELOPE-derived (the

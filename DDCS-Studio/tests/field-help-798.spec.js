@@ -31,6 +31,13 @@ test('P5.3 HELP COVERAGE: every visible field in every twin has help or a declar
     return userBuilderTypes().filter((t) => typeof t === 'string' && t.startsWith('user_'));
   });
   expect(ops.length, 'the registered twins are enumerable').toBeGreaterThanOrEqual(20);
+  // t2625 — MEASURED via summary.json (not assumed): this loop timed out at the DEFAULT 60_000ms twice in a
+  // row under the real full-suite's 4-worker contention (`"status":"timedOut"`, ~61-63s each), never as a
+  // content ("help gaps") failure — same class of flake `form-kernel-720.spec.js`'s own (e) test named and
+  // fixed at t2621 (an open/close loop over all ~32 registered twins, no scaling budget, so a transient
+  // per-op stall under load runs the whole test out of its DEFAULT time rather than reaching its own
+  // assertion). Same fix: scale the outer timeout with op count instead of raising a single magic number.
+  test.setTimeout(Math.max(90_000, ops.length * 6000));
   const gaps = {};
   for (const op of ops) {
     try {

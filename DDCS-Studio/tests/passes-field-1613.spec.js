@@ -126,19 +126,49 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
     // t2351 — the app's own declared "everything is wired" signal (t1279), not a hand-picked global subset —
     // see wizard-face-1599's own boot() for the full trace of why this class of wait was silently racy.
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 60000 });
+
+    // t2625 — DECOUPLED from any named production op, after 3 straight swaps (surfacing t2545 -> contour
+    // t2545 -> slot proposed-then-ruled-out t2625) each broke by the SAME mechanism: a twin whose Blocks view
+    // goes field_ref/group_box gets zero `param_field` canvas blocks materialized (`materializeParamGroup`'s
+    // own field_ref-presence skip, t2543), so it stops carrying the literal per-param rows this test walks.
+    // What THIS test actually verifies is a MECHANISM — materializeParamGroup's literal param_field injection +
+    // the t1605 two-way canvas writeback — not any specific op's content, so it needs a subject that stays
+    // plain-materialized FOREVER, not one picked from the same 32-op catalog every migration keeps shrinking.
+    // Registers a tiny synthetic def, live, on THIS page only (module state resets on the next page.goto, so
+    // nothing here touches the real catalog or any other test) — through the exact same `registerUserOp` path
+    // every real twin boots through (validate + materializeParamGroup + builder/spec/label registration), so
+    // the canvas it produces is mechanically identical to a real op's. Precedent for a synthetic stack instead
+    // of a named op already exists in this same file (the last test below, `[assign, formfield]`).
+    const opType = await page.evaluate(async () => {
+        const { userOpFromStack, registerUserOp } = await import('/blocks/userOps.js');
+        const { deriveBindingsFor } = await import('/blocks/dataOps/deriveBindings.js');
+        const { withPassesField } = await import('/blocks/dataOps/passesField.js');
+        const stack = [{ type: 'stepdown', params: { to: 4, by: 1.5, confirmEvery: 0 }, children: [] }];
+        const template = [{
+            type: 'user_root', params: {},
+            uiChildren: [
+                { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+                { type: 'param_group', params: { group: 'Test' }, children: [] },
+            ],
+            children: stack,
+        }];
+        const specs = [
+            { param: 'depth', match: { type: 'stepdown' }, key: 'to', type: 'number', default: 4, label: 'Depth', section: 'DEPTH & FEED' },
+            { param: 'stepdown', match: { type: 'stepdown' }, key: 'by', type: 'number', default: 1.5, label: 'Step Down', section: 'DEPTH & FEED' },
+        ];
+        // blockIndex must be derived against the FULL wrapped template (flattenBlocks walks user_root itself
+        // + uiChildren before children), not the bare body array — the same "re-derive against the final
+        // tree-shaped stack" gotcha BACKLOG.md's t2595 entry names for bore.
+        const bindings = withPassesField(deriveBindingsFor(template, specs));
+        const def = userOpFromStack('passes_fixture_2625', 'Passes Fixture (test)', template, bindings, 'form', null, 'test');
+        registerUserOp(def);
+        return def.opType;
+    });
+
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
     await page.evaluate(() => window.ddcsLoadBlockStack([]));
-    // t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to CONTOUR (surfacing went
-    // field_ref/group_box that turn). t2621 (BACKLOG #71/#72, conversion tier) — switched AGAIN, contour to
-    // SLOT: this turn's own migration moved contour onto the field_ref/group_box tree too, so it stopped being
-    // a valid subject for the SAME reason surfacing did (`materializeParamGroup`'s own field_ref-presence skip,
-    // t2543 — a field_ref-declaring twin gets zero `param_field` canvas blocks materialized). POCKET was
-    // already ruled out at t2545 (field_ref-based too). SLOT is genuinely still plain-materialized (checked
-    // live: `hasParamTable: true, hasFieldRef: false`, a real `param_field` block for every bound param
-    // including `depth`) — HARD per this arc's own scope, so it stays a stable subject going forward. Shares
-    // contour's own depth:4/stepdown:1.5 defaults exactly (`SLOT_DEFAULTS`), so the numbers below are unchanged.
-    await page.evaluate(() => window.ddcsEditWizardDef('user_slot_data'));
+    await page.evaluate((t) => window.ddcsEditWizardDef(t), opType);
     let last = -1;
     for (let i = 0; i < 120; i++) {
         const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);
@@ -149,7 +179,7 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
     // t1752 — Customize via Blocks is deterministically the createUserOpView('blk') host now (sectioned
     // template, customizing=true — never the placed-op read-only case), not the old #blk-form.
     await expect(page.locator('#blk_wiz_user_form [data-param="passes"]'), 'the stepper renders on the blocks face').toHaveCount(1);
-    // Contour defaults depth:4 @ stepdown:1.5 -> ceil(4/1.5) = 3 passes. Step ▲ -> passes 4 -> depth
+    // Fixture defaults depth:4 @ stepdown:1.5 -> ceil(4/1.5) = 3 passes. Step ▲ -> passes 4 -> depth
     // 4 + (4-3)*1.5 = 5.5 (one more whole stepdown bite), and the write rides the t1605 writeback into the
     // CANVAS param_field declaration — the two-way chain end to end.
     await expect(page.locator('#blk_wiz_user_form [data-param="passes"]')).toHaveValue('3');
