@@ -16,22 +16,33 @@ test('2 draggable handles (A + B); dragging B sets the #6 span; typing #6 drives
     });
     await page.evaluate(() => window.openWiz('user_rotary_clock_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => document.querySelectorAll('#userViz3dContainer [data-hid^="__simstart"]').length >= 2 || document.querySelectorAll('#userVizContainer [data-hid^="__simstart"]').length >= 2, null, { timeout: 8000 });
+    // t2597 — rotary_clock_data now migrates onto the declared uiChildren tree (renderUiTree), whose
+    // preview3d/feature_canvas viz containers carry `_tree`-suffixed ids (formWidgets.js's own `nsId(...)`),
+    // NOT the classic shell's fixed `#userViz3dContainer`/`#userVizContainer` this test used to check by id —
+    // a real, general flat-vs-tree container-id difference (same class as bore's own `.wiz-usage` collision at
+    // t2595), not specific to rotary clock. Only one viz widget is ever mounted at a time, so a global
+    // `[data-hid^="__simstart"]` check is unambiguous and works under either render path.
+    await page.waitForFunction(() => document.querySelectorAll('[data-hid^="__simstart"]').length >= 2, null, { timeout: 8000 });
     await page.waitForTimeout(300);
 
     // BOTH probe points render as draggable Layout handles (A + B) + the #6 span field is present
-    const cont = (await page.locator('#userVizContainer [data-hid="__simstart0"]').count()) ? '#userVizContainer' : '#userViz3dContainer';
-    const setup = await page.evaluate((sel) => {
-        const { rotaryClockDataDef } = window.__rcdef || {};
-        const hids = [...document.querySelectorAll(`${sel} [data-hid^="__simstart"]`)].map((e) => e.getAttribute('data-hid'));
+    const setup = await page.evaluate(() => {
+        const hids = [...document.querySelectorAll('[data-hid^="__simstart"]')].map((e) => e.getAttribute('data-hid'));
         return { hids: hids.sort(), hasSpanField: !!document.querySelector('#wiz_user_form [data-param="span"]') };
-    }, cont);
+    });
     expect(setup.hids, 'both A and B render as draggable Layout handles').toEqual(['__simstart0', '__simstart1']);
     expect(setup.hasSpanField, 'the #6 span field STAYS (precise numeric input — one source, additive)').toBe(true);
 
     // DRAG handle B upward (screen −Y = world +Y = a larger span). It writes #6 = B.y − A.y.
-    const cbox = await page.locator(cont).boundingBox();
-    const hbB = await page.locator(`${cont} [data-hid="__simstart1"]`).first().boundingBox();
+    // t2597 — the enclosing `.viz-canvas` container (id varies by render path, see above) found from the
+    // handle itself, not by a fixed id.
+    const contBox = await page.evaluate(() => {
+        const el = document.querySelector('[data-hid="__simstart1"]').closest('.viz-canvas');
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+    const cbox = contBox;
+    const hbB = await page.locator('[data-hid="__simstart1"]').first().boundingBox();
     await page.mouse.move(hbB.x + hbB.width / 2, hbB.y + hbB.height / 2);
     await page.mouse.down();
     await page.mouse.move(hbB.x + hbB.width / 2, cbox.y + 40, { steps: 18 });   // toward the top → world +Y → span grows

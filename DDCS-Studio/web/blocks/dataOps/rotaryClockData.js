@@ -69,27 +69,29 @@ export const ROTARY_CLOCK_VALUESWAP_BINDINGS = [
 
 export const ROTARY_CLOCK_DATA_OPTYPE = 'user_rotary_clock_data';
 
-/** The wrapped `user_root` template — the superset (all action arms), byte-transparent wrap (mirror rotaryCenterDataStack).
- *  panel form3d+2d + sim {rotary:true, machine:true} — the Clock is a rotary op → declares the rig (opSimContext ROTARY_RIG). */
-export function rotaryClockDataStack(params = ROTARY_CLOCK_DEFAULTS) {
-    const exec = rotaryClockStack(params, { superset: true });
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: true, machine: false, magazine: false, probeWcs: true } },   // t714 — the 4th-axis RIG frames the bar (rotary:true); no forceMachine envelope (machine:true was latent-dead)
-            { type: 'param_group', params: { group: 'Rotary Clock' }, children: [] },
-        ],
-        children: exec,
-    }];
+// t2597 (BACKLOG #71/#72, Phase 1 step 1) — mirrors boreFieldGroups' own header (surfacingFieldGroups' own
+// template): the ordered/grouped field lists this def's own uiChildren tree AND its flat bindings array both
+// need, computed ONCE, called TWICE (once against a bootstrap stack purely to compute field order for BUILDING
+// the tree, once again against the FINAL, already-tree-built stack for the bindings actually shipped).
+// ⚠ DIAGNOSED at bore (t2595): `deriveBindingsFor`'s own `match:{type}` resolution bakes a concrete `blockIndex`
+// AT DERIVE TIME (deriveBindings.js:63) — it does NOT re-resolve later, so a stale module-level bindings
+// constant (the old `ROTARY_CLOCK_BINDINGS`, derived against the OLD, smaller uiChildren) would break exactly
+// like a hand-counted blockIndex the moment uiChildren gets a bigger declared tree. Value bindings are still
+// derived over a PRUNED clone (mirroring the original `canonicalPrunedStack()`): all 7 scalars are LINEAR
+// (present under any action arm) so pruning changes nothing about which ones resolve, but stays consistent with
+// the corner/edge/middle family's own established shape.
+function prunedClone(stack) { const c = JSON.parse(JSON.stringify(stack)); pruneGuards(c, ROTARY_CLOCK_DEFAULTS); return c; }
+function rotaryClockFieldGroups(stack) {
+    const derived = deriveBindingsFor(prunedClone(stack), ROTARY_CLOCK_BINDING_SPECS);
+    const toolCut = derived.filter((b) => b.section === 'TOOL & CUT');
+    const geomValue = derived.filter((b) => b.section === 'GEOMETRY');
+    return {
+        TOOL_CUT: toolCut,
+        // value-swap/struct GEOMETRY fields carry no match/blockIndex (no value socket) — appended in their own
+        // declared order, matching the flat array's own pre-t2597 order (span, safeZ, action, reference, wcs).
+        GEOMETRY: [...geomValue, ...ROTARY_CLOCK_STRUCT_BINDINGS, ...ROTARY_CLOCK_VALUESWAP_BINDINGS],
+    };
 }
-
-/** Value bindings DERIVED over a canonical-pruned stack (no optional/when-gated binding — all 7 scalars are LINEAR, present
- *  under any action). EMIT re-derives BY IDENTITY over the actual pruned stack each build (via def.bindingSpecs). */
-function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(rotaryClockDataStack(ROTARY_CLOCK_DEFAULTS))); pruneGuards(c, ROTARY_CLOCK_DEFAULTS); return c; }
-export const ROTARY_CLOCK_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), ROTARY_CLOCK_BINDING_SPECS);
 
 // ── postInstantiate — the value-swaps + source-chips, recomposed from the resolved params (E0 superset UNCHANGED) ──
 
@@ -147,10 +149,51 @@ function applyProbeSources(stack) {
 /** Build the rotary-clock-as-data def — bindingSpecs (re-derive by #var identity) + the action guard + the value-swap
  *  recompose + source-chips in postInstantiate. Byte-identical to rotaryClockStack on all scalars + the structural sweep + both profiles. */
 export function rotaryClockDataDef() {
+    // t2597 (Phase 1 step 1) — a bootstrap stack (same `children`, no tree yet) just to read the ordered/grouped
+    // param names rotaryClockFieldGroups derives; re-derived again below against the real, final stack.
+    const bootstrapStack = [{ type: 'user_root', params: {}, uiChildren: [], children: rotaryClockStack(ROTARY_CLOCK_DEFAULTS, { superset: true }) }];
+    const g0 = rotaryClockFieldGroups(bootstrapStack);
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2597 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this
+            // twin onto renderUiTree, the SAME mechanism drill/surfacing/bore already use — NOT a widened
+            // predicate, a real declared split. Rotary Clock has NO classic shell (`wiz_rotary_clock` — grepped
+            // index.html, RETIRED at t1730, replaced by this twin) — so, like bore, there is no shell usage_text
+            // to reproduce verbatim; adapted from this file's own header description.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Rotary Clock' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Probes a flat on the rotary bar and sets or reports the A-axis rotational datum — or rotates the part to align the flat to the reference (Set A0 / Report / Rotate). Drag the two handles in the 2D layout to place the probe touches; the 3D view verifies clearance.' } },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2597 (Phase 1 step 2) — preview3d + feature_canvas as ADJACENT RIGHT-pane siblings, the SAME
+                // adjacency-merge shape drill/surfacing/bore already ship (t2511) — byte-identical DOM to the old
+                // combined `sim` node per t2511's own proof. rotary:true (unchanged from the old sim node) — the
+                // 4th-axis RIG frames the bar; no forceMachine envelope (machine:true was latent-dead, per t714).
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: true, machine: false, magazine: false, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: rotaryClockStack(ROTARY_CLOCK_DEFAULTS, { superset: true }),
+    }];
+    // t2597 — re-derived over the FINAL, real stack (the same computation g0 already used), so the flat binding
+    // array below and the declared tree can never disagree — mirrors boreFieldGroups' own two-call pattern.
+    const gFinal = rotaryClockFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
-    const valueBindings = ROTARY_CLOCK_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...valueBindings, ...ROTARY_CLOCK_STRUCT_BINDINGS, ...ROTARY_CLOCK_VALUESWAP_BINDINGS];
-    const def = userOpFromStack('rotary_clock_data', 'Rotary Clock (data)', rotaryClockDataStack(ROTARY_CLOCK_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...toolCut, ...gFinal.GEOMETRY];
+    const def = userOpFromStack('rotary_clock_data', 'Rotary Clock (data)', stack, bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CLOCK_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyReferenceWcs(applyHeaderComments(stack, resolved), resolved), resolved);   // t951 park-sweep — applySafeZFrame retired (the built-in now parks via safeRetractNode; no move→machinemove swap)
     // E2 — the SINGLE PREVIEW-START provider: reuse BUILT_IN.rotary_clock (opSimStarts.js) VERBATIM via the sim registry

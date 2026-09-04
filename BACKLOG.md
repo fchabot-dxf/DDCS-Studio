@@ -7671,6 +7671,23 @@ declared `usage_text` node and the generic `#wiz_user` container's own always-pr
 "seamless title" element — a genuine test-harness/product boundary, not fixed (out of this arc's own scope).
 Full account, all four findings with citations: WORK-LOG t2595.
 
+**t2597 — SCREENED every remaining op for hand-counted `blockIndex` BEFORE migrating further (per explicit
+dispatch), THEN migrated `rotary_clock_data`.** The screen: 6 ops need `match:{type}` conversion first
+(`atcWarmupData`, `contourData`, `pauseConfirmData`, `tapData`, `textData`, `wcsData`) — everything else is
+`blockIndex`-safe, but that axis alone is not sufficient: `atcCheckData`/`atcLengthData` (panel `'form3d'`, no
+2D pane) and `commData` (panel `'commscreen'`) use visualization mechanisms the `preview3d`+`feature_canvas`
+adjacency has never been proven against — a THIRD screening axis (panel kind), on top of blockIndex and the
+stale-bindings-must-re-derive finding t2595 already caught. `alignmentData`/`edgeData`/`middleData`/
+`rotaryCenterData` share rotary_clock_data's own proven shape and are the next reasonable candidates;
+`pocketData`/`slotData` stay HARD (structural-fork complexity, unrelated to either axis); `cornerData` stays the
+deferred trap; `atcChangeData`/`atcTableData`/`atcTestData`/`homingData`/`ioStepData` are structural-only (no
+value bindings at all) — genuinely the lowest-risk candidates, not yet attempted. Migrated `rotary_clock_data`
+(bore's own two-phase `xFieldGroups` pattern) and found a FOURTH mechanism gap: tree-mode viz containers carry
+`_tree`-suffixed ids (`formWidgets.js`'s own `nsId(...)`), never the classic shell's fixed `#userViz3dContainer`/
+`#userVizContainer` — a repo-wide grep found **44 test files** hardcoding those fixed ids, several for ops
+already on the safe list above; each will need the same fix `rotary-clock-handles.spec.js` got here the day its
+own op migrates. Full account: WORK-LOG t2597.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it

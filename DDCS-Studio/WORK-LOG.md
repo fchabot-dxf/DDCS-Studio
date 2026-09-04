@@ -73407,3 +73407,134 @@ nothing else broken alongside it.
 touched. `git status` clean outside this one file plus this WORK-LOG entry and a BACKLOG addendum. This is a
 SEPARATE commit from t2595's own Phase 1 migration work, per the dispatch's own explicit instruction.
 
+## 🔨 turn 2597 (main task) — screened every dataOps op for hand-counted blockIndex BEFORE migrating (per the
+dispatch's own explicit instruction), then migrated rotary_clock_data on the safe list — one op, one new
+mechanism finding, same stop discipline as t2595
+
+### THE SCREEN — every `web/blocks/dataOps/*Data.js` file, blockIndex vs match:{type} vs panel-kind
+
+Ran a mechanical sweep (`grep -c "blockIndex:"` / `"match: {"` / panel-argument to `userOpFromStack`) across all
+31 non-lathe-excluded dataOps files (lathe ops — `centerDrillData`/`faceProbeData`/`facingData`/`odProbeData`/
+`odTurnData`/`partingData`/`polygonData` — carry `lathe_profile`/`latheScene`/`LATHE_GROUP` markers, a visibly
+DIFFERENT 2D-visualization mechanism, out of THIS Mill-family arc's own scope; already-migrated surfacing/drill/
+bore excluded as done).
+
+**NEEDS match:{type} CONVERSION FIRST (hand-counted blockIndex, migration BLOCKED)** — 6 ops:
+`atcWarmupData.js` (5), `contourData.js` (26), `pauseConfirmData.js` (1), `tapData.js` (18), `textData.js` (31,
+already known/stopped at t2595), `wcsData.js` (7). Each confirmed by reading, not just the count: e.g.
+`pauseConfirmData.js`'s own comment names it outright — "blockIndex 2 = the flatten order user_root(0) ->
+param_group(1) -> pauseconfirm exec child(2)" — literally the anti-pattern `deriveBindings.js`'s own header
+warns against.
+
+**SAFE ON THE blockIndex AXIS (match:{type} only, blockIndex=0)** — everything else. But the blockIndex axis
+alone is NOT sufficient, per a second finding below — so this list further splits by PANEL KIND:
+
+  - **Proven-shape safe** (match:{type} AND panel='form3d+2d', the SAME preview3d+feature_canvas adjacency
+    already proven at drill/surfacing/bore/t2511): `alignmentData` (7), `cornerData` (16, KNOWN TRAP - two dead
+    placeholder sections + structural-fork complexity, deliberately deferred, unrelated to blockIndex),
+    `edgeData` (6, probe-family - canonicalPrunedStack/pruneGuards complexity, same shape as rotary clock below),
+    `middleData` (10), `rotaryCenterData` (8, "mirrors rotaryClockData" per its own header - same shape),
+    `rotaryClockData` (7 - MIGRATED this turn, see below).
+  - **Different/unverified panel kind - do NOT assume the same step 2 applies**: `atcCheckData` (8) and
+    `atcLengthData` (7) use panel='form3d' (NO +2d - no 2D layout pane at all; feature_canvas's own
+    adjacency-merge has never been exercised against a 3D-only panel). `commData` (8) uses panel='commscreen'
+    - a live comm-screen preview (`generateScreenPreview`), a THIRD visualization family entirely, distinct from
+    both the Mill form3d+2d shape and the Lathe layout:{kind:'lathe_profile'} shape. `pocketData` (61) and
+    `slotData` (30) are form3d+2d-shaped and blockIndex-safe but flagged HARD by the original pre-migration
+    survey for structural-fork complexity unrelated to either axis - still open, not attempted this turn.
+  - **Structural-only, no value bindings at all** (no blockIndex risk because there is nothing to derive
+    positionally): `atcChangeData`, `atcTableData`, `atcTestData`, `homingData`, `ioStepData` - all
+    match=0/blockIndex=0 because every one of their own bindings is a plain enum/string toggle with no
+    #var/atom socket. Genuinely the LOWEST-risk migration candidates on the whole list (zero binding-
+    resolution mechanism to break), not yet attempted.
+
+**The boreData.js sim=1 false positive, resolved**: the raw grep flagged `boreData.js` as still carrying a
+`type: 'sim'` node despite being fully migrated at t2595. Read the actual line (122): it lives inside
+`boreDataStack()`, a SEPARATE, still-exported function `boreDataDef()` no longer calls - kept alive only because
+`BORE_BINDINGS` (line 129, built from it) is imported by `tests/drill-bindings-identity-1385.spec.js` for a
+cross-op BINDING-IDENTITY check (which #var each param maps to), unrelated to the RENDER path. Confirmed
+`boreDataDef()`'s own actual template (the `stack` built inline, lines 171-210) already uses preview3d+
+feature_canvas - the grep counts a STRING in a still-legitimately-used but non-rendering helper, not a
+regression. Lesson for future screens of this kind: grep the RENDER path (the stack userOpFromStack is
+actually called with), not every occurrence of the string in the file - a per-op *Data.js file can legitimately
+keep an old-shaped stack builder alive for an unrelated identity test.
+
+### MIGRATED: rotary_clock_data (7 match bindings, probe family, panel form3d+2d) - same two-phase pattern
+as bore, PLUS a fourth, novel mechanism finding
+
+Followed `boreFieldGroups`'s own exact template: `rotaryClockFieldGroups(stack)` re-derives
+`ROTARY_CLOCK_BINDING_SPECS` fresh via `deriveBindingsFor` against a PRUNED clone of whatever stack is passed
+(mirroring the pre-existing `canonicalPrunedStack()` - all 7 scalars are LINEAR, present under every `action`
+arm, so pruning changes nothing about which resolve but stays consistent with the corner/edge/middle family's
+own established shape), called once against a bootstrap stack (empty uiChildren) to order the two group_box
+sections (GEOMETRY: span, safeZ, action, reference, wcs; TOOL & CUT: dist, retract, f_fast, f_slow, port - the
+SAME relative order the old flat-array-filtered-by-section produced), called again against the final tree-built
+stack for the bindings actually shipped to `userOpFromStack`. Removed `rotaryClockDataStack()` /
+`canonicalPrunedStack()` / the module-level `ROTARY_CLOCK_BINDINGS` export - confirmed (grep across the whole
+repo) nothing outside this file imported them, so they were genuinely orphaned by this edit, not just
+superficially unused (per "remove imports/variables/functions YOUR changes made unused" - unlike bore's own
+`boreDataStack`, which stayed alive for a real external consumer). No classic shell (`#wiz_rotary_clock` -
+RETIRED at t1730, index.html:345) - same shell-less shape as bore, same standalone test file (not
+`registerFormReproductionSuite`), same usage_text written fresh in this op's own voice.
+
+**NEW FINDING (not present at bore/drill/surfacing): tree-mode viz containers carry _tree-suffixed ids.**
+`rotary-clock-handles.spec.js` (pre-existing, PASSING before this turn) timed out waiting on
+`#userViz3dContainer [data-hid^="__simstart"]` / `#userVizContainer [...]` - the classic shell's own FIXED
+container ids. Diagnosed live (a scratch debug spec, not guessed): the simstart <rect> handles WERE rendering
+correctly (confirmed via applySettings + a global [data-hid] query), but their actual container ids are
+`nsId('userViz3dContainer_tree')`/`nsId('userVizContainer_tree')` (formWidgets.js:1599/1603, the SAME _tree
+suffix the `sim`-node tree-render branch already uses) - renderUiTree's own preview3d/feature_canvas
+adjacency-merge NEVER reuses the classic shell's fixed ids. This is a REAL, general flat-vs-tree difference, not
+specific to rotary clock - a repo-wide grep for `#userViz3dContainer|#userVizContainer` across `tests/`
+returns 44 FILES (mostly corner/middle/alignment/edge - several already on the SAFE migration list above).
+Every one of those tests will hit the identical failure the day its own op gets migrated, exactly the same class
+of gap bore's own .wiz-usage collision was. Fixed HERE only for `rotary-clock-handles.spec.js` (this turn's
+own scope): swapped the id-scoped selectors for a global [data-hid^="__simstart"] query and a
+closest('.viz-canvas') lookup from the handle itself - container-id-agnostic, passes under either render path,
+zero product-code change. **Not fixed in the other 43 files** - out of this turn's own scope (their own ops
+haven't migrated yet); named here so the NEXT op's migration doesn't have to rediscover it from a fresh timeout.
+
+New test: `tests/rotary-clock-form-reproduction-2597.spec.js` (mirrors bore-form-reproduction-2595.spec.js's
+own two-test, non-registerFormReproductionSuite shape - same .wiz-usage shell-less reasoning). Row order
+confirmed both by this new test AND independently by rotary-clock-in-place.spec.js's own live console assert
+("E3 IN-PLACE FORM: 10 fields -> span, safeZ, action, reference, wcs, dist, retract, f_fast, f_slow, port") -
+two independent confirmations of the same order, not one.
+
+**Targeted run - 22/22 passed**: the new row-diff spec (2), rotary-clock-data-emit.spec.js (the full
+byte-equivalence sweep - untouched by a pure UI-tree restructuring since it calls instantiate() directly, no
+render), rotary-clock-superset.spec.js, rotary-clock-sim-starts.spec.js, rotary-clock-handles.spec.js (now
+fixed), rotary-clock-in-place.spec.js, rotary-datum-glyph.spec.js, probe-family-token-policy-1756.spec.js.
+
+### PER-OP COST (measurement, not estimate, per the dispatch's own ask)
+
+Screen (all 31 files, mechanical grep + targeted reads to resolve 2 ambiguous cases): ~20 min. rotary_clock_data
+migration (field-groups function, def rewrite, new usage_text, new standalone test file): ~25 min. Diagnosing +
+fixing the NEW container-id finding (scratch debug spec, root-causing via formWidgets.js, rewriting the
+pre-existing handle test): ~20 min - this cost was NOT visible in bore/drill/surfacing's own per-op costs
+because none of them had a pre-existing test checking a fixed viz-container id; it will recur on any future op
+whose own tests do (named above). Total for rotary_clock_data including the new finding: ~45 min - roughly the
+same order of magnitude as bore's own similar cost at t2595, confirming Phase 1's per-op cost is NOT dropping
+just because the pattern is now templated; each op can still surface its own genuinely new mechanism gap.
+
+### STOPPED HERE - did not attempt a second migration this turn
+
+Per the same "STOP AT THE FIRST OP WHOSE DIFF WON'T GO CLEAN" discipline: `edgeData`/`rotaryCenterData` share
+rotary_clock_data's own probe-family shape (canonicalPrunedStack + pruneGuards) and are reasonable NEXT
+candidates; `atcCheckData`/`atcLengthData`/`commData` need their own panel-kind mechanism verified FIRST (3D-
+only and commscreen respectively - untested this session); `pocketData`/`slotData` remain HARD by the original
+survey's own structural-fork criterion; `cornerData` stays the deliberately-deferred trap. Given this turn
+already delivered the full screen (the dispatch's own primary, explicit ask) plus one verified migration plus a
+new general finding worth recording before it's lost, stopping here rather than pushing a second migration
+blind keeps each op's own diff reviewable on its own terms, matching t2595's own precedent.
+
+### VERIFY
+
+Full suite run (unconditional per the dispatch's own TIER instruction - shared render path), launched after the
+targeted 22/22 pass: **3090 passed, 0 failed, 28 skipped (38.5m), exit code 0.** t2595's own baseline run was
+3087 passed + 3 failed (= 3090 non-skipped) — this run's 3090 passed + 0 failed is an exact match on the
+non-skipped total, confirming: the small-item's own manifest fix holds under the full suite (not just the
+isolated single-file run already checked), the one flaky `sf-pos-snapback` entry passed clean under this run's
+own contention, and rotary_clock_data's migration + the two test-file edits introduced zero regressions anywhere
+else in the suite. `git status`: `rotaryClockData.js`, `rotary-clock-form-reproduction-2597.spec.js` (new),
+`rotary-clock-handles.spec.js`, `BACKLOG.md`, this WORK-LOG entry — nothing else.
+
