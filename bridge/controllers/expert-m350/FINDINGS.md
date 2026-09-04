@@ -1773,3 +1773,31 @@ re-derive addresses without measuring first.
 ⚠ **A discovery trap worth keeping:** the slave answers **every** address, returning zeros for unmapped
 ones — no exception frames. So "does it answer?" maps nothing; only **non-zero content** does. The populated
 region is roughly `6600`–`9101`.
+
+### 29. ⭐⭐⭐ THE POSITION REGISTERS TRACK LIVE DURING MOTION `[CONFIRMED 2026-08-26]`
+The open question from §28, settled by one continuous jog while polling `7260` (machine X/Y/Z):
+
+```
+t= 0.56s   X= 11.714   Y= -269.850
+t= 2.23s   X= 11.714   Y= -287.328     <- mid-move
+t= 8.31s   X= 11.714   Y= -359.446     <- mid-move
+t=17.68s   X= 11.714   Y= -478.944     <- mid-move
+t=18.24s   X= 15.134   Y= -480.962     <- Y stops, X starts
+t=20.45s   X= 38.778   Y= -480.962
+```
+**35 distinct positions in 20 s**, sweeping smoothly across a 211 mm Y move and then an X move.
+⇒ ⛔ **Not a flush and not a stop-value — the register follows the axis continuously.** `[CONFIRMED]`
+
+⭐⭐ **THIS IS THE PROGRESS SOURCE THE PROJECT HAS BEEN APPROXIMATING.** Live machine position, read over
+serial, with **no instrumentation of the G-code at all** — no beacons, no `MSETDATA` checkpoints, no
+`checkpoint_insert.py` pass, nothing added to the emitted program. ⇒ The beacon architecture exists to answer
+"how far along is this job", and this answers it directly and continuously.
+⚠ It gives POSITION, not a line number. Turning position into progress still needs the cursor design
+(`JOB-PROGRESS-PLAN.md`) — but the input to that cursor now exists and is free.
+
+**Sample rate: 1.9 Hz as measured — and that is MY loop, not the link.** The poll used a fixed 45 ms sleep
+plus a 0.5 s read timeout. A ~30-byte FC03 round trip at 115200 8N1 is well under 10 ms, so the ceiling is far
+higher; treat 1.9 Hz as a floor to tune, not a property of the controller.
+
+⚠ **Read-only throughout** — plain FC03, never `MGETDATA`. The machine was jogged by the owner, by hand, at
+the pendant; nothing here commanded motion.
