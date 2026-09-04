@@ -224,3 +224,20 @@ to keep in sync), or — when a preview genuinely needs to diverge (e.g. it draw
 literal emit trace wouldn't show usefully) — that divergence is a DECLARED, stated decision on the preview's
 own definition, not a quietly-forked copy of emit logic that will drift the first time the real emit path
 changes and nobody remembers to update the copy.
+
+## 20. Section names are free text the author types. Duplicates are allowed and are NOT merged
+
+⛔ **Owner ruling, 2026-09-04**, asked directly and answered "I absolutely don't mind": two `group_box` nodes
+in the same wizard MAY carry the same title, and nothing should collapse them into one card. A proposal to
+auto-merge same-titled boxes was put to the owner and declined.
+
+The vocabulary is genuinely open, not an enum — `SECTION_RANK` ranks only `IDENTITY`/`GEOMETRY`/`TOOL & CUT`
+(rule 18) and every other name sorts as "unranked", i.e. array order. Shipped wizards already rely on that:
+surfacing declares `AREA`/`TOOL`/`TOOL & STEPOVER`/`DEPTH & FEED`, atc_table declares `TOOL TABLE → CONTROLLER`.
+A `group_box`'s `title` is a plain `field_input`; a `formfield`'s `section` is a combo whose own header calls
+itself "a SPELLING AID, not a gate". Neither constrains the value, deliberately.
+
+⚠ **The one coupling to know about:** fold state is keyed by TITLE, not by box (`isSectionCollapsed(gTitle)` /
+`setSectionCollapsed(gTitle)`, `formWidgets.js`). So two same-named sections render as two independent cards
+that share one open/closed memory. That falls out of keying the preference by name — it was not designed, and
+per this ruling it does not need fixing.
