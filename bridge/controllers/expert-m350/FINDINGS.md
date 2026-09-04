@@ -1650,3 +1650,43 @@ workflow already use, so the H table stays at zero. `[app-side: Studio must not 
 profile — RENDERRANCHY's call, flagged not built]`
 ⭐ Note Studio does not emit `G43` today: the only occurrence in `web/` is inside the V4.1's *extracted vendor*
 macro, never in an emit path.
+
+### 26. ⭐⭐⭐ MODBUS POSITION POLLING WORKS — the reboot was the whole fix `[CONFIRMED 2026-08-26]`
+**Captured immediately before flashing firmware `2026-09-02-00`, whose only release note is
+*"Expanded Modbus register address mapping."*** ⇒ if the addresses move, this is the before-state.
+
+**Baseline: firmware `2026-04-10-00`, `#279 = 2` (Slave), COM6 @ 115200 8N1, slave id 1, read-only FC03.**
+
+```
+7080   work position    01031ba8000a42c9  ->  01 03 14 851f c234 2d0e 4425 b021 42c7 3c6a 4425 0000 0000
+7260   machine position 01031c5c000a024f  ->  01 03 14 0000 40a0 0000 c0a0 0000 c0a0 0000 c0a0 0000 0000
+10002  state            0103271200026eba  ->  01 03 04 0000 0000
+```
+
+**Decoded — and it matches the pendant on every axis:**
+```
+              X          Y          Z          A        B
+7080 work   -45.1300   660.7040    99.8440   660.9440   0.0000    == the pendant's "Abs"
+7260 mach     5.0000    -5.0000    -5.0000    -5.0000   0.0000    == the pendant's "Mach"
+10002 state       0
+```
+
+⭐ **ENCODING: word-swapped float32 — LOW WORD FIRST.** `0000 40a0` → `0x40a00000` → `5.0`. Two registers
+per axis, five axes per block. ⛔ Not plain big-endian; a straight `>f` over the payload gives garbage.
+
+⇒ **Three things settled at once:**
+1. ⭐ **The reboot was the entire fix.** `#279` was set but serial parameters only apply at startup, and the
+   machine had not restarted since. Every earlier probe answered a single `0x00` byte — *"no slave answering"*,
+   exactly as diagnosed, and NOT a wrong register map.
+2. ⭐ **The register map is CORRECT.** `7080` / `7260` / `10002` were second-hand from
+   foinnc/M3X-M350-IoT-Bridge and carried as `[unattested]` for months. They are right.
+   ⛔ Strike every note calling them suspect.
+3. ⭐ `master.py`'s `ModbusMaster` needs no address change — only the word-swap decode, which it does not do
+   yet (it returns raw registers by design).
+
+⚠ **A live-slave caveat worth keeping:** the first bytes of each reply are line noise (`010000…`, `000000f2…`)
+before the real `01 03 <len>` frame. A parser must **find the frame**, not assume it starts at byte 0 —
+pymodbus reported *"Incomplete message received"* on exactly this.
+
+⛔ **AFTER THE FLASH, RE-RUN THIS FIRST.** The new firmware expands the register mapping, so these three
+addresses are the first thing to re-verify — before anything is built on them.
