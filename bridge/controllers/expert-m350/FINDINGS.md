@@ -1842,3 +1842,40 @@ a deliberate act requiring the owner's ruling, not a convenience while debugging
 
 ⚠ **Untested and deliberately so:** whether an injected line can START a loaded program, and what happens if
 one is injected while a program is running. Both need the owner present and a reason.
+
+### 31. ⭐⭐⭐ A UNIVERSAL VARIABLE READER — injection + a scratch register reaches ANY variable `[CONFIRMED 2026-08-26]`
+Modbus maps `setting` indices 0..~1300 (§28) and nothing above. Injection (§30) closes the gap:
+
+```
+1. inject   #915 = #<target>          (#915 = H16 tool length offset -- unused, 0, range +/-9999)
+2. read     register 7330             (= 6500 + 2*415, the same slot over Modbus)
+3. inject   #915 = 0                  (restore)
+```
+**Proven on six variables the register map cannot reach:**
+
+| variable | | value |
+|---|---|---|
+| `#2500` | tool-setter calibration reference | **−0.4612** |
+| `#1927` | last probe touch Z | −5.000 |
+| `#1300` | current tool number | 1 |
+| `#578` | active coordinate system | 1 (G54) — matches `setting[78]` ✓ |
+| `#792` | live workpiece Z | 99.844 — matches the DRO ✓ |
+
+⇒ ⭐ **Every variable on the controller is now readable from the PC over one serial cable** — persistent
+vars, probe results, live state, anything the macro language can name. Combined with §28 (the parameter
+table) and §29 (live positions), the controller has no interior left that the bridge cannot see.
+
+⚠ **Choose the scratch slot carefully.** `#915` works because H16 is unused here, holds 0, and has a
+±9999.999 range — a narrow-range parameter would silently clamp or reject the value. ⛔ Restore it; leaving a
+value in an H slot is exactly the latent hazard §17/§22 chased.
+
+### ⭐ AND IT ANSWERS THE CALIBRATION QUESTION: `#2500` SURVIVED
+`#2500 = −0.4612`, not zero — so the flash did not lose it, and the patched `slib-g` O502 will write
+`#1430 = touch − #2500` against a real reference.
+
+⚠ **That it EXISTS is confirmed. That it is CORRECT is not.** The expected relation is
+`#2500 = [setter touch #1927] − [that tool's #1430]`, and with the current readings (`#1927 = −5.000`,
+`#1430 = −68.336`) that would be `63.336`, not `−0.4612`. ⇒ `#1927` reads like a stale home position rather
+than a real touch, so the mismatch is probably a stale input, not a bad reference — **but it is not proven.**
+⇒ ⛔ The physical check is the only real one, and it is the documented one: **jog to `G54 Z0`; the tip should
+sit on the spoilboard.** Off by ~2× means the sign is flipped. Do that before trusting a tool change.
