@@ -1690,3 +1690,41 @@ pymodbus reported *"Incomplete message received"* on exactly this.
 
 ⛔ **AFTER THE FLASH, RE-RUN THIS FIRST.** The new firmware expands the register mapping, so these three
 addresses are the first thing to re-verify — before anything is built on them.
+
+### 27. ⛔⛔ SYSTEM MACROS CANNOT BE EDITED OVER SMB — the controller restores its own at boot `[CONFIRMED 2026-08-26]`
+Four files were written to SYSDISK over SMB and **read back byte-correct**. After the next power-cycle:
+
+```
+sysstart.nc   661B -> 6B   (factory stub)        ⛔ reverted
+fndzero.nc    375B -> 59B                        ⛔ reverted
+fndY.nc       288B -> 15B                        ⛔ reverted
+slib-g.nc     patched (4 edits) -> factory       ⛔ reverted
+SETPROBE.nc   455B -> 455B                       ✅ SURVIVED
+```
+
+⭐ **The rule is exact: a file whose name is in the FLASH PAYLOAD is restored at boot. A new file is not.**
+`SETPROBE.nc` is not a firmware file, so nothing existed to put back. ⇒ **Any system macro shipped by the
+firmware is effectively read-only over the network**, no matter what a write reports.
+
+⚠ **A successful write and a correct read-back prove NOTHING here.** Both happened, and both were undone by
+the reboot. ⛔ Verify persistence across a power-cycle, not at write time.
+
+⇒ **This invalidated the documented restore procedure** in `RESTORE-CUSTOM-MACROS/README.md`, which said to
+copy the files onto SYSDISK after a flash. It cannot work. The README now carries the corrected route.
+
+### ⭐ THE ROUTE THAT WORKS — put the customisations IN the flash payload
+Patch `install/slib-g.nc` **on the USB stick** and drop the custom `sysstart.nc` / `fndzero.nc` / `fndY.nc` /
+`SETPROBE.nc` in beside it, then flash. The controller's own copy then IS the patched one, so there is
+nothing for it to revert to. `[CONFIRMED — owner, 2026-08-26: "Works perfectly."]`
+
+⚠ Two traps found while doing it:
+* `patch-slib-g.py` leaves a **`slib-g.nc.prepatch`** next to its target — ⛔ delete it before flashing, it
+  must not ship inside the payload.
+* The release ships a bare **`setting`** as a separate asset. ⛔ It must never go in `install/`; the OEM
+  read-me states that restores factory parameters, wiping axes, envelope, tool table and probe config.
+
+⭐ **What this cost, and the tell:** a flash reverts `slib-g.nc`, which re-arms the factory tool-setter bug —
+the rapid `G53 Z#637` descent **through** the setter before any `G31` runs. It also reverts `fndzero.nc` /
+`fndY.nc`, so homing stops syncing A to Y and **racks the gantry** (observed: A `−5.178` vs Y `−5.000`).
+⇒ ⛔ **After ANY flash, assume every system macro is factory until verified** — and verify by content, not by
+file size or a hash against a stale capture.

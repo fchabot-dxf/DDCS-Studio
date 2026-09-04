@@ -28,14 +28,45 @@ Two pieces:
   Content-matched + idempotent.
 - **config — `SETPROBE.nc`** (also run by `sysstart` each boot): `#1075=2` (probe input = IN02), `#1077=1` (level), `#632=800` (fast first probe), `#631=2` (2 touches). These are runtime and revert on reboot, so `sysstart` re-applies them. *(`#632`/`#631` are global → they affect the floating probe too; fine for spoilboard work, but verify floating still zeros.)*
 
-## Restore procedure (after a flash)
-1. Copy all `.nc` files here onto **SYSDISK** (overwrite), same route as any system file.
-2. Patch the freshly-flashed slib-g:
-   ```
-   python patch-slib-g.py "\\192.168.0.99\SYSDISK\slib-g.nc"
-   ```
-3. **Power-cycle.**
-4. Verify: home → **"HOMING COMPLETE - A SYNCED"**; then the tool-setter workflow below.
+## ⛔⛔ RESTORE PROCEDURE — THE OLD ONE DOES NOT WORK. MEASURED 2026-08-26.
+
+⛔ **Copying these files onto SYSDISK over SMB DOES NOT PERSIST.** They were written, read back
+byte-correct, and were **factory again after the next power-cycle**:
+
+```
+sysstart.nc   661B written -> 6B   (factory stub)    reverted
+fndzero.nc    375B written -> 59B                    reverted
+fndY.nc       288B written -> 15B                    reverted
+slib-g.nc     patched, all 4 edits -> factory        reverted
+SETPROBE.nc   455B written -> 455B                   SURVIVED
+```
+
+⭐ **The pattern is exact: a file the controller ships its own copy of is RESTORED at boot.**
+`SETPROBE.nc` survived because it is a NEW file — the firmware has no copy to put back. ⇒ Any system
+macro whose name appears in the flash payload cannot be edited over the network. **This is why homing
+came up unsynced after the 2026-09-02 flash** — A landed at `-5.178` against Y at `-5.000`.
+
+### ⭐ THE ROUTE THAT WORKS — bake the customisations into the flash payload
+Make the controller's OWN copy the patched one, so there is nothing to revert to.
+
+1. Extract `install/` from the release zip onto a FAT32 stick's root (hardware **V1** => `install/`,
+   **V2** => `psys/`). ⛔ **Never add the `setting` file** — the OEM read-me says that restores FACTORY
+   parameters and would wipe axes, envelope, tool table and probe config.
+2. Patch the payload's copy, not the controller's:
+   `python patch-slib-g.py "D:/install/slib-g.nc"`
+   ⚠ **then DELETE the `slib-g.nc.prepatch` the patcher leaves behind** — it must not ship in the payload.
+3. Copy `sysstart.nc`, `fndzero.nc`, `fndY.nc`, `SETPROBE.nc` from this folder **into `install/`**, overwriting.
+4. Flash: power **off** -> stick in -> power **on**. Do not cut power mid-upgrade.
+5. Verify: home -> **"HOMING COMPLETE - A SYNCED"**, A and Y machine both `-5.000`, not `-5.178`.
+
+⭐ **Confirmed working 2026-08-26** on firmware `2026-09-02-00` — the owner: *"Works perfectly."*
+⚠ No checksum or manifest was found in the payload, so the bootloader appears not to validate it — that
+is an absence of evidence, not a guarantee. Keep the unmodified release zip to fall back to.
+
+⚠ `key-1.nc`-`key-7.nc` are in this folder but were **NOT needed**: only `key-1.nc` is in the payload, and
+`key-2`-`key-7` survived byte-identical (modulo line endings). ⭐ **And the owner does not use the K-buttons
+at all** — the everyday tool setter is the on-screen **Fixed Probe** button, which is what the `slib-g`
+patch fixes. Ignore the K-button assignment note above.
 
 ## Tool-setter workflow (the order matters)
 1. **Zero G54 Z0 on the spoilboard** (floating probe) — the sacred Z0.
