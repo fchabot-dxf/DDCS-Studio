@@ -69,26 +69,6 @@ export const OD_PROBE_STRUCT_BINDINGS = [
       widgetConfig: { options: WCS_OPTIONS } },
 ];
 
-function odProbeDataStack(p = OD_PROBE_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            { type: 'layout', params: { kind: 'lathe_profile' } },
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { probeWcs: true } },   // this op PRODUCES the WCS — never render through the table
-            // t1301 — WHERE THE OPERATOR PUT THE STYLUS: just outside the bar, a little back along the round and
-            // clear of the chuck, which is word for word what this op's prompt asks them to do.
-            { type: 'simstart', params: { anchor: 'lathe', out: 4, zplane: -8 } },
-            { type: 'param_group', params: { group: 'OD Probe' }, children: [] },
-        ],
-        children: odProbeStack(p),
-    }];
-}
-
-export const OD_PROBE_BINDINGS = deriveBindingsFor(odProbeDataStack(OD_PROBE_DEFAULTS), OD_PROBE_BINDING_SPECS);
-
 export function rebuildOdProbe(stack, resolved) {
     const p = resolved || {};
     const n = (k) => (Number.isFinite(Number(p[k])) ? Number(p[k]) : OD_PROBE_DEFAULTS[k]);
@@ -104,11 +84,46 @@ export function rebuildOdProbe(stack, resolved) {
 }
 
 export function odProbeDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis) — same pattern as faceProbeData.js's own t2617 migration
+    // (identical shape: rebuild-from-resolved-params postInstantiate, simstart kept in uiChildren for the same
+    // reason). Sections declared IDENTITY/TOOL & CUT from the start (canonical SECTION_RANK order).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...OD_PROBE_BINDING_SPECS, ...OD_PROBE_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'OD Probe' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    // this op PRODUCES the WCS — never render through the table (IRON RULE 2)
+                    { type: 'preview3d', params: { probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                    // t1301 — WHERE THE OPERATOR PUT THE STYLUS: just outside the bar, a little back along the
+                    // round and clear of the chuck, which is word for word what this op's prompt asks them to do.
+                    { type: 'simstart', params: { anchor: 'lathe', out: 4, zplane: -8 } },
+                ],
+            },
+        }],
+        children: odProbeStack(OD_PROBE_DEFAULTS),
+    }];
+    const bindings = [...deriveBindingsFor(stack, OD_PROBE_BINDING_SPECS), ...OD_PROBE_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
         'lathe_odprobe',
         'OD probe (lathe)',
-        odProbeDataStack(OD_PROBE_DEFAULTS),
-        [...OD_PROBE_BINDINGS, ...OD_PROBE_STRUCT_BINDINGS],
+        stack,
+        bindings,
         'form3d+2d',
         null,
         LATHE_GROUP,

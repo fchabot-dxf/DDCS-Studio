@@ -12,8 +12,11 @@ import { test, expect } from '@playwright/test';
  * in place of yet. Test 2 is a simplified edit-reaches-model check, not a full `emitEquivalence` sweep —
  * already covered by this op's own dedicated emit test.
  *
- * EXPECTED_ORDER is ATC_CHECK_BINDING_SPECS' own array order, grouped by section (TOOL & CUT, GEOMETRY,
- * TOLERANCE — all three contiguous runs in the source array, no NAME-KEYED merge needed).
+ * EXPECTED_ORDER is ATC_CHECK_BINDING_SPECS' own array order, grouped by section: GEOMETRY, TOOL & CUT,
+ * TOLERANCE. t2617 (BACKLOG #71/#72) — REORDERED from TOOL & CUT/GEOMETRY/TOLERANCE: out of band against
+ * `SECTION_RANK` (`ui/formWidgets.js`; TOLERANCE is unranked, stays last either way), caught by
+ * `tests/section-order-parity-2617.spec.js` and confirmed against the real `renderOpForm` (t2613's own
+ * measurement) — the section SPLIT itself was already correct, only the group_box order.
  */
 
 const ROW_SELECTOR = '.form-row, .grid-2, .grid-3';
@@ -21,10 +24,10 @@ const DATA_MODULE = '/blocks/dataOps/atcCheckData.js';
 const DEF_FACTORY = 'atcCheckDataDef';
 
 const EXPECTED_ORDER = [
-  // TOOL & CUT
-  'maxDist', 'retract', 'f_fast', 'f_slow', 'port',
   // GEOMETRY
   'blockHeight', 'safeZ',
+  // TOOL & CUT
+  'maxDist', 'retract', 'f_fast', 'f_slow', 'port',
   // TOLERANCE
   'tolerance',
 ];

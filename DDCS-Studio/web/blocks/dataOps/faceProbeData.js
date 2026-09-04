@@ -71,29 +71,6 @@ export const FACE_PROBE_STRUCT_BINDINGS = [
       widgetConfig: { options: WCS_OPTIONS } },
 ];
 
-function faceProbeDataStack(p = FACE_PROBE_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            { type: 'layout', params: { kind: 'lathe_profile' } },
-            // IRON RULE 2, declared to the preview: this op PRODUCES the WCS, so the picture must never be mapped
-            // through the declared WCS table — that table describes a previous setup, not the one being measured.
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { probeWcs: true } },
-            // t1301 — WHERE THE OPERATOR PUT THE STYLUS. The op's own prompt asks them to jog just clear of the face,
-            // so the preview starts there: a negative `out` places it INSIDE the bar's radius (it touches the FACE,
-            // not the round), a few mm ahead of the raw end in +Z. Without this the stroke began at the scene origin.
-            { type: 'simstart', params: { anchor: 'lathe', out: -4, zplane: 6 } },
-            { type: 'param_group', params: { group: 'Face Probe' }, children: [] },
-        ],
-        children: faceProbeStack(p),
-    }];
-}
-
-export const FACE_PROBE_BINDINGS = deriveBindingsFor(faceProbeDataStack(FACE_PROBE_DEFAULTS), FACE_PROBE_BINDING_SPECS);
-
 /** Rebuild the macro from the resolved params — one emit source, so nothing can drift out of the snapshot. */
 export function rebuildFaceProbe(stack, resolved) {
     const p = resolved || {};
@@ -110,11 +87,52 @@ export function rebuildFaceProbe(stack, resolved) {
 }
 
 export function faceProbeDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis) — same minimal pattern as facingData.js/centerDrillData.js's own
+    // pilots. `simstart` stays inside `uiChildren` (not `children`): `rebuildFaceProbe`'s own `postInstantiate`
+    // wholesale-replaces `root.children` on every build, so `uiChildren` is the only stable home across a
+    // rebuild — the tree's own `simstart` branch (formWidgets.js, t2617) treats it as metadata-only, same as
+    // `layout`. Sections declared IDENTITY/TOOL & CUT from the start (canonical SECTION_RANK order).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...FACE_PROBE_BINDING_SPECS, ...FACE_PROBE_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Face Probe' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    // IRON RULE 2, declared to the preview: this op PRODUCES the WCS, so the picture must never
+                    // be mapped through the declared WCS table — that table describes a previous setup, not the
+                    // one being measured.
+                    { type: 'preview3d', params: { probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                    // t1301 — WHERE THE OPERATOR PUT THE STYLUS. The op's own prompt asks them to jog just clear
+                    // of the face, so the preview starts there: a negative `out` places it INSIDE the bar's
+                    // radius (it touches the FACE, not the round), a few mm ahead of the raw end in +Z. Without
+                    // this the stroke began at the scene origin.
+                    { type: 'simstart', params: { anchor: 'lathe', out: -4, zplane: 6 } },
+                ],
+            },
+        }],
+        children: faceProbeStack(FACE_PROBE_DEFAULTS),
+    }];
+    const bindings = [...deriveBindingsFor(stack, FACE_PROBE_BINDING_SPECS), ...FACE_PROBE_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
         'lathe_faceprobe',
         'Face probe (lathe)',
-        faceProbeDataStack(FACE_PROBE_DEFAULTS),
-        [...FACE_PROBE_BINDINGS, ...FACE_PROBE_STRUCT_BINDINGS],
+        stack,
+        bindings,
         'form3d+2d',
         null,
         LATHE_GROUP,

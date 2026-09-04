@@ -108,8 +108,12 @@ export function atcCheckDataDef() {
                     params: { group: 'Tool Check' },
                     children: [
                         { type: 'usage_text', params: { style: 'plain', text: 'A quick tap on the tool setter that <b>aborts if the tool is broken, missing, or the wrong length</b>. Re-measures and compares to the stored tool-length table (1430+T-1). Setter pin/level from <b>Settings → Probes</b>; block height, feeds, safe Z, max distance from <b>Settings → ATC</b>.' } },
-                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        // t2617 (BACKLOG #71/#72) — REORDERED to GEOMETRY/TOOL & CUT/TOLERANCE (was TOOL & CUT/
+                        // GEOMETRY/TOLERANCE): out of band against SECTION_RANK, caught by
+                        // tests/section-order-parity-2617.spec.js. TOLERANCE is unranked (falls after every
+                        // ranked band either way), so only GEOMETRY/TOOL & CUT needed swapping.
                         { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
                         { type: 'group_box', params: { title: 'TOLERANCE' }, children: fieldRefsOf(g0.TOLERANCE) },
                         { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
                     ],
@@ -130,7 +134,7 @@ export function atcCheckDataDef() {
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
     const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
     const geometry = gFinal.GEOMETRY.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...toolCut, ...geometry, ...gFinal.TOLERANCE];
+    const bindings = [...geometry, ...toolCut, ...gFinal.TOLERANCE];   // t2617 — matches the tree's own reordered declaration above
     const def = userOpFromStack('atc_check_data', 'Tool Check (data)', stack, bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_CHECK_BINDING_SPECS;
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcCheckRecompose(stack, resolved));

@@ -49,23 +49,6 @@ export const POLY_STRUCT_BINDINGS = [
       help: 'How finely each flat is chopped into A/X moves. Per FACE, not per turn, so every shape gets the same fidelity per flat. Rounded to an even number so a point lands on each corner AND on the middle of each flat.' },
 ];
 
-function polyDataStack(p = POLY_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
-            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
-            { type: 'sim', params: {} },
-            { type: 'layout', params: { kind: 'lathe_profile' } },
-            { type: 'param_group', params: { group: 'Polygon' }, children: [] },
-        ],
-        children: appendToolSel(polygonStack(p)),
-    }];
-}
-
-export const POLY_BINDINGS = deriveBindingsFor(polyDataStack(POLY_DEFAULTS), POLY_BINDING_SPECS);
-
 /**
  * THE PATH IS REGENERATED, not patched. Every Studio-side parameter changes the whole sweep, so the honest hook
  * rebuilds the program from the resolved params rather than trying to edit blocks into a new shape.
@@ -90,9 +73,43 @@ export function rebuildPolygon(stack, resolved) {
 }
 
 export function polygonDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis, LAST of the seven) — same minimal pattern as facingData.js/
+    // centerDrillData.js. Sections declared IDENTITY/GEOMETRY/TOOL & CUT from the start (canonical
+    // SECTION_RANK order). `layoutSpecFromOp`'s own `isPolygon` special case (panelTypes.js, the acrossFlats
+    // drag-commit-on-release fix, BACKLOG #70) keys off `def.opType` matching /polygon/ — a string check,
+    // unaffected by this tree migration.
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...POLY_BINDING_SPECS, ...POLY_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Polygon' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    { type: 'preview3d', params: {} },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                ],
+            },
+        }],
+        children: appendToolSel(polygonStack(POLY_DEFAULTS)),
+    }];
+    const bindings = [...deriveBindingsFor(stack, POLY_BINDING_SPECS), ...POLY_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
-        'lathe_polygon', 'Polygon Turn (lathe)', polyDataStack(POLY_DEFAULTS),
-        [...POLY_BINDINGS, ...POLY_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+        'lathe_polygon', 'Polygon Turn (lathe)', stack,
+        bindings, 'form3d+2d', null, LATHE_GROUP,
     ), POLY_DEFAULTS);
     def.postInstantiate = (stack, resolved) => rebuildPolygon(stack, resolved);
     return def;

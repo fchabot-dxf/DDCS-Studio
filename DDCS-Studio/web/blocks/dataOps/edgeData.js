@@ -153,9 +153,19 @@ export function edgeDataDef() {
                     params: { group: 'Edge' },
                     children: [
                         { type: 'usage_text', params: { text: 'Probes one wall (a LINE datum, one axis) and writes the found position to a work-coordinate register — a strict subset of Corner (no safe-traverse/reposition/fan-out). Set which axis the wall faces, which way the stylus approaches, and which WCS receives the result.' } },
-                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        // t2617 (BACKLOG #71/#72) — REORDERED to IDENTITY/GEOMETRY/TOOL & CUT (was TOOL & CUT/
+                        // IDENTITY/GEOMETRY): the t2599 comment above this file's own earlier draft claimed
+                        // "faithful reproduction of the existing flat render", inferred from the SOURCE ARRAY's
+                        // own declaration order — but never verified against the real `renderOpForm`, which
+                        // ALWAYS re-sorts by SECTION_RANK regardless of array order (t2613's own measurement,
+                        // confirmed by calling the real function: the actual classic render was IDENTITY-first
+                        // all along). Rule 18 (context/PRODUCT-PRINCIPLES.md): a form whose rows read out of
+                        // band order is a declaration bug — fixed at the declaration, not by re-deriving order
+                        // from the render path (the tree path has NO SECTION_RANK enforcement of its own; see
+                        // `tests/section-order-parity-2617.spec.js`, the cross-op guard that now closes this).
                         { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(g0.IDENTITY) },
                         { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
                         { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
                     ],
                 }],
@@ -175,7 +185,7 @@ export function edgeDataDef() {
     const gFinal = edgeFieldGroups(stack);
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
     const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...toolCut, ...gFinal.IDENTITY, ...gFinal.GEOMETRY];
+    const bindings = [...gFinal.IDENTITY, ...gFinal.GEOMETRY, ...toolCut];   // t2617 — matches the tree's own reordered declaration above
     // t339 E4 — NO '*_datawiz' group: the edge twin is opened IN-PLACE from the built-in Edge's Probe slot (opensAs), and its
     // own menu entry is hidden (wizardLibrary drops opensAs targets), so it never lands in a separate Data Wiz dropdown.
     const def = userOpFromStack('edge_data', 'Edge (data)', stack, bindings, 'form3d+2d', { forceMachine: true });

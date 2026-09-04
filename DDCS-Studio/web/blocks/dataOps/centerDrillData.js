@@ -41,29 +41,6 @@ export const CDRILL_STRUCT_BINDINGS = [
       widgetConfig: { options: [[DRILL_KINDS.straight.label, 'straight'], [DRILL_KINDS.peck.label, 'peck']] } },
 ];
 
-function cdrillDataStack(p = CDRILL_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED (this twin never had one): id-collision fix, same
-            // as drillData.js's own t2301 comment. Empty params — no existing lathe-cutting-twin precedent to
-            // match (mill's rotary/machine/magazine trio doesn't map to a lathe rig; the two lathe PROBE twins
-            // that already had sim, odProbeData.js/faceProbeData.js, carry probeWcs:true instead, which doesn't
-            // apply here either — this op reads a WCS, it doesn't produce one). The `layout` node below is this
-            // twin's OWN real 2D content (the half-profile canvas) — a separate, currently-unwired node type
-            // (confirmed: 'layout' has no case in formWidgets.js's traverse() switch, falls to the t1561
-            // unwired-placeholder branch), unrelated to sim's own generic layout2d pane either way.
-            { type: 'sim', params: {} },
-            { type: 'layout', params: { kind: 'lathe_profile' } },
-            { type: 'param_group', params: { group: 'Centre Drill' }, children: [] },
-        ],
-        children: appendToolSel(centerDrillStack(p)),
-    }];
-}
-
-export const CDRILL_BINDINGS = deriveBindingsFor(cdrillDataStack(CDRILL_DEFAULTS), CDRILL_BINDING_SPECS);
-
 /** STRAIGHT means "no step". Rather than a second arm that could drift, the identity writes the peck it implies. */
 export function applyStraightPeck(stack, resolved) {
     if ((resolved && resolved.kind) !== 'straight') return stack;
@@ -82,9 +59,52 @@ export function applyStraightPeck(stack, resolved) {
 }
 
 export function centerDrillDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis) — same minimal pattern as facingData.js's own t2607 pilot: no
+    // bootstrap/final split needed (all specs already `match`-based by identity — the tree only needs `.param`
+    // strings for field_ref, not a derived blockIndex). Sections declared IDENTITY/GEOMETRY/TOOL & CUT from the
+    // start — the canonical SECTION_RANK order (t2613/t2617 found and fixed three EARLIER migrations that
+    // guessed wrong and shipped out of band; `tests/section-order-parity-2617.spec.js` now catches this class
+    // for every op, including this one, going forward).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...CDRILL_BINDING_SPECS, ...CDRILL_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Centre Drill' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t1281-class — form3d+2d: the 3D bar and the half-profile. preview3d+feature_canvas as ADJACENT
+                // RIGHT-pane siblings (Phase 1 step 2, t2511's own adjacency-merge shape). `layout{kind:
+                // 'lathe_profile'}` stays alongside: consumed by layoutSpecFromOp via def.layout (self-healed at
+                // registration), NOT rendered by the tree (formWidgets.js's own `layout` branch, t2607, treats
+                // it as metadata-only).
+                RIGHT: [
+                    { type: 'preview3d', params: {} },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                ],
+            },
+        }],
+        children: appendToolSel(centerDrillStack(CDRILL_DEFAULTS)),
+    }];
+    // t2617 — deriveBindingsFor ONLY the value-socket specs (they carry `match`); CDRILL_STRUCT_BINDINGS.kind
+    // has none (a structural toggle, consumed by postInstantiate's own JS, not resolved to a blockIndex) —
+    // concatenated unchanged, same pattern edge/wcs's own STRUCT_BINDINGS arrays already use.
+    const bindings = [...deriveBindingsFor(stack, CDRILL_BINDING_SPECS), ...CDRILL_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
-        'lathe_centerdrill', 'Centre Drill (lathe)', cdrillDataStack(CDRILL_DEFAULTS),
-        [...CDRILL_BINDINGS, ...CDRILL_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+        'lathe_centerdrill', 'Centre Drill (lathe)', stack,
+        bindings, 'form3d+2d', null, LATHE_GROUP,
     ), CDRILL_DEFAULTS, 'centredrill');   // …a bit on the centreline, not an insert on a holder — t1722: matches LATHE_TOOL_KINDS.centredrill's declared id (data/latheTools.js), not a second, American-spelled identity
     def.postInstantiate = (stack, resolved) => applyStraightPeck(stack, resolved);
     return def;

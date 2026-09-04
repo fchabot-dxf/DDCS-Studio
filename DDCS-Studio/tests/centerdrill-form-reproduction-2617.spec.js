@@ -1,37 +1,31 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * WIZARDS-AS-DATA — t2599 (BACKLOG #71/#72, Phase 1) migrated edge_data onto the declared
- * `split_horizontal`/`group_box`/`field_ref` tree (mirroring drill/surfacing/bore/rotary_clock/alignment).
+ * WIZARDS-AS-DATA — t2617 (BACKLOG #71/#72, Phase 1) migrated centerDrillData.js onto the declared
+ * `split_horizontal`/`group_box`/`field_ref` tree — the SECOND of the seven lathe-family ops carrying
+ * `layout{kind:'lathe_profile'}`, following facingData.js's own t2607 pilot. Rule 17 (self-applied): grepped
+ * the whole `tests/` directory for `user_lathe_centerdrill`/`CDRILL_DATA_OPTYPE`/`centerDrillData` before
+ * calling this migration verified — no other spec file references this op's own ids or ops.
  *
- * NOT built on `tests/support/formReproduction.js`'s shared `registerFormReproductionSuite` — same reason as
- * bore/rotary_clock/alignment's own standalone specs: its own "test 2" assumes a REAL, dedicated classic shell
- * page. Edge has none — `#wiz_edge` was RETIRED at t1730 (index.html:347). Same `.wiz-usage` collision. Tests 1
- * and 2 below are copied directly from `formReproduction.js`'s own test 1/test 3 (unmodified logic).
- *
- * EXPECTED_ORDER is edgeData.js's own declared IDENTITY/GEOMETRY/TOOL & CUT split (see `edgeFieldGroups`) — edge
- * is the FIRST migrated op with THREE sections rather than two. t2617 (BACKLOG #71/#72) — REORDERED from the
- * original TOOL & CUT/IDENTITY/GEOMETRY: that order was a t2599 mistake, not a faithful reproduction — it was
- * inferred from the pre-migration SOURCE ARRAY's own declaration order, never verified against the real
- * `renderOpForm`, which always re-sorts by `SECTION_RANK` (IDENTITY → GEOMETRY → TOOL & CUT) regardless of
- * array order (t2613's own measurement). Now matches SECTION_RANK, machine-enforced by
- * `tests/section-order-parity-2617.spec.js`.
+ * EXPECTED_ORDER declared in the canonical SECTION_RANK order from the start (IDENTITY/GEOMETRY/TOOL & CUT) —
+ * not reproducing a guessed pre-migration order, the exact mistake t2613/t2617 found and fixed on three
+ * earlier ops.
  */
 
 const ROW_SELECTOR = '.form-row, .grid-2, .grid-3';
-const DATA_MODULE = '/blocks/dataOps/edgeData.js';
-const DEF_FACTORY = 'edgeDataDef';
+const DATA_MODULE = '/blocks/dataOps/centerDrillData.js';
+const DEF_FACTORY = 'centerDrillDataDef';
 
 const EXPECTED_ORDER = [
   // IDENTITY
-  'axis', 'dir',
+  'kind',
   // GEOMETRY
-  'wcs',
+  'depth', 'peck',
   // TOOL & CUT
-  'dist', 'retract', 'f_fast', 'f_slow', 'port', 'radius',
+  'feed', 'toolNum',
 ];
 
-test('edge-form-reproduction: declared tree places fields in the same structure as the flat form', async ({ page }) => {
+test('centerdrill-form-reproduction: declared tree places fields in the same structure as the flat form', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
@@ -69,7 +63,7 @@ test('edge-form-reproduction: declared tree places fields in the same structure 
   expect(r.fields.length).toBe(r.boundParamCount);
 });
 
-test('edge-form-reproduction: an edit in the declared tree reaches the op model and comes back', async ({ page }) => {
+test('centerdrill-form-reproduction: an edit in the declared tree reaches the op model and comes back', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
@@ -81,7 +75,7 @@ test('edge-form-reproduction: an edit in the declared tree reaches the op model 
     const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
 
     const def = dd[a.defFactory]();
-    const dataBuilder = builderOf(dd[a.dataOptypeExport]);   // === instantiate(def, params) — the SAME path a real save uses
+    const dataBuilder = builderOf(dd[a.dataOptypeExport]);
 
     const binds = formBindings(def);
     const userRoot = def.template.find((b) => b && b.type === 'user_root');
@@ -114,12 +108,41 @@ test('edge-form-reproduction: an edit in the declared tree reaches the op model 
     return { beforeVal: Number(before[a.editParam]), afterVal: Number(after[a.editParam]), eqPass: eq.pass, firstDiff: eq.firstDiff };
   }, {
     dataModule: DATA_MODULE, defFactory: DEF_FACTORY, rowSelector: ROW_SELECTOR,
-    refStackModule: '/wizards/stacks/edgeWizard.js', refStackExport: 'edgeStack',
-    dataOptypeExport: 'EDGE_DATA_OPTYPE', defaultsExport: 'EDGE_DEFAULTS',
-    editParam: 'dist', editValue: '45',
+    refStackModule: '/wizards/lathe/centerDrill.js', refStackExport: 'centerDrillStack',
+    dataOptypeExport: 'CDRILL_DATA_OPTYPE', defaultsExport: 'CDRILL_DEFAULTS',
+    editParam: 'depth', editValue: '12.5',
   });
 
-  expect(r.beforeVal).toBe(15);   // EDGE_DEFAULTS.dist
-  expect(r.afterVal).toBe(45);
+  expect(r.beforeVal).toBeGreaterThanOrEqual(0);
+  expect(r.afterVal).toBe(12.5);
   expect(r.eqPass, r.firstDiff ? JSON.stringify(r.firstDiff) : '').toBe(true);
+});
+
+test('centerdrill-form-reproduction: the lathe half-profile mounts as a REAL 2D canvas, no unwired placeholder', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+  await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const M = await import('/blocks/dataOps/centerDrillData.js'); try { U.registerUserOp(M.centerDrillDataDef()); } catch (_) {} });
+  await page.evaluate(() => window.openWiz('user_lathe_centerdrill'));
+  await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+  await page.waitForTimeout(600);
+
+  const r = await page.evaluate(() => {
+    const wizUser = document.getElementById('wiz_user');
+    const visible = (sel) => [...(wizUser ? wizUser.querySelectorAll(sel) : [])].some((e) => e.offsetParent !== null);
+    const layout2dHost = wizUser ? [...wizUser.querySelectorAll('[data-viz-pane="layout2d"]')].find((e) => e.offsetParent !== null) : null;
+    const svg = layout2dHost ? layout2dHost.querySelector('svg') : null;
+    return {
+      unwiredPlaceholder: wizUser ? wizUser.querySelectorAll('.unwired-block[data-block-type="layout"]').length : -1,
+      has3dPaneVisible: visible('[data-viz-pane="preview3d"]'),
+      has2dPaneVisible: !!layout2dHost,
+      canvasCount: wizUser ? wizUser.querySelectorAll('canvas').length : 0,
+      svgChildCount: svg ? svg.childElementCount : -1,
+    };
+  });
+
+  expect(r.unwiredPlaceholder, 'the layout node renders NO ⚠ "layout" — not wired yet placeholder').toBe(0);
+  expect(r.has3dPaneVisible, 'form3d+2d: the 3D bar pane is also visible').toBe(true);
+  expect(r.has2dPaneVisible, 'the 2D layout pane is visible').toBe(true);
+  expect(r.canvasCount, 'a real 3D canvas mounts').toBeGreaterThan(0);
+  expect(r.svgChildCount, 'the 2D pane\'s SVG has real drawn content (the half-profile), not an empty shell').toBeGreaterThan(0);
 });

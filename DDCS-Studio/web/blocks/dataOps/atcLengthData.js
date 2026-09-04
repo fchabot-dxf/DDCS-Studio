@@ -120,8 +120,13 @@ export function atcLengthDataDef() {
                     params: { group: 'Tool Length' },
                     children: [
                         { type: 'usage_text', params: { text: 'Touches off the tool setter to write the current tool\'s length into the tool-length table. Setter pin/level, block height, feeds, safe Z, and max distance all live in Settings → ATC / Probes, not here.' } },
-                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
+                        // t2617 (BACKLOG #71/#72) — REORDERED to GEOMETRY/TOOL & CUT (was TOOL & CUT/GEOMETRY):
+                        // out of band against SECTION_RANK, caught by tests/section-order-parity-2617.spec.js
+                        // (t2613's own measurement, confirmed against the real renderOpForm). The SPLIT itself
+                        // (which field lands in which section) was already correct — only the group_box ORDER
+                        // was wrong.
                         { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(g0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(g0.TOOL_CUT) },
                         { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
                     ],
                 }],
@@ -142,7 +147,7 @@ export function atcLengthDataDef() {
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
     const toolCut = gFinal.TOOL_CUT.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
     const geometry = gFinal.GEOMETRY.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const bindings = [...toolCut, ...geometry];
+    const bindings = [...geometry, ...toolCut];   // t2617 — matches the tree's own reordered declaration above
     const def = userOpFromStack('atc_length_data', 'Tool Length (data)', stack, bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_LENGTH_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcLengthRecompose(stack, resolved));

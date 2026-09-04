@@ -90,25 +90,6 @@ export const OD_STRUCT_BINDINGS = [
       widgetConfig: { options: [[OD_KINDS.straight.label, 'straight'], [OD_KINDS.taper.label, 'taper']] } },
 ];
 
-/** The wrapped template: the UI declarations, then the macro itself as the executable children. */
-function odDataStack(p = OD_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // form2d: the form on the left, the half-profile canvas on the right — the pilot's layout
-            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
-            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
-            { type: 'sim', params: {} },
-            { type: 'layout', params: { kind: 'lathe_profile' } },   // the half-profile, not the mill's XY stock
-            { type: 'param_group', params: { group: 'OD Turn' }, children: [] },
-        ],
-        children: appendToolSel(odTurnStack(p)),
-    }];
-}
-
-export const OD_BINDINGS = deriveBindingsFor(odDataStack(OD_DEFAULTS), OD_BINDING_SPECS);
-
 /**
  * t1293 — THE TWIN DELEGATES TO THE ONE STACK BUILDER. This is the blocker the advisor's probe found, and the root is
  * worth stating plainly: a data twin's template is a SNAPSHOT, built once from the defaults. t1291's taper fix is a
@@ -159,11 +140,42 @@ export function rebuildOdTurn(stack, resolved) {
 
 /** The twin, ready for registerUserOp — a Lathe-group op with a 2D panel and no rotary/machine sim claims. */
 export function odTurnDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis) — same minimal pattern as facingData.js/centerDrillData.js.
+    // Sections declared IDENTITY/GEOMETRY/TOOL & CUT from the start (canonical SECTION_RANK order).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...OD_BINDING_SPECS, ...OD_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'OD Turn' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    { type: 'preview3d', params: {} },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },   // the half-profile, not the mill's XY stock
+                ],
+            },
+        }],
+        children: appendToolSel(odTurnStack(OD_DEFAULTS)),
+    }];
+    const bindings = [...deriveBindingsFor(stack, OD_BINDING_SPECS), ...OD_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
         'lathe_odturn',
         'OD Turn (lathe)',
-        odDataStack(OD_DEFAULTS),
-        [...OD_BINDINGS, ...OD_STRUCT_BINDINGS],
+        stack,
+        bindings,
         'form3d+2d',
         null,
         LATHE_GROUP,

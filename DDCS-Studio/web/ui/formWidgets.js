@@ -1227,6 +1227,17 @@ export function wireDerivedFields(host, bindings) {
     applyDerives();   // initial values — the declared expression, not a stored default
 }
 
+// t1239 IDENTITY FIRST ([[op-defining-fields-at-top]], user) — a DECLARED section ORDER, applied in the ONE form
+// layer so every wizard (built-in twin or user-authored) inherits it: what it is → where it is → how it cuts.
+// An unlisted section keeps its declaration order after the ranked ones. t2401 — `FEATURE CONTEXT` added,
+// ranked right after IDENTITY (see `renderOpForm`'s own historical comment, still in place below, for the full
+// account). t2617 (BACKLOG #71/#72) — exported: a `group_box` node's own author-typed order has NO enforcement
+// against this canonical rank at all (t2613's own finding — 3 migrated ops shipped out of band, confirmed
+// against a REAL `renderOpForm` call, not against source order — see WORK-LOG t2613/t2617), so a cross-op guard
+// needs the SAME rank table `renderOpForm` uses, not a second hand-copied array that can drift from it.
+export const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
+export const sectionRankOf = (sec) => { const i = SECTION_RANK.indexOf(String(sec || '').toUpperCase()); return i < 0 ? SECTION_RANK.length : i; };
+
 // t2611 (BACKLOG #71/#72, parity fix) — the ONE declared "does this form's fields cross the fold threshold"
 // decision, shared by the classic renderOpForm below AND the tree-mode group_box default (renderUiTree's own
 // `traverse()`, 'group_box' branch). Extracted here because they had independently drifted: renderOpForm's own
@@ -1343,9 +1354,9 @@ export function renderOpForm(host, bindings) {
     // order without renaming the shell's own vocabulary. Safe for WCS (the only other FEATURE CONTEXT user):
     // its own WCS/OPTIONS sections stay unranked/tied, so this only reorders relative to GEOMETRY, which WCS
     // never declares — confirmed no behavior change (wcs-form-reproduction-2381.spec.js stays green).
-    const SECTION_RANK = ['IDENTITY', 'FEATURE CONTEXT', 'GEOMETRY', 'TOOL & CUT'];
-    const rankOf = (sec) => { const i = SECTION_RANK.indexOf(String(sec || '').toUpperCase()); return i < 0 ? SECTION_RANK.length : i; };
-    units.sort((a, b) => rankOf(sectionOf(a)) - rankOf(sectionOf(b)));   // Array#sort is stable → order WITHIN a section is untouched
+    // t2617 — SECTION_RANK/sectionRankOf now declared once, at module scope (see their own header above), so a
+    // cross-op guard can consult the SAME table this sort uses rather than a second copy.
+    units.sort((a, b) => sectionRankOf(sectionOf(a)) - sectionRankOf(sectionOf(b)));   // Array#sort is stable → order WITHIN a section is untouched
     const sectionize = sectionizeFor(bindings);   // t2611 — the ONE shared threshold decision (see its own header above)
     if (sectionize) {
         const secEls = {};
@@ -1891,6 +1902,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // nesting). The feature_canvas sibling this node sits beside already renders the SAME SVG pane
                 // every migrated mill op's 2D layout uses — no new render branch exists for lathe, because none
                 // is needed. This node's own tree presence is metadata-only, exactly like a shape_* declaration.
+            } else if (node.type === 'simstart') {
+                // t2617 (BACKLOG #71/#72) — SAME category as `layout` just above, for the SAME reason: a
+                // `simstart` block is consumed by userOps.js's own `simStartsFromStack` (a `flattenBlocks` scan
+                // of `def.template` at REGISTRATION, recursing into `uiChildren` regardless of nesting — see
+                // that function's own header, "NOT the macro: a sim-start emits no line"), never rendered.
+                // faceProbeData.js/odProbeData.js declare it inside `uiChildren` specifically (not `children`)
+                // because their own `postInstantiate` wholesale-replaces `root.children` on every rebuild
+                // (`rebuildFaceProbe`'s own `root.children = built`) — `uiChildren` is untouched by that, so it
+                // stays a stable home across every build. Metadata-only; must not wear the t1561 placeholder.
             } else {
                 // t1561 — REFUSE, don't silently flatten. A block type this function does not (yet) know how to
                 // render used to fall through here and traverse straight into the PARENT container — the block's

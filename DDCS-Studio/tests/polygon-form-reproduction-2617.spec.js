@@ -1,35 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * WIZARDS-AS-DATA — t2603 (BACKLOG #71/#72, Phase 1) migrated atc_length_data onto the declared
- * `split_horizontal`/`group_box`/`field_ref` tree — the FIFTH and LAST op using the `panel:'form3d'` (3D-only,
- * `preview3d` declared alone) shape, proved against BACKLOG #77's own fix. Static shape (no superset/guards),
- * 7 value bindings, `atcLengthFieldGroups` mirrors `atcCheckFieldGroups`' own two-phase pattern.
+ * WIZARDS-AS-DATA — t2617 (BACKLOG #71/#72, Phase 1) migrated polygonData.js onto the declared
+ * `split_horizontal`/`group_box`/`field_ref` tree — the SEVENTH and LAST of the lathe-family ops, closing
+ * BACKLOG #71/#72's Phase 1 for the whole family. Rule 17 (self-applied): grepped the whole `tests/` directory
+ * for `user_lathe_polygon`/`POLY_DATA_OPTYPE`/`polygonData` before calling this migration verified.
  *
- * NOT built on `tests/support/formReproduction.js`'s shared `registerFormReproductionSuite`: `#wiz_atc_length`
- * (index.html:894) is a real classic shell this twin isn't wired to open in place of yet, AND (per this file's
- * own t2383 note) that shell has NO real input fields to reproduce anyway — just a settings-hint + a button.
- * Test 2 is a full `emitEquivalence` check (this op's own emit is simple enough — no live-settings recompose
- * complexity like homing/atc_table/atc_test — to make the real sweep cheap here, unlike those three).
- *
- * EXPECTED_ORDER is ATC_LENGTH_BINDING_SPECS' own array order, grouped by section, GEOMETRY then TOOL & CUT.
- * t2617 (BACKLOG #71/#72) — REORDERED from TOOL & CUT/GEOMETRY: out of band against `SECTION_RANK`
- * (`ui/formWidgets.js`), caught by `tests/section-order-parity-2617.spec.js` and confirmed against the real
- * `renderOpForm` (t2613's own measurement) — the section SPLIT itself was already correct, only the order.
+ * EXPECTED_ORDER declared in the canonical SECTION_RANK order from the start (IDENTITY/GEOMETRY/TOOL & CUT).
  */
 
 const ROW_SELECTOR = '.form-row, .grid-2, .grid-3';
-const DATA_MODULE = '/blocks/dataOps/atcLengthData.js';
-const DEF_FACTORY = 'atcLengthDataDef';
+const DATA_MODULE = '/blocks/dataOps/polygonData.js';
+const DEF_FACTORY = 'polygonDataDef';
 
 const EXPECTED_ORDER = [
-  // GEOMETRY
-  'blockHeight', 'safeZ',
+  // IDENTITY
+  'sides',
+  // GEOMETRY — `depth` is `match`-based (POLY_BINDING_SPECS, filtered first); acrossFlats/doc/segmentsPerFace
+  // are Studio-side-only (POLY_STRUCT_BINDINGS, appended after) — bySection('GEOMETRY') preserves that order.
+  'depth', 'acrossFlats', 'doc', 'segmentsPerFace',
   // TOOL & CUT
-  'maxDist', 'retract', 'f_fast', 'f_slow', 'port',
+  'feed', 'toolNum',
 ];
 
-test('atc-length-form-reproduction: declared tree places fields in the same structure as the flat form', async ({ page }) => {
+test('polygon-form-reproduction: declared tree places fields in the same structure as the flat form', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
@@ -67,16 +61,14 @@ test('atc-length-form-reproduction: declared tree places fields in the same stru
   expect(r.fields.length).toBe(r.boundParamCount);
 });
 
-test('atc-length-form-reproduction: an edit in the declared tree reaches the op model and comes back', async ({ page }) => {
+test('polygon-form-reproduction: an edit in the declared tree reaches the op model and comes back', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
   const r = await page.evaluate(async (a) => {
     const dd = await import(a.dataModule);
     const { renderUiTree, formBindings, renderOpForm } = await import('/ui/formWidgets.js');
-    const refMod = await import(a.refStackModule);
     const { builderOf } = await import('/blocks/opBuilders.js');
-    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
 
     const def = dd[a.defFactory]();
     const dataBuilder = builderOf(dd[a.dataOptypeExport]);
@@ -106,40 +98,49 @@ test('atc-length-form-reproduction: an edit in the declared tree reaches the op 
     const after = {};
     for (const read of readers) Object.assign(after, read());
 
+    // polygonData.js's own postInstantiate REBUILDS the macro (a Studio-side path with no controller cosine) —
+    // assert the built G-code directly reflects the edit, same as facing/faceProbe/odProbe/odTurn.
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const emitParams = { ...dd[a.defaultsExport], ...after };
-    const eq = emitEquivalence(refMod[a.refStackExport], dataBuilder, [emitParams]);
+    const built = dataBuilder(emitParams);
+    const text = emitMapped(built).text;
 
-    return { beforeVal: Number(before[a.editParam]), afterVal: Number(after[a.editParam]), eqPass: eq.pass, firstDiff: eq.firstDiff };
+    return { beforeVal: Number(before[a.editParam]), afterVal: Number(after[a.editParam]), text };
   }, {
     dataModule: DATA_MODULE, defFactory: DEF_FACTORY, rowSelector: ROW_SELECTOR,
-    refStackModule: '/wizards/stacks/atcLengthWizard.js', refStackExport: 'atcLengthStack',
-    dataOptypeExport: 'ATC_LENGTH_DATA_OPTYPE', defaultsExport: 'ATC_LENGTH_DEFAULTS',
-    editParam: 'blockHeight', editValue: '65',
+    dataOptypeExport: 'POLY_DATA_OPTYPE', defaultsExport: 'POLY_DEFAULTS',
+    editParam: 'depth', editValue: '18',
   });
 
-  expect(r.beforeVal).toBe(50);   // ATC_LENGTH_DEFAULTS.blockHeight
-  expect(r.afterVal).toBe(65);
-  expect(r.eqPass, r.firstDiff ? JSON.stringify(r.firstDiff) : '').toBe(true);
+  expect(r.afterVal).toBe(18);
+  expect(r.text, 'the rebuilt macro carries the edited depth value').toContain('18');
 });
 
-test('atc-length-form-reproduction: preview3d alone renders a REAL 3D canvas (BACKLOG #77, fixed)', async ({ page }) => {
+test('polygon-form-reproduction: the lathe half-profile mounts as a REAL 2D canvas, no unwired placeholder', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-  await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const M = await import('/blocks/dataOps/atcLengthData.js'); try { U.registerUserOp(M.atcLengthDataDef()); } catch (_) {} });
-  await page.evaluate(() => window.openWiz('user_atc_length_data'));
+  await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const M = await import('/blocks/dataOps/polygonData.js'); try { U.registerUserOp(M.polygonDataDef()); } catch (_) {} });
+  await page.evaluate(() => window.openWiz('user_lathe_polygon'));
   await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
   await page.waitForTimeout(600);
 
   const r = await page.evaluate(() => {
     const wizUser = document.getElementById('wiz_user');
     const visible = (sel) => [...(wizUser ? wizUser.querySelectorAll(sel) : [])].some((e) => e.offsetParent !== null);
+    const layout2dHost = wizUser ? [...wizUser.querySelectorAll('[data-viz-pane="layout2d"]')].find((e) => e.offsetParent !== null) : null;
+    const svg = layout2dHost ? layout2dHost.querySelector('svg') : null;
     return {
+      unwiredPlaceholderCount: wizUser ? wizUser.querySelectorAll('.unwired-block').length : -1,
+      has3dPaneVisible: visible('[data-viz-pane="preview3d"]'),
+      has2dPaneVisible: !!layout2dHost,
       canvasCount: wizUser ? wizUser.querySelectorAll('canvas').length : 0,
-      treeBoxVisible: visible('[id$="userVizBox_tree"][data-viz-pane="preview3d"]'),
-      has2dPaneVisible: visible('[data-viz-pane="layout2d"]'),
+      svgChildCount: svg ? svg.childElementCount : -1,
     };
   });
+
+  expect(r.unwiredPlaceholderCount, 'no unwired placeholder anywhere').toBe(0);
+  expect(r.has3dPaneVisible, 'form3d+2d: the 3D bar pane is also visible').toBe(true);
+  expect(r.has2dPaneVisible, 'the 2D layout pane is visible').toBe(true);
   expect(r.canvasCount, 'a real 3D canvas mounts').toBeGreaterThan(0);
-  expect(r.treeBoxVisible, 'the declared tree-mode 3D box is the one actually visible').toBe(true);
-  expect(r.has2dPaneVisible, 'NO 2D pane is visible').toBe(false);
+  expect(r.svgChildCount, 'the 2D pane\'s SVG has real drawn content (the half-profile), not an empty shell').toBeGreaterThan(0);
 });

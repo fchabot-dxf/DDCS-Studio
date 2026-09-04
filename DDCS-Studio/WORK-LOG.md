@@ -74565,3 +74565,90 @@ confirm the environmental, non-deterministic nature already established rather t
 
 `git status`: `ARCHITECTURE.md`, this WORK-LOG entry. No other files changed.
 
+## turn 2617 — the section-order fork resolved (declared order wins, rule 18): edge/atc_length/atc_check
+reordered + a machine-enforced cross-op guard closes the hole; ALL SIX remaining lathe ops migrated clean —
+BACKLOG #71/#72 Phase 1 is DONE for the whole lathe family
+
+### THE CROSS-OP GUARD — written and proven not-vacuous BEFORE the three reorders landed
+
+`tests/section-order-parity-2617.spec.js`: enumerates every tree-mode op from `listUserOps()` (never a hand-
+listed array — an op added later is covered automatically), walks its declared `group_box` order, and compares
+it against the REAL `renderOpForm`'s own output for that op's CURRENT bindings (never a reimplemented sort,
+never source-array order — the exact mistake that created this bug). Exported the shared table it needed
+(`SECTION_RANK`/`sectionRankOf`, `ui/formWidgets.js`) rather than hand-copying it — `renderOpForm` itself now
+calls the exported version too, so there is one source, not two that can drift again.
+
+Ran it BEFORE touching any op: **failed, correctly, naming exactly the 3 ops t2613 measured** (atc_length,
+atc_check, edge) with the precise mismatch detail — not vacuous, proven live.
+
+### THE THREE REORDERS — fixed at the declaration (rule 18: "a form whose rows read out of band order has a
+declaration bug, not a styling one"), confirmed against the REAL renderOpForm, not source order
+
+`edgeData.js` (TOOL & CUT/IDENTITY/GEOMETRY → IDENTITY/GEOMETRY/TOOL & CUT), `atcLengthData.js` (TOOL & CUT/
+GEOMETRY → GEOMETRY/TOOL & CUT), `atcCheckData.js` (TOOL & CUT/GEOMETRY/TOLERANCE → GEOMETRY/TOOL & CUT/
+TOLERANCE, TOLERANCE unranked so unaffected). Each op's own `group_box` declarations AND the `bindings` array
+construction reordered together (the latter doesn't affect visual output — `renderOpForm` always re-sorts — but
+kept consistent for source clarity). Each op's own row-diff test's `EXPECTED_ORDER` updated to match, with the
+`t2599`/`t2603` header comments corrected in place (they had claimed "faithful reproduction" — false, per
+t2613's own measurement) rather than left to silently contradict the new order. `tests/section-order-parity-
+2617.spec.js` now passes for all three.
+
+### THE SIX LATHE OPS — migrated, rule 17 applied to each, stopped at none (all six went clean)
+
+centerDrill, faceProbe, odProbe, odTurn, parting, polygon — the same minimal pattern facing proved at t2607: all
+`match`-based bindings (no bootstrap/final split needed), sections declared IDENTITY/GEOMETRY/TOOL & CUT from
+the start (the canonical order — not reproducing a guessed one, the exact mistake just fixed on three earlier
+ops). Two genuinely new shapes found and handled, not previously exercised by facing:
+
+1. **`simstart`** (faceProbe, odProbe): a sim-only marker block ("emits no line", `userOps.js`'s own doc),
+   discovered via `flattenBlocks`'s recursive `uiChildren`/`children` scan same as `layout`. Kept inside
+   `uiChildren` specifically (not `children`) because both ops' own `postInstantiate` (`rebuildFaceProbe`/
+   `rebuildOdProbe`) wholesale-replaces `root.children` on every build — `uiChildren` is the only home stable
+   across a rebuild. `formWidgets.js`'s `traverse()` gained a third metadata-only silent-skip case (alongside
+   `SHAPE_2D_TYPES` and `layout`) so it doesn't wear the t1561 unwired-placeholder. A Blockly `simstart` block
+   already existed (classic ops always had it) — `uichildren-vocabulary-pairing.test.mjs` confirmed clean,
+   no dual-vocabulary gap.
+2. **Rebuild-not-prune `postInstantiate`** (faceProbe/odProbe/odTurn/polygon): these four regenerate the whole
+   macro from resolved params rather than pruning a frozen template — the row-diff test's own "edit reaches
+   model" check couldn't use `emitEquivalence` against a reference stack builder for the two probe ops (no
+   simple reference — the rebuild computes controller-side expressions), so it instead builds the REAL op via
+   `builderOf`+`emitMapped` and asserts the edited value's literal presence in the built text — a real-symptom
+   check specific to this op shape, not a weaker one.
+
+Per-op reach checks (rule 17 — grep the whole `tests/` directory for the op's own ids/opType before calling it
+verified, not just its own dedicated spec): centerDrill 9 files/65 tests, faceProbe 7 files/38 tests, odProbe 7
+files/38 tests, odTurn 15 files (incl. 1 node-tier)/101 tests, parting 13 files (incl. 2 node-tier)/75 tests,
+polygon 9 files (incl. 1 node-tier)/44 tests — all green, zero regressions, including the polygon-specific
+drag-commit-on-release spec (`lathe-drag-responsive-2505.spec.js`) and the `isPolygon` opType-string special
+case in `layoutSpecFromOp` (unaffected by this migration — it keys off the string, not the tree structure).
+
+Facing (t2607) + these six = **BACKLOG #71/#72 Phase 1 is now DONE for the entire lathe family** — all 7 lathe
+ops on `renderUiTree`.
+
+### VERIFY
+
+Cross-op guard (`section-order-parity-2617.spec.js`) re-run after all 6 migrations landed: still 26/26 tree-mode
+ops pass (20 pre-existing + facing + the 6 new — every new op declared canonical order from the start, none
+tripped the guard it would have caught). Node tier: 238/238, `architecture-map-1698.test.mjs` 6/6 (no stale
+citation), `uichildren-vocabulary-pairing.test.mjs` clean (the new `simstart` render case has its Blockly twin).
+Broad sweep (119 tests: every `*form-reproduction*` spec + the new guard + lathe-matrix + lathe-pilot-1271 + the
+t2531 canary): 119 passed, 0 failed.
+
+**Full suite via `npm test`: 3151 passed, 1 failed, 15 flaky, 28 skipped, e2e exit 1.** The one failure, named:
+`preview-mutation-manifest-2463.spec.js` — the same pre-existing load-dependent flake classified at t2609/
+t2611/t2613/t2615, unrelated to anything this turn touched (surfacing's own sf_pos handle, nowhere near any
+file changed here). Test count rose from 3176 to 3195 (+19: 3 per new lathe op ×6 = 18, + the 1 new cross-op
+guard), all landing green.
+
+`git status`: `web/ui/formWidgets.js` (`SECTION_RANK`/`sectionRankOf` export, the `simstart` silent-skip case),
+`web/blocks/dataOps/{edgeData,atcLengthData,atcCheckData}.js` (the 3 reorders), `web/blocks/dataOps/
+{centerDrillData,faceProbeData,odProbeData,odTurnData,partingData,polygonData}.js` (the 6 migrations), 3
+updated row-diff tests (`edge-form-reproduction-2599`, `atc-length-form-reproduction-2603`,
+`atc-check-form-reproduction-2603`), 7 new test files (`section-order-parity-2617` + 6 per-op form-reproduction
+specs), this WORK-LOG entry.
+
+### NEXT
+
+tap/contour/text stay parked (measured, ready, not migrated — per the dispatch's own explicit "still keep").
+pocket/slot stay HARD, corner stays deferred — untouched this turn, as instructed.
+

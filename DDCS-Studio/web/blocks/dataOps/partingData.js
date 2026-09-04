@@ -48,23 +48,6 @@ export const PART_STRUCT_BINDINGS = [
       widgetConfig: { options: [[PART_KINDS.groove.label, 'groove'], [PART_KINDS.part.label, 'part']] } },
 ];
 
-function partDataStack(p = PART_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
-            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
-            { type: 'sim', params: {} },
-            { type: 'layout', params: { kind: 'lathe_profile' } },
-            { type: 'param_group', params: { group: 'Part / Groove' }, children: [] },
-        ],
-        children: appendToolSel(partingStack(p)),
-    }];
-}
-
-export const PART_BINDINGS = deriveBindingsFor(partDataStack(PART_DEFAULTS), PART_BINDING_SPECS);
-
 /** The header says what the operator chose. It is the ONE thing the identity changes, so it had better be right. */
 export function applyPartHeader(stack, resolved) {
     const groove = partKind(resolved && resolved.kind) === 'groove';
@@ -84,9 +67,40 @@ export function applyPartHeader(stack, resolved) {
 }
 
 export function partingDataDef() {
+    // t2617 (BACKLOG #71/#72, the sixth axis) — same minimal pattern as facingData.js/centerDrillData.js.
+    // Sections declared IDENTITY/GEOMETRY/TOOL & CUT from the start (canonical SECTION_RANK order).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const allSpecs = [...PART_BINDING_SPECS, ...PART_STRUCT_BINDINGS];
+    const bySection = (name) => allSpecs.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Part / Groove' },
+                    children: [
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: fieldRefsOf(bySection('IDENTITY')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    { type: 'preview3d', params: {} },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                ],
+            },
+        }],
+        children: appendToolSel(partingStack(PART_DEFAULTS)),
+    }];
+    const bindings = [...deriveBindingsFor(stack, PART_BINDING_SPECS), ...PART_STRUCT_BINDINGS];
     const def = withLatheScene(userOpFromStack(
-        'lathe_parting', 'Part / Groove (lathe)', partDataStack(PART_DEFAULTS),
-        [...PART_BINDINGS, ...PART_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+        'lathe_parting', 'Part / Groove (lathe)', stack,
+        bindings, 'form3d+2d', null, LATHE_GROUP,
     ), PART_DEFAULTS);
     def.postInstantiate = (stack, resolved) => applyPartHeader(stack, resolved);
     return def;
