@@ -1801,3 +1801,44 @@ higher; treat 1.9 Hz as a floor to tune, not a property of the controller.
 
 ⚠ **Read-only throughout** — plain FC03, never `MGETDATA`. The machine was jogged by the owner, by hand, at
 the pendant; nothing here commanded motion.
+
+### 30. ⭐⭐⭐ G-CODE INJECTION OVER MODBUS WORKS — the PC can make the controller execute a line `[CONFIRMED 2026-08-26]`
+The `2026-08-03-00` feature, proven on `2026-09-02-00`. `#1505=-5000(MODBUS OK)` was written over serial and
+**`[0000]:MODBUS OK` appeared on the pendant.** ⇒ the controller **parses and EXECUTES** what is injected — it
+is not a buffer someone else has to read.
+
+**THE PROTOCOL, all of it:**
+```
+function   FC16 (write multiple registers)
+register   3000
+payload    ASCII G-code, one line, trailing \n, ≤ 246 bytes (firmware's own limit)
+packing    ⭐ LITTLE-ENDIAN WITHIN EACH REGISTER — FIRST character in the LOW byte
+buffer     drains after the controller consumes it (FC03 readback returns zeros)
+```
+
+⭐⭐ **THE BYTE ORDER IS THE WHOLE PROTOCOL, and the controller told us it.** Packed big-endian first, the
+pendant answered:
+```
+sent:      # 1 5 0 5 = - 5 0 0 0 ( M O D B U S   O K )
+error:     1 # 0 5 = 5 5 - 0 0 ( 0 O M B D S U O   ) K      <- every byte pair reversed
+```
+⇒ ⭐ **A syntax error that echoes your payload back is a gift** — it named the defect exactly. Same
+convention as the word-swapped float32s (§28): **this controller is little-endian throughout.**
+
+### ⛔⛔ WHAT THIS CHANGES, AND THE LINE IT CROSSES
+This is the **first capability in this project that lets the PC command the machine.** Everything before it
+was read-only by construction. It answers the ROADMAP's standing open experiment — *"remote start without the
+panel — this is the gate for hands-free delivery→run"* — and it does so with **no G-code instrumentation and
+no macro on the controller**.
+
+⛔ **The standing rule still holds: delivery is automatic, RUNNING is operator-pressed.** A channel that can
+send `#1505` can send `G1 Z-50 F1000`. Nothing about this finding relaxes that rule; it makes it load-bearing.
+
+⇒ ⭐ **The guard lives in code, not in intent:**
+`controllers/expert-m350/tools/modbus_inject.py` **refuses in code** any payload containing a G or M code, an
+axis letter followed by a value, a feed/spindle word, or a tool change — checked before the port is opened,
+and unit-tested against `G0 X10`, `G1 Z-5 F100`, `M3 S12000`, `X10.5`, `M30`, `T2`. ⛔ Removing that guard is
+a deliberate act requiring the owner's ruling, not a convenience while debugging.
+
+⚠ **Untested and deliberately so:** whether an injected line can START a loaded program, and what happens if
+one is injected while a program is running. Both need the owner present and a reason.
