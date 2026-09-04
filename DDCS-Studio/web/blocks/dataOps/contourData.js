@@ -19,7 +19,7 @@ import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
-import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
+import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
 import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
@@ -61,62 +61,60 @@ const SIDE_OPTIONS = [['Outside', 'outside'], ['Inside', 'inside'], ['On (finish
 // this turn's own WORK-LOG, not silently reassigned to look shell-derived). ONLY array position and `section:`
 // changed below — every other property (blockIndex/key/type/default/widget/when/label/help/units) is
 // untouched, confirmed byte-identical by `contour-data-emit.spec.js`.
+// t2621 (BACKLOG #71/#72, conversion tier, LAST of the three) — CONVERTED from hand-counted `blockIndex:
+// 0/1/2/3/4` to identity-based `match: {type}`: contourStack's own flatten (comment above) is a STATIC tree,
+// no guards/supersets — every block type (`progstart`/`wcs`/`placeonstock`/`stepdown`/`contourfill`,
+// `contourWizard.js`) appears exactly once, VERIFIED by reading the stack builder directly — no `nth` needed
+// anywhere in this file, the 5-distinct-block case (this arc's own hardest by the distinct-target-block metric)
+// closes the same way tap/text's own 3-block cases did.
 const CONTOUR_EXEC_BINDINGS = [
     // SHAPE
-    { param: 'shape', tokenRefusal: 'Picks the region-generation kernel (rect / circle / polygon / ellipse each walk a different point set) — the program\'s shape depends on this before it can be built, not a value inside one.', blockIndex: 4, key: 'shape', type: 'enum', default: CONTOUR_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: 'SHAPE' },
-    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offX', type: 'number', default: CONTOUR_DEFAULTS.originX, label: 'Origin X', section: 'SHAPE' },
-    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offY', type: 'number', default: CONTOUR_DEFAULTS.originY, label: 'Origin Y', section: 'SHAPE' },
-    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 2, key: 'offZ', type: 'number', default: CONTOUR_DEFAULTS.offZ, label: 'Z Offset', section: 'SHAPE' },
-    { param: 'stockAttach', tokenEligible: true, blockIndex: 2, key: 'stockAttach', type: 'enum', default: CONTOUR_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: 'SHAPE' },
-    { param: 'pathDatum', tokenEligible: true, blockIndex: 2, key: 'pathDatum', type: 'enum', default: CONTOUR_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: 'SHAPE' },
-    { param: 'stockDatum', tokenEligible: true, formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: CONTOUR_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: 'SHAPE' },
-    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: CONTOUR_DEFAULTS.stockW, label: 'Stock W', section: 'SHAPE' },
-    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: CONTOUR_DEFAULTS.stockH, label: 'Stock H', section: 'SHAPE' },
-    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: CONTOUR_DEFAULTS.stockZ, label: 'Stock Z', section: 'SHAPE' },
-    { param: 'wcs', tokenEligible: true, blockIndex: 1, key: 'wcs', type: 'enum', default: CONTOUR_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, label: 'WCS', section: 'SHAPE' },
-    { param: 'w', tokenRefusal: 'Feeds the twin\'s own boundary-boundary build before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 4, key: 'w', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: 'SHAPE' },   // t722 P2a — W/H for rect AND ellipse
-    { param: 'h', tokenRefusal: 'Feeds the twin\'s own boundary build before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 4, key: 'h', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'SHAPE' },
+    { param: 'shape', tokenRefusal: 'Picks the region-generation kernel (rect / circle / polygon / ellipse each walk a different point set) — the program\'s shape depends on this before it can be built, not a value inside one.', match: { type: 'contourfill' }, key: 'shape', type: 'enum', default: CONTOUR_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: 'SHAPE' },
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: CONTOUR_DEFAULTS.originX, label: 'Origin X', section: 'SHAPE' },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: CONTOUR_DEFAULTS.originY, label: 'Origin Y', section: 'SHAPE' },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: CONTOUR_DEFAULTS.offZ, label: 'Z Offset', section: 'SHAPE' },
+    { param: 'stockAttach', tokenEligible: true, match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: CONTOUR_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: 'SHAPE' },
+    { param: 'pathDatum', tokenEligible: true, match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: CONTOUR_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: 'SHAPE' },
+    { param: 'stockDatum', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: CONTOUR_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: 'SHAPE' },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: CONTOUR_DEFAULTS.stockW, label: 'Stock W', section: 'SHAPE' },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: CONTOUR_DEFAULTS.stockH, label: 'Stock H', section: 'SHAPE' },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: CONTOUR_DEFAULTS.stockZ, label: 'Stock Z', section: 'SHAPE' },
+    { param: 'wcs', tokenEligible: true, match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: CONTOUR_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, label: 'WCS', section: 'SHAPE' },
+    { param: 'w', tokenRefusal: 'Feeds the twin\'s own boundary-boundary build before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'contourfill' }, key: 'w', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: 'SHAPE' },   // t722 P2a — W/H for rect AND ellipse
+    { param: 'h', tokenRefusal: 'Feeds the twin\'s own boundary build before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'contourfill' }, key: 'h', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'SHAPE' },
     // dia: a plain radius magnitude in every state EXCEPT shape:circle + entry:ramp, where it also sets the ramp
     // chord-line count (ops/contour.js circleTrace) — fail-closed (INV13's own doctrine) rather than picking the
     // common-case framing, since the two states disagree.
-    { param: 'dia', tokenRefusal: 'On a circle with a ramp entry this also decides how many ramp-chord lines get built (not just its radius) — the program\'s shape can depend on this number, not just a value inside one.', blockIndex: 4, key: 'dia', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'SHAPE' },   // t722 P2a — Ø for circle AND polygon
-    { param: 'sides', tokenRefusal: 'Sets the polygon\'s vertex count — a real loop bound, not a value inside one.', blockIndex: 4, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'SHAPE' },
+    { param: 'dia', tokenRefusal: 'On a circle with a ramp entry this also decides how many ramp-chord lines get built (not just its radius) — the program\'s shape can depend on this number, not just a value inside one.', match: { type: 'contourfill' }, key: 'dia', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'SHAPE' },   // t722 P2a — Ø for circle AND polygon
+    { param: 'sides', tokenRefusal: 'Sets the polygon\'s vertex count — a real loop bound, not a value inside one.', match: { type: 'contourfill' }, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'SHAPE' },
     // SIDE & TOOL
-    { param: 'side', tokenRefusal: 'Picks which of three fixed offset formulas (outside / inside / on) computes the toolpath — a categorical choice read by the twin\'s own geometry build, not a value inside one.', blockIndex: 4, key: 'side', type: 'enum', default: CONTOUR_DEFAULTS.side, widget: 'dropdown', widgetConfig: { options: SIDE_OPTIONS }, label: 'Side', help: 'Outside/Inside offset the cut by the tool radius so the FINISHED edge matches the size you type; On traces the boundary itself.', section: 'SIDE & TOOL' },
-    { param: 'toolDia', tokenRefusal: 'Feeds the offset-toolpath computation (side inside/outside) before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 4, key: 'tool', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.toolDia, section: 'SIDE & TOOL' },   // t1662 — label from SHARED_LABELS
-    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'SIDE & TOOL', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
+    { param: 'side', tokenRefusal: 'Picks which of three fixed offset formulas (outside / inside / on) computes the toolpath — a categorical choice read by the twin\'s own geometry build, not a value inside one.', match: { type: 'contourfill' }, key: 'side', type: 'enum', default: CONTOUR_DEFAULTS.side, widget: 'dropdown', widgetConfig: { options: SIDE_OPTIONS }, label: 'Side', help: 'Outside/Inside offset the cut by the tool radius so the FINISHED edge matches the size you type; On traces the boundary itself.', section: 'SIDE & TOOL' },
+    { param: 'toolDia', tokenRefusal: 'Feeds the offset-toolpath computation (side inside/outside) before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'contourfill' }, key: 'tool', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.toolDia, section: 'SIDE & TOOL' },   // t1662 — label from SHARED_LABELS
+    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'SIDE & TOOL', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
     // DEPTH & FEED — depth pass (block 3, stepdown): the generic `stepdown` atom (kind:'depth') JS-unrolls one
     // G-code block per Z level (blockEmitter.js's depthLevels loop) — a genuine line-count decision, not a
     // re-coerced magnitude.
-    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', blockIndex: 3, key: 'to', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.depth, label: 'Depth', section: 'DEPTH & FEED' },
-    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', blockIndex: 3, key: 'by', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.stepdown, label: 'Step Down', section: 'DEPTH & FEED' },
+    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', match: { type: 'stepdown' }, key: 'to', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.depth, label: 'Depth', section: 'DEPTH & FEED' },
+    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', match: { type: 'stepdown' }, key: 'by', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.stepdown, label: 'Step Down', section: 'DEPTH & FEED' },
     // t2375 — confirmEvery/entry/rampAngle have NO shell field at all (grepped index.html's own wiz_contour
     // block, zero hits) — twin-only, the same orphan class drill/pocket's own reproduction tests already name
     // and accept. Placed here (their closest conceptual home, after the shell-matching DEPTH & FEED fields)
     // rather than left unsectioned (which would render them as stray, un-boxed rows outside every section).
-    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', blockIndex: 3, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', section: 'DEPTH & FEED', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', match: { type: 'stepdown' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', section: 'DEPTH & FEED', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // t842 — DEPTH ENTRY: plunge or ramp (NO helix — a helix would gouge inside the profile). Polyline → ramp along the first
     // segment; circle → a helical lead-in around the arc. Degrades to plunge (with a why) if the first segment is too short.
     // t1758 — UNLIKE surfacing's own entry (eligible — surfaceraster is a fixed macro template regardless of mode):
     // contour is a literal transcript, so entry genuinely branches the JS kernel's own emitted line shape/count
     // (ops/contourfill.js, ops/contour.js) — same param name, opposite verdict (t1704's own warning).
-    { param: 'entry', tokenRefusal: 'Picks a genuinely different descent shape in the literal transcript (a straight plunge vs. a ramp lead-in with its own line count) — not a value inside one.', blockIndex: 4, key: 'entry', type: 'enum', default: CONTOUR_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS_NO_HELIX }, label: 'Depth Entry', section: 'DEPTH & FEED', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a lead-in descent at ≤ the ramp angle along the profile (degrades to plunge where the first segment is too short).' },
+    { param: 'entry', tokenRefusal: 'Picks a genuinely different descent shape in the literal transcript (a straight plunge vs. a ramp lead-in with its own line count) — not a value inside one.', match: { type: 'contourfill' }, key: 'entry', type: 'enum', default: CONTOUR_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS_NO_HELIX }, label: 'Depth Entry', section: 'DEPTH & FEED', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a lead-in descent at ≤ the ramp angle along the profile (degrades to plunge where the first segment is too short).' },
     // t1758 — UNLIKE pocket's rampAngle (deferrable, only clamps a descent angle): contour's own ops/contour.js
     // circleTrace derives `revs`/`n` (the literal ramp-chord line count) directly from rampAngle, and the polyline
     // path compares it against the available run to decide plunge-degrade — a real loop-bound + branch, not a
     // coercion casualty. Same param name, different op-specific wiring, NOT deferrable here.
-    { param: 'rampAngle', tokenRefusal: 'Directly sets how many ramp-lead-in lines get built (and whether the descent degrades to a plunge) — the program\'s shape depends on this number, not a value inside one.', blockIndex: 4, key: 'rampAngle', type: 'number', default: CONTOUR_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'DEPTH & FEED', help: 'Max descent angle of the ramp lead-in (degrees from horizontal).' },
-    { param: 'feed', tokenEligible: true, blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'DEPTH & FEED' },
-    { param: 'plunge', tokenEligible: true, blockIndex: 4, key: 'plunge', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'DEPTH & FEED' },
+    { param: 'rampAngle', tokenRefusal: 'Directly sets how many ramp-lead-in lines get built (and whether the descent degrades to a plunge) — the program\'s shape depends on this number, not a value inside one.', match: { type: 'contourfill' }, key: 'rampAngle', type: 'number', default: CONTOUR_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'DEPTH & FEED', help: 'Max descent angle of the ramp lead-in (degrees from horizontal).' },
+    { param: 'feed', tokenEligible: true, match: { type: 'contourfill' }, key: 'feed', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'DEPTH & FEED' },
+    { param: 'plunge', tokenEligible: true, match: { type: 'contourfill' }, key: 'plunge', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'DEPTH & FEED' },
 ];
-
-// t2301 (BACKLOG 20) — dropped from 4 to 3: 'panel' removed from uiChildren below (id-collided with sim's own
-// layout2d pane, see that node's own comment). Exactly the hazard t2257 caught on atcWarmupData.js — a stale
-// hardcoded wrap left after panel's removal breaks every binding — caught here before committing, not after.
-// t2371 — bumped 3 to 4: `path_anchor` inserted into uiChildren BEFORE param_group (see below) shifts every
-// flatten index after it by one — the same hazard, same discipline, this time on an ADDITION not a removal.
-const WRAP_PREFIX_COUNT = 4;   // user_root + sim + path_anchor + param_group
-export const CONTOUR_BINDINGS = CONTOUR_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
 export const CONTOUR_DATA_OPTYPE = 'user_contour_data';
 
@@ -160,43 +158,69 @@ export function contourPreviewGeometry(p) {
  *  contourStack(CONTOUR_DEFAULTS) (== BUILDERS(defaults), the canonical valid-by-construction stack); the hand-authored
  *  BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/contour-data-emit.spec.js. */
 export function contourDataDef() {
+    // t2621 (BACKLOG #71/#72, the conversion tier's own last op) — bootstrap stack (children only, uiChildren
+    // doesn't affect what toolBindingsFor/entryBindingsFor find) to derive the field groups, then the SAME
+    // execChildren feed the real stack below. Sections SHAPE/SIDE & TOOL/DEPTH & FEED are ALL unranked by
+    // SECTION_RANK — nothing to violate — so preserving CONTOUR_EXEC_BINDINGS' own array order (shell-verified,
+    // t2375's own account) is sufficient; no reordering needed for these three names. `path_anchor` placed
+    // first in the LEFT pane's children, mirroring surfacingData.js's/textData.js's own precedent.
     const exec = contourStack(CONTOUR_DEFAULTS);
-    const stack = [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: inert + id-collided with sim's own layout2d pane (see
-            // drillData.js's own t2301 comment for the full mechanism, first fixed for ATC at t2257).
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            // t2371 — the dual stock-attach/path-datum corner picker. Contour's own static shell
-            // (index.html:578) mounts it at prefix "ct_" — copied verbatim, not re-derived (a wrong prefix
-            // binds the picker to another wizard's mount — the exact collision class pinned at t2367,
-            // `pa-mount-scope-2367.spec.js`). See surfacingData.js's own t2271 comment (the arc's pilot) for how
-            // formWidgets.js's 'path_anchor' branch reproduces the widget's getElementById convention without
-            // touching ui/pathAnchorField.js, and for why the stockAttach/pathDatum dropdown rows (this file's
-            // own declared bindings, above) end up hidden rather than left visible — the shell shows the
-            // picker only, no text fallback.
-            { type: 'path_anchor', params: { prefix: 'ct_' } },
-            { type: 'param_group', params: { group: 'Contour' }, children: [] },
-        ],
-        children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
-    }];
+    const execChildren = appendToolSel(appendEntry(exec));   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
+    const bootstrapStack = [{ type: 'user_root', params: {}, children: execChildren }];
     // t2375 — toolNum (toolBindingsFor) and entryX/entryY (entryBindingsFor) are SHARED-deriver-sourced
     // (deriveBindings.js) — toolNum carries no `section:` at all there, entryBindingsFor carries the OLD
     // 'GEOMETRY' name; neither can be changed at the source without touching a Rule-1b shared file, so both
-    // are overridden LOCALLY here via .map() (their own array position doesn't move blockIndex, so this is
-    // form-only, byte-identical-emit-safe — proven by contour-data-emit.spec.js) and spliced into the group
-    // their target section needs so formWidgets.js's own first-seen-wins section-box order comes out
-    // SHAPE -> SIDE & TOOL -> DEPTH & FEED, matching the shell (index.html:564-613) exactly. toolNum lands
-    // immediately before rpm within SIDE & TOOL — the same toolNum-before-rpm convention drill's and
-    // pocket's own EXPECTED_ORDER already establish for their TOOL sections, not a new one invented here.
-    const shapeFields = CONTOUR_BINDINGS.filter((b) => b.section === 'SHAPE');
-    const sideToolCore = CONTOUR_BINDINGS.filter((b) => b.section === 'SIDE & TOOL' && b.param !== 'rpm');
-    const rpmField = CONTOUR_BINDINGS.filter((b) => b.section === 'SIDE & TOOL' && b.param === 'rpm');
-    const depthFeedFields = CONTOUR_BINDINGS.filter((b) => b.section === 'DEPTH & FEED');
-    const entryXY = entryBindingsFor(stack).map((b) => ({ ...b, section: 'SHAPE' }));
-    const toolNum = toolBindingsFor(stack).map((b) => ({ ...b, section: 'SIDE & TOOL' }));
-    const def = userOpFromStack('contour_data', 'Contour (data)', stack, withPassesField([...shapeFields, ...entryXY, ...sideToolCore, ...toolNum, ...rpmField, ...depthFeedFields]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
+    // are overridden LOCALLY here via .map() and spliced into the group their target section needs, so the
+    // declared tree's own order comes out SHAPE -> SIDE & TOOL -> DEPTH & FEED, matching the shell
+    // (index.html:564-613) exactly. toolNum lands immediately before rpm within SIDE & TOOL — the same
+    // toolNum-before-rpm convention drill's/pocket's own EXPECTED_ORDER already establish.
+    const fieldsOf = (stackForDerive) => {
+        const derived = deriveBindingsFor(stackForDerive, CONTOUR_EXEC_BINDINGS);
+        const entryXY = entryBindingsFor(stackForDerive).map((b) => ({ ...b, section: 'SHAPE' }));
+        const toolNum = toolBindingsFor(stackForDerive).map((b) => ({ ...b, section: 'SIDE & TOOL' }));
+        const shapeFields = derived.filter((b) => b.section === 'SHAPE');
+        const sideToolCore = derived.filter((b) => b.section === 'SIDE & TOOL' && b.param !== 'rpm');
+        const rpmField = derived.filter((b) => b.section === 'SIDE & TOOL' && b.param === 'rpm');
+        const depthFeedFields = derived.filter((b) => b.section === 'DEPTH & FEED');
+        return withPassesField([...shapeFields, ...entryXY, ...sideToolCore, ...toolNum, ...rpmField, ...depthFeedFields]);   // t1613 — the derived `passes` field, spliced after stepdown
+    };
+    const bindings0 = fieldsOf(bootstrapStack);
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const bySection = (name) => bindings0.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Contour' },
+                    children: [
+                        // t2621 — REPRODUCED verbatim from the live shell (index.html's own `.wiz-usage` text
+                        // for `#wiz_contour`), not restated from memory.
+                        { type: 'usage_text', params: { text: 'Traces a rectangular or circular profile with an end mill in the active WCS. The boundary you type is the FINISHED edge; the toolpath is offset to a side (outside / inside / on) by the tool radius and stepped down to depth. Drag the handles in the 2D layout (square = place, round = size); the dashed line is the boundary, the solid line is the tool-centre path. Spindle start + end-of-program come from Settings.' } },
+                        // t2371 — the dual stock-attach/path-datum corner picker. Contour's own static shell
+                        // (index.html:578) mounts it at prefix "ct_" — copied verbatim, not re-derived (a wrong
+                        // prefix binds the picker to another wizard's mount — the exact collision class pinned
+                        // at t2367, `pa-mount-scope-2367.spec.js`).
+                        { type: 'path_anchor', params: { prefix: 'ct_' } },
+                        { type: 'group_box', params: { title: 'SHAPE' }, children: fieldRefsOf(bySection('SHAPE')) },
+                        { type: 'group_box', params: { title: 'SIDE & TOOL' }, children: fieldRefsOf(bySection('SIDE & TOOL')) },
+                        { type: 'group_box', params: { title: 'DEPTH & FEED' }, children: fieldRefsOf(bySection('DEPTH & FEED')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ],
+            },
+        }],
+        children: execChildren,
+    }];
+    const bindings = fieldsOf(stack);   // t2599 — re-derived over the FINAL, real stack, so the tree and the bindings can never disagree
+    const def = userOpFromStack('contour_data', 'Contour (data)', stack, bindings, 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = contourPreviewGeometry;   // t712 — per-feature 2D handles (pos + shape size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)

@@ -74782,3 +74782,96 @@ produced findings, not code.
 contour stays last of the three conversion-tier ops (5 distinct blocks, per the dispatch's own metric) — not
 attempted this turn. pocket/slot stay HARD, corner stays deferred.
 
+## turn 2621 — form-kernel-720's own scaling theory measured (op count is NOT growing; fixed structurally, not
+by raising the timeout); the fold-count switched to counting group_box NODES per rule 20 (owner-called); contour
+converted and migrated — the LAST of the conversion tier, 5 distinct blocks, verified clean
+
+### form-kernel-720 — the mechanism measured before touching anything
+
+Instrumented the SAME loop this test runs (timed each op's own open→wait→check cycle) and ran it uncontended,
+single-worker: **32 ops, 51.6s total, mean 1611ms/op, slowest (`user_homing_data`) 3227ms — no op comes remotely
+close to the 8s per-op timeout.** Confirms the failure is contention-triggered (this repo's own well-documented
+4-worker sensitivity), not a genuine per-op defect.
+
+**The "op count scaling" theory, refuted by measurement, not argued**: `userBuilderTypes()` already returns 32
+ops TODAY, and `contour`/`pocket`/`slot`/`corner` are ALREADY in that population (`user_contour_data`,
+`user_pocket_data`, `user_slot_data`, `user_corner_data` all present in the timing data, confirmed directly) —
+migrating them to tree mode changes their own RENDER PATH, not how many ops this loop walks. N is not going to
+grow from here. What IS true: the fixed 8s-per-op budget already has thin headroom against this repo's own
+documented contention multiplier, and that was true before this turn too — it just hadn't been exercised.
+
+**Fixed structurally, not by raising the number** (explicitly ruled out): the loop now retries a SINGLE op once,
+fresh, before recording a timeout as a genuine "defect" — a real broken dropdown reproduces identically on
+retry; a contention stall (bursty, not sustained for the whole test) very likely does not. This is a correctness
+guarantee BY CONSTRUCTION, not probabilistic: the defect-check code only runs after a SUCCESSFUL open, and
+success ends the retry loop immediately — the retry only ever wraps the open/wait step, never the
+dropdown-validity assertion, so a genuine defect cannot be retried away. Added `test.setTimeout(Math.max(90_000,
+ops.length * 6000))` — a budget that scales with `ops.length`, matching the dispatch's own literal phrase —
+purely so a retry-heavy run under real contention has room to finish on the RIGHT signal (`defects != []`)
+instead of a wrong one (a Playwright test-timeout). Re-ran clean, uncontended: 52.4-52.9s, unchanged from
+before the fix (zero retries fire in the common case).
+
+### THE FOLD-COUNT HARDENING — rule 20, owner-called this turn (not my own judgment call)
+
+Extracted the shared threshold formula into `rowCountFor`/`distinctSectionCountFor` (unchanged logic, just
+named) and added `groupBoxCountIn(uiTree)` (walks the declared tree, counts `group_box` NODES — never deduped
+by title). `sectionizeFor(bindings)` (the classic path — no tree exists there, so it still counts distinct
+`binding.section` VALUES, its only available signal, unchanged behavior) and the new `sectionizeForTree(uiTree,
+bindings)` (the tree path — counts NODES now) both funnel through the same row-count half, so neither can drift
+from it alone. `renderUiTree`'s own call site switched from `sectionizeFor(bindings)` to
+`sectionizeForTree(uiTree, bindings)`.
+
+New `section-count-rule20-2621.spec.js`, 3 tests, proven not vacuous (reverted `formWidgets.js` to HEAD,
+confirmed all 3 fail — `sectionizeForTree` doesn't exist there — restored, re-ran clean): two same-titled
+`group_box` nodes now count as 2 (sectionize TRUE) even though the underlying bindings share ONE distinct
+`section` value (which the OLD counting would have seen as 1, wrongly refusing to fold); two differently-titled
+boxes still count as 2 (no regression on the common case); a single box (or none) still stays plain. 0 current
+reach (no shipped op declares duplicate-titled boxes) — the owner's own point in calling it now, before
+anything reaches it, not after.
+
+### CONTOUR — converted, migrated, verified clean: the conversion tier's last, hardest case
+
+Read `contourWizard.js`'s own stack builder directly before converting anything: `[progstart, wcs,
+placeonstock{ stepdown{ contourfill } }, progend]` — 5 distinct block types (`progstart`/`wcs`/`placeonstock`/
+`stepdown`/`contourfill`), each appearing exactly once, no guards/supersets. Confirmed clean — no `nth` needed
+anywhere. Converted `blockIndex: 0/1/2/3/4` to `match:{type:...}` across all 26 `CONTOUR_EXEC_BINDINGS` entries.
+
+Contour HAS a real classic shell (`#wiz_contour`) — same situation as text (t2619) and surfacing (t2545):
+switched the existing shared-harness spec (`contour-form-reproduction-2375.spec.js`) from `mode:'flat'` to the
+tree default rather than writing a new one. Added the missing `usage_text` node (the harness caught its absence
+on the first run, same as text). `path_anchor` placed first, mirroring the established precedent.
+
+**A second real, expected regression found and fixed by rule 17's own census**: `passes-field-1613.spec.js`'s
+own "BLOCKS Wizard View face" test used `user_contour_data` as its subject specifically BECAUSE it was still
+plain-materialized (`hasParamTable:true, hasFieldRef:false`) — its own comment already documents being switched
+ONCE before, from surfacing to contour, for this exact reason (t2545). Migrating contour this turn made it
+field_ref-based too, so `#blk_wiz_user_form`'s own `param_field` canvas blocks stop materializing for it — the
+SAME mechanism, hitting the SAME test, a second time. Switched the subject to `user_slot_data` (verified live:
+`hasParamTable:true, hasFieldRef:false`, still genuinely flat — slot is HARD per this arc's own scope, so it
+stays a stable subject going forward) — `SLOT_DEFAULTS` shares contour's exact `depth:4`/`stepdown:1.5`
+defaults, so every expected number in the test carries over unchanged.
+
+### VERIFY
+
+Cross-op section-order guard: 29/29 tree-mode ops (28 prior + contour) pass. Node tier: 238/238 (incl. the 2
+node-tier contour specs, unaffected). Contour's own rule-17 census: 24 files (Playwright + 2 node-tier), 88
+tests total, 1 genuine regression found and fixed (`passes-field-1613.spec.js`, above), re-run clean.
+`form-section-collapse-820.spec.js` + the rule-20 guard: 8/8, confirming the fold-count refactor is
+behavior-preserving for every existing case.
+
+**Full suite via `npm test`: 3162 passed, 1 failed, 12 flaky, 28 skipped, e2e exit 1.** The one failure, named:
+`preview-mutation-manifest-2463.spec.js` — the same pre-existing load-dependent flake classified at every prior
+gate this session, unrelated to anything touched here. **`form-kernel-720.spec.js` did NOT reappear** — the
+structural retry fix held under the real full-suite contention it was built for, not just in isolation.
+
+`git status`: `web/ui/formWidgets.js` (`sectionizeForTree`/`groupBoxCountIn`, rule 20), `web/blocks/dataOps/
+contourData.js` (the migration), `tests/form-kernel-720.spec.js` (the retry fix), `tests/contour-form-
+reproduction-2375.spec.js` (mode switch), `tests/passes-field-1613.spec.js` (the subject swap), 2 new test
+files (`contour-canvas-mount-2621`, `section-count-rule20-2621`).
+
+### NEXT
+
+pocket and slot stay HARD; corner stays deferred — none touched this turn. This closes BACKLOG #71/#72's own
+conversion tier entirely (tap/text/contour all converted+migrated). 29 of 32 built-in-equivalent ops are now on
+`renderUiTree`; the 3 remaining (pocket, slot, corner) are explicitly out of this arc's own current scope.
+

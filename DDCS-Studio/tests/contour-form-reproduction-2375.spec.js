@@ -1,13 +1,14 @@
 import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 /**
- * WIZARDS-AS-DATA — t2375: the arc's FIRST `mode:'flat'` reproduction (contour). Unlike drill/pocket (a
- * uiChildren TREE reproducing the shell's structure), contour is flat-rendered (no `split_*` node) — so what
- * has to reproduce the shell is CONTOUR_EXEC_BINDINGS' own array order + `section:` values, fixed this same
- * turn (see contourData.js's own header comment above CONTOUR_EXEC_BINDINGS for the full account: before this
- * turn the array declared ~25 bindings under `section: 'GEOMETRY'`/`'TOOL & CUT'` — a HARDCODED whitelist
- * `formWidgets.js`'s own SECTION_RANK recognizes, but the WRONG names relative to the shell's own SHAPE/
- * SIDE & TOOL/DEPTH & FEED — "the metadata exists and is WRONG").
+ * WIZARDS-AS-DATA — t2375 gave contour real `section:` metadata (reproduced via `mode:'flat'`, since contour
+ * was flat-rendered live at the time — the arc's FIRST `mode:'flat'` reproduction). t2621 (BACKLOG #71/#72,
+ * conversion tier, LAST of the three) converted contour's own hand-counted `blockIndex` bindings to
+ * identity-based `match:{type}` and moved it onto the declared `split_horizontal`/`group_box`/`field_ref`
+ * tree — switched to `mode:'tree'` (the shared default) to test the REAL render path, mirroring surfacing's
+ * (t2545) and text's (t2619) own precedent exactly. EXPECTED_ORDER is UNCHANGED from t2375: the three
+ * `group_box`es place every field explicitly (see contourData.js's own `fieldsOf`/tree declaration), so there
+ * are still zero orphans.
  *
  * EXPECTED_ORDER is hand-derived from index.html's own `#wiz_contour` shell (lines 564-613): SHAPE (shape,
  * originX, originY, offZ, wcs, w, h — dia/sides hidden by their own `when` at the rect default; stockAttach/
@@ -33,7 +34,6 @@ const EXPECTED_ORDER = [
 ];
 
 registerFormReproductionSuite({
-  mode: 'flat',
   wizardLabel: 'contour',
   dataModule: '/blocks/dataOps/contourData.js',
   defFactory: 'contourDataDef',

@@ -129,17 +129,16 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
     await page.evaluate(() => window.ddcsLoadBlockStack([]));
-    // t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to CONTOUR. Surfacing itself is
-    // no longer a valid subject for the SECOND half of this test: this turn's own migration moved surfacing
-    // onto the field_ref/group_box tree, and `materializeParamGroup`'s own field_ref-presence skip (t2543) means
-    // a field_ref-declaring twin no longer gets `param_field` canvas blocks materialized at all — the SAME,
-    // already-established outcome `cam-block-native-params-s52.spec.js`'s own `drillSame` test pins for drill.
-    // POCKET turns out to be field_ref-based too (checked live: `hasFieldRef: true, hasParamTable: false` for
-    // pocket, zero `param_field` blocks materialize for it either) — NOT a safe substitute, even though it's
-    // untouched by this turn. CONTOUR is genuinely still plain-materialized (checked live: `hasParamTable: true,
-    // hasFieldRef: false`, a real `param_field` block for every bound param including `depth`), and shares
-    // pocket's own depth:4/stepdown:1.5 defaults, so the numbers below are unchanged either way.
-    await page.evaluate(() => window.ddcsEditWizardDef('user_contour_data'));
+    // t2545 (BACKLOG #71/#72, the section migration) — switched from surfacing to CONTOUR (surfacing went
+    // field_ref/group_box that turn). t2621 (BACKLOG #71/#72, conversion tier) — switched AGAIN, contour to
+    // SLOT: this turn's own migration moved contour onto the field_ref/group_box tree too, so it stopped being
+    // a valid subject for the SAME reason surfacing did (`materializeParamGroup`'s own field_ref-presence skip,
+    // t2543 — a field_ref-declaring twin gets zero `param_field` canvas blocks materialized). POCKET was
+    // already ruled out at t2545 (field_ref-based too). SLOT is genuinely still plain-materialized (checked
+    // live: `hasParamTable: true, hasFieldRef: false`, a real `param_field` block for every bound param
+    // including `depth`) — HARD per this arc's own scope, so it stays a stable subject going forward. Shares
+    // contour's own depth:4/stepdown:1.5 defaults exactly (`SLOT_DEFAULTS`), so the numbers below are unchanged.
+    await page.evaluate(() => window.ddcsEditWizardDef('user_slot_data'));
     let last = -1;
     for (let i = 0; i < 120; i++) {
         const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);

@@ -1244,20 +1244,57 @@ export const sectionRankOf = (sec) => { const i = SECTION_RANK.indexOf(String(se
 // t820 rule (a form sectionizes only past SECTION_THRESHOLD rows AND ≥2 declared sections — "where sensible", a
 // short form stays plain) was never consulted by group_box at all, which defaulted `collapsible` unconditionally
 // true the instant a group_box node was declared — a real, shipped regression (t2605's wcsData.js migration,
-// caught t2609 via form-section-collapse-820.spec.js). Same grouping logic renderOpForm already used (a
-// binding's own `.group` folds MULTI_WIDGET siblings into one row) — exported so a live measurement can call the
-// SAME function the render path uses, not a second reimplementation for counting purposes.
-export function sectionizeFor(bindings) {
+// caught t2609 via form-section-collapse-820.spec.js).
+//
+// t2621 (BACKLOG #71/#72, rule 20 hardening — owner-called, context/PRODUCT-PRINCIPLES.md #20: section names
+// are free text, duplicates are legal and must NOT collapse into one) — the ROW-COUNT half of this decision
+// stays bindings-derived either way (the same grouping logic renderOpForm always used — a binding's own
+// `.group` folds MULTI_WIDGET siblings into one row); the SECTION-COUNT half now differs by path ON PURPOSE:
+// `renderOpForm` has no declared tree to consult, so it still counts DISTINCT `binding.section` VALUES (its
+// only available signal, unchanged); `renderUiTree` has a real tree, so it counts `group_box` NODES instead —
+// counting distinct VALUES there would silently merge two same-titled boxes into one, which could drop a
+// wizard's own count below the ≥2-sections half and wrongly leave a wizard the owner explicitly ruled valid
+// unfolded. Both still funnel through the SAME threshold formula so neither copy can drift from it alone.
+function rowCountFor(bindings) {
     const units = [], byGroup = {};
     for (const b of (bindings || [])) {
         if (!b || b.anchorUnresolved) continue;
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }
+    return units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
+}
+function distinctSectionCountFor(bindings) {
     const secList = [];
-    for (const u of units) { const s = (u[0] && u[0].section) || null; if (s && !secList.includes(s)) secList.push(s); }
-    const rowCount = units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
-    return rowCount > SECTION_THRESHOLD && secList.length >= 2;
+    for (const b of (bindings || [])) {
+        if (!b || b.anchorUnresolved) continue;
+        const s = b.section || null;
+        if (s && !secList.includes(s)) secList.push(s);
+    }
+    return secList.length;
+}
+/** `group_box` NODE count in a declared uiChildren tree — literal nodes, never deduped by title (rule 20). */
+function groupBoxCountIn(uiTree) {
+    let n = 0;
+    const walk = (nodes) => {
+        for (const node of childrenOf(nodes)) {
+            if (!node) continue;
+            if (node.type === 'group_box') n++;
+            if (node.children) walk(node.children);
+            if (node.uiChildren) walk(node.uiChildren);
+        }
+    };
+    walk(uiTree);
+    return n;
+}
+// exported so a live measurement can call the SAME function the render path uses, not a second
+// reimplementation for counting purposes.
+export function sectionizeFor(bindings) {
+    return rowCountFor(bindings) > SECTION_THRESHOLD && distinctSectionCountFor(bindings) >= 2;
+}
+/** t2621 — the tree-mode variant `renderUiTree` uses: same threshold, section count from `group_box` NODES. */
+export function sectionizeForTree(uiTree, bindings) {
+    return rowCountFor(bindings) > SECTION_THRESHOLD && groupBoxCountIn(uiTree) >= 2;
 }
 
 export function renderOpForm(host, bindings) {
@@ -1432,10 +1469,13 @@ function paneFlexCss(token) {
 // own comment for why reusing that id directly would be unsafe for an op whose in-place route is already live.
 export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = null, ns = null) {
     const readers = [];
-    // t2611 (BACKLOG #71/#72, parity fix) — computed ONCE, over the WHOLE op's bindings (matching renderOpForm's
-    // own GLOBAL decision — one fold rule for the whole form, not a per-section one), so every group_box below
+    // t2611 (BACKLOG #71/#72, parity fix) — computed ONCE, over the WHOLE op's tree, matching renderOpForm's
+    // own GLOBAL decision — one fold rule for the whole form, not a per-section one — so every group_box below
     // with no explicit `collapsible` override follows the SAME threshold rule the classic shell always has.
-    const sectionize = sectionizeFor(bindings);
+    // t2621 — `sectionizeForTree` (not `sectionizeFor`): counts declared `group_box` NODES, not distinct
+    // `binding.section` values, so rule 20's own "duplicates are legal, don't merge" holds here too (see that
+    // function's own header for the full account).
+    const sectionize = sectionizeForTree(uiTree, bindings);
     // t2477 (BACKLOG #67) — the tree's own `sim`/`panel` viz ids need the SAME caller namespace
     // `userOpView.js`'s own `id()`/`elNS()` already apply when LOOKING these ids up (`ns_base` for a
     // namespaced host like the Blocks-tab pane, bare `base` for the un-namespaced standalone modal,
