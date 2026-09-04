@@ -20,6 +20,15 @@
  *     { type, var: '#23' }        an `assign` block whose params.var === '#23'   (the natural corner key)
  *     { type, params: {k:v,…} }   a block of `type` whose params match every (k,v)   (general form)
  *     { type }                    the SOLE block of that type in the stack
+ *     { type, nth: N }            the Nth (0-based) block matching {type[, params]} — for a FIXED, never-
+ *                                  branching stack (t2605, atcWarmup) whose own repeated blocks (two `spindle`/
+ *                                  `dwell` stages) carry no per-stage identity field at all, so {type,params}
+ *                                  alone is genuinely ambiguous (both stages can share the same default value).
+ *                                  `nth` counts POSITION WITHIN THE TYPE-FILTERED SUBSET, never an absolute
+ *                                  flatten offset — immune to uiChildren restructuring (the actual hazard class
+ *                                  blockIndex/WRAP_PREFIX_COUNT names) because uiChildren never adds/removes
+ *                                  `spindle`/`dwell` exec blocks; only a genuine change to the STACK's own
+ *                                  emitted sequence could invalidate it, the same risk any identity match runs.
  *   key — the socket key on that block the binding drives (assign → 'value').
  *   default — OPTIONAL. If omitted, the binding default is READ from the matched socket's baked value — so a socket that
  *     holds an EXPRESSION default (e.g. corner's reposition #23 = '#15') keeps that expression when the param is unset,
@@ -52,6 +61,18 @@ export function deriveBindings(flatStack, specs) {
     for (const s of specs) {
         const hits = [];
         for (let i = 0; i < flatStack.length; i++) if (matches(flatStack[i], s.match)) hits.push(i);
+        // t2605 — { nth: N }: pick the Nth hit (0-based) from the SAME type[+params]-filtered hit list above,
+        // rather than requiring the filter alone to narrow to exactly one. Still throws if there aren't enough
+        // hits to satisfy N — an ambiguity the filter's own {type[,params]} genuinely can't resolve is a
+        // build-time error either way, `nth` just names WHICH of the tied matches this spec means, not a
+        // license to under-specify the filter.
+        if (s.match && 'nth' in s.match) {
+            if (s.match.nth < 0 || s.match.nth >= hits.length) {
+                const how = ('var' in s.match) ? `${s.match.type} ${s.match.var}` : (s.match.type || '?');
+                throw new Error(`deriveBindings: spec "${s.param}" nth=${s.match.nth} out of range (${how} matched ${hits.length} blocks)`);
+            }
+            hits.splice(0, hits.length, hits[s.match.nth]);
+        }
         // ② B4 ③ — an OPTIONAL spec targets a PRUNE-GATED socket (present only in some param states, e.g. corner's #21/#22
         // which exist only under probeZFirst): 0 matches → the socket is absent in THIS state → SKIP the binding (do not
         // substitute a socket that isn't there). A non-optional spec still requires exactly 1 (a real authoring error else).

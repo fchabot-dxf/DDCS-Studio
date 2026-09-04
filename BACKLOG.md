@@ -7753,6 +7753,17 @@ working dispatch for multiple live ops. Migrated all 5: `atc_table_data`, `atc_t
 `atc_check_data`, `atc_length_data` — each with its own row-diff test, a live canvas-mount proof, and its own
 full pre-existing suite green. Full account: WORK-LOG t2603.
 
+**t2605 — the "cheap end" of the six positional-binding ops converted + migrated: `pause_confirm` (1 binding),
+`atc_warmup` (4, not 5), `wcs` (6, not 7).** `wcs` (all 6 bindings target ONE block, keyed apart) was cheaper
+than `atc_warmup` (4 bindings but 2 pairs of structurally-identical sibling blocks needing a small, real
+extension to `deriveBindings.js`'s own match vocabulary — `{type, params, nth}`) — direct evidence that raw
+binding count does not predict conversion cost; the real driver is DISTINCT TARGET BLOCK count, and separately
+whether any target has an unidentified structural sibling. Applying that measured axis (not yet a conversion,
+a structural read) to the remaining three: **tap 18 bindings → 3 distinct blocks; contour 26 → 5; text 31 → 3**
+— by distinct-block count text and tap TIE for cheapest, contour is the most structurally involved, flipping
+the naive by-count ranking. `comm`'s own `panel:'commscreen'` resolved MIGRATABLE (BACKLOG #77's own updated
+entry has the full account) in the same turn. Full account: WORK-LOG t2605.
+
 ---
 
 ## PART 2's OWN LEAD FINDING FIRST, because band 1 and band 2 both sit downstream of it
@@ -8176,6 +8187,16 @@ same latent bug isn't left for whoever next reads it).
 migrated and green** (t2603): `atc_table_data`, `atc_test_data`, `atc_change_data` (the "hardest of the ATC
 set" per its own file header — no additional complexity survived the migration, since only the FORM tree was
 touched, not the recompose/emit machinery), `atc_check_data`, `atc_length_data` — each verified with its own
-row-diff test plus a live "does a real canvas mount" proof, plus its own full pre-existing test suite. `commData`
-(`panel:'commscreen'`) remains a SEPARATE, still genuinely unverified panel kind — not this defect, not yet
-checked either way. Full account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).
+row-diff test plus a live "does a real canvas mount" proof, plus its own full pre-existing test suite. Full
+account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).
+
+**t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
+blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
+— its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
+pre-existing standalone `feature_canvas` branch. A DIFFERENT, genuinely new defect was found instead, live:
+`registerUserOp`'s own self-heal (`userOps.js:1432`) re-derives `.panel` from the template's `feature_canvas`
+node's OWN `params.panel` (`panelFromStack`, `userOps.js:350-354`), overriding the `userOpFromStack` argument
+entirely — a `feature_canvas` node with empty `params` silently lost the `'commscreen'` panel the instant it
+registered. Every other migrated op's own `feature_canvas` node already carried this correctly (confirmed by
+grep); comm was the first standalone (no adjacent `preview3d`) one in the whole arc, an isolated authoring
+slip, not a second #77. Fixed, re-verified live. Full account: WORK-LOG t2605.

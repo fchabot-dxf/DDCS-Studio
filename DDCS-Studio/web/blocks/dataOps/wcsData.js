@@ -9,17 +9,18 @@
  */
 import { wcsStack } from '../../wizards/stacks/wcsWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { deriveBindingsFor } from './deriveBindings.js';
 
 export const WCS_DEFAULTS = { sys: '0', axisX: true, axisY: true, axisZ: false, sync: false, slave: '3' };
 
 const SYS_OPTIONS = [['Active WCS (Auto)', '0'], ['G54', '54'], ['G55', '55'], ['G56', '56'], ['G57', '57'], ['G58', '58'], ['G59', '59']];
 const SLAVE_OPTIONS = [['A', '3'], ['B', '4']];
 
-// wcsStack(DEFAULTS) = [wcszero]; pre-order flatten under the wrap: user_root(0) sim(1) param_group(2) wcszero(3).
-// t2301 — WRAP dropped from 4 to 3 ('panel' removed from uiChildren, BACKLOG 20). This is the EXACT hazard
-// t2257 caught the hard way on atcWarmupData.js (a hardcoded WRAP left stale after panel's removal broke
-// every binding); caught here BEFORE committing, not after, by reading this file's own comment before editing.
-const WRAP = 3;
+// t2605 (BACKLOG #71/#72 conversion tier) — CONVERTED from a hand-counted `blockIndex: 0` + a `WRAP` constant
+// (the EXACT hazard t2257 caught the hard way on atcWarmupData.js — this file's own comment already named it
+// as the thing to watch for, before this conversion existed to close it) to identity-based `match:
+// {type:'wcszero'}` — the ONE block in the whole exec stack, unambiguous by type alone (unlike atc_warmup, no
+// `nth` needed: all 6 bindings target the SAME block, disambiguated by `key`, not by which block).
 // t1704 — WCS is the "trivial ideal" case for token eligibility: wcsStack (wizards/wcsWizard.js) is a ONE-LINE
 // function that copies every param straight into the single wcszero atom's params object — zero JS arithmetic,
 // zero branching, at the wizard layer. All 6 are `tokenEligible`. (None render as a typed field today — every one
@@ -31,45 +32,57 @@ const WRAP = 3;
 const WCS_PICKER_GATE = { param: '_wcsPickerOk', is: false, tip: 'This controller has no per-WCS-index register — it zeroes whichever WCS frame is currently active, and can\'t target a specific one.' };
 const WCS_SYNC_GATE = { param: '_wcsSyncOk', is: false, tip: 'Dual-gantry slave sync is a DDCS-Expert-specific register write — no equivalent on this controller.' };
 // t2381 — SECTION MISMATCH, fixed: the shell (index.html:1196-1237) declares THREE sections — FEATURE
-// CONTEXT (axisX/axisY/axisZ), WCS (sys), OPTIONS (sync/slave) — but this array declared only two
-// (`GEOMETRY` covering sys+axisX/Y/Z, `OPTIONS` unchanged) and in the WRONG field order (sys first; the
-// shell puts the axis checkboxes first). Reordered + resectioned to match exactly — same mechanism as
-// t2375's contour fix (array position, not just the `section:` string, drives formWidgets.js's own
-// rendered grouping — see contourData.js's own header comment above CONTOUR_EXEC_BINDINGS for the full
-// account). `GEOMETRY`/`TOOL & CUT`/`IDENTITY` are SECTION_RANK's own canonical whitelist, unrelated to
-// this shell's own real section names — using them here would have been the SAME class of bug the mill
-// family had (a hardcoded-whitelist-shaped name standing in for the shell's own).
-const WCS_EXEC_BINDINGS = [
+// CONTEXT (axisX/axisY/axisZ), WCS (sys), OPTIONS (sync/slave) — matched exactly (unchanged by this turn).
+const WCS_BINDING_SPECS = [
     // FEATURE CONTEXT
-    { param: 'axisX', tokenEligible: true, blockIndex: 0, key: 'axisX', type: 'bool', default: WCS_DEFAULTS.axisX, label: 'Zero X', section: 'FEATURE CONTEXT' },
-    { param: 'axisY', tokenEligible: true, blockIndex: 0, key: 'axisY', type: 'bool', default: WCS_DEFAULTS.axisY, label: 'Zero Y', section: 'FEATURE CONTEXT' },
-    { param: 'axisZ', tokenEligible: true, blockIndex: 0, key: 'axisZ', type: 'bool', default: WCS_DEFAULTS.axisZ, label: 'Zero Z', section: 'FEATURE CONTEXT' },
+    { param: 'axisX', tokenEligible: true, match: { type: 'wcszero' }, key: 'axisX', type: 'bool', default: WCS_DEFAULTS.axisX, label: 'Zero X', section: 'FEATURE CONTEXT' },
+    { param: 'axisY', tokenEligible: true, match: { type: 'wcszero' }, key: 'axisY', type: 'bool', default: WCS_DEFAULTS.axisY, label: 'Zero Y', section: 'FEATURE CONTEXT' },
+    { param: 'axisZ', tokenEligible: true, match: { type: 'wcszero' }, key: 'axisZ', type: 'bool', default: WCS_DEFAULTS.axisZ, label: 'Zero Z', section: 'FEATURE CONTEXT' },
     // WCS
-    { param: 'sys', tokenEligible: true, blockIndex: 0, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'WCS', gate: WCS_PICKER_GATE },
+    { param: 'sys', tokenEligible: true, match: { type: 'wcszero' }, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'WCS', gate: WCS_PICKER_GATE },
     // OPTIONS
-    { param: 'sync', tokenEligible: true, blockIndex: 0, key: 'sync', type: 'bool', default: WCS_DEFAULTS.sync, label: 'Sync A Axis (Dual Gantry)', section: 'OPTIONS', gate: WCS_SYNC_GATE },
-    { param: 'slave', tokenEligible: true, blockIndex: 0, key: 'slave', type: 'enum', default: WCS_DEFAULTS.slave, widget: 'dropdown', widgetConfig: { options: SLAVE_OPTIONS }, label: 'Slave', section: 'OPTIONS', gate: WCS_SYNC_GATE },
+    { param: 'sync', tokenEligible: true, match: { type: 'wcszero' }, key: 'sync', type: 'bool', default: WCS_DEFAULTS.sync, label: 'Sync A Axis (Dual Gantry)', section: 'OPTIONS', gate: WCS_SYNC_GATE },
+    { param: 'slave', tokenEligible: true, match: { type: 'wcszero' }, key: 'slave', type: 'enum', default: WCS_DEFAULTS.slave, widget: 'dropdown', widgetConfig: { options: SLAVE_OPTIONS }, label: 'Slave', section: 'OPTIONS', gate: WCS_SYNC_GATE },
 ];
-export const WCS_BINDINGS = WCS_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP }));
 
 export const WCS_DATA_OPTYPE = 'user_wcs_data';
 
-/** Build the wcs-as-data def — a static-shape twin (positional bindings; no superset) over the dialect-aware wcszero atom. */
+/** Build the wcs-as-data def — a static-shape twin (identity bindings; no superset) over the dialect-aware wcszero atom. */
 export function wcsDataDef() {
-    const exec = wcsStack(WCS_DEFAULTS);   // [wcszero]
+    // t2605 (Phase 1 step 1) — no bootstrap/final split needed (static shape, all 6 specs target the SAME
+    // single block by type — the tree only needs `.param` strings to build field_refs, not the derived
+    // blockIndex), but the FINAL bindings shipped are still re-derived fresh against the real, final stack
+    // (t2595's own finding — a stale derive against a different uiChildren shape would break identically to
+    // the blockIndex/WRAP this conversion just removed).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const bySection = (name) => WCS_BINDING_SPECS.filter((b) => b.section === name);
     const stack = [{
         type: 'user_root',
         params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — 'panel' removed: the SAME id-collision fix as drillData.js's own comment
-            // (its sim/panel branches share DOM ids), first established for ATC at t2257. layout2d:false ADDED
-            // here (unlike drill/pocket): the removed panel's OWN comment already named this op's own 2D pane
-            // as permanently empty ("form-only: WCS is a register-write macro — no motion / no preview") — the
-            // exact reason ATC's own sim declarations carry layout2d:false, not a new judgment call.
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false, layout2d: false } },
-            { type: 'param_group', params: { group: 'WCS' }, children: [] },
-        ],
-        children: exec,
+        uiChildren: [{
+            // t2605 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree. panel='form' (viz:false, per panelTypes.js:45) — the SAME no-viz
+            // shape io_step/pause_confirm already proved: no viz-mounting code runs in either render path, so
+            // the RIGHT pane is declared empty — matching this file's own pre-existing note that WCS's 2D pane
+            // was ALWAYS permanently empty ("a register-write macro — no motion / no preview").
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'WCS' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Zeroes the selected axes in the target work-coordinate register — Active WCS (whichever is loaded) or a specific G54-G59. Optionally syncs the dual-gantry slave A-axis to match.' } },
+                        { type: 'group_box', params: { title: 'FEATURE CONTEXT' }, children: fieldRefsOf(bySection('FEATURE CONTEXT')) },
+                        { type: 'group_box', params: { title: 'WCS' }, children: fieldRefsOf(bySection('WCS')) },
+                        { type: 'group_box', params: { title: 'OPTIONS' }, children: fieldRefsOf(bySection('OPTIONS')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                RIGHT: [],
+            },
+        }],
+        children: wcsStack(WCS_DEFAULTS),
     }];
-    return userOpFromStack('wcs_data', 'WCS (data)', stack, WCS_BINDINGS, 'form');
+    const bindings = deriveBindingsFor(stack, WCS_BINDING_SPECS);
+    return userOpFromStack('wcs_data', 'WCS (data)', stack, bindings, 'form');
 }

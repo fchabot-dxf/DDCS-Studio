@@ -25,58 +25,76 @@
  */
 import { atcWarmupStack } from '../../wizards/stacks/atcWarmupWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { deriveBindingsFor } from './deriveBindings.js';
 
 /** Author defaults — match atcWarmupStack's own num() fallbacks so the seeded template == the true default stack. */
 export const ATC_WARMUP_DEFAULTS = { rpm1: 6000, time1: 30, rpm2: 12000, time2: 30 };
 
-// Hand-authored binding map → execution-stack indexes (atcWarmupStack pushes a flat stack, no nesting):
-//   0 comment · 1 comment · 2 comment · 3 confirm · 4 spindle(off) · 5 coolant(off) · 6 comment · 7 message ·
-//   8 spindle(stage1) · 9 dwell(stage1) · 10 comment · 11 message · 12 spindle(stage2) · 13 dwell(stage2) ·
-//   14 spindle(off) · 15 message · 16 label · 17 endprogram
-// t2383 — SECTION ABSENCE, fixed: none of these four carried `section:` at all before this turn (t2381's own
-// registry survey flagged it, 0/4). The shell (index.html:917-940) declares exactly ONE section — "WARM-UP
-// SEQUENCE" — covering all four fields, already in the shell's own order, so no reorder was needed, only the
-// `section:` addition.
-const ATC_WARMUP_EXEC_BINDINGS = [
-    { param: 'rpm1', blockIndex: 8, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm1, section: 'WARM-UP SEQUENCE' },
-    { param: 'time1', blockIndex: 9, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time1, section: 'WARM-UP SEQUENCE' },
-    { param: 'rpm2', blockIndex: 12, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm2, section: 'WARM-UP SEQUENCE' },
-    { param: 'time2', blockIndex: 13, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time2, section: 'WARM-UP SEQUENCE' },
+// t2605 (BACKLOG #71/#72 conversion tier) — CONVERTED from hand-counted `blockIndex` values (a
+// `WRAP_PREFIX_COUNT`-style constant this file's own comment already names as the exact hazard class
+// `deriveBindings.js`'s header warns against — it desynced once already, t2257, and needed a live-caught fix)
+// to identity-based `match`. THE GENUINE WRINKLE: atcWarmupStack's own two stages (spindle-on + dwell, twice)
+// are STRUCTURALLY IDENTICAL blocks with no per-stage identity field at all — `{type:'spindle', params:
+// {dir:'cw'}}` alone still matches BOTH stage blocks (ambiguous), and `{type:'dwell'}` alone matches both
+// dwells too (their own DEFAULT sec values even collide: time1=time2=30). `{type, params, nth}` — a small,
+// genuinely-needed extension to deriveBindings.js's own match vocabulary (t2605) — resolves this: `nth` counts
+// position WITHIN THE TYPE[+params]-FILTERED SUBSET, not an absolute flatten offset, so it stays immune to the
+// uiChildren-restructuring hazard this whole conversion tier exists to close (see deriveBindings.js's own
+// updated header for the full reasoning). The `dir:'cw'` filter on spindle excludes the two spindle-OFF
+// blocks (no `dir` key at all) before `nth` picks stage 1 vs stage 2.
+// t2383 — SECTION ABSENCE, fixed (unchanged from before this turn): none of these four carried `section:` at
+// all (t2381's own registry survey flagged it, 0/4). The shell (index.html:917-940) declares exactly ONE
+// section — "WARM-UP SEQUENCE" — covering all four fields, already in the shell's own order.
+// KEPT ALIVE under its historic name: `tests/atc-warmup-as-data.spec.js` imports `ATC_WARMUP_BINDINGS` directly
+// (a real external consumer, reading only `.param`/`.key` from each entry — never `.blockIndex` off this array
+// itself, only off the REGISTERED def's own bindings — so renaming the fields from blockIndex to match loses
+// nothing that test needs; only the export NAME must stay the same).
+export const ATC_WARMUP_BINDINGS = [
+    { param: 'rpm1', match: { type: 'spindle', params: { dir: 'cw' }, nth: 0 }, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm1, section: 'WARM-UP SEQUENCE' },
+    { param: 'time1', match: { type: 'dwell', nth: 0 }, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time1, section: 'WARM-UP SEQUENCE' },
+    { param: 'rpm2', match: { type: 'spindle', params: { dir: 'cw' }, nth: 1 }, key: 'rpm', type: 'number', default: ATC_WARMUP_DEFAULTS.rpm2, section: 'WARM-UP SEQUENCE' },
+    { param: 'time2', match: { type: 'dwell', nth: 1 }, key: 'sec', type: 'number', default: ATC_WARMUP_DEFAULTS.time2, section: 'WARM-UP SEQUENCE' },
 ];
-
-// Wrapped-template indexes (user_root + param_group precede execution children).
-// t2257 (BACKLOG 20) — was 4 (user_root + panel + sim + param_group); removing the redundant, id-colliding
-// 'panel' node (see atcChangeData.js's own comment) drops this to 3. Caught live: registerUserOp threw
-// "binding (block 16.rpm) does not resolve in the template" for every param after the panel removal alone —
-// this constant is the ONE place that offset was hardcoded, and it was the ONLY thing left pointing at the
-// old wrap shape. Full suite re-run confirmed clean after this fix.
-const WRAP_PREFIX_COUNT = 3;   // user_root + sim + param_group
-export const ATC_WARMUP_BINDINGS = ATC_WARMUP_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
 export const ATC_WARMUP_DATA_OPTYPE = 'user_atc_warmup_data';
 
 /** Build the spindle-warmup-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function atcWarmupDataDef() {
-    const exec = atcWarmupStack(ATC_WARMUP_DEFAULTS);
+    // t2605 (Phase 1 step 1) — static shape (no superset/guards), but STILL re-derived fresh against the final
+    // tree-shaped stack (t2595's own finding: match bakes a concrete blockIndex at DERIVE time and never
+    // re-resolves — reusing ATC_WARMUP_BINDINGS's own raw specs directly against a DIFFERENT stack shape than
+    // whatever it was last derived against would break identically to the blockIndex this conversion removed).
+    const fieldRefsOf = (group) => group.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
     const stack = [{
         type: 'user_root',
         params: {},
-        uiChildren: [
-            // t407 IN-PLACE — the built-in atcWarmupView is twoPane with a 3D machine preview (preview3D +
-            // previewMachine), so the twin must show the SAME so the DECLARED machine+magazine sim renders.
-            // Display-only (this whole node emits nothing) → emit byte-identical.
-            // t2257 (BACKLOG 20) — the separate 'panel' node t407 added alongside 'sim' is REMOVED: it was
-            // inert (params.panel isn't read by formWidgets.js's panel branch) and id-collided with sim's
-            // own layout2d pane — see atcChangeData.js's own comment for the full reasoning. layout2d: false
-            // is the CORRECT way to say "3D preview, no 2D pane" that t407 was reaching for with 'form3d'.
-            { type: 'sim', params: { rotary: false, machine: true, magazine: true, layout2d: false } },
-            {
-                type: 'param_group',
-                params: { group: 'Spindle Warmup' },
-                children: [],
+        uiChildren: [{
+            // t2605 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree, the SAME mechanism drill/surfacing/bore/.../atc_length already use.
+            // No classic shell to reproduce for THIS twin's own purposes (`#wiz_atc_warmup`, index.html:941, is
+            // a real, still-live classic shell like atc_table/test/change — this twin stays unlinked from it,
+            // opened separately) — usage_text written fresh.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Spindle Warmup' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Runs a two-stage spindle warmup: spin up and hold at each RPM for the set time, then stop. Useful after a cold start or a long idle before cutting.' } },
+                        { type: 'group_box', params: { title: 'WARM-UP SEQUENCE' }, children: fieldRefsOf(ATC_WARMUP_BINDINGS) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2605 (Phase 1 step 2) — panel='form3d' (no 2D pane). preview3d declared ALONE — the shape
+                // BACKLOG #77 fixed (t2603), already proven across 5 ATC ops; this op shares the identical
+                // mechanism, not re-verified from scratch.
+                RIGHT: [
+                    { type: 'preview3d', params: { rotary: false, machine: true, magazine: true } },
+                ],
             },
-        ],
-        children: exec,
+        }],
+        children: atcWarmupStack(ATC_WARMUP_DEFAULTS),
     }];
-    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', stack, ATC_WARMUP_BINDINGS, 'form3d', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
+    const bindings = deriveBindingsFor(stack, ATC_WARMUP_BINDINGS);
+    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', stack, bindings, 'form3d', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
 }

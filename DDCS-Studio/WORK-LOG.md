@@ -73996,3 +73996,118 @@ own containment claim held under the real shared-suite check, not just the targe
 `atcChangeData.js`/`atcCheckData.js`/`atcLengthData.js`/`atcTableData.js`/`atcTestData.js`/`formWidgets.js`, 5
 new row-diff test files, this WORK-LOG entry, BACKLOG.md (the #77 rewrite + its own #72 sub-note).
 
+## turn 2605 — the "cheap end" of the six positional-binding ops converted + migrated (pause_confirm, atc_warmup,
+wcs); comm's own last-unverified panel kind resolved to MIGRATABLE, with a genuinely new, isolated defect found
+and fixed along the way; a small, real extension to deriveBindings.js's own match vocabulary; per-binding cost
+measured, not guessed
+
+### CONVERTED + MIGRATED: pause_confirm (1), atc_warmup (4, not 5 — recounted), wcs (6, not 7 — recounted)
+
+**pause_confirm** — 1 binding (`msg`), the ONE `pauseconfirm` block in the whole stack, unambiguous by type
+alone — the cheapest possible conversion, a pure rename (`blockIndex:2` → `match:{type:'pauseconfirm'}`).
+panel='form' (viz:false) — the SAME no-viz shape io_step/atc_warmup's own siblings already proved. Test 3 (the
+REAL-SYMPTOM standard, now applied to every migration regardless of panel kind) opens the real page, edits the
+message, and confirms it reaches the actual emitted `M00` line — caught one test-authoring bug of my own along
+the way (`/M0\b/` doesn't match `M00`, since `\b` needs a non-word char after the second `0`; fixed to `/M00\b/`).
+
+**atc_warmup** — 4 real bindings (rpm1/time1/rpm2/time2 — the dispatch's own "5" was one more than the file
+actually declares). THE GENUINE WRINKLE this op surfaced: its own two stages (spindle-on + dwell, each twice)
+are STRUCTURALLY IDENTICAL blocks with no per-stage identity field at all — `{type:'spindle', params:
+{dir:'cw'}}` alone still matches BOTH stages, and both dwells even share the same DEFAULT `sec` value
+(time1=time2=30 by default), so even a value-based match would be genuinely ambiguous. Resolved with a small,
+real extension to `deriveBindings.js`'s own match vocabulary: `{type, params, nth}` — the Nth hit within the
+type[+params]-filtered subset, immune to uiChildren restructuring (the actual hazard class this whole
+conversion tier exists to close) because uiChildren never adds/removes `spindle`/`dwell` exec blocks; only a
+genuine change to the STACK's own emitted sequence could invalidate it. Documented directly in
+`deriveBindings.js`'s own header, not just in the consumer. **Proved it actually works, not just that it
+doesn't throw**: a REAL-SYMPTOM test sets all 4 fields to DISTINCT values and asserts the emitted code shows
+EACH stage's own value (`S7000`/`S19000`, `P11000`/`P22000`) — a row-diff test alone could not have caught `nth`
+picking the WRONG stage (silent cross-wiring), only reading the real emitted G-code proves it bound correctly.
+
+**wcs** — 6 bindings (not 7), ALL targeting the SAME single `wcszero` block, disambiguated by `key` alone — no
+`nth` needed, the SIMPLEST conversion of the three despite having the MOST bindings — direct evidence that
+binding COUNT does not predict conversion cost (see the per-binding-cost section below). A pre-existing test
+(`wcs-form-reproduction-2381.spec.js`, from t2381's own section-mismatch fix) uses `renderOpForm` directly
+(flat render, unaffected by the uiChildren tree change) and stayed green with ZERO edits needed — confirmed by
+reading it before assuming it would need updating, not by running-and-hoping.
+
+### SMALL ITEM: comm's own `panel:'commscreen'` resolved — MIGRATABLE, not blocked, with a real (different)
+defect found and fixed along the way
+
+Read the mechanism BEFORE writing any migration code, per the dispatch's own instruction: `userOpView.js:874-885`
+mounts `commscreen` mode into `vel('userVizContainer')` (the SAME resolver every other panel kind uses) and
+injects `_commWizard.generateScreenPreview(...)` HTML directly — no FeatureCanvas/SVG render, just a container
+to inject into. `formWidgets.js`'s own STANDALONE `feature_canvas` branch (pre-dating this whole arc, :1648-1663)
+already builds exactly that target id (`userVizContainer_tree`) — the container-ID mechanism BACKLOG #77 found
+broken was **never in play here at all**; declared a standalone `feature_canvas` node (no adjacent `preview3d`
+— commscreen has no 3D view) and migrated the rest normally (3 sections, all contiguous, no derive needed at
+all — every binding is a pure form declaration, the real value-writing `COMM_BINDING_SPECS` was ALREADY
+`match`-based, not part of the blockIndex conversion tier at all).
+
+**A genuinely different, real defect surfaced anyway, live, not assumed**: the first version (a
+`feature_canvas` node with empty `params`) registered without error, but the live popup mock never rendered —
+`userOpView.js` was instead mounting a 3D toolpath preview (WRONG for a Communication op). Root-caused by
+instrumenting `document.getElementById` to trace every viz-container lookup and reading the resulting stack
+traces: `registerUserOp`'s own self-heal (`userOps.js:1432`, `def.panel = resolvePanelMeta(def)`) RE-DERIVES
+`.panel` from the template's `feature_canvas` node's OWN `params.panel` (`panelFromStack`, `userOps.js:350-354`)
+AFTER construction — overriding whatever string `userOpFromStack`'s own positional `panel` argument set,
+NEVER falling back to it. Every OTHER migrated op's own `feature_canvas` node ALREADY carries `params.panel`
+(confirmed by grep across every dataOps file, all nine prior migrations correct) — this was an isolated
+authoring slip on comm specifically (the first `feature_canvas` node in this whole arc with no adjacent
+`preview3d` to copy the convention from), not a second instance of #77, and not a systemic gap. Fixed by adding
+`params: { panel: 'commscreen' }`; re-verified live (the real popup dialog renders inside the tree-mode
+container, byte-identical markup to the classic path) before shipping. The REAL-SYMPTOM test for this op
+specifically asserts `canvasCount === 0` (a wrong dispatch would have mounted a WebGL canvas instead of the
+mock) — this is the exact class of defect a row-diff-only bar would have shipped silently.
+
+### PER-BINDING COST, measured not guessed — the real deliverable this turn
+
+**The naive metric (raw binding count) does not predict cost.** wcs (6 bindings, ALL same block) was cheaper
+than atc_warmup (4 bindings, but 2 pairs of STRUCTURALLY IDENTICAL sibling blocks). The real cost driver,
+measured directly across these three conversions: **the number of DISTINCT TARGET BLOCKS a batch's own
+bindings must identify, and — separately — whether any of those blocks has an unidentified STRUCTURAL SIBLING
+of the same type** (the `nth` case). pause_confirm: 1 binding → 1 block, trivial. wcs: 6 bindings → 1 block (all
+disambiguated by key), trivial. atc_warmup: 4 bindings → 4 conceptual targets, but only 2 DISTINCT TYPES
+(`spindle`×2, `dwell`×2) — the sibling-disambiguation cost, not the binding count, is what made this one cost
+roughly 2x a comparable non-`nth` conversion (the `deriveBindings.js` extension + a dedicated cross-wiring proof
+test, on top of the ordinary conversion+migration work).
+
+**Applying this measured axis to the remaining three (not attempted this turn — a structural READ, not a
+conversion or a full mechanism check)**: `grep -oE "blockIndex: [0-9]+"` sorted+counted against `tapData.js`/
+`contourData.js`/`textData.js` gives the DISTINCT-BLOCK count directly — **tap: 18 bindings → 3 distinct blocks
+(indices 1/2/3). contour: 26 bindings → 5 distinct blocks (0/1/2/3/4). text: 31 bindings → 3 distinct blocks
+(3/4/5).** By raw count, text looks hardest (31); by distinct-block count, text and tap are TIED for cheapest
+(3 each) and contour is the most structurally involved (5). This flips the naive ranking the dispatch itself
+warned might happen. **Not yet confirmed whether any of tap/contour/text's own distinct blocks has a duplicate-
+type sibling** (the atc_warmup-class multiplier) — a quick read of tap's own binding comments (its blockIndex:2
+cluster looks like a single `placeonstock`-style block shared by 9 params; blockIndex:3 looks like one `tap`
+cut-atom shared by 7) suggests the SAME "many bindings, one block, keyed apart" shape wcs already proved cheap,
+not the atc_warmup shape — but this is a STRUCTURAL READ, not a verified conversion, and stated as such: a real
+measurement of distinct-block-count, an ESTIMATE (not yet a measurement) of whether `nth` will be needed
+anywhere in the next batch.
+
+### PER-OP COST (this turn's own four items)
+
+pause_confirm: ~20 min (simplest possible case; the only real time sink was the `/M0\b/` regex bug in my own
+test). atc_warmup: ~50 min (the `deriveBindings.js` extension — design, implement, document, verify via a
+dedicated cross-wiring test — was the majority of this; the migration itself, once `nth` existed, was ordinary).
+wcs: ~30 min (conversion trivial; most of the time was confirming the pre-existing `wcs-form-reproduction-2381`
+spec needed no changes, by reading it rather than assuming). comm: ~55 min (the migration itself was quick; the
+`feature_canvas.params.panel` mystery — 6 rounds of live instrumentation to find a 4-line root cause — was
+nearly the whole cost). Total: ~2h35m for 3 conversions + 1 panel-kind resolution + 1 shared-machinery
+extension + 1 genuinely new defect found-and-fixed.
+
+### VERIFY
+
+Targeted run per op (own pre-existing suite + `param-group-table-separation-2543.spec.js`, the t2531 canaries):
+pause_confirm 3/3 (+ 26 other tests sharing the same run, all green — palette/wizard-manager/renderer-parity/
+render-equivalence/modal-gesture/twin-section-invariant, confirming no cross-op regression), atc_warmup 5/5,
+wcs 21/21 (incl. the untouched pre-existing 2381 spec), comm 17/17 (incl. the untouched pre-existing 2399 spec
++ the live in-place flow). Node tier (`npm run test:node`): caught a SECOND architecture-map TRAP6 citation
+break (comm's own line, the SAME class t2601 already fixed for homing) — found via the FULL node run, not
+assumed absent; fixed the citation string, re-ran clean, 238/238. Full suite (unconditional per the dispatch's
+own TIER instruction), launched after all four items: **3129 passed, 0 failed, 28 skipped (37.6m), exit code
+0.** Up from t2603's own 3120 (4 new row-diff files × ~3 tests each) — zero regressions. `git status`:
+`pauseConfirmData.js`/`atcWarmupData.js`/`wcsData.js`/`commData.js`/`deriveBindings.js`, 4 new row-diff test
+files, `architecture-map-1698.test.mjs` (the TRAP6 fix), this WORK-LOG entry, BACKLOG.md.
+

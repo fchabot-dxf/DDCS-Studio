@@ -82,25 +82,9 @@ export const COMM_BINDING_SPECS = [
     { param: 'cycle', type: 'number', default: COMM_DEFAULTS.cycle, match: { type: 'hmibeep' }, key: 'cyc', optional: true },  // beep pulse width = cycle
 ];
 
-/** The wrapped user_root template — the superset (all arms), byte-transparent wrap (mirror the sibling *DataStack). */
-export function commDataStack(params = SUPERSET_PARAMS) {
-    const exec = commStack(params, { superset: true });
-    return [{
-        type: 'user_root', params: {},
-        uiChildren: [
-            // t2301 (BACKLOG 20) — uiChildren's 'panel' NODE removed: id-collided with sim's own layout2d pane
-            // (see drillData.js's own t2301 comment for the mechanism, first fixed for ATC at t2257). This is
-            // NOT the live comm-screen preview (generateScreenPreview) — that reads the SEPARATE 'commscreen'
-            // argument on the userOpFromStack(...) call below, untouched here; confirmed by reading
-            // userOpView.js:768's own live consumer before editing, not assumed. layout2d:false ADDED (unlike
-            // drill/pocket): comm is popup/status/input/beep/dwell — no physical motion/geometry ever, so a 2D
-            // layout pane would be permanently empty, the same reasoning wcsData.js's own comment gives.
-            { type: 'sim', params: { layout2d: false } },
-            { type: 'param_group', params: { group: 'Communication' }, children: [] },
-        ],
-        children: exec,
-    }];
-}
+// t2605 (BACKLOG #71/#72 small item) — `commDataStack()` (the old flat-render `user_root` wrapper) is REMOVED
+// here — `commDataDef()` below now builds its own tree-shaped stack inline, and grepping the whole repo found
+// no other caller (product code or test) invoking this function by name.
 
 // ── the DERIVED guard keys — pruneGuards uses these to collapse the value-typed forks. ──
 // t632 — the HMI-vs-degrade fork (_hmi) is GONE: each atom carries it at emit time (the un-freeze), so the twin folds per-post.
@@ -165,8 +149,67 @@ function applyCommRecompose(stack, resolved) {
 /** Build the Communication-as-data def — bindingSpecs (re-derive by #var identity over the pruned stack) + deriveGuards +
  *  the value-bearing recompose in postInstantiate. Byte-identical to commStack across the type sweep × HMI + non-HMI. */
 export function commDataDef() {
+    // t2605 (BACKLOG #71/#72 small item) — the LAST unverified panel kind, resolved: panel='commscreen'
+    // routes (userOpView.js:874-885) to `vel('userVizContainer')` (SAME resolver, same base every other panel
+    // kind uses) and injects `_commWizard.generateScreenPreview(...)` HTML into it directly — no FeatureCanvas/
+    // SVG render at all, just a plain container to inject into. A STANDALONE `feature_canvas` node (no adjacent
+    // `preview3d`) already builds EXACTLY that target id (`formWidgets.js`'s own dedicated "FEATURE CANVAS"
+    // single-pane branch, :1648-1663, builds `userVizContainer_tree`) — the CONTAINER-ID mechanism BACKLOG #77
+    // found broken was never in play here at all.
+    // ⚠ A DIFFERENT, GENUINE gap was found instead, live, not assumed: the first attempt (a `feature_canvas`
+    // node with empty `params`) registered successfully but silently lost its `'commscreen'` panel — the
+    // in-place popup mock never rendered, and `userOpView.js` dispatched into the WRONG mode branch (mounting a
+    // 3D toolpath preview for a Communication op). Root-caused by instrumenting `document.getElementById` to
+    // trace every viz-lookup call: `registerUserOp`'s own self-heal (`userOps.js:1432`,
+    // `def.panel = resolvePanelMeta(def)`) re-derives `.panel` from the template's own `feature_canvas` node
+    // (`panelFromStack`, userOps.js:350-354) AFTER construction, overriding whatever string
+    // `userOpFromStack`'s own positional `panel` argument set — every migrated op's own `feature_canvas` node
+    // needs its OWN `params.panel`, this is not optional decoration. Fixed by adding it below; re-verified live
+    // after the fix (the real popup mock renders inside the tree-mode container).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const bySection = (name) => [...COMM_STRUCT_BINDINGS, ...COMM_VALUESWAP_BINDINGS].filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2605 (Phase 1 step 1) — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes
+            // this twin onto renderUiTree. No classic-shell text to reproduce for THIS twin's own purposes
+            // (`#wiz_comm`, index.html:1103, is a real, still-live classic shell this twin stays unlinked
+            // from) — usage_text written fresh.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    params: { group: 'Communication' },
+                    children: [
+                        { type: 'usage_text', params: { text: 'Shows the operator a popup, a status-bar message, prompts for a numeric input, beeps, or dwells. The right pane previews exactly what the controller screen will show.' } },
+                        { type: 'group_box', params: { title: 'FEATURE CONTEXT' }, children: fieldRefsOf(bySection('FEATURE CONTEXT')) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'ADVANCED' }, children: fieldRefsOf(bySection('ADVANCED')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t2605 (Phase 1 step 2) — a STANDALONE feature_canvas (no adjacent preview3d — commscreen mode
+                // has no 3D view at all): this is the mock controller-screen live preview, not a geometry canvas.
+                // ⚠ ROOT-CAUSED LIVE, not assumed: `registerUserOp`'s own self-heal (`userOps.js:1432`,
+                // `def.panel = resolvePanelMeta(def)`) re-derives `.panel` from the template AFTER construction
+                // — `panelFromStack()` (userOps.js:350-354) finds the FIRST `feature_canvas` block and returns
+                // its OWN `params.panel` (a STRING) or, if absent, `null` — overriding whatever string
+                // `userOpFromStack`'s own positional `panel` arg set, NOT falling back to it. Every OTHER
+                // migrated op's own `feature_canvas` node already carries `params.panel` (e.g. `'form3d+2d'`)
+                // for exactly this reason; this node needs it too, or the def silently loses its `'commscreen'`
+                // panel the instant it's registered (found live: `def.panel` read `null` post-registration,
+                // dispatching `userOpView.js` into the WRONG mode branch — it was mounting a 3D toolpath
+                // preview for a Communication op).
+                RIGHT: [
+                    { type: 'feature_canvas', params: { panel: 'commscreen' } },
+                ],
+            },
+        }],
+        children: commStack(SUPERSET_PARAMS, { superset: true }),
+    }];
     const bindings = [...COMM_STRUCT_BINDINGS, ...COMM_VALUESWAP_BINDINGS];
-    const def = userOpFromStack('comm_data', 'Communication (data)', commDataStack(), bindings, 'commscreen', {}, 'setup_datawiz');
+    const def = userOpFromStack('comm_data', 'Communication (data)', stack, bindings, 'commscreen', {}, 'setup_datawiz');
     def.bindingSpecs = COMM_BINDING_SPECS;   // re-derive the clean scalar sockets BY IDENTITY over the PRUNED stack every build
     def.deriveGuards = commDeriveGuards;     // inject the derived keys → pruneGuards collapses the value-typed forks
     def.postInstantiate = (stack, resolved) => applyCommRecompose(stack, resolved);
