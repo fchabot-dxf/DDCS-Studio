@@ -43,39 +43,58 @@ export const FACING_BINDING_SPECS = [
       label: 'Feed', section: 'TOOL & CUT', default: FACING_DEFAULTS.feed },
 ];
 
-/** The wrapped template: the UI declarations, then the macro itself as the executable children. */
-function facingDataStack(p = FACING_DEFAULTS) {
-    return [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            // t1281 — form3d+2d: the 3D BAR and the half-profile, both. It was form2d, which is why a lathe
-            // wizard had no 3D pane at all — the op could not show the bar because it never declared a place to.
-            // t2301 (BACKLOG 20) — 'panel' removed, 'sim' ADDED: id-collision fix, see centerDrillData.js's own
-            // fuller comment (same reasoning, no existing plain-lathe-cutting-twin precedent to match).
-            { type: 'sim', params: {} },
-            { type: 'layout', params: { kind: 'lathe_profile' } },   // t1273 — the half-profile, not the mill's XY stock
-            {
-                type: 'param_group',
-                // …not "identity": facing HAS no identity fields, and a group named for something that does not
-                // exist would be worse than no group. The first thing a turner needs to say is what to remove.
-                params: { group: 'Facing' },
-                children: [],
-            },
-        ],
-        children: facingStack(p),
-    }];
-}
-
-export const FACING_BINDINGS = deriveBindingsFor(facingDataStack(FACING_DEFAULTS), FACING_BINDING_SPECS);
-
 /** The twin, ready for registerUserOp — a Lathe-group op with a 2D panel and no rotary/machine sim claims. */
 export function facingDataDef() {
+    // t2607 (BACKLOG #71/#72, Phase 1, the sixth axis' pilot) — no bootstrap/final split needed (static shape,
+    // all 4 specs already `match:{type:'assign',var}` by identity — the tree only needs `.param` strings to
+    // build field_refs, not a derived blockIndex), mirroring wcsData.js's own t2605 minimal pattern. Bindings
+    // are still re-derived fresh against the real, final stack below (t2595's own finding).
+    const fieldRefsOf = (specs) => specs.map((b) => ({ type: 'field_ref', params: { param: b.param } }));
+    const bySection = (name) => FACING_BINDING_SPECS.filter((b) => b.section === name);
+    const stack = [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [{
+            // t2607 — wrapped in split_horizontal so hasTreeLayout() (userOpView.js) routes this twin onto
+            // renderUiTree, the SAME mechanism edge/corner/drill/... already use. Facing has no classic shell
+            // (it was born a data-op twin, t1271) — no shell usage_text to reproduce verbatim.
+            type: 'split_horizontal', params: { ratio: '360px:*' },
+            children: {
+                LEFT: [{
+                    type: 'param_group',
+                    // …not "identity": facing HAS no identity fields, and a group named for something that does
+                    // not exist would be worse than no group. The first thing a turner needs to say is what to
+                    // remove.
+                    params: { group: 'Facing' },
+                    children: [
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: fieldRefsOf(bySection('GEOMETRY')) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: fieldRefsOf(bySection('TOOL & CUT')) },
+                        { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
+                    ],
+                }],
+                // t1281 — form3d+2d: the 3D BAR and the half-profile, both. It was form2d, which is why a lathe
+                // wizard had no 3D pane at all — the op could not show the bar because it never declared a place
+                // to. t2607 — preview3d+feature_canvas as ADJACENT RIGHT-pane siblings (Phase 1 step 2, the SAME
+                // adjacency-merge shape every prior migrated op ships, t2511) — byte-identical DOM to the old
+                // combined `sim` node. `layout{kind:'lathe_profile'}` stays alongside: consumed by
+                // layoutSpecFromOp via `def.layout` (self-healed at registration, panelTypes.js:296's own
+                // `latheLayoutSpec` short-circuit) — NOT rendered by the tree (formWidgets.js's own `layout`
+                // branch, t2607, treats it as metadata-only, exactly like a shape_* declaration).
+                RIGHT: [
+                    { type: 'preview3d', params: {} },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    { type: 'layout', params: { kind: 'lathe_profile' } },
+                ],
+            },
+        }],
+        children: facingStack(FACING_DEFAULTS),
+    }];
+    const bindings = deriveBindingsFor(stack, FACING_BINDING_SPECS);
     return withLatheScene(userOpFromStack(
         'lathe_facing',
         'Facing (lathe)',
-        facingDataStack(FACING_DEFAULTS),
-        FACING_BINDINGS,
+        stack,
+        bindings,
         'form3d+2d',
         null,
         LATHE_GROUP,

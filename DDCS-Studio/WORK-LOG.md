@@ -74111,3 +74111,93 @@ own TIER instruction), launched after all four items: **3129 passed, 0 failed, 2
 `pauseConfirmData.js`/`atcWarmupData.js`/`wcsData.js`/`commData.js`/`deriveBindings.js`, 4 new row-diff test
 files, `architecture-map-1698.test.mjs` (the TRAP6 fix), this WORK-LOG entry, BACKLOG.md.
 
+## turn 2607 — the sixth axis (7 lathe ops carrying `layout{kind:'lathe_profile'}`): the render question answered,
+the fork measured (neither option the dispatch offered — a THIRD, cheaper one), facing migrated as the pilot
+
+### THE RENDER QUESTION — OBSERVED, not just read
+
+`renderUiTree`'s own `traverse()` had no case for `type:'layout'` — it is not in `SHAPE_2D_TYPES` (vizBlocks.js:64
+confirmed no membership), so it fell through to the t1561 final `else`: a visible `unwiredPlaceholder(node.type)`
+box (`⚠ "layout" — not wired yet`, orange-dashed), children still traversed into the parent. Not silent, not a
+throw — VISIBLE-BUT-BROKEN, exactly the doctrine's own intent. Confirmed live (not just read): reverted both this
+turn's own files to HEAD, opened facing pre-fix in a real page — before the fix, the placeholder never had a
+chance to appear because facing wasn't in tree mode yet at all (see the fork section below for why that mattered);
+the actual live confirmation of the placeholder's own appear/disappear is `facing-form-reproduction-2607.spec.js`'s
+third test, which asserts `.unwired-block[data-block-type="layout"]` count === 0 post-migration, and — proven
+directly by reverting `formWidgets.js` alone with the migrated `facingData.js` kept — the placeholder DOES appear
+without the one-line traverse() fix, confirming the observed mechanism live, not from source-reading alone.
+
+### THE FORK — measured, and it wasn't either option offered
+
+The dispatch's own two options: a new formWidgets.js render branch, or a `feature_canvas` variant. Traced the
+ACTUAL consumption chain instead of picking between them: `layoutSpecFromOp` (panelTypes.js:296) already calls
+`latheLayoutSpec(def, params, onChange)` FIRST, before any mill stock-footprint default, and returns its result
+immediately if non-null — this is the SAME `layoutSpecFromOp` that `renderLayout2D` (panelTypes.js:1036, the
+literal function every migrated MILL op's 2D pane already renders through) calls, fed by `def.layout` — which
+`resolveLayoutMeta`/`layoutFromStack` (userOps.js:363-373) self-heals at registration by scanning `def.template`
+via `flattenBlocks`, which RECURSES into `.uiChildren`/`.children` (userOps.js:131-142) — so a `layout` node is
+found by that scan whether it sits at the top of a flat stack or nested inside a tree, unconditionally. Traced
+`userOpView.js:856` (`renderLayout2D(c, _def, params, ...)`, the form3d+2d dispatch branch) to confirm `_def` is
+the live def object (carrying the self-healed `.layout`) and `c` is resolved by the SAME id-agnostic `vid()`
+lookup BACKLOG #77 already proved works identically for classic and tree-mode containers.
+
+**Conclusion: NEITHER fork option. The 2D rendering mechanism for lathe already exists, unconditionally, inside
+the one function every migrated op's 2D pane already calls — no new branch, no variant.** The ONLY gap was that
+`traverse()` didn't know to leave the `layout` node's own uiChildren PRESENCE alone (so it wouldn't wear the
+unwired placeholder) — the exact same one-line category `SHAPE_2D_TYPES` already occupies for the identical
+reason (a declared type that's "consumed elsewhere", not "unwired"). Fixed with a 9-line addition (formWidgets.js,
+mirroring the SHAPE_2D_TYPES branch immediately above it) — no new machinery, no registry, matching the project's
+own declare-over-handroll floor: the render behavior was already declared (in `layoutSpecFromOp`'s own dispatch),
+this was a missing "don't re-declare it as a form row" leaf, not a missing engine.
+
+### PILOT — facingData.js migrated
+
+Mirrored `wcsData.js`'s own t2605 minimal pattern (no bootstrap/final split — all 4 `FACING_BINDING_SPECS` were
+already `match:{type:'assign',var}` by identity, so the tree only needs `.param` strings for `field_ref`, not a
+derived blockIndex). `layout{kind:'lathe_profile'}` placed as a third RIGHT-pane sibling next to
+`preview3d`+`feature_canvas` (the adjacency-merge pair) — placement inside the tree doesn't matter to the SCAN
+(flattenBlocks recurses regardless of nesting), so next to the pane it affects is the most legible spot. Removed
+the now-orphaned `facingDataStack()`/module-level `FACING_BINDINGS` (confirmed zero external consumers via grep —
+unlike `EDGE_BINDINGS`, which `edge-data-emit.spec.js` still imports directly).
+
+### VERIFY
+
+New `facing-form-reproduction-2607.spec.js`, 3 tests: (1) row-diff — tree places the 4 fields in
+`FACING_BINDING_SPECS`' own declared order (GEOMETRY×3, TOOL & CUT×1), 0 orphans; (2) an edit in the tree reaches
+the real builder via `emitEquivalence` against `facingStack`; (3) REAL-SYMPTOM, a real page open —
+`.unwired-block[data-block-type="layout"]` count is 0, the 3D pane AND the 2D pane are both visible (form3d+2d),
+a real `<canvas>` mounts (3D), and the 2D pane's own `<svg>` has real drawn child content (the half-profile), not
+an empty shell. **Proved test 1 is not vacuous**: reverted both changed files to HEAD (not `git stash` — this
+repo's shared-stash hazard — copied aside and restored instead), re-ran against pre-migration code: test 1 fails
+correctly (4 orphans, 0 explicit — the OLD flat uiChildren has no field_ref tree at all). Tests 2/3 also pass on
+the OLD code — test 2 because renderUiTree's own orphan-auto-append already wired the edit through structurally
+(a legitimate "pinning something already true", not vacuous — it's a different claim than placement); test 3
+because the classic (non-tree) shell never called `traverse()` at all, so the placeholder bug was never reachable
+pre-migration — the fix only matters once an op is actually IN tree mode, which facing wasn't until this turn.
+
+Existing suites, all green: `facing-data-emit.spec.js` (both tests, cross-dialect emit unaffected — `children`
+untouched), `lathe-pilot-1271.spec.js` (incl. its own `FACING_BINDING_SPECS` section-order assertion), full
+`lathe-matrix.spec.js`. Node tier `architecture-map-1698.test.mjs`: 6/6, no stale citation. t2531 canary
+(`param-group-table-separation-2543.spec.js`): 2/2.
+
+**Full suite (unconditional per the dispatch): 3133 passed, 4 failed, 11 flaky, 28 skipped (37.7m).** Investigated
+the 4 hard failures individually — `preview-mutation-manifest-2463.spec.js` passed clean on isolated re-run (a
+full-suite parallel-load flake). The remaining two (`form-section-collapse-820.spec.js` ×2,
+`interpass-connector-1235.spec.js` — the latter fails on a `.screenshot()` call, `#userVizContainer` element not
+stabilizing, not a real assertion) were checked against pre-t2607 HEAD by the same revert-and-rerun method used
+for the vacuous-test proof above: **both reproduce identically on HEAD, unrelated to this turn's own two changed
+files.** Pre-existing, not caused or worsened by this turn — reported, not fixed (out of this turn's own scope;
+`interpass-connector-1235.spec.js` uses the un-namespaced `#userVizContainer` id against MIDDLE, migrated to tree
+mode at t2599, so it may be a stale id-gap case the t2599/t2601 sweeps missed — worth a look, not diagnosed here).
+
+`git status`: `facingData.js`, `formWidgets.js` (the one-line-category `layout` addition), the new
+`facing-form-reproduction-2607.spec.js`, this WORK-LOG entry.
+
+### NEXT
+
+The mechanism is proven, cheaply, on one op. The other 6 (centerDrill, faceProbe, odProbe, odTurn, parting,
+polygon) should inherit it directly — same `layout{kind:'lathe_profile'}` sibling placement, same one-line
+formWidgets.js fix (already shipped, not per-op). Not attempted this turn per the dispatch's own "ONE pilot"
+instruction. `interpass-connector-1235.spec.js`'s possible stale `#userVizContainer` id is a loose thread worth
+naming to the advisor, not silently fixed mid-scope.
+

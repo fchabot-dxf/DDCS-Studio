@@ -1839,6 +1839,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // t1627 — a declared 2D shape is WIRED, and its rendering IS the feature canvas (layoutSpecFromOp
                 // consumes it from the template). It has no form-row body, so the tree face renders nothing here —
                 // this is a consumed type, not an unwired one, and must not wear the t1561 placeholder.
+            } else if (node.type === 'layout') {
+                // t2607 (BACKLOG #71/#72, the sixth axis) — SAME category as SHAPE_2D_TYPES just above, for the
+                // SAME reason: a lathe op's `layout{kind:'lathe_profile'}` node is consumed by layoutSpecFromOp
+                // (panelTypes.js:296, `latheLayoutSpec` short-circuits before the mill stock-footprint default) —
+                // via `def.layout`, self-healed at registration by resolveLayoutMeta/layoutFromStack scanning
+                // def.template (flattenBlocks recurses into uiChildren, so this node is found there regardless of
+                // nesting). The feature_canvas sibling this node sits beside already renders the SAME SVG pane
+                // every migrated mill op's 2D layout uses — no new render branch exists for lathe, because none
+                // is needed. This node's own tree presence is metadata-only, exactly like a shape_* declaration.
             } else {
                 // t1561 — REFUSE, don't silently flatten. A block type this function does not (yet) know how to
                 // render used to fall through here and traverse straight into the PARENT container — the block's
