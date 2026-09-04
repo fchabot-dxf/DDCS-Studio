@@ -40,7 +40,14 @@ function readState(page) {
             }
             bbox = { w: Number.isFinite(mxx - mnx) ? mxx - mnx : 0, h: Number.isFinite(mxy - mny) ? mxy - mny : 0, n: segs.length };
         }
-        const status = (document.getElementById('userVizStatus') || {}).textContent || '';
+        // t2619 — [id*="userVizStatus"] (not a bare #userVizStatus), the SAME id-gap class
+        // interpass-connector-1235.spec.js was fixed for at t2611: text went tree-mode this turn, whose own
+        // status element is namespaced `userVizStatus_tree` (formWidgets.js's own nsId). A `blk_userVizStatus`
+        // Blocks-tab variant sits inert in the DOM regardless of active tab (t2611's own finding) — picking the
+        // first VISIBLE match (not just the first DOM match) is what disambiguates it here, since this is a
+        // plain status span, not a container `:has()` can filter by drawn content.
+        const statusEl = [...document.querySelectorAll('[id*="userVizStatus"]')].find((e) => e.offsetParent !== null);
+        const status = (statusEl || {}).textContent || '';
         return { fcPaths, handles, moveHandles, bbox, status };
     });
 }

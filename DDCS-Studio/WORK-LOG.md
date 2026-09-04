@@ -74652,3 +74652,133 @@ specs), this WORK-LOG entry.
 tap/contour/text stay parked (measured, ready, not migrated — per the dispatch's own explicit "still keep").
 pocket/slot stay HARD, corner stays deferred — untouched this turn, as instructed.
 
+## turn 2619 — THE section: QUESTION, answered by measurement (do not implement, per the dispatch): far from
+vestigial, load-bearing in three distinct, measured ways. THEN tap + text converted and migrated, both verified
+static-shape live (no `nth` needed), the cross-op guard now 28/28. A genuine id-gap regression caught and fixed
+by rule 17's own census, live.
+
+### THE section: QUESTION — measured, not argued, nothing implemented
+
+**Claim under test**: in tree mode, `field_ref` placement decides row position and `binding.section` is never
+consulted for it — `renderOpForm` groups by section into a detached `tempHost` and that grouping is thrown
+away, leaving `sectionizeFor`'s own distinct-value COUNT as `section:`'s one surviving live job.
+
+**Confirmed TRUE for `renderUiTree` itself** — read `traverse()` in full: it never touches `binding.section`
+anywhere. Confirmed by construction: `field_ref` relocates a pre-built row via `container.appendChild`, and the
+wrapping `.form-sec` div `renderOpForm` built it inside (in the scratch host) is never carried along — only the
+bare row moves.
+
+**But this is not the whole picture, measured three more ways, each changing the answer:**
+
+1. **A THIRD render surface exists and IS live**: `ui/userOpForm.js`'s `openUserOpForm`/`insertUserOp` — "the
+   generic param form (wizard-maker insert form)", exposed as `window.ddcsInsertUserOp`, wired from
+   `commandDeck.js`'s own `wizItemOnclick` (`app.js:167`, `commandDeck.js:92`). It calls `renderOpForm` DIRECTLY
+   into a REAL, permanent overlay — full section chrome, full `SECTION_RANK` ordering, not thrown away.
+2. **It is reachable for a real, measured SUBSET of ops on their PRIMARY insert path.** `wizItemOnclick`
+   (`commandDeck.js:82-92`) routes a user op's menu click to `ddcsInsertUserOp` (the flat form) UNLESS
+   `def.panel` is exactly `'form2d'` or `'form3d+2d'` — any op with `panel:'form3d'`/`'form'`/`'commscreen'`
+   gets the flat quick-insert form on a FRESH menu insert, full stop. Measured live (opened every tree-mode op,
+   read its own `def.panel`): **10 of 26 tree-mode ops are DUAL-RENDER** — atc_warmup/atc_length/atc_check/
+   atc_test/atc_change/atc_table/wcs/comm/io_step/pause_confirm. For these, `.section` is NOT reduced to a
+   count — it is the primary, full-chrome, full-order mechanism on the path a user actually hits first.
+   `openForEdit` (`wizardManager.js:401`, re-editing an ALREADY-PLACED op) always calls `this.open(opType)`
+   directly, bypassing `wizItemOnclick` entirely — so these 10 ops genuinely render BOTH ways depending on
+   fresh-insert vs re-edit, confirmed by reading the real routing code, not inferred from behavior.
+   **Consequence checked, not assumed**: since t2611/t2617 already made `sectionizeFor`/`SECTION_RANK` the ONE
+   shared source both `renderOpForm` and the tree's `group_box` default consult, and the cross-op guard already
+   confirms every tree order matches the real `renderOpForm` output — the two renders are CURRENTLY consistent
+   for all 10. That consistency is a property of this turn's own prior fixes, not something `.section` being
+   "vestigial" would have produced on its own.
+3. **`.section` is the mechanism EVERY migrated op's own def-construction code reads to correctly BUILD the
+   tree in the first place.** Exhaustive grep, `.section ===` across `web/blocks/dataOps/`: every single migrated
+   op's own `bySection('X')`/`.filter(b => b.section === 'X')` helper — the thing that turns a flat bindings
+   array into the correct `fieldRefsOf(...)` set for each declared `group_box` — reads `.section` directly.
+   This consultation happens at JS-authoring/build time (inside each `xxxDataDef()`), not inside `renderUiTree`
+   at runtime — which is exactly why it didn't show up when tracing `traverse()` alone. Dropping `.section`
+   would not leave a single harmless vestige; it would break every migrated op's own construction code
+   (`bySection` calls returning nothing) at the SAME time as the flat quick-form's chrome/order (item 1) and
+   the fold-threshold count (the owner's own named job).
+
+**Direct answer**: `.section` should NOT be dropped. It is genuinely load-bearing in three separate, measured
+ways — one of them (the dual-render quick-insert form) reaching 10 of 26 migrated ops on their PRIMARY, most
+common user path, which the dispatch's own framing had not accounted for. The "one live job" framing undersold
+it because it was reasoning from `renderUiTree`'s own code, which is accurate but incomplete — the same shape
+of miss this session has now named three times (rule 17's own genesis).
+
+**The fold-count question, answered directly**: yes, `sectionizeFor` COULD be rewritten to count `group_box`
+NODES from the tree instead of distinct `binding.section` VALUES — and per rule 20 (duplicates legal, don't
+merge), counting NODES would be the more correct semantic (two same-titled boxes should count as 2, not
+collapse to 1). Measured: 0 current ops have duplicate-titled boxes, so this divergence has zero reach today —
+a real, small hardening worth naming, not an active bug. **Not implemented, as instructed** — this is a report,
+not a fix.
+
+### TAP + TEXT — converted, migrated, both verified static-shape LIVE (not estimated)
+
+Read both stack builders directly before converting anything. `tapStack` (`wizards/stacks/tapWizard.js`):
+`[progstart, wcs, placeonstock{ tap }, progend]` — every block type (`wcs`/`placeonstock`/`tap`) appears
+exactly once. `textStack` (`wizards/stacks/textWizard.js`): `[comment, comment, progstart, placeonstock{
+stepdown{ filltext } }, progend]` — every relevant type (`placeonstock`/`stepdown`/`filltext`) likewise exactly
+once. **Both confirmed clean: no `nth` needed anywhere in either file** — the dispatch's own open question
+("whether either has one is still UNVERIFIED") is now closed for both, not just tap.
+
+Converted `blockIndex: 1/2/3` (tap) and `blockIndex: 3/4/5` (text) to `match:{type:'wcs'|'placeonstock'|'tap'}`
+/ `match:{type:'placeonstock'|'stepdown'|'filltext'}`. Migrated both onto the declared tree, following the
+established two-phase (bootstrap-stack-for-field-order, final-stack-for-shipped-bindings) pattern since both
+also assemble `toolBindingsFor`/`entryBindingsFor` (already identity-based) alongside their own converted specs.
+
+- **tap**: sections IDENTITY-free (GEOMETRY, TOOL & CUT only, per its own t2401 comment — "no which-variant
+  selector"), declared in canonical `SECTION_RANK` order from the start. No classic shell (`wiz_tap` retired) —
+  own standalone spec, `tap-form-reproduction-2619.spec.js`, mirroring facing's own t2607 pattern.
+- **text**: HAS a real classic shell (`#wiz_text`, index.html:820-857) — the pre-existing shared-harness spec
+  (`text-form-reproduction-2377.spec.js`) just needed `mode:'flat'` removed (defaults to `'tree'`), mirroring
+  `surfacingData.js`'s own t2545 precedent exactly (same situation, same fix). Added the missing `usage_text`
+  node (reproduced verbatim from the shell — the harness's own "usage/title match the shell" check caught its
+  absence immediately, live, not a silent gap). `path_anchor` placed first in the LEFT pane's children,
+  mirroring surfacing's own t2271/t2545 placement (the arc's pilot for this exact node type — no new mechanism
+  needed). `TEXT_BINDINGS`'s own export kept alive (⚠ pattern, same as `EDGE_BINDINGS`) — `text-as-data.spec.js`
+  imports it directly; content is now the raw specs array (match-based, no `.blockIndex`) since the registered
+  def's own resolved bindings (which `deriveBindings` always concretizes regardless of `match` vs hand-typed
+  `blockIndex`) supply what that test's own primary lookup path needs.
+
+**A genuine regression caught by rule 17's own census, live, not assumed clean**: `text-atom-708.spec.js`'s own
+`readState()` read `document.getElementById('userVizStatus')` — the bare, classic id. Text going tree-mode this
+turn namespaces it `userVizStatus_tree`, so the lookup silently returned `null` → empty string, and the
+width-honesty test failed with `Received: ""`. The EXACT id-gap class `interpass-connector-1235.spec.js` was
+fixed for at t2611 (a `blk_userVizStatus` Blocks-tab variant sits inert in the DOM regardless of active tab, so
+a bare substring match isn't enough) — fixed with the same disambiguation shape, adapted for a plain status
+span rather than a container: pick the first VISIBLE match (`offsetParent !== null`), not just the first DOM
+match. Proven not vacuous by direct observation (failed before the fix, passed after — witnessed both states
+in the same investigation, not inferred).
+
+### VERIFY
+
+Cross-op section-order guard (`section-order-parity-2617.spec.js`): 28/28 tree-mode ops (26 prior + tap + text)
+pass — both new migrations declared canonical order from the start, neither tripped it. Node tier: 238/238.
+tap's own rule-17 census: 13 files, 46 tests, all green. text's own rule-17 census: 20 files, 71 tests, all
+green (1 genuine failure found and fixed — the `userVizStatus` id gap above — proven not vacuous, re-run clean).
+
+**Full suite via `npm test`: 3162 passed, 2 failed, 7 flaky, 28 skipped, e2e exit 1.** Both failures named and
+individually investigated, not waved through on count alone:
+- `preview-mutation-manifest-2463.spec.js` — the SAME pre-existing load-dependent flake classified at every
+  prior gate this session (t2609/t2611/t2613/t2615/t2617); unrelated, touches surfacing's own sf_pos handle.
+- `form-kernel-720.spec.js` › `(e) form integrity` — **NEW this run**, absent from every one of the last 3 full
+  gate logs (t2613/t2615/t2617), so checked properly rather than assumed pre-existing. Re-ran isolated,
+  single-worker, TWICE: passed clean both times (~53s each). This turn touched no shared/core file at all (only
+  `tapData.js`/`textData.js`, confirmed via `git status` — `formWidgets.js` untouched this turn, unlike t2617).
+  The test itself iterates EVERY registered twin sequentially with an 8s-per-op `waitForSelector` — tap+text
+  now add 2 more ops to that loop (28 vs the prior 26), extending its own cumulative runtime under the full
+  suite's 4-worker contention (this repo's own extensively-documented w4/w6/w8 sensitivity,
+  `playwright.config.js`'s own comment). Classified as a contention-class timeout, not a structural regression
+  from either migration — but reported plainly as a NEW appearance, not silently folded into "the usual flake",
+  since the evidence for causation is mechanical/plausible, not proven the way the sf_pos flake's history is.
+
+`git status`: `web/blocks/dataOps/tapData.js`, `web/blocks/dataOps/textData.js`, `tests/text-atom-708.spec.js`
+(the id-gap fix), `tests/text-form-reproduction-2377.spec.js` (mode switch), 2 new test files
+(`tap-form-reproduction-2619`, `text-canvas-mount-2619`). No other files changed — the `section:` investigation
+produced findings, not code.
+
+### NEXT
+
+contour stays last of the three conversion-tier ops (5 distinct blocks, per the dispatch's own metric) — not
+attempted this turn. pocket/slot stay HARD, corner stays deferred.
+

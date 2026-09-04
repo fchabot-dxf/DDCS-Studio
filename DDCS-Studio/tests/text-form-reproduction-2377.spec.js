@@ -1,16 +1,16 @@
 import { registerFormReproductionSuite } from './support/formReproduction.js';
 
 /**
- * WIZARDS-AS-DATA — t2377: the arc's FOURTH and LAST `mode:'flat'` reproduction (text), completing the mill
- * family (drill, pocket, contour, slot, surfacing, text — all six now ratcheted). Text was flagged as the
- * hard one going in: ZERO of its bindings carried `section:` before this turn, AND its bindings assemble
- * from THREE sources at textData.js's own assembly line — `toolBindingsFor(stack)` + `TEXT_BINDINGS` +
- * `entryBindingsFor(stack)`, the first and third SHARED across every mill-family wizard via
- * `deriveBindings.js`. Per Rule 1b (AGENTS.md, added after t2371's own near-miss), `deriveBindings.js`
- * itself was NOT touched — `toolNum`'s and `entryX`/`entryY`'s own section values are overridden LOCALLY via
- * `.map()` inside `textDataDef()`'s own assembly, the exact technique t2375's contour fix and this same
- * turn's surfacing fix both already used successfully. See textData.js's own header comment above
- * TEXT_EXEC_BINDINGS for the full account.
+ * WIZARDS-AS-DATA — t2377 gave text real `section:` metadata (reproduced via `mode:'flat'`, since text was
+ * flat-rendered live at the time — the fourth and last `mode:'flat'` reproduction, completing the mill family
+ * alongside drill/pocket/contour/slot/surfacing). t2619 (BACKLOG #71/#72, the conversion-tier pair) converted
+ * text's own hand-counted `blockIndex` bindings to identity-based `match:{type}` and moved it onto the declared
+ * `split_horizontal`/`group_box`/`field_ref` tree — switched to `mode:'tree'` (the shared default drill/pocket/
+ * surfacing already use) to test the REAL render path rather than silently keep exercising the now-bypassed
+ * flat one, mirroring surfacing's own t2545 precedent exactly (see that file's own comment for the same
+ * reasoning). EXPECTED_ORDER is UNCHANGED from t2377: the four `group_box`es place every field explicitly (see
+ * textData.js's own `fieldsOf`/tree declaration), so there are still zero orphans — same claim as flat mode's
+ * own "every bound field renders somewhere", now proven through the tree instead.
  *
  * EXPECTED_ORDER is hand-derived from index.html's own `#wiz_text` shell (lines 820-857): TEXT (text,
  * height, strokeWidth, width, slant, [hidden x/y], originX, originY, offZ, [hidden stock fields], spacing)
@@ -44,7 +44,6 @@ const EXPECTED_ORDER = [
 ];
 
 registerFormReproductionSuite({
-  mode: 'flat',
   wizardLabel: 'text',
   dataModule: '/blocks/dataOps/textData.js',
   defFactory: 'textDataDef',
