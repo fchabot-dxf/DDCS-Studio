@@ -1879,3 +1879,35 @@ value in an H slot is exactly the latent hazard §17/§22 chased.
 than a real touch, so the mismatch is probably a stale input, not a bad reference — **but it is not proven.**
 ⇒ ⛔ The physical check is the only real one, and it is the documented one: **jog to `G54 Z0`; the tip should
 sit on the spoilboard.** Off by ~2× means the sign is flipped. Do that before trusting a tool change.
+
+### 32. ⛔⛔ A RUNNING OR PAUSED MACRO'S WRITES ARE NOT VISIBLE OVER MODBUS UNTIL IT COMPLETES `[CONFIRMED 2026-08-26]`
+`CALIBRATE.nc` was run. It computes `#2500 = [#34 - #36]` and only THEN puts up a `#1505` dialog. While it
+sat at that dialog, waiting for Enter:
+
+```
+#2500  read 0.0000        #1927  read 0.0000
+```
+After Enter — the macro completing, nothing else changing:
+```
+#2500  read -1.9204       #1927  read -70.2480
+#1927 - #1430 = -70.2480 - (-68.3276) = -1.9204  == stored #2500   ✓ exact
+```
+⇒ The store had ALREADY executed, two lines before the dialog. **The values were simply not readable yet.**
+
+⭐ **Contrast with a single INJECTED line, which commits immediately** — `#631 = 3` was readable at once (§30).
+⇒ The rule is not "macro writes are slow"; it is **"an in-flight macro's state is not exported."**
+
+⚠⚠ **THIS CONSTRAINS JOB TRACKING, and it is the useful half.** Live POSITION tracks continuously during
+motion (§29) — that is unaffected. But **any variable a running program maintains reads STALE**, so a progress
+design that polls a macro-kept counter or cursor will silently read the value from before the program started.
+⇒ ⛔ Build progress on POSITION and the state register, not on variables the program writes.
+
+### ⚠ AND THE PROCESS LESSON, because it recurred four times in one day
+Read `#2500 = 0`, I declared the calibration had failed and asked the owner what had gone wrong. Nothing had.
+The owner then said: *"the dialogue appeared but i didnt press enter before i said i ran calibrate."*
+
+That is the **fourth** time on 2026-08-26 that a real measurement was read correctly and its SIGNIFICANCE was
+called wrong: the probe-set tool offset being non-zero (that is what tool offsets are FOR), the unset Z−
+soft limit (the one bound whose value changes per job), the "stale setting file" (two readings from different
+moments), and this. ⇒ ⭐ **Every one dissolved when the owner supplied ordinary context the measurement could
+not carry.** ⛔ Before calling a reading a fault, ask what was happening at the machine when it was taken.
