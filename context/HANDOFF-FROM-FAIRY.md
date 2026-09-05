@@ -364,3 +364,53 @@ cost four lines of G-code.** Worth the reflex next time: *which moment did each 
 | Do `.break0`/`.break1`/`processing` update **during** a run? | a program running, human present. Baselines committed at `bench/` |
 | Flash `2026-08-03-00`? | after the reboot result, as its own step |
 | Gateway `workOrigin.z` is missing the tool-table term | ⭐ **RENDERRANCHY's** — unblocked, nothing gating it |
+
+---
+
+# ⏸ PAUSE STATE — Fairy, 2026-09-05. **Read this one; the block above is provenance.**
+
+## 1. THE MACHINE — safe, nothing mid-test
+`READY`, green strip, `MPG`, `V21_dwell.nc` loaded but not running, no motion all session. Only a scratch
+macro variable was written. Photographed at pause. Safe to power down.
+
+## 2. ⛔⛔ EMIT HAZARDS — **THIS IS THE PART THAT AFFECTS THE APP**
+All measured on the Expert today, all camera-verified against the pendant.
+
+| | |
+|---|---|
+| ⛔ **THERE IS NO POWER OPERATOR** | `^` **and** `**` both raise `syntax error!` (both photographed). ⇒ **any emitted exponentiation must become repeated multiplication.** Worth grepping the emit paths |
+| ⛔ **`MOD` is a syntax error** | photographed. Do not emit it |
+| ⭐ **arguments are in DEGREES** | `COS[90]`→0, `SIN[90]`→1, `TAN[45]`→1, `ATAN[1,1]`→45. **Never established here before, and it silently changes every emitted arc** |
+| ⭐ **`ATAN[y, x]` comma form re-confirmed** | `ATAN[1, 2]` = **26.565**, independently reproducing §V13's `ATANC=2657` by a different route. ⚠ **The §V13 app-side fix is still RENDERRANCHY's and still pending** — `data/probeToSlot.js:538` and `wizards/alignmentWizard.js:158` still emit the slash form, which this controller rejects |
+| ✅ confirmed working | `SQRT` `COS` `SIN` `TAN` `ABS` `ROUND`(rounds) `FIX`(truncates), and **all six** of `EQ` `NE` `LT` `GT` `LE` `GE` |
+
+## 3. ⭐⭐ THE G-CODE INJECTION CHANNEL IS LOSSY — ~25% OF FRAMES NEVER ARRIVE
+If anything app-side is ever built on register 3000, **it must check the FC16 acknowledgement and resend.**
+Perfect correlation over 18 writes: 13 landed all had a valid ack, 5 lost all had none — the controller never
+received them. Immune to pacing and to bus quiet time; latency is bimodal, **~440 ms or never**.
+⇒ **A multi-line sequence sent blind will usually be missing a line, with no error anywhere.**
+A lost line leaves the variable at its **previous** value, which reads as a plausible answer.
+
+## 4. ⭐⭐ THE PC CAN NOW SEE THE CONTROLLER'S ERROR STATE — VIA A CAMERA
+The error state is **in no register** (a differential sweep of the whole macro mirror, before and after a
+deliberate error, changed nothing). It is only on the pendant: the top-bar cell (`READY` → red `ERROR`) and
+the bottom strip (green → red, **quoting the offending line verbatim**). A USB webcam reads it —
+`camera-vision` skill, **index 1**. ⇒ Fairy no longer has to ask the owner whether something failed.
+⚠ `~/.claude/skills/` does not exist on this seat, so the skill cannot auto-load; it was reached by its
+canonical `Apps/fred-skills` path and needs its per-skill symlink.
+
+## 5. ⚠ WHAT I GOT WRONG — five retractions in one session, all one root cause
+`NE` "broken"; a whitespace-around-operators "rule"; `[3*3]` a "syntax error"; `**` a "silent no-op"; `#915`
+"refuses writes". **Every one came from a lost frame leaving a stale value that I read as a measurement.**
+⭐ **The rule that came out of it:** on this channel a **negative** result (rejected / no-op / refuses) is
+worth nothing without either an acknowledged frame or a photograph of the pendant. **Positives were never at
+risk** — a lost frame cannot invent a correct answer for a specific expression, and the whole operator table
+reproduced 10/10 after the fix.
+
+## 6. STILL OPEN
+| question | needs |
+|---|---|
+| ⭐ **Is `#279` (poll vs slave mode) the real fix for the 25% frame loss?** Every ack arrives behind 6–11 bytes of junk that is not ours, and the controller is a Modbus **MASTER** by default — its own polling frames colliding with ours would explain everything. The junk is measured; the attribution is a **hypothesis** | Fairy, machine on. Changing `#279` needs a reboot to take effect |
+| `G10 L20` — the only item in `bench/05` that moves an axis | human at the machine |
+| `bench/04-modbus-slave-test-plan.md` | written, never run |
+| Gateway `workOrigin.z` missing the tool-table term | ⭐ **RENDERRANCHY's**, still unblocked |
