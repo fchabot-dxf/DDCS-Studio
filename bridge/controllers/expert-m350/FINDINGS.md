@@ -2576,3 +2576,37 @@ non-delivery cannot produce either.
 ⚠ **The one figure that WAS published wrongly: "~25% random frame loss."** It came from the broken tool and
 should not be relied on. Superseded above; flagged here because it was pushed and the other seat may have
 read it before the correction.
+
+### ⭐ THE `[3+3]` MYSTERY, AS FAR AS IT GOES — **DELIVERY IS PROBABILISTIC AND CONTENT-DEPENDENT** `[MEASURED 2026-09-05, mechanism UNKNOWN]`
+Scanned all 100 `#916 = [a+b]` lines for FC16 acknowledgement, then repeated the interesting ones 5× each.
+
+⭐ **It is not deterministic-vs-random. It is a CONTINUUM of delivery probability, set by the line's bytes:**
+
+| line | delivered | |
+|---|---|---|
+| `[3+3]` `[3/3]` `[3-3]` `[0+7]` `[4+4]` `[7+0]` `[8+1]` `[0/7]` | **0/5** | never |
+| `[3*3]` `[4+1]` | 1/5 | almost never |
+| `[8+4]` | 2/5 | |
+| `[0+5]` `[4+8]` `[1-8]` `[1/8]` | 3–4/5 | |
+| `[2+4]` `[4+7]` `[0+0]` `[1*8]` `[1+6]` | **5/5** | always |
+
+⛔ **THREE CRC THEORIES WERE PROPOSED AND ALL THREE REFUTED BY PREDICTION** — each was tested on expressions
+never previously run, which is the only way this is worth anything:
+1. *CRC low byte ∈ {0xFB, 0xFF}* → 7/10, and `0xFB`/`0xFF` each appear in both a failure and a pass.
+2. *CRC low byte has a nibble == 0xF* → 90/100 but **nine false alarms** (`[4+7]` `0x0F`, `[0+0]` `0x4F` both deliver).
+3. *CRC low byte ≥ 0xFA* → 6/9; `[0-7]` `0xFE` and `[0*7]` `0xFF` deliver 4/5, `[3*3]` `0xFA` delivers 1/5.
+
+⇒ Each rule carved a threshold through a gradient, so it fitted the sample it was built from and failed on
+fresh data. ⭐ **The mechanism is genuinely unknown** and is left that way deliberately rather than fitted a
+fourth time. It smells like signal integrity — some byte patterns survive the wire far worse than others —
+but nothing here establishes that, and the earlier "~25% random loss" and "deterministic per line" framings
+are BOTH wrong: it is one phenomenon with a per-line probability.
+
+⚠ **Also corrected:** the single-shot scan's 11 "undelivered" included `[0+3]` and `[1+6]`, which are 5/5 on
+repeat. **One observation cannot classify a line** — anything quoting a delivery rate needs repeats.
+
+### ⇒ IT DOES NOT NEED TO BE SOLVED TO BE SAFE
+The ACK **detects** it and retrying **defeats** it: retry the identical line, then a byte-different variant
+(a trailing space). `tools/macro_probe.py` does both, and the full 20-value record re-verified 20/20 through
+it. ⛔ **Any future user of register 3000 must do the same** — at these rates a blind multi-line sequence will
+lose lines, and the lost ones produce no error anywhere.
