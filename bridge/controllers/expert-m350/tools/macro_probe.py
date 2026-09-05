@@ -79,9 +79,13 @@ def inject(s, text, settle=0.9, tries=6):
     # effect is monotonic in length (32 mixed, 48 mostly, 64 clean). Trailing spaces are semantically
     # inert here. ⚠ It fixes THAT CLASS ONLY -- background loss over 20 random lines moved 82% -> 87%,
     # so the ack-retry below is still required. The vendor's 246 bytes is a MAXIMUM, not a required size.
-    if len(text) < PAD_TO:
-        text = text.ljust(PAD_TO)
-    payload = (text + "\n").encode("ascii")
+    # ⛔⛔ NO TRAILING NEWLINE, AND NO PADDING. SOLVED 2026-09-05 -- this was the whole "[3+3] never
+    # delivers" mystery. The vendor's own tool (m350_liveg.py::send_gcode_process) sends
+    # `gcode_str.encode('ascii')` with NO terminator. We appended "\n" from the first experiment and never
+    # questioned it. Measured: with "\n", `#916 = [3+3]` executed 0/5; without it, 5/5 -- same for [4+4],
+    # [0+7], [7+0], [8+1]. The 64-byte padding only ever "worked" because it changed the length enough to
+    # dodge the symptom; it is not a fix and is no longer applied.
+    payload = text.encode("ascii")
     if len(payload) > MAX_PAYLOAD:
         raise SystemExit("%d bytes exceeds the firmware's %d-byte limit" % (len(payload), MAX_PAYLOAD))
     if len(payload) % 2:

@@ -2852,3 +2852,39 @@ counters. `[TO TEST: confirm it becomes non-zero during an actual move — needs
 The five known-bad lines, 5 attempts each, unpadded: **`0/5` with our framing, `0/5` with no `\n`, `0/5`
 with no `\n` + `flush`.** ⇒ Neither the terminator nor the flush affects delivery. **Payload LENGTH remains
 the only lever that works** (pad to 64 ⇒ 5/5). The vendor's own tool would hit this too.
+
+## ⭐⭐⭐ SOLVED — THE `[3+3]` MYSTERY WAS **OUR TRAILING NEWLINE** `[CONFIRMED on machine 2026-09-05]`
+
+⛔ **The vendor's tool sends NO terminator.** `m350_liveg.py::send_gcode_process`:
+```python
+raw_bytes = gcode_str.encode('ascii')      # <- no "\n", ever
+if len(raw_bytes) % 2 != 0: raw_bytes += b'\x00'
+```
+We appended `"\n"` in the very first injection experiment and never questioned it again.
+
+| payload, 5 attempts, **executed** | with `\n` | **without `\n`** |
+|---|---|---|
+| `#916 = [3+3]` | **0/5** | ⭐ **5/5** |
+| `#916 = [4+4]` | 0/5 | 3/5 |
+| `#916 = [0+7]` | 0/5 | ⭐ 5/5 |
+| `#916 = [7+0]` | 0/5 | ⭐ 5/5 |
+| `#916 = [8+1]` | 0/5 | ⭐ 5/5 |
+
+⇒ **Every "impossible" line executes once the newline is removed.** `tools/macro_probe.py` now sends the
+payload raw, and a 10-expression battery ran **10/10 with no padding and no retries needed**.
+
+### ⛔ WHAT THIS RETRACTS — MOST OF ONE DAY'S "FINDINGS"
+1. **"Pad to 64 bytes"** — not a fix. It only changed the length enough to dodge the symptom. **Removed.**
+2. **"Certain exact byte sequences are deterministically undeliverable"** — there is no such class. It was
+   one bug with a length-dependent presentation.
+3. **Three CRC hypotheses** — all were curve-fitting to an artifact of our own payload construction.
+4. **"~25% random frame loss"** — inflated by the same cause. ⚠ Some background loss remains (`[4+4]` at
+   3/5), so **the ack-retry stays**, but the headline figure was never a property of the link.
+
+### ⛔⛔ AND THE PROCESS FAILURE, WHICH IS THE REAL LESSON
+**The reference implementation was public the entire time.** `M350-LiveG` is the vendor's own PC tool for
+this exact register, its source is one file in a public repo, and it answers the question in five lines.
+⇒ **Hours went into scope-free hypothesis testing against a spec that could have been read.**
+⭐ Owner, repeatedly, and correctly: *"did you read all the docs?"* · *"maybe it's another baud altogether"*
+· *"obviously if you're looking at outdated docs it's meant to go bad."* **Read the reference
+implementation before characterising a transport.**

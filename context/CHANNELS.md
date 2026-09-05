@@ -103,7 +103,12 @@ Machine: **DDCS Expert M350 V1.1, firmware `2026-09-02-00`**, RS232 port 2, 1152
 ⚠ Every claim below is measured on that machine, with the pendant photographed. Send via a GitHub issue on
 **foinnc/M350** or **foinnc/M350-LiveG** — he is active there (both repos updated 2026-09-02).
 
-### ⭐⭐ Q1 — THE ONE THAT MATTERS: some exact payloads to register `3000` are NEVER acknowledged
+### ⛔ Q1 — **WITHDRAWN 2026-09-05. DO NOT SEND.** This was OUR bug, not the firmware's.
+⭐ **Cause: we appended a trailing `
+` to the payload.** `M350-LiveG` sends none. Without it, every
+"undeliverable" line executes 5/5. Kept below only as the record of what was measured and eliminated.
+
+#### ~~some exact payloads to register `3000` are NEVER acknowledged~~
 Writing `#916 = [3+3]` (FC16, reg 3000, ASCII, byte-swapped per pair, as `M350_LiveG` does) is **never
 acknowledged** — 0 of 5, every time, no reply at all. The controller never receives it, so nothing executes
 and no error appears on the screen. But **any byte-level variation of the same expression works**:
