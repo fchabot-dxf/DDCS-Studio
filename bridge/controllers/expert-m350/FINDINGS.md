@@ -2980,3 +2980,15 @@ Three signals, all live over Modbus, no SMB polling:
 ⇒ **`16062` ÷ total lines = a genuine progress bar**, and the pair `(10002, 16062)` distinguishes running /
 stalled / finished. ⚠ Whether `16062` counts physical file lines or *executable* blocks is untested on a
 file with comments interleaved — here they coincided `[TO TEST]`.
+
+### ⚠ OPEN — DOES `16062` **ADVANCE**, OR ONLY REPORT THE LINE IT IS PARKED ON? `[TO TEST]`
+Both confirming runs (V21, V22) sat on a **single** `G04` for 20–30 s. So what is proven is that `16062`
+**reports the executing line** — *not* that it tracks progress line by line. ⛔ **A progress bar needs the
+advancing behaviour, and that is untested.**
+
+⇒ **`verify/V23_lineadvance.nc`** is written and ready: three 8-second dwells on lines **8, 11 and 14**, with
+comment spacers so the numbers cannot be confused with adjacency. Expect `16062` to read `8 → 11 → 14`.
+⭐ It writes only `#100`-`#102` — **true scratch on both controllers** (see `context/DDCS-VARIABLES.md`), no
+parameters touched. No motion.
+⚠ Needs: the machine on, the file copied to `CNCDISK`, and the owner to press Start (the copy could not be
+made — the controller was already powered down).
