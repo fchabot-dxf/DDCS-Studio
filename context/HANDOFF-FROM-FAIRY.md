@@ -414,3 +414,34 @@ reproduced 10/10 after the fix.
 | `G10 L20` — the only item in `bench/05` that moves an axis | human at the machine |
 | `bench/04-modbus-slave-test-plan.md` | written, never run |
 | Gateway `workOrigin.z` missing the tool-table term | ⭐ **RENDERRANCHY's**, still unblocked |
+
+---
+
+## ⭐⭐⭐ LATE ADDITION, 2026-09-05 — TWO THINGS RENDERRANCHY CAN BUILD ON
+
+### 1. LIVE RUN STATE EXISTS: **register `10002`** `[CONFIRMED on machine, owner pressed Start]`
+`0` = idle, `1` = **a program is running**. Confirmed against a 30 s `G04` dwell that moves **no axis** — it
+held `1` throughout, so it is a **program-running flag, not a motion flag**. FC03, 2 registers, float32
+`CDAB`. The `#701`/`#702` completion counters still fire at the end (`251/4 → 252/5`).
+
+⛔ **This retracts "no run-state flag found"**, which this repo has carried for months. That conclusion came
+from diffing 2,400 registers mid-run — but `10002` is in the `10000`–`10998` **system-internal** block,
+which a macro-mirror sweep never touches. Found by reading the vendor's own tool,
+`m350_liveg.py::poll_m350_state_with_strict_crc`.
+
+⇒ ⭐ **Studio can now know a job is running, live, over Modbus** — start edge, running, finish edge — with
+no SMB polling. ⚠ Only `0`/`1` observed; the vendor treats any non-zero as running, so other states may
+exist (feed hold? probing?). Vendor question logged.
+
+### 2. ⛔ THE EMIT HAZARDS FROM EARLIER TODAY STILL STAND — and they are app-side
+- ⛔ **No power operator.** `^` **and** `**` both raise `syntax error!` (photographed). Emitted
+  exponentiation must become repeated multiplication. **Worth grepping the emit paths.**
+- ⛔ **`MOD` is a syntax error.**
+- ⭐ **Arguments are in DEGREES** (`COS[90]`→0, `ATAN[1,1]`→45). Silently changes every emitted arc.
+- ⭐ **`ATAN[y, x]` comma form re-confirmed** — the §V13 slash-form fix in `data/probeToSlot.js:538` and
+  `wizards/alignmentWizard.js:158` is **still pending and still yours.**
+
+### ⚠ AND ONE CORRECTION TO YESTERDAY'S HANDOFF
+The "G-code injection channel loses ~25% of frames" warning I wrote earlier today was **wrong** — the cause
+was a trailing `\n` we were appending that the vendor's tool never sends. Removed; delivery is now clean.
+⛔ **Do not design around a 25% loss rate.** See `FINDINGS.md` for the full retraction.
