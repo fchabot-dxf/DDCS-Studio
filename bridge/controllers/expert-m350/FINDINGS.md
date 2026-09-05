@@ -2701,3 +2701,33 @@ Modbus transaction **over this same cable**. Different direction, same wire — 
 that feature too. Not a known fault, but worth watching if beacons ever behave oddly.
 ⇒ ⭐ **And it becomes load-bearing the day the app's pull moves from SMB to Modbus** — an open question
 already recorded as RENDERRANCHY's call.
+
+### ⛔⛔ REFUTED — LOWERING THE BAUD MAKES IT **MUCH WORSE** `[MEASURED on machine 2026-09-05]`
+Param `267` ("Serial 2 baud rate", Param page → **System** section) set from `115200` to `19200`, controller
+rebooted. Sync confirmed against ground truth (`reg 7080` = `-45.130001068115234`, matching the pendant).
+
+| | 115200 | **19200** |
+|---|---|---|
+| correct READS of a known register | ~100% | ⛔ **2/20** |
+| 20 random lines × 3, delivery | 82% | ⛔ **30%** |
+| the five 0/5 lines | 0/5 | 1–2/5 |
+
+⇒ **Reverted to 115200.** ⭐ Also note this incidentally **confirms our cable is on Serial 2** — the link
+followed param `267`, so `266` (M3K keyboard) is correctly left alone.
+
+### ⭐⭐ AND THE DIRECTION OF THE EFFECT IS THE REAL FINDING — IT POINTS AT CONTENTION, NOT LATENCY
+⛔ **This refutes the USB-latency hypothesis**, not just the fix. If frames were being split because USB
+latency exceeds the RTU inter-character timeout, **lowering the baud lengthens that timeout and should
+IMPROVE things.** It made them ~6× worse — the opposite direction.
+
+⭐ **What fits instead: bus contention.** The controller is a Modbus **MASTER** by default (`#279` = `2`, and
+the vendor manual's §1 says *"Default master mode"*), and **6–11 bytes of foreign junk precede every FC16
+ack** — traffic that is not ours. At 19200 every frame occupies the wire ~6× longer, so the window in which
+the controller's own transmissions can collide with ours is ~6× wider. ⇒ **The magnitude matches the
+degradation**, and this is the first hypothesis today whose *predicted direction* was confirmed by an
+experiment run after it was formed, rather than fitted to data already in hand.
+
+⇒ ⭐ **NEXT TEST: `#279`.** If the controller can be stopped from initiating transactions (or moved to a slave
+mode), contention disappears. ⚠ The vendor manual documents `279` as **"Modbus RTU Enable"**, not a mode
+selector — but a later firmware reportedly adds a **P279 SLAVE** setting, and this machine is now on that
+newer firmware. ⛔ Untested, and it needs a reboot to apply `[TO TEST]`.
