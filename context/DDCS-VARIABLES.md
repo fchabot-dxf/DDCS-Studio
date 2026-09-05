@@ -15,6 +15,16 @@ Param-page section).
 
 # DDCS variable writing — look it up first
 
+## ⭐⭐ THE WHOLE RULE, IN ONE LINE
+
+```
+#N   N <  500   ->  SCRATCH.  locals #0-49, globals #50-499.  Nothing here is a machine setting.
+#N   N >= 500   ->  Pr(N-500).  A REAL MACHINE PARAMETER.  Look it up before you write it.
+```
+
+⭐ Owner, 2026-09-05: *"any parameter below five hundred is for sure not a system parameter."* **Correct**,
+and it matches the vendor's own address map. `#916` is `Pr416` — a tool length offset. `#100` is just scratch.
+
 ## ⭐ FIRST — WRITING A MACRO? THE SCRATCH IS `#0`-`#499`. USE IT.
 
 | range | what |
