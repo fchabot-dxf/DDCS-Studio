@@ -2353,3 +2353,32 @@ are one-operand calls that *should* error, `ATAN[1]/[1]` is the slash form alrea
 `ATAN[1, 1]` — the only valid form of the four — was dropped by the latch. **§V13 stands unchanged.**
 ⇒ Second time in two days a question was taken to the machine that this file already answered (the other:
 `G04 P` is milliseconds). **Read the section before testing the thing the section is about.**
+
+## ⭐ TWO WRITE PATHS, AND ONLY ONE SURVIVES A LATCH `[CONFIRMED on machine 2026-09-05]`
+There are two independent ways to change a macro variable from the PC, and they behave differently:
+
+| path | how | survives a latch? |
+|---|---|---|
+| **G-code injection** | FC16 → reg `3000`, ASCII `#916 = 5` | ⛔ **NO** — silently dropped |
+| **direct register write** | FC16 → reg `6500 + 2×(N−500)`, word-swapped float32 | ⭐ **YES** |
+
+**Proven with the channel latched:** a direct write of `1234.0` to reg `7332` landed and read back, at the
+moment G-code injection was dropping every line. ⇒ **A latch blocks the G-code interpreter, not Modbus.**
+
+### ⛔ BUT THE VIRTUAL BUTTONS ARE NOT REACHABLE THAT WAY — `#2037` IS OUTSIDE THE MIRROR
+Writing `65863` (RESET) to reg `9574` = `6500 + 2×(2037−500)` was **ACKed and discarded**; the register still
+read `0`, and the pendant kept its `ERROR`. A block sweep shows why:
+
+* live data runs to roughly **`#1999`**; `#1650`–`#1999` is already nearly all zero
+* **`#2000`–`#2599` is entirely zero** — `#2037` sits here
+
+⇒ **The `6500 + 2×(N−500)` mapping has an UPPER BOUND near `#1999`**, which this file previously stated
+without one. `#2037` responds only to a *running macro*, i.e. to the injection channel — **the exact thing a
+latch blocks.**
+
+⛔⛔ **THEREFORE THE PC CANNOT CLEAR A LATCH. Only the operator can, at the pendant.** This was claimed
+earlier in this file as an assumption; it is now measured. ⚠ Lead, unattested: M350-LiveG is reported to have
+its **own keypress register** at an address we do not know — if found, it may offer a second route `[TO TEST]`.
+
+⭐ Corroboration: **`#2500` reads `0` over Modbus**, matching the existing note that the tool-setter
+calibration reference is in neither `setting`, `camsetting` nor `uservar` and needs a macro to read.
