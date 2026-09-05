@@ -402,8 +402,10 @@ test('THE CAM KNOB — a #var in a placed pocket reaches #42/#43, coordinates un
         const P = { ...base, originX: 12.5, originY: -7.25, stockAttach: 'pp', pathDatum: 'pp', stockDatum: 'nnp', stockW: 200, stockH: 160, stockZ: 20 };
         // ⚠ WRITTEN INTO THE SOCKET, not through the wizard's front door: pocketStack coerces its params with num(),
         // which is correct for a FORM (a typed field is a number). A CAM exposure substitutes into the block's socket.
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as raster-direction-1418.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
         const setLive = (stack, keys) => {
-            const walk = (bs) => { for (const b of (bs || [])) { if (b.type === 'surfaceraster') Object.assign(b.params, keys); walk(b.children); walk(b.uiChildren); } };
+            const walk = (bs) => { for (const b of kidsOf(bs)) { if (b.type === 'surfaceraster') Object.assign(b.params, keys); walk(b.children); walk(b.uiChildren); } };
             walk(stack); return stack;
         };
         const baked = emitMapped(setLive(pocketStack(P), {})).text;

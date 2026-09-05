@@ -423,8 +423,11 @@ test('THE ROLE — a #var in the direction socket does NOT become a register, an
         const { pocketStack, pocketRasterGap } = await import('/wizards/pocketWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { paramRole } = await import('/data/atomRoles.js');
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18 (a split's own `children` is a
+        // mouth-keyed {LEFT,RIGHT} object, not always an array) — same fix as live-depth-knob-1389's own note.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
         const setDir = (stack, v) => {
-            const walk = (bs) => { for (const b of (bs || [])) { if (b.type === 'surfaceraster') b.params.direction = v; walk(b.children); walk(b.uiChildren); } };
+            const walk = (bs) => { for (const b of kidsOf(bs)) { if (b.type === 'surfaceraster') b.params.direction = v; walk(b.children); walk(b.uiChildren); } };
             walk(stack); return stack;
         };
         const P = { ...base, direction: 'oneway' };

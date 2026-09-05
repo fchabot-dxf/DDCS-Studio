@@ -665,7 +665,9 @@ test('THE BOTH-PATHS GUARD — peck AND helical both re-point through holecycle,
         const { drillStack } = await import('/wizards/drillWizard.js');
         const { BUILDERS } = await import('/blocks/opBuilders.js');
         const { BLOCKS } = await import('/wizards/ops/index.js');
-        const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as live-depth-knob-1389.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+        const flat = (st, o = []) => { for (const b of kidsOf(st)) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         const all = [];
         for (const [op, build] of Object.entries(BUILDERS)) { try { all.push({ op, types: flat(build({})) }); } catch (_) { /* needs params */ } }
         return {
@@ -717,7 +719,9 @@ test('THE TAP — untouched by the switch, and it is REACHABILITY that says so',
     const r = await page.evaluate(async () => {
         const { tapStack } = await import('/wizards/tapWizard.js');
         const { BLOCKS } = await import('/wizards/ops/index.js');
-        const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as live-depth-knob-1389.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+        const flat = (st, o = []) => { for (const b of kidsOf(st)) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         return { tap: flat(tapStack({})), tapRegistered: !!BLOCKS.tap, cycles: (await import('/wizards/ops/holecycle.js')).CYCLES };
     });
     expect(r.tap, 'tap builds its own leaf').toContain('tap');

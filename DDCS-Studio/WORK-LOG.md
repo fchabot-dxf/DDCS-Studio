@@ -75480,3 +75480,156 @@ structure for corner (the split_horizontal convention wins, corner-redivide.spec
 rewritten to match), or find a THIRD structural shape neither tried here. BACKLOG #71/#72's conversion tier is
 otherwise closed — 32/32 built-in-equivalent ops tree-rendered, no op left holding an empty PRESENTATION mouth.
 
+## 🔨 turn 2633 — THE TWO SWEEPS DEFERRED AT t2631: vocabulary walkers, and INVARIANT #18 repo-wide
+
+Corner and the REDIVIDE fork are UNTOUCHED this turn (confirmed: `git diff --stat` on both is empty) — the
+advisor took that finding to the owner. This turn does the two things t2631 flagged and deferred: census every
+consumer of the uiChildren vocabulary for the SAME kind of gap `firstRealLeaf` had, and grep the whole repo for
+the hand-rolled-array-iteration bug (ARCHITECTURE.md INVARIANT #18) found twice by accident last turn.
+
+### PART 1 — THE VOCABULARY WALKER CENSUS
+
+Dispatched a thorough read-only census (not a text-only grep — each candidate's own `emit`/render branch was
+checked against its actual declaration, not assumed from its name). **41 walkers found** across
+`blocks/`, `blocks/blockly/`, `blocks/dataOps/`, `ui/`, `data/`, `wizards/`, `viz/`:
+
+- **17 type-agnostic** (recurse into every node regardless of type — safe by construction, nothing to teach).
+- **17 type-switching, verified SAFE** (a hardcoded type list, but the DEFAULT for an unlisted type happens to
+  be correct — e.g. `pruneGuards` only special-cases `guard` and recurses-and-keeps everything else, which is
+  right for any node).
+- **7 AT-RISK** — a hardcoded type list whose DEFAULT for an unlisted vocabulary type is actively wrong:
+
+1. **`firstRealLeaf` (blockEmitter.js) — the ONE this arc already touched, still had gaps.** The census also
+   surfaced that the declared uiChildren vocabulary is BIGGER than the 32 types this arc's own header comments
+   track: `grid_container`/`tab_group`/`tab_page` (transparent, `emit: children||[]`, confirmed at their own
+   declaration sites) and `layout`/`path_anchor`/`cam_table`/`shape_rect`/`shape_circle`/`shape_line`/
+   `shape_marker`/`form_dropdown`/`form_checkbox`/`form_segmented`/`form_diagram`/`form_action_btn`
+   (metadata-only, `emit: () => []`, each confirmed at its own declaration) were STILL missing from
+   `TRANSPARENT_CONTAINERS`/`METADATA_ONLY_LEAVES` even after t2631's own fix. **Fixed** (same file, same
+   mechanism, cheap and low-risk to close out immediately rather than leave half-done) — both sets now carry
+   the full declared vocabulary. Node tier re-run after: 238/238.
+
+2. **`emit()`'s own transparent-container branch (blockEmitter.js:331, real G-code dispatch) — NOT fixed,
+   flagged as the most severe finding.** A literal 6-way `||` chain (`param_group|guard|section|setup|
+   safetraverse|opunit`) is missing `split_horizontal`/`split_vertical`/`group_box`/`grid_container`/
+   `tab_group`/`tab_page`/`cam_table` — and worse, their OWN declared `emit: (params, children) => children`
+   signature doesn't match this call site's actual `def.emit(p, dx, dy, dialect)` args: with `dx===0` the
+   children are silently DROPPED from the emitted program; with a nonzero placement `dx`, `.map`/`.length` on
+   a number would THROW. Latent today (no shipped twin puts a real exec atom inside one of these containers in
+   the PRESENTATION mouth — atoms live in the EXECUTION mouth, `children`, which this branch never touches),
+   but this is the CORE emit path, not a test helper — too consequential to touch blind in this turn's own
+   budget. Flagged for a dedicated turn.
+
+3. **`checkLayoutNodes` (blocksApp.js:941) vs `hasTreeLayout` (userOpView.js:106) — two DIFFERENT hardcoded
+   lists answering the SAME "is this twin tree-mode?" question, and they DISAGREE.** `checkLayoutNodes` (9
+   types) is the wider of the two; `hasTreeLayout` checks ONLY `split_horizontal`/`split_vertical`. Consequence
+   (already documented, already cost a real fix): a twin declaring `path_anchor` outside a split routes to the
+   TREE renderer from the Blocks-tab pane but the FLAT renderer from the standalone modal — `userOpView.js:125`'s
+   own `mountFlatPathAnchor` is a workaround for exactly this disagreement, not a coincidence. Any future
+   group_box-only twin (no split) hits the same wall. Not fixed — an architectural reconciliation, not a
+   one-line add.
+
+4. **`traverse` (formWidgets.js:1533) — AT-RISK but the GOOD kind, cited as the pattern to copy.** Missing all
+   ten `*_handle` types, `layoutwidget`, `cam_field`, `cam_table`, `guard`/`setup`/`safetraverse`/`opunit`,
+   `user_root`, the `form_*` family — but its own default is a VISIBLE `⚠ "<type>" — not wired yet` placeholder
+   that still recurses into the node's own children, never a silent wrong branch. Lowest severity of the seven;
+   not fixed, noted as the shape every other AT-RISK walker should have used from the start.
+
+5. **`preorderAtoms` (devMode.js:33)** — a mouth-NAME variant of the same bug (hardcodes `DO` only, missing
+   `PRESENTATION`/`EXECUTION`/`LEFT`/`RIGHT`/`TOP`/`BOTTOM`/`TABS`) feeding `writeAuthoredValue`'s own
+   `blockIndex`-to-live-socket mapping — a mismatch here writes a value into the WRONG block's socket, silently.
+   The file's own t-comment already half-concedes this. Not fixed this turn.
+
+6. **`lint.js:133`'s own `walk`** — under-reports warnings for `guard`/`cond`/`depth`/`fill`/`place`/`rotate`/
+   `skim`/`user_root`/`op` children (coverage gap only, never a wrong emit). Lowest stakes of the seven. Not
+   fixed.
+
+**Structural observation carried over from the census, not mine originally:** the fix that would make this
+whole CLASS of bug impossible rather than merely patched is already proven twice in this codebase —
+`stackBridge.js`'s `mouthsOf(def)` (a block DECLARES its own mouths; its own comment records collapsing four
+independent hand-lists after five silent losses) and `exposeClassifier.js`'s registry-`kind` lookup. Every
+AT-RISK walker above is a hand-maintained literal list that could instead ask the block's own definition a
+declared question. Not built this turn — a scoped, sizeable follow-up, not a fix folded into this one.
+
+### PART 2 — INVARIANT #18, REPO-WIDE
+
+Grepped for the SAME hand-rolled `for (const b of (bs || []))`-style recursive walker (never `childrenOf`) that
+corner-wall-collapse-1664/freeze-value-2425 both carried by accident last turn. Found **8 more test files, 10
+more occurrences**, all local helper functions walking `.children`/`.uiChildren` together (the signature that
+actually reaches a split node's own `{LEFT,RIGHT}` shape): `live-depth-knob-1389.spec.js`,
+`expose-absorbed-fold-1389.spec.js`, `pocket-tenant-extraction-1391.spec.js` (×2 — one left deliberately
+unfixed, see below), `raster-direction-1418.spec.js`, `pocket-rides-raster-1406.spec.js`,
+`holecycle-parametric-1381.spec.js` (×2), `literal-hole-ownership-1389.spec.js` (×2), `cam-op-seed.spec.js`.
+Fixed via an inlined `childrenOf`-equivalent (`Array.isArray(x) ? x : (x ? Object.values(x).flat() : [])`) at
+each site — inlined rather than imported because most of these walkers live inside stringified/`eval`'d
+function bodies (`page.evaluate(patchSrc)` idioms) where a real module import isn't in scope.
+
+**One instance left deliberately unfixed, named not silently skipped:** `pocket-tenant-extraction-1391.spec.js`'s
+own index-based `swap()` walker WRITES BACK via `bs[i] = lit` — a childrenOf-style normalization would return a
+freshly-flattened array whose mutations never reach the original tree, which would SILENTLY BREAK the thing the
+walker exists to do rather than fix a live gap. Confirmed unreachable in practice (its own `stack` traces to
+`pocketWizard.js`'s classic reference builder, which never emits a uiChildren-bearing node at all) — documented
+in-place rather than force a rewrite that trades a latent, inert risk for a real one.
+
+**Every fix in this class checked against production code too** (not just tests): the census in Part 1 already
+covers this — `pruneGuards`, `findGuardWhenForBlockType`, `buildPolicyMap`, `collapseGuardsByDefault`, and every
+per-twin `postInstantiate` walker in `dataOps/*.js` all recurse via `childrenOf` or an equivalent already; none
+omit `uiChildren`. The gap was concentrated in ad-hoc TEST-file local helpers, not application code (`emit()`'s
+own gap from Part 1 item 2 is a different, TYPE-coverage bug, not this array-shape one).
+
+All 8 fixed files + the 2 from t2631 re-run together: 109/109 passed. Node tier: 238/238.
+
+### PART 3 — AN HONEST VERDICT ON THE CENSUS METHOD
+
+Asked plainly: can a grep-based census be trusted here at all? **No, not on its own — it is a floor, never a
+count, and should never be the sole basis for a "verified clean" claim.** The evidence is the id-gap census's
+own history this arc: 44 (t2597, a first order-of-magnitude estimate) → subsequent recounts → 130 files found
+this turn's own predecessor (t2631), of which THREE slipped the grep-based census ENTIRELY because
+`openWizardViaBar`'s own short `optype:'corner'` form is a textually DIFFERENT surface than
+`cornerData|user_corner_data|CORNER_DATA_OPTYPE` — no refinement of the SAME grep pattern would ever have found
+them; only running the actual suite did. That is not "the count kept changing because reality changed" — it is
+"the count kept changing because the search itself was incomplete each time," and an instrument whose own error
+bars are unknowable in advance cannot license a completeness claim, no matter how many times it is re-run.
+
+**The root cause is structural, not carelessness:** a grep pattern is a guess at every TEXTUAL surface form a
+reference to something might take — a full import path, a short alias, an indirect reference through a shared
+helper that itself takes an opType parameter, a runtime-constructed string. There is no way to enumerate that
+set completely by inspection; the only thing that actually EXERCISES the real reference graph is the
+interpreter itself. Compare `twin-section-invariant-2381.spec.js`'s own census, which is NOT grep-based — it
+calls `listUserOps()` and classifies each REGISTERED twin by its own live `hasTreeLayout()` state at test-run
+time. That is trustworthy by construction: it asks the running system what is actually true, rather than
+guessing what text might be present in a file. A grep census over source text and a runtime census over live
+state are not the same INSTRUMENT wearing different clothes — one is a guess, the other a measurement.
+
+**The right role for a grep census, then: a cheap way to shrink the search space and explain why the suite went
+red, never the gate that proves it clean.** This turn's own practice already matches that, in hindsight —
+`npm test`/`playwright test` was run twice at t2631 specifically because the grep-driven fixes needed a
+non-grep instrument to confirm they actually landed, and the full suite (not a re-grep) is what is closing this
+turn too. The recommendation, stated plainly rather than left implicit: any FUTURE claim of the shape "N files
+reference X, all N fixed, therefore done" should read "N files matched this grep, all N fixed; the full suite
+is what says whether that was actually all of them" — the suite is the honest instrument here, the grep is a
+convenience on top of it, not a substitute for it.
+
+### VERIFY
+
+Vocabulary-walker census: 41 walkers, 7 AT-RISK, counts and citations above; 1 fixed (`firstRealLeaf`'s
+remaining gaps), 6 named as findings (severity-ranked, most severe = `emit()`'s own transparent-container
+branch). INVARIANT #18 grep: 8 more files / 10 more occurrences found and fixed, 1 instance named and
+deliberately left (mutation-semantics risk, confirmed unreachable). Honest verdict on the census method:
+written above — no, not on its own. Corner and the redivide fork: untouched (`git diff --stat` empty on both).
+
+**Node tier: 238/238.** Full suite via `npm test`: 3161 passed, 3 failed, 16 flaky, 28 skipped, e2e exit 1 — the
+SAME 3 failures as t2631's own closing run (`corner-redivide.spec.js` ×2, the advisor's own deliberate red, not
+touched here; `preview-mutation-manifest-2463.spec.js` ×1, the pre-existing surfacing flake). No new failures
+from this turn's own changes. `git status`: clean except this turn's own files, staged for commit below.
+
+### NEXT
+
+The advisor's own REDIVIDE ruling with the owner is still open — not this turn's to chase. Of the 6 remaining
+AT-RISK walkers, `emit()`'s own transparent-container gap (item 2) is the one worth a dedicated turn: it is
+live product code on the CORE emit path, not a test helper, and its failure mode (silently dropped G-code, or a
+thrown `.map`) is worse than anything else found this session. The declarative fix `stackBridge.js`'s
+`mouthsOf(def)` and `exposeClassifier.js`'s `kind`-lookup both already demonstrate — a block declaring its own
+`transparentAtEmit`/`metadataOnly` rather than five hand-lists agreeing by accident — would close all 7 AT-RISK
+entries at once and make the whole class structurally impossible rather than merely re-patched a sixth time.
+

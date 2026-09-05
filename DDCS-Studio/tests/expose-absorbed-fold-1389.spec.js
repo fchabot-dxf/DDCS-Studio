@@ -45,8 +45,11 @@ test('THE SYMPTOM — a live feed on a PLACED bolt circle changes F words ONLY; 
         // params with `num()`, so `drillStack({feed:'#2601'})` yields the default 100 — measured, and it is the correct
         // behaviour for a FORM (a typed field is a number). A CAM exposure works the way this test now does: the slot
         // substitutes `#2601` into the block's own socket. Staging it through drillStack would have tested nothing.
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18 (a split's own `children` is a
+        // mouth-keyed {LEFT,RIGHT} object, not always an array) — same fix as live-depth-knob-1389's own note.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
         const setFeed = (stack, v) => {
-            const walk = (bs) => { for (const b of (bs || [])) { if (b.type === 'holecycle') b.params.feed = v; walk(b.children); walk(b.uiChildren); } };
+            const walk = (bs) => { for (const b of kidsOf(bs)) { if (b.type === 'holecycle') b.params.feed = v; walk(b.children); walk(b.uiChildren); } };
             walk(stack); return stack;
         };
         const baked = emitMapped(setFeed(drillStack(P), 120)).text;

@@ -32,7 +32,9 @@ test('THE TENANT MOVED OUT — pocket carries NO literal hole, across its whole 
     await boot(page);
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
-        const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as live-depth-knob-1389.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+        const flat = (st, o = []) => { for (const b of kidsOf(st)) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         const scan = (p, opts) => { try { const t = flat(pocketStack(p, opts)); return { literal: t.filter((x) => x === 'drill' || x === 'bore'), hole: t.filter((x) => x === 'holecycle') }; } catch (e) { return { err: String(e).slice(0, 60) }; } };
         const BIG = { toolDia: 6, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 };
         return {
@@ -113,7 +115,9 @@ test('THE PAIR IS RETIRED — nothing reaches them, and both are gone BOTH WAYS'
         const uo = await import('/blocks/userOps.js');
         const ops = await import('/wizards/ops/index.js');
         const { BLOCKS } = ops;
-        const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
+        // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as live-depth-knob-1389.
+        const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+        const flat = (st, o = []) => { for (const b of kidsOf(st)) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         const reach = [];
         for (const [op, build] of Object.entries(BUILDERS)) {
             try { const t = flat(build({})); if (t.includes('drill') || t.includes('bore')) reach.push('BUILDERS:' + op); } catch (_) { /* needs params */ }

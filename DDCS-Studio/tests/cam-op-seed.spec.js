@@ -14,7 +14,9 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
     const { surfacingStack } = await import('/wizards/surfacingWizard.js');
     const op = (opType, params) => ({ opType, params });
     const byKey = (res, k) => (res.fields || []).find((f) => f.key === k);
-    const find = (blocks, type) => { for (const b of (blocks || [])) { if (b && b.type === type) return b; const c = find(b.children, type) || find(b.uiChildren, type); if (c) return c; } return null; };
+    // t2633 — childrenOf-equivalent inlined: ARCHITECTURE.md INVARIANT #18, same fix as live-depth-knob-1389.
+    const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+    const find = (blocks, type) => { for (const b of kidsOf(blocks)) { if (b && b.type === type) return b; const c = find(b.children, type) || find(b.uiChildren, type); if (c) return c; } return null; };
 
     const P_POCKET = { shape: 'rect', w: 120, h: 90, depth: 5, stepdown: 2, toolDia: 8, feed: 1500, plunge: 120, clearance: 6, rpm: 9000, stepoverPct: 45 };
     const P_SURF = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 16, feed: 900, plunge: 180, clearance: 5, rpm: 12000, stepoverPct: 60 };

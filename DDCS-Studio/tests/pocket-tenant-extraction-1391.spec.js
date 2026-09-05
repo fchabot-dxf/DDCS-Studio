@@ -84,6 +84,14 @@ for (const [name, cfg] of Object.entries(TINY)) {
             // The two leaves take the placement DIFFERENTLY, and that is correct rather than a confound: the literal has
             // its text rewritten by the fold (it always did), while holecycle absorbs the shift as params. Comparing the
             // TRACED result is exactly what proves those two routes land in the same place.
+            // t2633 — this walker's own index-based loop assumes `bs` is a plain, MUTABLE array (it writes
+            // `bs[i] = lit` in place) — a childrenOf-style normalization would return a FRESH flattened array
+            // whose mutations wouldn't reach the original tree, so it's not a drop-in fix here the way the
+            // read-only walker just below is. Confirmed unreachable in practice: `stack` traces back to
+            // pocketWizard.js's own classic `pocketStack` (line 65 below), which never emits a split_horizontal
+            // /uiChildren-bearing node at all — a non-array `bs` (ARCHITECTURE.md INVARIANT #18) can't occur on
+            // this specific path today. Left as-is rather than force a rewrite that would risk breaking the
+            // mutation it depends on for no live gap.
             const swap = (stack) => {
                 const walk = (bs) => { for (let i = 0; i < (bs || []).length; i++) {
                     const b = bs[i];
@@ -98,7 +106,8 @@ for (const [name, cfg] of Object.entries(TINY)) {
                 } };
                 walk(stack); return stack;
             };
-            const hc = (() => { let f = null; const walk = (bs) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === 'holecycle') f = b; walk(b.children); walk(b.uiChildren); } }; walk(pocketStack(cfg)); return f; })();
+            // t2633 — childrenOf-equivalent inlined (read-only walker, safe to normalize): same INVARIANT #18 fix.
+            const hc = (() => { const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []); let f = null; const walk = (bs) => { for (const b of kidsOf(bs)) { if (!b) continue; if (b.type === 'holecycle') f = b; walk(b.children); walk(b.uiChildren); } }; walk(pocketStack(cfg)); return f; })();
             const nowTxt = emitMapped(pocketStack(cfg)).text;                 // the app as it is now
             const litTxt = emitMapped(swap(pocketStack(cfg))).text;           // the same program, literal leaf
             return { now: moves(nowTxt), lit: moves(litTxt), nowTxt, hasHoleCycle: !!hc };

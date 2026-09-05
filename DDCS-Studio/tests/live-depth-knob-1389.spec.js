@@ -25,8 +25,15 @@ const boot = async (page) => {
 };
 
 /** An exposed knob writes the SOCKET (drillStack's own params run through num(), as a form's fields should). */
+// t2633 — childrenOf-equivalent inlined (not a bare (bs||[]) for...of): ARCHITECTURE.md INVARIANT #18 — a
+// split_horizontal/split_vertical node's own `children` is a mouth-keyed {LEFT,RIGHT} object, not a plain
+// array. This walker's own `stack` (drillWizard.js's classic drillStack) never actually contains one today, so
+// it was never exploitable in practice, but it's the same hand-rolled reimplementation the census found
+// repeated across several test files' own local helpers — fixed for consistency, not because this one file was
+// caught failing.
 const withSocket = (patch) => `(function (stack) {
-    const walk = (bs) => { for (const b of (bs || [])) { if (b.type === 'holecycle') Object.assign(b.params, ${JSON.stringify(patch)}); walk(b.children); walk(b.uiChildren); } };
+    const kidsOf = (x) => Array.isArray(x) ? x : (x ? Object.values(x).flat() : []);
+    const walk = (bs) => { for (const b of kidsOf(bs)) { if (b.type === 'holecycle') Object.assign(b.params, ${JSON.stringify(patch)}); walk(b.children); walk(b.uiChildren); } };
     walk(stack); return stack;
 })`;
 
