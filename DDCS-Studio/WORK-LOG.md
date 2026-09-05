@@ -76244,3 +76244,88 @@ corrected).
 
 Saved as `DDCS-Studio/verification/post-wizard-form.png` and `DDCS-Studio/verification/post-wizard-blocks.png`.
 
+## t2643 — ROOT-CAUSED AND FIXED: t2639's blank canvas was never hasTreeLayout, it was a dead default
+
+Dispatch: prove t2639's own blank-canvas dead end through the real UI (not reasoned), check whether it's the
+same disease as comm's own t2605 finding, fix if contained, name the shared-path fix rather than take it, then
+prove the completeness bar (a rendered handle that writes back).
+
+### THE REAL MECHANISM, confirmed live not assumed
+
+Two separate facts, found by reading `userOpView.js`'s `update()` and driving the app fresh:
+
+1. **`feature_canvas.panel` is a plain Blockly `field_dropdown`.** Its built-in `fromJson` has NO
+   initial-value property at all — a fresh block ALWAYS gets `options[0]`, full stop. `def.defaults[f]` (which
+   EVERY other field kind in `bridge.js`'s `jsonDef()` explicitly reads, `String(def.defaults[f] ?? …)`) is
+   NEVER consulted for a dropdown. Confirmed by trying a `dd.value = …` addition first — silently ignored,
+   proving the property doesn't exist on this field class's own contract.
+2. **`PANEL_TYPES`'s own key order (`panelTypes.js`) put `'form'` first** — `viz:false`, hides the WHOLE
+   `.wiz-visual` pane. So every freshly-dragged `feature_canvas`, having never had its own default actually
+   apply, silently got the one option that renders NOTHING — reproduced live
+   (`tests/panel-default-2643.spec.js`, before the fix: a genuine flyout drag serialized `PANEL='form'`, not
+   the block's own declared `'form3d'`).
+
+**The comm/t2605 relationship, checked directly (not assumed same or different):** t2605's own fix
+(`registerUserOp`'s self-heal, `resolvePanelMeta`/`panelFromStack`, `userOps.js`) reads the FULL `def.template`
+array (so it correctly reaches a `feature_canvas` nested in `uiChildren`) and OVERRIDES `def.panel` from it at
+registration time — this mechanism is CORRECT and still wins today regardless of the dropdown bug, which is
+exactly why this was findable at all (the self-heal always ends up reading whatever the block's own PANEL field
+actually says, dropdown-default bug included). A SEPARATE, PARALLEL bug was found in the same investigation,
+NOT the same code path: `devMode.js`'s own Save-dialog prefill (`blkPanel`, ~line 974) scans
+`flattenBlocks(a.opRec.children)` — the EXECUTION tree ONLY, never `uiChildren` — so it NEVER finds a
+uiChildren-nested `feature_canvas` and always treats the panel as "undeclared," showing the dropdown (which
+then also defaults to ITS OWN first `<option>`, `'form3d'`, per the identical class of bug). Confirmed live:
+`.blk-dev-savedlg .blk-dev-paneltype` DOES render even with a `feature_canvas` already on the canvas — this
+directly resolves t2639's own confusion about whether `.selectOption(...)` failing was a bug (it wasn't a
+missing-dropdown bug; t2639's own separate finding that the option LABEL text didn't match was the real cause
+there). This second bug is COSMETIC, not data-loss — the self-heal always overrides whatever the dialog
+committed, using the TRUE template scan — so it is named here, in `panel-default-2643.spec.js`'s own header
+comment, and NOT fixed: it lives in the shared Save-dialog prep path every wizard save goes through, exactly
+the "reaches the shared save path, stop and report" case.
+
+### THE FIX, contained
+
+`web/blocks/blockly/bridge.js`'s `jsonDef()`, the `k === 'dropdown'` branch: for `feature_canvas.panel`
+specifically, reorder ITS OWN `options` array (not `PANEL_TYPES` itself, which other consumers read in their
+own declared order for unrelated reasons) so the block's declared default sorts first — the only lever that
+actually works against Blockly's own `field_dropdown` contract. `web/wizards/ops/featureCanvas.js`'s own
+`defaults.panel` changed from `'form3d'` to `'form2d'` — measured, not guessed: 31 of 32 shipped
+`feature_canvas` declarations across `dataOps/` + real test fixtures explicitly set `'form2d'`; the ONE
+`'form3d'` occurrence anywhere in the repo is a stray test fixture (`wizard-face-1599.spec.js`), not a shipped
+op. `feature_canvas`'s own header already documents it as "the 2D-capable half" of the preview3d/feature_canvas
+split — `'form2d'` is what the block was always FOR.
+
+**The general defect — no dropdown-kind field on any block ever honours its own declared default, only option
+order does — is named in `bridge.js`'s own comment, NOT generally fixed.** Reordering every dropdown's own
+options to put its declared default first is an unmeasured, registry-wide change (dozens of dropdown fields
+across every block type) — the exact class of mistake t2641's own Part B got burned by this same session.
+Left for its own turn.
+
+### VERIFY
+
+`tests/panel-default-2643.spec.js`: a real flyout drag now serializes `PANEL='form2d'`; every other panel kind
+stays reachable (reordering, not narrowing). `tests/panel-default-completeness-2643.spec.js`: byte-identical to
+`point-handle-block.spec.js`'s own DRIVE-THE-APP test with exactly one line removed — the
+`setDropdownField('feature_canvas','PANEL','form2d')` call — proving the fix alone is sufficient: a person who
+drags `feature_canvas`+`point_handle`, wires two formfields, and saves, NEVER once opening the PANEL dropdown,
+still gets a real 2D SVG (`verification/t2643-completeness-bar.png` — a populated canvas with a working drag
+handle, not the empty black pane t2639 found), a rendered handle, and a drag that changes both the field values
+AND the emitted G-code. **THE COMPLETENESS BAR IS MET**: canvas+handle authoring through the real UI, with zero
+special knowledge, now works end to end.
+
+Full suite (`npm test`): node 245/245; e2e **3172 passed, 1 failed, 13 flaky, 28 skipped**. The 1 failure
+(`trig-lift-plan-1466.spec.js` LOCK 5) is the SAME pre-existing, out-of-scope verify-macro lint failure named
+in t2641's own entry (confirmed again via `git log`, unrelated to this turn). 13 flaky
+(`census-finding2-emits-teal-1684`, `collapse-on-delete-1948`, `disable-guard-2307`,
+`faceprobe-form-reproduction-2617`, `formfield-loud-mismatch-1636`, `freeze-value-2425`, `g53-and-cut-legend`,
+`group-gesture`, `pocket-canvas`, `pull-v41-wcs`, `tooltable-gate-1890`, `undo-blind-writes-2427`,
+`wcs-sync-gate-1906`) named per the dispatch's own ask — spread across unrelated domains, none naming
+`feature_canvas`/`panel`/`bridge.js`/`devMode.js`, all passed on retry. `git status` clean except this entry,
+confirmed below.
+
+### NEXT
+
+Two named-not-fixed items for whoever picks this up: (1) the general dropdown-default defect in
+`jsonDef()` — a registry-wide reorder, needs its own measurement turn; (2) `devMode.js`'s `blkPanel` scan
+(Save-dialog prefill) missing `uiChildren` — cosmetic confusion only (self-heal already compensates), but it
+IS the shared save path every wizard save goes through.

@@ -535,7 +535,32 @@ function jsonDef(def) {
         else if (k === 'picker' && RELTO_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'relTo', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
-        else if (k === 'dropdown') args0.push({ type: 'field_dropdown', name: FN(f), options: optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]), tooltip: desc });
+        // t2643 (BACKLOG #71/#72) — ⚠ GENERAL DEFECT NAMED, NOT GENERALLY FIXED: Blockly's own built-in
+        // `field_dropdown` ALWAYS selects `options[0]` for a freshly-created block — its `fromJson` has no
+        // "initial value" property at all (confirmed live: adding a `value` key to the args0 object, tried
+        // first, was silently ignored — every custom field class above accepts `value`/`text`, but this is
+        // Blockly's own stock class, a different contract). So `def.defaults[f]` is NEVER consulted for ANY
+        // dropdown-kind field on ANY block in the registry — only each field's OWN OPTION ORDER decides its
+        // fresh-drag value. Fixing this in general (reordering every dropdown's own options to put its declared
+        // default first) is an UNMEASURED, registry-wide blast radius — the exact class of mistake t2641's own
+        // Part B just got burned by. Named here, left for its own turn, not guessed at under this turn's
+        // narrower mandate.
+        // ⭐ THE ONE INSTANCE FIXED HERE, contained: `feature_canvas.panel` — PANEL_TYPES' own key order (hence
+        // `optionsFor`'s returned order, since it's `Object.keys(PANEL_TYPES)`) put `'form'` (viz:false, hides
+        // the WHOLE visualization pane) first, so every freshly-dragged feature_canvas silently got the one
+        // option that makes it look completely empty. This IS t2639's own blank-canvas dead end, confirmed live
+        // (tests/panel-default-2643.spec.js): a fresh drag serialized PANEL='form'. Fixed by reordering THIS
+        // field's own options only (not PANEL_TYPES itself, which other consumers — the Save dialog's <select>,
+        // devMode.js — read in its own declared order for unrelated reasons) so 'form2d' (this block's own
+        // declared default, featureCanvas.js) sorts first; every other option stays reachable, just reordered.
+        else if (k === 'dropdown') {
+            let opts = optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]);
+            if (f === 'panel' && def.type === 'feature_canvas') {
+                const i = opts.findIndex((o) => o[1] === def.defaults[f]);
+                if (i > 0) opts = [opts[i], ...opts.slice(0, i), ...opts.slice(i + 1)];
+            }
+            args0.push({ type: 'field_dropdown', name: FN(f), options: opts, tooltip: desc });
+        }
         else if (k === 'checkbox') args0.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
         else if (k === 'text') args0.push({ type: 'field_input', name: FN(f), text: String(def.defaults[f] ?? ''), tooltip: desc });
         else if (k === 'region') args0.push({ type: 'input_value', name: FN(f), check: 'Region', tooltip: desc });
