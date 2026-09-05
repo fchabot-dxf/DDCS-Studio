@@ -2950,3 +2950,33 @@ theory. `[TO TEST: confirm pin 9 GND is actually landed and common — a physica
 
 ⚠ Also noted: the vendor's own screenshots show **LiveG V1.9**, while the GitHub *release* page offers only
 **V1.7**. A newer build exists somewhere; its source may document more registers.
+
+## ⭐⭐⭐ REGISTER `16062` **IS** THE LIVE EXECUTING LINE NUMBER — PROVEN `[CONFIRMED on machine 2026-09-05, owner ran the program]`
+Polled while `V21_dwell.nc` ran:
+
+| t (s) | `10002` (running) | ⭐ `16062` | |
+|---|---|---|---|
+| 3.8 | `1` | ⭐ **`10`** | ⭐ **`G04 P30000` is LINE 10 of that file** — exact match |
+| 31.7 | `0` | `0` | finished; both clear |
+
+⇒ ⭐⭐ **`16062` = the line currently executing, `0` when idle.** Macro `#2031`, float32 `CDAB`, FC03.
+Verified against a file whose only executable line sits at a known position.
+
+⛔⛔ **THIS SETTLES A CONTRADICTION THIS FILE HAS CARRIED FOR MONTHS.** Two entries above disagree:
+*"[VENDOR-STATED] REGISTER 16062 IS THE CURRENT EXECUTING G-CODE LINE NUMBER"* (unattested) and
+*"[CONFIRMED — FROM THE VENDOR] There is no line-number register. One is being ADDED (~2026-08-27)."*
+⇒ **Both were true in sequence.** It did not exist, it was added, and this machine runs
+`2026-09-02-00` — newer than that promise. **It exists and it works.**
+
+### ⭐⭐ WHAT THIS GIVES THE APP — REAL PROGRESS, NOT A DONE FLAG
+Three signals, all live over Modbus, no SMB polling:
+
+| register | meaning |
+|---|---|
+| **`10002`** | `1` = a program is running, `0` = idle (**program**-level, not motion — holds `1` through a dwell) |
+| ⭐ **`16062`** | **the executing line number**, `0` when idle |
+| `#701`/`#702` | completion counters, increment on the finish edge |
+
+⇒ **`16062` ÷ total lines = a genuine progress bar**, and the pair `(10002, 16062)` distinguishes running /
+stalled / finished. ⚠ Whether `16062` counts physical file lines or *executable* blocks is untested on a
+file with comments interleaved — here they coincided `[TO TEST]`.

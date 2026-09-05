@@ -445,3 +445,17 @@ exist (feed hold? probing?). Vendor question logged.
 The "G-code injection channel loses ~25% of frames" warning I wrote earlier today was **wrong** — the cause
 was a trailing `\n` we were appending that the vendor's tool never sends. Removed; delivery is now clean.
 ⛔ **Do not design around a 25% loss rate.** See `FINDINGS.md` for the full retraction.
+
+### ⭐⭐⭐ AND THE LINE NUMBER EXISTS TOO — register `16062` `[CONFIRMED on machine 2026-09-05]`
+Read `10` while `V21_dwell.nc` ran, whose `G04` is **line 10**; `0` when idle. ⇒ **Live executing line
+number.** With `10002` (running flag) this is **real progress tracking over Modbus** — no SMB polling:
+
+| register | meaning |
+|---|---|
+| `10002` | `1` running / `0` idle (program-level, holds through a dwell) |
+| ⭐ `16062` | the line currently executing, `0` when idle |
+| `#701`/`#702` | completion counters, on the finish edge |
+
+⛔ This resolves the contradiction in `FINDINGS.md` — *"vendor-stated 16062 is the line number"* vs *"there
+is no line-number register, one is being added ~2026-08-27"*. **Both were true in sequence**; this machine is
+on `2026-09-02-00`, newer than that promise. ⚠ Untested: whether it counts file lines or executable blocks.
