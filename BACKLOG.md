@@ -8246,6 +8246,42 @@ known-harmful call rather than greying out a button. ⛔ No feature may test the
 consumer reads the table (this repo has just spent an arc digging out `checkLayoutNodes` vs `hasTreeLayout` —
 two hand-lists answering one question, disagreeing).
 
+### 79. ⭐⭐ LIVE JOB TRACKING over Modbus — poll `10002`/`16062`, show run state + executing line in Studio
+
+**[OPEN, owner-directed 2026-09-05: "we can add it to the backlogs". The controller side is PROVEN; only the
+app side is missing.]**
+
+⭐ **The substrate, confirmed on the owner's own M350 at fw `2026-09-02-00`** (FINDINGS 2026-09-05, verified
+with `V22_lineno.nc` + the vendor's own polling tool):
+
+| register | meaning |
+|---|---|
+| `10002` | `1` = a program is RUNNING, `0` = idle — program-level, holds through a `G04` dwell (not a motion flag) |
+| ⭐ `16062` | **the line currently executing** — read `10` while line 10 ran, `0` at idle |
+| `#701`/`#702` | completion counters, fire on the finish edge |
+
+⇒ **This is the beacon replacement (#78) fully realised**: start edge, live line number, finish edge — with
+**no file instrumentation, nothing injected, read-only FC03 polls**. It also answers the owner's months-old
+vendor question ("does it allow to know what line number a running program is at? for tracking") — yes, on
+current firmware, proven at the machine.
+
+**The build (app side, all of it ours):** the gateway polls both registers over the existing serial link
+(read-only; the poller machinery in `bridge/bridge-app` already has health/status discipline from t2063) and
+Studio surfaces it — run/idle state, current line, and progress once the job's total line count is known
+(the gateway already has the file it delivered; lines-total ÷ line-now is a percentage with no map file).
+
+Constraints, all already on the record:
+- ⚠ `16062`'s unit is **untested: file lines vs executable blocks** (FINDINGS 2026-09-05) — resolve before
+  drawing a percent off it, or label the readout "line N" and sidestep the question entirely.
+- ⚠ Only `0`/`1` observed on `10002`; the vendor treats any non-zero as running — treat unknown values as
+  running, never as idle. Vendor question logged (feed hold? probing?).
+- ⛔ **M350-only. The V4.1 has no Modbus at all** (`context/DDCS-VARIABLES.md`) — this feature gates on the
+  #78 capability table, and a V4.1 profile simply never shows it.
+- ⛔ Read-only polls only. This feature never writes a register; it shares a serial line with a channel that
+  CAN write, and the #78 gate + `live-cnc` safety rules stay in force.
+- ⭐ Poll cadence: the vendor's own tool polls `10002` continuously; the M3X bridge polls positions at 100 ms.
+  Start there, measure, and never let tracking polls starve a position read.
+
 **t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
