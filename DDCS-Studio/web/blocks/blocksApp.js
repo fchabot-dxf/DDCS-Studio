@@ -23,7 +23,7 @@ import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curat
 import { findStrayTopBlockIds } from './programShape.js';   // t2281 — a block dragged from the toolbox and left disconnected: greyed here, excluded from the model in stackBridge.js's own workspaceToStack
 import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
-import { getUserDef, flattenBlocks, childrenOf } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315)
+import { getUserDef, flattenBlocks, childrenOf, usesTreeOnlyLayout } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2641 — usesTreeOnlyLayout: the ONE tree-vs-flat predicate, shared with userOpView.js
 import { findGuardWhenForBlockType } from './whenGuard.js';   // t2415 (BACKLOG #23) — shared with disableGuard.js: does a declared guard wrap this block type?
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
@@ -938,16 +938,28 @@ async function buildWorkspace() {
     formHost.style.display = '';
     const { def, stack, authoredHere, customizing, userRoot, placedOpFallback, opBlock } = deriveLiveWizard();
 
+    // t2641 (BACKLOG #71/#72) — checkLayoutNodes answers a DIFFERENT, coarser question from userOps.js's
+    // usesTreeOnlyLayout: "does this canvas state count as an authored WIZARD FACE at all" (show/hide + which
+    // top-level branch createUserOpView renders through here), not "which DOM id scheme should the render path
+    // use" (usesTreeOnlyLayout's own question, render-critical — see its header for why widening IT broke 25
+    // specs this same turn and was reverted). Being over-inclusive here is low-cost (worst case: the wizard pane
+    // shows when it strictly needn't); being over-inclusive in usesTreeOnlyLayout is high-cost (breaks the
+    // actual render path). So this stays its OWN, wider set — restored to its exact original 9-type behavior —
+    // but now explicitly COMPOSED on top of the shared 2-type render-critical core rather than an independent
+    // copy of it, so the one part that genuinely IS the same question (split_horizontal/split_vertical) can
+    // never silently drift between the two call sites again; the census's own complaint (t2633 item 3) was
+    // exactly that silent drift, not that the two sets must be identical.
+    const FACE_ONLY_TYPES = new Set(['grid_container', 'tab_group', 'group_box', 'section', 'sim', 'preview3d', 'feature_canvas']);   // t2511 — preview3d joins sim; t2515 — 'panel' renamed 'feature_canvas'
     function checkLayoutNodes(nodes) {
       for (const n of childrenOf(nodes)) {
         if (!n) continue;
-        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'preview3d', 'feature_canvas'].includes(n.type)) return true;   // t2511 — preview3d joins sim; t2515 — 'panel' renamed 'feature_canvas'
+        if (FACE_ONLY_TYPES.has(n.type)) return true;
         if (n.children && checkLayoutNodes(n.children)) return true;
         if (n.uiChildren && checkLayoutNodes(n.uiChildren)) return true;
       }
       return false;
     }
-    const hasTree = userRoot && checkLayoutNodes(userRoot.uiChildren);
+    const hasTree = userRoot && (usesTreeOnlyLayout(userRoot.uiChildren) || checkLayoutNodes(userRoot.uiChildren));
 
     // ── t1599 — A DEFINE CUSTOM WIZARD BLOCK ON THE CANVAS MEANS THE WIZARD FACE. FULL STOP. ────────────────────
     // The predicate used to be a disjunction of three PROXIES for that — a layout tree under the root, an editing

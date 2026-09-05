@@ -23,7 +23,7 @@ import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf, makeOp, _builderAtoms } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
-import { flattenBlocks, childrenOf, getUserStatusHint, getUserSimGcode, getUserPreviewVarSeed } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography); t2315: the ONE children/uiChildren shape normalization
+import { flattenBlocks, usesTreeOnlyLayout, getUserStatusHint, getUserSimGcode, getUserPreviewVarSeed } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography); t2641: the ONE tree-vs-flat predicate, shared with blocksApp.js
 import { panelType, renderLayout2D, pinnedStartsFor, previewOnlyParams, clearPreviewOnlyParams, setPreviewOnlyWriteHandler, setFormHost } from '../ops/panelTypes.js';
 import { renderZRuler } from '../../viz/zRulerStrip.js';   // t1021 — the depth ruler docked down the LEFT of the 2D plan canvas
 import { depthLevels } from '../clearing.js';   // t1021 — the ONE slice source (== the emitter) for the ruler's pass ticks
@@ -103,23 +103,14 @@ function applyGroupParams(def, params) {
     return copy;
 }
 
+// t2641 (BACKLOG #71/#72) — was its own 2-type hand-list (split_horizontal/split_vertical only), independently
+// maintained from blocksApp.js's own 9-type checkLayoutNodes and silently disagreeing with it (t2633 census item
+// 3). Both now read userOps.js's usesTreeOnlyLayout — the shared "does this need the tree renderer" predicate.
 function hasTreeLayout(template) {
     if (!Array.isArray(template)) return false;
     const root = template.find((b) => b && b.type === 'user_root');
     if (!root || !Array.isArray(root.uiChildren) || root.uiChildren.length === 0) return false;
-    // t2315 — was its own third, independent normalization of the children/uiChildren object shape (a
-    // different implementation from formWidgets.js's own several, and from flattenBlocks, which had none at
-    // all — the exact inconsistency t2313 found). Now shares childrenOf with both.
-    function checkNodes(nodes) {
-        for (const n of childrenOf(nodes)) {
-            if (!n) continue;
-            if (n.type === 'split_horizontal' || n.type === 'split_vertical') return true;
-            if (n.children && checkNodes(n.children)) return true;
-            if (n.uiChildren && checkNodes(n.uiChildren)) return true;
-        }
-        return false;
-    }
-    return checkNodes(root.uiChildren);
+    return usesTreeOnlyLayout(root.uiChildren);
 }
 
 // t2371 — a `path_anchor` node OUTSIDE a tree layout (surfacing/contour/slot/text: a bare uiChildren sibling of

@@ -42,6 +42,14 @@ import { WIDGET_BY_TYPE } from '../../blocks/userOps.js';
 
 export const paramFieldBlock = {
     type: 'param_field', label: 'form field', category: 'Wizard Inputs', kind: 'param_field',
+    // t2641 — `hidden: true`: no longer a DRAGGABLE toolbox entry (buildToolbox's `PALETTE.filter((def) => !def.hidden)`,
+    // the same mechanism `safetraverse`/`comment` use — t903/t2289). Zero shipped op uses this block directly (all 32 use
+    // field_ref); its only live producer is materializeParamGroup (userOps.js), which instantiates it PROGRAMMATICALLY
+    // from an already-derived blockIndex binding — never dragged from the palette. Dragging one fresh had no binding
+    // mechanism on its own face at all (unlike formfield's bindMode/matchvar), so it rendered a form field silently
+    // wired to nothing — a valid-by-construction trap sitting at the exact moment a person starts. Stays fully in
+    // PALETTE/BLOCKS (materialization + param_table untouched); only the flyout entry is gone.
+    hidden: true,
     help: 'One wizard FORM field for a value binding: the form label, widget, type, default, and (for a number widget) the min/max/step/units. `param` is the def value-binding it declares (read-only routing key). Metadata only — emits no G-code.',
     // t2385 — BOTH watched: `fieldsFor` resolves the EFFECTIVE widget from `widget` (explicit) OR `type` (the
     // t1562 inherit-when-empty fallback) — live-caught before shipping: with only 'widget' watched, changing

@@ -56,7 +56,10 @@ test('FOUR role groups on the category axis — three populated (membership from
     expect(r.layout, 'Wizard Layout = the defs that declare it').toEqual(r.byCat.layout);
     expect(r.previews, 'Wizard Previews = the defs that declare it').toEqual(r.byCat.previews);
     // sanity on the ruled shape: the named anchors sit where the ruling put them
-    expect(r.inputs).toEqual(expect.arrayContaining(['formfield', 'param', 'form_dropdown', 'coordlist', 'slider_field', 'param_field', 'param_group']));
+    expect(r.inputs).toEqual(expect.arrayContaining(['formfield', 'param', 'form_dropdown', 'coordlist', 'slider_field', 'param_group']));
+    // t2641 — param_field is no longer draggable (hidden: true — zero shipped ops use it; materializeParamGroup is
+    // its only live producer, instantiating it programmatically, never from the palette). Same precedent as opunit below.
+    expect(r.inputs).not.toContain('param_field');
     // (opunit also declares Wizard Layout but is palette-hidden by design — created programmatically at fork/load-wrap)
     expect(r.layout).toEqual(expect.arrayContaining(['user_root', 'section', 'group_box', 'split_horizontal', 'layoutwidget']));
     // t2507 — layout_2d_canvas deleted (BACKLOG #61 L7: wired but never useful, see ARCHITECTURE.md's own

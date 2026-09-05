@@ -76079,3 +76079,112 @@ explicitly the owner's own call among the four costed options; the split_horizon
 proposed yet (this turn only diagnosed it) and would want the same treatment PART 2 got before anyone
 implements a fix.
 
+## t2641 — CLOSE THE TWO THAT STOP A PERSON: param_field off the palette, hasTreeLayout's question changed
+(and a WRONG first answer caught live by the gate before it shipped)
+
+Dispatch: fix (not measure) the two IMPOSSIBLE gaps t2639 found — `param_field`'s silent dead-end, and
+`hasTreeLayout`'s split-only trigger — plus reconcile it with `checkLayoutNodes`'s own independent hand-list
+(t2633 census item 3), plus a separate Part D measurement. Full suite required (`hasTreeLayout` is a shared,
+silent-failure-prone render path).
+
+### PART A — param_field removed from the palette, materialization untouched
+
+`web/wizards/ops/paramField.js`: added `hidden: true` to `paramFieldBlock`'s own declaration — the SAME,
+already-precedented mechanism `safetraverse` (t903) and `comment` (t2289) use. `buildToolbox()`
+(`blocks/blockly/bridge.js:879-906`) already filters `PALETTE.filter((def) => !def.hidden)` before bucketing
+into flyout categories, and `BLOCKS` (`wizards/ops/index.js`) is derived from the UNFILTERED `PALETTE` — so the
+block type stays fully registered (materialization / `param_table` untouched), it just stops being a draggable
+toolbox entry. Field_ref is used by all 32 shipped ops (96 occurrences); param_field appears in zero dataOps
+templates directly — this really was the free, measured-cheap fix t2639's own costing named it as.
+
+Updated `tests/palette-by-role-1623.spec.js`'s own toolbox-membership assertion (it directly asserted
+`param_field` present in the "Wizard Inputs" flyout at line 59) to expect its ABSENCE instead, mirroring the
+existing `opunit`-is-palette-hidden-by-design precedent already commented right below it. Verified the
+round-trip is intact: all 21 tests across `palette-by-role-1623`, `param-group-table-separation-2543`,
+`cam-block-native-params-s5/s52/s53`, and `freeze-value-2425` pass — every one of those exercises
+`materializeParamGroup`/`param_table` constructing `param_field` block instances directly (`ws.newBlock`,
+programmatic tree injection), never through the toolbox flyout, so `hidden` never touches them.
+
+### PART B/C — hasTreeLayout's question, and the WRONG first fix caught by the gate
+
+**The corrected understanding, after a real regression:** the first version of this fix reasoned "renderOpForm
+only renders flat `bindings`, so any uiChildren node type it can't otherwise represent — `preview3d`/`sim`/
+`feature_canvas`/`code_preview`/`usage_text`/`grid_container`/`tab_group`/`layout`/`simstart`/`param_table` —
+must force tree mode, or its content silently drops (t2639's own drag-handle dead end)." That theory read as
+solid — it's grounded in an actual read of `renderOpForm`'s own body (it truly only iterates `formBindings()`
+output, no node-type dispatch at all) — and the MEASURE-FIRST step (all 32 shipped ops carry exactly one
+top-level `split_horizontal`, confirmed live via a scratch Playwright sweep over `app.js`'s own `SEED_BUILDERS`)
+showed genuinely ZERO blast radius on the shipped set, plus a direct proof that it fixed the t2639 shape (a
+bare `feature_canvas`+`point_handle`, no split: old predicate false, new predicate true). Ran the required full
+suite anyway, as instructed, because "the render path is shared and the failure mode is silent" — and the gate
+caught what the measurement against the shipped 32 could not: **25 failed specs**, all clustered on
+`feature_canvas`/handle-block ops built FRESH (not from the shipped 32) — `length-handle-block`,
+`point-handle-block` + 7 sibling `*-handle-block.spec.js` files, `pointpick-block`, `pane-sizer-1353`/
+`-mobile-1468`, `pane-visual-host-1760`/`-programmatic-1762`, `open-as-modal-1625`, `wizard-shapes-1627`,
+`handle-target-fails-visibly-2525`.
+
+Root cause, read directly from `userOpView.js`'s `update()` (not `render()`, which is all Part B's first pass
+had looked at): `preview3d`/`sim`/`feature_canvas` visualization is drawn through a COMPLETELY SEPARATE,
+already-working pipeline — `panelType(_def.panel)` (the op's own top-level `panel` string, e.g. `'form2d'`) +
+`renderLayout2D`/`mgr.preview3D` — entirely independent of `uiChildren` node types or `hasTreeLayout`. Forcing
+tree mode for these ops flips `userOpView.js`'s own `vizBase`/`vid`/`vel` helpers (line ~691, keyed directly off
+`isTree`) from the bare DOM-id scheme (`userVizContainer`) to the `_tree`-suffixed one that only `renderUiTree`'s
+own branches populate — so the legacy panelType pipeline kept drawing into `userVizContainer_tree`, but every
+existing test (and the shell's own surrounding scaffold) still read `userVizContainer`. Confirmed directly by
+grep across the failing specs (`tests/pointpick-block.spec.js:124`, `tests/length-handle-block.spec.js:321`,
+`tests/pane-visual-host-programmatic-1762.spec.js:47` all read the bare id).
+
+**Reverted the type additions, keeping only what's proven.** `web/blocks/userOps.js`'s new
+`usesTreeOnlyLayout(nodes)` now triggers on `split_horizontal`/`split_vertical` ONLY — byte-identical to the
+ORIGINAL `hasTreeLayout`. This is the one case with genuinely no flat-mode equivalent anywhere (nothing else
+ever draws a two-pane split). The other candidate types were never independently re-verified after the
+feature_canvas/sim/preview3d theory broke down, so per this session's own "an unverified guess is not a fix"
+discipline, none of them shipped either. **t2639's own drag-handle dead end is very likely NOT a
+`hasTreeLayout` defect at all** — `panelType('').viz` is false when an op's top-level `panel` field is unset,
+which hides the whole `.wiz-visual` pane regardless of render path, and that SAME turn separately found the
+real Save-dialog's own panel-type dropdown (`.selectOption({label:'Form + 3D + 2D'})`) silently failing to
+commit. That is the more likely true root cause — flagged in `userOps.js`'s own header comment for whoever
+picks this up next, not fixed here (out of this turn's remaining budget after the regression + re-verify cost).
+
+**What DID land, safely:** `hasTreeLayout` (`userOpView.js`) and `checkLayoutNodes` (`blocksApp.js`) now share
+ONE declared source (`usesTreeOnlyLayout`) for the two foundational types instead of two independently
+hand-copied lists that could silently drift (the census's own actual complaint, t2633 item 3) — but
+`checkLayoutNodes` stays its own, WIDER 9-type set (restored to its exact original behavior: the shared 2-type
+core OR'd with a local `FACE_ONLY_TYPES` set of the remaining 7), because it answers a genuinely different,
+coarser question ("is this canvas state a wizard face at all," low-cost to over-include) from
+`usesTreeOnlyLayout`'s render-critical one (high-cost to over-include, as this turn's own regression proved).
+Full reconciliation into one identical set is NOT safe — stated, not silently done, per the dispatch's own
+"or say why that cannot be done."
+
+Rewrote `tests/tree-layout-predicate-2641.spec.js` (the version committed here, not the earlier broken draft)
+to pin the CORRECTED behavior: a bare `feature_canvas`/`sim`/`preview3d` does NOT force tree; an explicit split
+still does; ordinary field-only forms and a top-level bare `path_anchor` (the t2371 exemption) both stay flat;
+and all 32 shipped ops reproduce the ORIGINAL `hasTreeLayout`/`checkLayoutNodes` results exactly through the
+new shared/composed predicates.
+
+### VERIFY
+
+Param_field gone from the palette, `param_table`'s own round-trip proven intact (21 passing specs). The
+renderer question's blast radius was measured, not reasoned — and the measurement against the shipped 32 was
+insufficient on its own (zero blast radius there, real regression everywhere else); the REQUIRED full suite is
+what actually caught it, which is exactly why it was required. Both hand-lists share their one safely-shareable
+foundation; the remainder is not merged, with the reason stated in code. Full suite (`npm test`), re-run AFTER
+the revert: `node` 245/245, `e2e` **3172 passed, 1 failed, 11 flaky, 28 skipped**. The 1 failure
+(`trig-lift-plan-1466.spec.js` LOCK 5) is a verify-macro comment-lint check on
+`bridge/controllers/expert-m350/verify/V20_read_2500.nc` — confirmed via `git log` to be a pre-existing,
+out-of-scope failure (from a controller-verify-macro commit, `258806ef`, unrelated to anything this turn
+touched). The 11 flaky (`carve-live-crisp-816`, `census-finding2-emits-teal-1684`,
+`faceprobe-form-reproduction-2617`, `formfield-block`, `formfield-loud-mismatch-1636`, `freeze-value-2425`,
+`g53-and-cut-legend`, `plane-guarantee-961`, `wcs-sync-gate-1906`, `wizard-face-1599`,
+`workspace-save-open-1225`) are named per the dispatch's own ask — spread across unrelated domains, none
+naming `hasTreeLayout`/`checkLayoutNodes`/`param_field`/tree-vs-flat rendering, all passed on retry; read as
+pre-existing parallel-worker timing noise, not a regression from this turn's changes. `git status` clean
+except this entry, confirmed below.
+
+### NEXT
+
+The true root cause of t2639's own blank-canvas finding (very likely the def-level `panel` field / the
+Save-dialog's own panel-type dropdown silently failing to commit, NOT `hasTreeLayout`) still needs its own
+separate investigation — named in `userOps.js`'s header comment so it isn't lost. Part D (test-redundancy
+measurement) lands in its own separate commit, per the dispatch's own "small item, separate commit."
+

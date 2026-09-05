@@ -126,6 +126,44 @@ export function childrenOf(nodeChildren) {
     return Object.values(nodeChildren).flatMap((v) => (Array.isArray(v) ? v : []));
 }
 
+// t2641 (BACKLOG #71/#72) — THE RENDER-PATH QUESTION: does this op's uiChildren need formWidgets.js's tree
+// renderer (renderUiTree) to draw correctly, or can the classic flat renderer (renderOpForm, driven purely by
+// formBindings()) handle it? Was userOpView.js's own hasTreeLayout, a private 2-type hand-list; now the ONE
+// declared source it AND blocksApp.js's checkLayoutNodes (below) both read.
+// ⚠ MEASURED THE HARD WAY, not assumed (t2641): the first version of this predicate also added preview3d / sim /
+// feature_canvas / code_preview / usage_text / grid_container / tab_group / layout / simstart / param_table,
+// reasoning "renderOpForm can't draw a visualization pane, so route it to tree." That reasoning was WRONG for
+// preview3d/sim/feature_canvas specifically: userOpView.js's own update() (not renderOpForm) draws those
+// through an entirely SEPARATE, already-working pipeline — panelType(_def.panel) + renderLayout2D/mgr.preview3D
+// — driven by the op's own top-level `panel` string ('form2d'/'form3d+2d'/…), independent of uiChildren node
+// types or hasTreeLayout. Forcing tree mode for these ops flipped their DOM container ids from the bare scheme
+// (userVizContainer) to the _tree-suffixed one (userOpView.js's own vizBase) that only the tree path's
+// renderUiTree branches populate — breaking every existing feature_canvas/handle op: 25 failed specs in the
+// REQUIRED full suite this same turn (length-handle-block, point-handle-block + 7 sibling handle-block specs,
+// pointpick-block, pane-sizer-1353/mobile-1468, pane-visual-host-1760/programmatic-1762, open-as-modal-1625,
+// wizard-shapes-1627, handle-target-fails-visibly-2525). Caught by the gate, reverted before landing — not
+// shipped. split_horizontal/split_vertical are the only types with NO flat-mode equivalent anywhere (nothing
+// else ever draws a two-pane split), so they stay the sole trigger — restoring the original, tested behavior
+// byte-for-byte. The other 7 candidate types (code_preview/usage_text/grid_container/tab_group/layout/
+// simstart/param_table) were NEVER independently verified after the feature_canvas/sim/preview3d theory broke
+// down, so they are NOT added here either — an unverified guess is not a fix. t2639's own drag-handle dead end
+// (a hand-built feature_canvas+point_handle wizard rendering a fully empty pane) is very likely NOT a
+// hasTreeLayout defect at all — panelType('').viz is false when an op's top-level `panel` field is unset, which
+// would hide the whole .wiz-visual pane regardless of tree/flat, and the SAME turn separately found the real
+// UI's own panel-type dropdown (`.selectOption({label:'Form + 3D + 2D'})`) silently failing to commit. That is
+// the more likely true root cause, and it needs its own separate investigation — flagged, not fixed here.
+const TREE_ONLY_TYPES = new Set(['split_horizontal', 'split_vertical']);
+
+export function usesTreeOnlyLayout(nodes) {
+    for (const n of childrenOf(nodes)) {
+        if (!n) continue;
+        if (TREE_ONLY_TYPES.has(n.type)) return true;
+        if (n.children && usesTreeOnlyLayout(n.children)) return true;
+        if (n.uiChildren && usesTreeOnlyLayout(n.uiChildren)) return true;
+    }
+    return false;
+}
+
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
 export function flattenBlocks(blocks, out = [], currentGroup = null) {
