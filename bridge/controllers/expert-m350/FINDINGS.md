@@ -2410,3 +2410,35 @@ races it reports the channel healthy when it is already dying.
 ⚠ **A false all-clear is worse than no check at all**, because it launders the next batch's stale reads into
 "measurements". `tools/macro_probe.py` now waits **1.8 s** after the expression and a further **1.0 s** before
 the canary. ⭐ Both verdicts it has produced since were then confirmed against a photograph of the pendant.
+
+## ⭐⭐ WHY AN INJECTED WRITE "DOESN'T TAKE" — **TWO INDEPENDENT CAUSES** `[CONFIRMED on machine 2026-09-05]`
+
+### CAUSE 1 — a latch, from an error earlier in the batch (100% loss until Reset)
+Covered above. Total, persistent, and invisible from the PC. This is the big one.
+
+### CAUSE 2 — ⭐ **BASELINE RANDOM LOSS OF ROUGHLY 10–25%, ON A PERFECTLY HEALTHY CHANNEL**
+Measured with the pendant photographed **green and `READY` before and after**, using only plain numeric
+assignments that cannot raise an error:
+
+| test | result |
+|---|---|
+| 20 unverified writes | **17/20 landed, 3 lost** |
+| 15 writes, polled until the value appeared | **11 arrived in ~440 ms; 4 NEVER arrived** (6 s cutoff) |
+
+⭐ **The latency is bimodal: ~440 ms, or never.** There is no slow tail — a line either executes in well under
+half a second or it is gone. ⇒ A "dropped" write leaves the variable at its **previous value**, which is what
+makes it read as a plausible answer instead of a failure.
+
+⛔ **PACING DOES NOT FIX IT.** Loss vs. the gap left before each line: `0 ms → 2/12`, `250 ms → 0/12`,
+`500 ms → 1/12`, `1000 ms → 2/12`. No relationship. Waiting longer is not the answer, and neither is a
+register-3000 handshake (the buffer was never observed non-zero even immediately after a write).
+⚠ **Root cause remains UNKNOWN** `[TO TEST]`.
+
+### ⇒ THE OPERATING RULE: **NEVER TRUST AN UNVERIFIED INJECTION**
+Write → read back → retry. At ~15% loss, four attempts put the residual failure near **0.05%**. This is what
+`tools/macro_probe.py::set_var` does, and it is not optional: **every wrong finding recorded in this file on
+2026-09-05 traces back to a single unverified write whose stale read-back was taken as a measurement.**
+
+⚠ **This applies to the whole G-code injection channel, not just probing** — anything built on register 3000
+inherits a ~1-in-6 silent failure rate per line. A multi-line sequence sent blind will *usually* be missing a
+line. ⛔ Any future use must verify each line landed, or be idempotent and re-sent.
