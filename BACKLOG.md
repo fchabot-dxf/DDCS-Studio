@@ -8198,6 +8198,43 @@ touched, not the recompose/emit machinery), `atc_check_data`, `atc_length_data` 
 row-diff test plus a live "does a real canvas mount" proof, plus its own full pre-existing test suite. Full
 account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).
 
+### 78. ⛔ REMOVE THE BEACON PROGRESS MECHANISM ENTIRELY — owner: "beacons dont work remove them"
+
+**[OPEN, owner-directed 2026-09-04. Not a cleanup — ~238 references in `bridge/bridge-app`.]**
+
+⭐ **The owner's statement is the finding.** The beacon tracks job progress by **rewriting the user's `.nc`**:
+the instrumenter inserts `#250 = <n>` + `MSETDATA[250,1,0,2,16,300]` checkpoints, each arriving at the PC
+slave as `28416 + n`, decoded against a per-job JSON map into percent/op/line/ETA
+(`bridge/bridge-app/shared/PROTOCOL.md` §1–§2).
+
+⚠ **AND THE DOCS DISAGREE WITH THE OWNER, WHICH IS ITSELF WORTH RECORDING.** `PROTOCOL.md` says *"Proven on
+the machine 2026-06-06 (`CHECKPOINT_TEST.nc`): n = 1/2/3 arrived as 28417/28418/28419, wedge-free"* and calls
+the frame fixed. The owner says it does not work. ⇒ **The proof was a purpose-built three-checkpoint test
+file, never a real instrumented job** — the same narrow-proof-generalised-too-far shape this repo keeps
+finding (cf. the t2599 `edge` comment claiming "faithful reproduction" of a render nobody had called the
+function to observe). Do NOT re-litigate the owner's report against that line; establish what the test proved
+and mark the doc accordingly on the way out.
+
+⭐⭐ **THE REPLACEMENT ALREADY EXISTS AND IS BETTER:** Modbus live position polling —
+*"the position registers TRACK LIVE during motion — progress without instrumentation"*
+(`expert-m350/FINDINGS.md` §29, CONFIRMED 2026-08-26). Continuous rather than at inserted checkpoints, and
+**it never touches the user's file**. A mechanism that rewrites a program which then cuts metal is a standing
+hazard the poller removes entirely.
+
+⚠ **The one trade, recorded and consciously accepted:** `MSETDATA` (master-mode push) works on ANY firmware;
+the poller needs `P279 = SLAVE`, i.e. fw ≥ `2025-12-11-00`. Removing beacons therefore leaves pre-slave-mode
+firmware with no progress tracking at all. Moot per the owner (it does not work anyway), but it is the reason
+[[the firmware-capability gate]] below matters — an old-firmware user should be TOLD, not silently degraded.
+
+**Related, same conversation:** a gateway notice that reads the firmware version (safely, from the `eng` dump
+over SMB — works on any firmware, before any Modbus is attempted) and gates functions off ONE declared
+capability table. Two gates, not one: `≥2025-12-11-00` → slave mode (DRO, machine coords, param table,
+keypress); `≥2026-08-03-00` → injection (MDI, the universal variable reader). ⛔ Below `2025-12-11-00`,
+`MGETDATA` does not fail politely — it **freezes the controller and needs a reboot**, so the gate BLOCKS a
+known-harmful call rather than greying out a button. ⛔ No feature may test the version string itself; every
+consumer reads the table (this repo has just spent an arc digging out `checkLayoutNodes` vs `hasTreeLayout` —
+two hand-lists answering one question, disagreeing).
+
 **t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
