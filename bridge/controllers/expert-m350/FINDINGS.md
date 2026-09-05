@@ -2815,3 +2815,40 @@ executed.** ⇒ Two independent layers, and they fail independently:
 
 ⇒ **A latch is an INTERPRETER halt while the transport stays healthy.** That is why an acked line can still
 do nothing, and why "still alive?" checks based on the ack alone are worthless during an error.
+
+## ⭐⭐⭐ RUN STATE **IS** EXPORTED — REGISTER `10002`. THE VENDOR'S OWN TOOL POLLS IT. `[VENDOR SOURCE + read on machine 2026-09-05]`
+From `m350_liveg.py::poll_m350_state_with_strict_crc` (github.com/foinnc/M350-LiveG):
+```python
+read_cmd = calculate_crc(bytes([slave, 0x03, 0x27, 0x12, 0x00, 0x02]))   # 0x2712 = 10002, FC03, 2 regs
+...
+return int(struct.unpack('>f', bytes([res[5], res[6], res[3], res[4]]))[0])   # CDAB word-swap
+```
+⭐ **`0x2712` = register `10002`, float32 CDAB. `0` = idle.** Read live here: **`0.0`** with the machine idle.
+
+**How the vendor uses it — a complete motion-completion protocol:**
+1. send the line, confirm the 8-byte FC16 echo
+2. poll `10002` up to 8× at 20 ms — **leaving `0` means motion STARTED**
+3. then poll at 40 ms until it reads `0` **twice consecutively** — motion FINISHED
+4. if it never left `0`, the move was a zero-stroke (already at target)
+
+⛔⛔ **THIS ANSWERS A QUESTION THIS FILE HAS CARRIED AS OPEN FOR MONTHS** — *"no 'currently running' flag
+found"*, after diffing 2,400 registers mid-run. ⚠ **I read `10002` earlier today, got `0.0`, and dismissed
+it as "not Z either."** It was the answer, in a register I had already sampled. `10002` sits in the
+`10000`–`10998` *system internal variables* block, which is why a macro-variable sweep never surfaced it.
+⇒ ⭐ **Directly relevant to Studio**: this is a real progress/completion signal, not the end-of-run
+counters. `[TO TEST: confirm it becomes non-zero during an actual move — needs the owner at the machine.]`
+
+## ⭐ THE VENDOR'S REGISTER-3000 SEND PATH — AND WHAT IT DOES **NOT** EXPLAIN
+`m350_liveg.py::send_gcode_process`, the reference implementation:
+- ⛔ **NO trailing `\n`** — `gcode_str.encode('ascii')`, pad to even with `\x00`, byte-swap each pair. We
+  append `\n`; the vendor does not.
+- **`serial_conn.flush()`** immediately after `write()`; we never flushed.
+- success = the reply is **exactly the 8-byte echo** `slave 10 <addr> <count> <crc>`.
+- ⭐ **`res[1] == 0x90` is a BUSY exception** — the controller can explicitly answer "busy" (FC16 | 0x80).
+- baud dropdown offers **`9600 / 38400 / 115200`** — ⭐ **`19200` is not offered at all**, which fits our
+  measured collapse at that rate.
+
+### ⛔ BOTH DIFFERENCES TESTED AND REFUTED AS A FIX
+The five known-bad lines, 5 attempts each, unpadded: **`0/5` with our framing, `0/5` with no `\n`, `0/5`
+with no `\n` + `flush`.** ⇒ Neither the terminator nor the flush affects delivery. **Payload LENGTH remains
+the only lever that works** (pad to 64 ⇒ 5/5). The vendor's own tool would hit this too.
