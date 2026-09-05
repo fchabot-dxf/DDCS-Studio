@@ -2640,3 +2640,33 @@ and ack-retry are BOTH required**; neither alone is sufficient. With both, 25/25
 *before* the controller parses anything. ⇒ Buffer size, terminators, stale bytes and G-code semantics are all
 **ruled out**; this is framing/signal integrity on the wire. That is also why three CRC theories failed: they
 were modelling a parser that was never involved.
+
+### ⭐⭐ THE LIKELY MECHANISM, FROM THE FIELD LITERATURE: **USB-SERIAL LATENCY SPLITS RTU FRAMES ABOVE 19200 BAUD** `[RESEARCHED 2026-09-05 — plausible, NOT yet tested]`
+Searched for the symptom rather than guessing a fourth CRC rule. It is a **known, named problem**:
+
+> *"At baud rates above 19,200 the inter-character timeout becomes very short, and USB-to-serial converters
+> and software-based serial ports may introduce latency that exceeds these thresholds, **causing frames to be
+> split erroneously**."* — and the standard first move is *"if you see CRC errors at higher baud rates, try
+> reducing the baud rate before anything else."*
+
+⭐ **A split frame fails CRC at the slave, and a Modbus slave answers a bad CRC with SILENCE — no exception,
+no NAK.** ⇒ That is exactly our signature: no ack, no error on the pendant, nothing executed.
+
+**The numbers for this link:** 115200 baud ⇒ one character ≈ **87 µs**, so RTU's 1.5-character inter-character
+limit is ≈ **130 µs**. ⛔ **This machine's FTDI `LatencyTimer` is `16` — the default, and over 100× that gap.**
+(`HKLM\SYSTEM\CurrentControlSet\Enum\FTDIBUS\VID_0403+PID_6001+BG01LT65A\0000\Device Parameters`.)
+
+⚠ **Honest caveat:** FTDI's own app note (AN232B-04) describes the latency timer as governing the **receive**
+path — the chip buffers device→PC data until the buffer fills or the timer expires. Our failure is in the
+**transmit** direction (the line never executes), so the latency timer may not be the actual cause. It is
+cheap and reversible, so it is worth eliminating first, but **the stronger candidate is the baud rate.**
+
+### ⇒ TWO UNTESTED FIXES, IN ORDER OF COST `[TO TEST]`
+1. **`LatencyTimer` 16 → 1** — PC-side only, no controller change, instantly reversible. Needs admin:
+   *Device Manager → Ports → USB Serial Port (COM6) → Port Settings → Advanced → Latency Timer*.
+   ⚠ Baseline to A/B against, measured today: `[3+3]` **0/5** bare, and **82%** delivery across 20 random lines.
+2. ⭐ **DROP THE BAUD RATE** — the field-standard first move, and it addresses the transmit path the latency
+   timer does not. ⛔ Needs the controller's serial parameter changed **and a reboot** (serial params apply
+   only at startup — already established here), so it is a real bench step, not a keystroke.
+
+⭐ If either works, the padding and ack-retry workarounds become belt-and-braces rather than load-bearing.
