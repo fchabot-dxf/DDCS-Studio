@@ -31,9 +31,57 @@ import time
 REG_INJECT = 3000
 MAX_PAYLOAD = 246
 PAD_TO = 64
-SCRATCH = 916   # NOT 915 -- #915 refuses writes, cause unknown (FINDINGS 2026-09-05)
-REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7332
+SCRATCH = 1060  # = Pr560. ⛔ CHOSEN DELIBERATELY, NOT AT RANDOM. There is NO scratch space on this
+                # controller, so this had to be a real parameter picked on evidence: Pr560 is UNNAMED in
+                # DDCS-Studio/web/data/default_vars.js AND absent from every section of PARAM-PAGE-MAP.md.
+                # ⚠ #915-#918 were used before this and are H16-H19 TOOL LENGTH OFFSETS -- see
+                # context/DDCS-VARIABLES.md. Its value is saved and restored around every run.
+REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7620
 SENTINEL = -77777.0
+
+
+# ⛔⛔ WHAT EACH MACRO ADDRESS ACTUALLY IS. There is NO scratch space on this controller: every
+# Modbus-writable macro address is a real machine parameter or a system global.
+#   #0-#49     subprogram locals   (not Modbus-visible)
+#   #50-#499   global variables    (not Modbus-visible -- the ONLY true scratch, macro-side only)
+#   #500-#1499 = Pr0-Pr999   REAL PARAMETERS, mirrored at 6500 + 2*(N-500)
+#   #1500-#2499 system globals,     mirrored at 15000 + 2*(N-1500)
+#   #2500-#2999 = Pr1000-Pr1499     mirrored at 8500 + 2*(N-2500)
+# ⚠ A value of 0 does NOT mean unused -- an unset tool offset reads 0, so does a free slot.
+NAMED = [
+    (800,  844,  "the WCS table G54-G59 -- G54 Z0 IS THE SPOILBOARD"),
+    (900,  919,  "H01-H20 TOOL LENGTH OFFSETS"),
+    (920,  939,  "D01-D20 cutter compensation offsets"),
+    (655,  670,  "the software limits"),
+    (622,  626,  "home / machine zero"),
+    (735,  739,  "machine zero offsets"),
+    (575,  577,  "probe input port and level"),
+    (766,  767,  "SERIAL BAUD RATE -- breaking this loses the link"),
+    (779,  779,  "Modbus RTU mode (slave) -- breaking this loses the link"),
+    (796,  797,  "serial parity / stop bits -- breaking this loses the link"),
+    (1390, 1449, "the tool table (X/Y/Z offsets)"),
+]
+
+
+def describe(var):
+    """Return a warning string if this macro address is a known-meaningful slot, else ''."""
+    for lo, hi, what in NAMED:
+        if lo <= var <= hi:
+            return "#%d is Pr%d -- %s" % (var, var - 500, what)
+    if 500 <= var <= 1499:
+        return "#%d is Pr%d -- a REAL PARAMETER (unnamed here, look it up before writing)" % (var, var - 500)
+    return ""
+
+
+def assert_writable(var):
+    """⛔ Refuse a write to a named-dangerous slot. Owner-ruled after #915-#918 (H16-H19 tool
+    offsets) were used as scratch for hours on 2026-09-05 and left holding 111.0 and 222.0."""
+    for lo, hi, what in NAMED:
+        if lo <= var <= hi:
+            raise SystemExit(
+                "\n  REFUSED: #%d is Pr%d -- %s\n"
+                "  This is not scratch space. Look it up in default_vars.js and\n"
+                "  PARAM-PAGE-MAP.md, and if you really mean it, say so explicitly.\n" % (var, var - 500, what))
 
 
 def crc16(b):
@@ -135,6 +183,7 @@ def poll_for(s, reg, want, window=3.0, match=True):
 
 def set_var(s, var, value, tries=4):
     """Write a numeric value and confirm it landed, polling rather than guessing a delay."""
+    assert_writable(var)                      # ⛔ refuses named-dangerous slots
     reg = 6500 + 2 * (var - 500)
     value = float(value)
     for attempt in range(tries):
@@ -198,6 +247,9 @@ def main():
         exprs = args
     import serial
     s = serial.Serial(port, 115200, 8, "N", 1, timeout=1.0)
+    # ⭐ SAVE the scratch slot's real value and put it back afterwards. It is a parameter, not scratch,
+    # so leaving our arithmetic in it is exactly the mistake this tool now guards against.
+    original = read_f32(s, REG_READ)
     try:
         for e in exprs:
             try:
@@ -213,6 +265,13 @@ def main():
                                       if v is None else v))
         inject(s, "#%d = 0" % SCRATCH)
     finally:
+        if original is not None:
+            for _ in range(4):
+                inject(s, "#%d = %s" % (SCRATCH, original), settle=0.0)
+                time.sleep(0.4)
+                v = read_f32(s, REG_READ)
+                if v is not None and abs(v - original) < 0.01:
+                    break
         s.close()
     return 0
 

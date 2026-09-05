@@ -26,6 +26,7 @@ delivery mechanism. **Open it now.**
 | [`context/CHANNELS.md`](context/CHANNELS.md) | the vendor and the community — what is pending with each |
 | [`context/VERIFICATION.md`](context/VERIFICATION.md) | **which suite to run and what it costs** — the tier policy, where to watch progress, and the two traps that silently disable the tooling |
 | ⭐ [`context/RUNNING-THE-LOOP.md`](context/RUNNING-THE-LOOP.md) | **advisor/worker mechanics that have already cost real time** — never idle the worker on a non-decision · narrow scope at dispatch not mid-turn · `git add <path>` does not protect a shared FILE · name the tier |
+| ⭐ [`context/DDCS-VARIABLES.md`](context/DDCS-VARIABLES.md) | ⛔ **look up a `#variable` before writing it** — there is NO scratch space; `#915`-`#919` are tool offsets, `#800`+ is the WCS table |
 | [`context/GIT-AND-TOOLING-HAZARDS.md`](context/GIT-AND-TOOLING-HAZARDS.md) | shell/git/test-runner traps in THIS repo — heredoc escapes, the shared git stash, the mem-server's stale preload, CSS token defaults |
 | [`context/VERIFICATION-DISCIPLINE.md`](context/VERIFICATION-DISCIPLINE.md) | what "green" has to mean here — verify the real symptom not a proxy, assert the value not the change, review the whole surface |
 | [`context/PRODUCT-PRINCIPLES.md`](context/PRODUCT-PRINCIPLES.md) | standing owner rulings on the product itself — nothing is precious, GUI over fields, no unrequested affordances |
