@@ -100,9 +100,20 @@ The queue now, in order:
    - **DDCS V4.1 Firmware Execution Insights (Attested for V4.1 only by Yt Liu):**
      - *Macro Parser Mode (#122 / `macro_` prefix):* Standard G-code mode lacks loop stacks for `WHILE` and freezes on unspaced `IF` tokens. Unlocked by setting parameter `#122 = 1` or prefixing the filename with `macro` (e.g., `macro_test.nc`, matching factory `macroMillCylinder.nc`).
      - *Comma-Separated `ATAN[dy, dx]` Syntax:* `ATAN` on DDCS V4.1 strictly requires two arguments separated by a comma (e.g., `#190 = ATAN[1, 1]`, returning 45° in degrees).
-Standing user backlog behind those (from t1046, still real): K-button wizard (Expert-only, #2037
-nav library) · exe auto-update (branch pair exists — needs a real packaged-exe test) · Google
-Drive reliable for other users (desktop OAuth live-untested).
+Standing user backlog behind those (from t1046): K-button wizard (Expert-only, #2037
+nav library) · exe auto-update (branch pair exists — needs a real packaged-exe test).
+⭐ **Google Drive is DONE — struck from this list 2026-09-05, owner-confirmed: "google drive works."** The old
+entry ("reliable for other users · desktop OAuth live-untested") was stale twice over. The live round-trip was
+never broken, only **blocked on an external prerequisite the owner has since supplied**; and "for other users"
+is moot because **credentials ship BUNDLED** — `fairy/config.py` auto-seeds `google_client_id`/`_secret` from
+`fairy/google_oauth.json` when empty, stamps `google_client_source = "bundled"`, and migrates a mis-seeded WEB
+id to the bundled desktop one (t2079b). `config.py:24` states it outright: *"no extra credential to configure."*
+⇒ No user supplies anything, no Setup field is needed, and the `drive.file` scope means the app only ever sees
+files it created.
+⚠ **Method note, because this cost real time:** an advisor read this line plus a 79-day-old memory's own
+"Remaining: add a Setup field", grepped for that field, found none, and concluded Drive was unreachable for
+anyone else — never checking whether the TODO was still needed. **Grep for the CAPABILITY, never trust a stale
+document's remaining-work list** (`context/VERIFICATION-DISCIPLINE.md`).
 4. **Wizards-as-Data Architecture & Layout Splitters:**
    - **Intention:** Provide declarative, block-driven wizard layouts (`split_horizontal`, `split_vertical`, `grid_container`, `tab_group`, `group_box`, `corner_grid_picker`, etc.) that allow custom wizard authoring in the Blocks tab without hardcoding HTML.
    - **Live Wizard View Drawer Integration:** The right-hand drawer in the Blocks tab serves as the single, full-height **Wizard View** (replacing standalone 3D/Gcode panels), continuously rendering a live 1:1 calculated Generator Modal preview as blocks change.
