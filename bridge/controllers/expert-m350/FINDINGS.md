@@ -2773,3 +2773,45 @@ bad."* Findings were being built on **this file's summary** of a **2025 manual**
 firmware**, while the vendor's live repo went unread. ⭐ **`Docs/` there holds ~40 more folders never opened
 here**, including `虚拟按键` (virtual keys), `按键键值宏地址#2037`, the full G/M code list, the coordinate
 transform formulas, and the current 4.7 MB system manual.
+
+## ⭐⭐⭐ THE FIRMWARE IS `2026-09-02-00`, NOT `2026-08-03-00` — AND THE VENDOR DOCS SETTLE THREE THINGS `[CONFIRMED from the pendant + vendor spec, 2026-09-05]`
+⛔ **This file has recorded the wrong firmware version.** The System Info page reads
+**`Software Ver: 2026-09-02-00`** (photographed). That release's one change is *"Expanded Modbus register
+address mapping"* — ⇒ **the official address map applies to this machine exactly.**
+Releases live at **github.com/foinnc/M350/releases**, each with `read.me.txt` + `setting` + V1/V2 zips.
+
+### ⛔ RETRACTED — "`#2500` is not Modbus-readable"
+**`#2500` is at register `8500`** (user-parameter block 2), `R/W`, and it **reads `-1.9204`** — the live
+tool-setter calibration reference. This file said a macro was the only way to read it. Wrong address, not
+unreadable. Same for `#2037` (`16074`) and `#2038` (`16076`).
+
+### ⭐⭐ `#2037` — THE OFFICIAL DOC, AND WHY A REGISTER WRITE CAN NEVER PRESS A KEY
+`assets/vendor-spec/2037_Button_simulation_macro_variable_M350.pdf` (vendor `Docs/按键键值宏地址#2037`):
+> *"Bit0-bit15: key value, actual key value = Table value − 1000; Bit16: press status; 0 loosen, 1 press.
+> Reset: `#2037 = 1*2^16 + (1327−1000) = 65863`."* ⭐ *"**Assign the #2037 assignment statement, and placed
+> in the executable code.**"*
+
+⛔⛔ **THE KEY PRESS IS AN INTERPRETER ACTION, NOT A REGISTER VALUE.** Writing `65863` to reg `16074` lands
+in the mirror and presses nothing — verified: the register write is accepted and the pendant's `ERROR`
+stays. ⇒ **The PC therefore CANNOT clear a latch**, and the reason is now documented rather than inferred:
+a latch halts the interpreter, and the press requires the interpreter. `[CONFIRMED — the original
+conclusion was right, the earlier reasoning ("#2037 is outside the mirror") was wrong.]`
+
+**Key values** (subtract 1000, add `65536` for a press): Reset `1327` · Start `1328` · Pause `1329` ·
+Esc `1027` · Enter `1013` · Backspace `1008` · arrows `1016-1019` · Spindle on/off `1331` · M3/M4/M5
+`1372/1371/1370` · jog `X± 1350/1351  Y± 1352/1353  Z± 1354/1355` · feed `100%/+10%/-10%` `1364/1365/1366` ·
+spindle rate `1367/1368/1369` · Fast `1388` · Start1-3 `1392-1394` · screens: Monitor `1373` Program `1374`
+Param `1375` IO `1376` System Log `1377` System Info `1378` MDI `1348` Manual `1326` Probe `1323`.
+⭐ `#2038` reads the **current key value + press state** — the read side of the same mechanism.
+
+### ⛔ CORRECTION — "THE FC16 ACK IS THE CHEAP TRUTH" IS ONLY HALF RIGHT
+**ACK proves DELIVERY, not EXECUTION.** With an error displayed: **9/10 injections acknowledged, 0/10
+executed.** ⇒ Two independent layers, and they fail independently:
+
+| layer | what fails | how it looks |
+|---|---|---|
+| **transport** (Modbus) | frame lost on the wire | **no ack** |
+| **interpreter** (G-code) | halted by an error | **ack OK, nothing happens** |
+
+⇒ **A latch is an INTERPRETER halt while the transport stays healthy.** That is why an acked line can still
+do nothing, and why "still alive?" checks based on the ack alone are worthless during an error.
