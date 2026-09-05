@@ -75926,3 +75926,156 @@ visually/textually distinguish the two so picking the wrong one is not a silent 
 live-preview staleness) is the next biggest authoring-experience gap — a person cannot iterate without it.
 The unreached drag-handle round trip is the next turn's own natural continuation of this one.
 
+## 🔨 turn 2639 — finish the handle round trip, propose (don't pick) on the param_field trap, mark all 7
+
+Same discipline as t2637: real toolbox clicks, real mouse-drag placements (a `Blockly Connection`'s own screen
+coordinates computed via its CTM, used as the drag target — more reliable than guessing pixel offsets, though
+NOT uniformly — see below), real click+type into fields, the real Save dialog. No product code touched, no
+def hand-written. Scratch scripts (`tests/zzh*.spec.js`) run, read, deleted before this entry — `git status`
+clean of anything but this WORK-LOG entry.
+
+### PART 1 — the drag-handle round trip: BLOCKED, and the block IS the finding
+
+Built the full structure through the UI: `user_root` → `assign #1` in EXECUTION; `param_group` →
+`formfield(param:px, matchvar:#1)` → `feature_canvas` → `point_handle` (left at its own default `fx:"px",
+fy:"py"`, matching the field's own name) in PRESENTATION. Verified CORRECT via Blockly's own model, not
+assumed: walked the block chain (`getNextBlock()`) and confirmed `param_group → feature_canvas → point_handle`
+in order, with `formfield` correctly nested inside `param_group`'s own `DO` mouth. Saved (name "Handle Test"),
+opened the real saved wizard via the same route a person's own click would take.
+
+**The rendered form used the CLASSIC (non-`_tree`) container ids** (`userVizContainer`, `blk_userVizContainer`
+— confirmed via DOM query) — meaning it rendered through the FLAT renderer, not the tree one. No handle
+existed anywhere in the DOM (`[data-hid]`: zero matches), the visualization pane was empty black, confirmed
+stable after a 2.5s settle (this session's own established false-alarm class — ruled out, not assumed).
+
+**Root cause, confirmed by reading the actual check** (`userOpView.js:106-123`, `hasTreeLayout`): it returns
+true ONLY if a `split_horizontal`/`split_vertical` node exists ANYWHERE in the twin's own `uiChildren` — no
+other node type counts, confirmed by reading the function's own body, not inferred. My build never included
+one, because **nothing in the UI ever told me to** — the Save dialog's own hint text ("drop a Panel and a Form
+field block into its Presentation mouth") and every category label I explored never once mentioned a split.
+`userOpView.js`'s own t2371 comment confirms this is not a fluke: forcing tree mode for ops in this exact
+shape "was tried first and reverted... a much bigger behavior change than 'add a picker'" — the fix that
+exists for OTHER such ops (`path_anchor`) is a hand-written per-op workaround (`mountFlatPathAnchor`), not a
+generic mechanism a person's own blocks could reach. **`point_handle`/`feature_canvas` dropped into a
+non-split Presentation mouth render nothing, silently — the classic/flat renderer has no branch for either
+node type**, so a canvas-interactive wizard built by following the app's own on-screen guidance produces an
+empty visualization pane with zero error anywhere.
+
+**This is the SAME defect my own t2633 vocabulary-walker census already named** (`checkLayoutNodes` vs
+`hasTreeLayout`, item 3 of the 7 AT-RISK walkers) — but that census measured it as an internal-consistency
+gap between two hand-lists; THIS turn proves it from the authoring side as a total, silent dead end for the
+one completeness bar the dispatch itself named ("a real form with... AT LEAST ONE working drag handle that
+writes back to a field"). **Could not verify the drag-writes-back claim because the handle never rendered at
+all — the blocker sits upstream of the drag itself**, which is itself the honest answer to "did you complete
+the round trip": no, and here is exactly where and why, not a vague "ran out of time."
+
+**A second, narrower automation note, named because it's a real limitation of THIS turn's own method, not the
+product**: the connection-coordinate drag technique that worked reliably for every OTHER connection in this
+build (assign→EXECUTION, param_group→PRESENTATION, feature_canvas/point_handle via `.nextConnection`) failed
+consistently for ONE specific connection — a flyout `formfield` dropped onto `param_group`'s own `DO` input
+connection — landing the block unconnected every time; the pixel-offset technique from t2637's own first
+successful build (targeting a fixed offset from the parent block's own top-left) worked reliably there
+instead. Also noted: `formfield`'s own `MATCHVAR` field is a dropdown/autocomplete (shows "(nothing in this
+stack yet)" when no execution vars exist yet to match against — a genuinely helpful, context-aware hint,
+positive not a gap) — editing a SECOND formfield's own `MATCHVAR` via typed-text-then-Enter proved unreliable
+across repeated attempts in a way editing the FIRST one never was; not fully root-caused within this turn's
+own budget, named rather than glossed over.
+
+### PART 2 — the param_field trap: four options, blast radius, NONE implemented
+
+Measured facts first, not guessed: `field_ref` appears in every one of the 32 built-in-equivalent ops' own
+dataOps files (96 occurrences total, `grep`-confirmed). `param_field` as a literal `type:'param_field'` node
+appears in **zero** dataOps files' own hand-written templates — the only two files that reference it at all
+are `userOps.js` (`materializeParamGroup`, which auto-GENERATES `param_field` block instances FROM an
+already-derived binding, for the Blocks-tab's own "Customize as blocks" display of an EXISTING op — never
+touched by a person dragging from the palette) and `paramField.js` (the block's own definition/emit). The
+DRAGGABLE PALETTE ENTRY a new author reaches for is a separate surface from that materialization machinery —
+this matters for blast radius below, since "touch the palette block" and "touch the materialization code" are
+NOT the same change.
+
+**A — delete `param_field` from the Wizard Inputs flyout entirely.**
+Blast radius on existing ops: zero (none declare it). Blast radius on the materialization machinery: zero IF
+scoped to only the flyout registration — `materializeParamGroup` generates `param_field` block INSTANCES
+programmatically, not by dragging from a palette, so removing the flyout entry doesn't stop it from still
+emitting/rendering `param_field`-typed blocks for existing ops' own Customize views. What breaks: a person can
+no longer intentionally author a NEW field this narrower way at all — funnels everyone through `formfield`.
+Round-trip: N/A, the option is removed from view.
+
+**B — relabel/redesign the block face so its own dependency is visible** (a visible "(needs a binding wired
+elsewhere)" badge, a distinct/muted colour, marked "advanced").
+Blast radius: touches only `paramField.js`'s own declaration — a label/style change, no shape change. Risk:
+EXISTING materialized `param_field` instances (correctly bound already, via `blockIndex`, for real shipped
+ops) would ALSO pick up the same warning styling unless the fix can tell "freshly dragged, unbound" apart from
+"materialized, already resolved" — needs that distinction built in, or it creates a NEW false alarm on
+correctly-working fields. What breaks: nothing functionally either way.
+
+**C — make `param_field` ERROR LOUDLY (a visible warning, matching the SAME loud-not-silent pattern this
+arc's own `traverse()` unwired-placeholder already uses elsewhere) when its own `param` value has no
+resolvable binding, instead of rendering a dead field with no signal.**
+Blast radius: touches the validation path only (likely alongside `validateUserOp` or the Blocks-tab's own
+reprojection step) — needs one check: "does this param_field's own declared `param` resolve to a real
+derived binding." Existing materialized instances already HAVE one (that's how they got materialized), so
+they're unaffected; only a freshly-dragged, never-bound one would trip it. Smallest-radius fix that keeps the
+block itself unchanged. Round-trip: a person dragging one alone would see an immediate warning instead of
+silence — this session's own established pattern for "AT-RISK but the good kind."
+
+**D — merge the two blocks into one** (`formfield`'s own self-contained bindMode/matchvar mechanism as the
+ONLY form-field block the palette offers; `param_field`'s own shorter field set becomes a "simple mode" toggle
+on the SAME block rather than a second one).
+Blast radius: the largest of the four — touches `paramField.js`'s own definition, whatever renders the toggle,
+AND `materializeParamGroup`'s own type checks (which branch on `b.type === 'field_ref'`/`'param_field'` by
+literal name in several places — a real schema change, not a label change) — those call sites would need
+updating or the merged block would need to keep emitting as `param_field` for backward compatibility with
+every already-materialized instance across all 32 shipped ops. What breaks: potentially the most of the four,
+since it changes a type identity multiple existing code paths already key off of.
+
+**None of the four implemented.** This is the owner's call to make on the authoring surface, per the dispatch.
+
+### PART 3 — all seven gaps, marked impossible (blocks a person) vs annoying (slows them down)
+
+1. **No discoverable "start" entry point** (user_root buried near the bottom of a 28-entry flyout) —
+   **ANNOYING.** Recoverable: a person who keeps scanning eventually reaches it; nothing about it is silent
+   once found, and once found the block behaves exactly as expected.
+2. **The `param_field` trap** (silently dead, unwired field with zero error) — **IMPOSSIBLE.** No signal
+   anywhere tells a person their build is broken; they would ship a wizard with a field that renders but
+   controls nothing, and have no way to discover why without reading source.
+3. **Live Wizard View never refreshes while actively building** — **ANNOYING.** Slows iteration (no feedback
+   loop until Save), but doesn't block progress — a person can still save, look, and keep going.
+4. **Mouth-drop-target precision** (Presentation/Execution sit close, a bad drop connects silently in the
+   wrong one) — **ANNOYING ALONE, COMPOUNDS TOWARD IMPOSSIBLE WITH #3.** Recoverable on its own (drag it
+   again once noticed) — but paired with #3's own lack of live feedback, a person may not notice the mistake
+   at all until they save and something is missing, which is the same SILENT-FAILURE shape as #2, just less
+   severe (a misplaced block is fixable once found; an unbound field is a schema gap needing source-reading).
+5. **Precise canvas drag-and-drop is genuinely hard to land** — **ANNOYING.** A general, well-known class of
+   Blockly-editor friction, recoverable by retrying; this turn's own repeated automation failures on ONE
+   specific connection type (finding above, Part 1's own second note) is evidence this friction is real, not
+   theoretical, but it does not stop a person outright.
+6. **Corner-specific leftover blocks cluttering the generic palette** — **ANNOYING.** Pure discoverability
+   tax on an already-long category; does not prevent success.
+7. **"Save wizard…" also inserts an instance into the current program, unannounced** — **ANNOYING.**
+   Surprising, not destructive (Undo exists); doesn't block authoring, just isn't what the dialog's own
+   copy would lead a person to expect.
+8. **(New this turn, not in the original seven, and the most severe of all)** — **feature_canvas/point_handle
+   dropped into a non-split Presentation mouth silently render nothing** — **IMPOSSIBLE, and the highest-value
+   finding of this turn.** This is the one that actually blocks the dispatch's own completeness bar: a person
+   cannot build a canvas-interactive, built-in-equivalent wizard by following the app's own on-screen guidance
+   today, with zero error anywhere telling them why.
+
+### VERIFY
+
+The handle round trip: completed as far as it goes, blocked with its exact cause named (Part 1) rather than
+abandoned unexplained — this itself satisfies "the blocker named" per the dispatch's own VERIFY line. Four
+options on the `param_field` trap, each with blast radius, none implemented (Part 2). All seven original gaps
+plus the one newly found this turn marked impossible-vs-annoying, each with the reasoning (Part 3). Nothing
+fixed: `git status` clean except this WORK-LOG entry, confirmed below. No full suite — zero product changes,
+matching the dispatch's own "discovery turn" framing.
+
+### NEXT
+
+The split_horizontal requirement (Part 1's own root cause) and the `param_field` trap (Part 2) are the two
+highest-leverage fixes available — both are now root-caused with a real mechanism named, not just observed
+symptoms, so whichever gets picked up next does not need to re-diagnose. The `param_field` decision is
+explicitly the owner's own call among the four costed options; the split_horizontal gap has no clean options
+proposed yet (this turn only diagnosed it) and would want the same treatment PART 2 got before anyone
+implements a fix.
+
