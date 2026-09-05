@@ -75808,3 +75808,121 @@ and the advisor's own note that they used `hasTreeLayout` as a progress counter 
 existed. LAYOUT-2D's own real content (the DOM-split, or a different field allocation) is a genuine open
 decision for whoever picks it up next, costed above.
 
+## 🔨 turn 2637 — THE AUTHORING TEST: can a person actually BUILD a wizard through the Blocks UI?
+
+**No product code touched. No dataOps file hand-written. No def registered via JS.** Every step below was
+driven the way a person would: real clicks on toolbox categories, real mouse-down/move/up drags from the
+flyout to the canvas, real click+Ctrl-A+type+Tab keystrokes into block fields, the real "Save wizard…" dialog.
+The only JS `page.evaluate()` calls used were to READ state a person would see on screen anyway (block types,
+field values, `listUserOps()`) or to compute WHERE on screen to click next — never to construct or register
+anything. Full transcript: a sequence of throwaway Playwright scripts (`tests/zzauthor*.spec.js`), each run,
+screenshotted, read, and deleted before this entry was written — none committed, per the dispatch's own "fix
+nothing" instruction; `git status` is clean of anything but this WORK-LOG entry.
+
+**Target chosen**: "Probe Single Point" — set a variable from a form field, small but genuinely exercises the
+whole pipeline (a real form field, a real execution atom, a real emitted line). Did not reach the full
+built-in-equivalent bar (preview3d/feature_canvas connected and verified structurally; a working DRAG HANDLE
+writing back to a field was NOT reached before the turn's own budget ran out — named honestly below, not
+claimed).
+
+### THE GAP LIST (counted, each with what it blocks)
+
+**1. No discoverable "start a new wizard" entry point.** Neither the STUDIO tab's own group dropdowns
+(Setup/Probe/ATC/Mill/Lathe — all built-ins only) nor the Blocks tab's own default landing state (a starter
+canvas showing unrelated example blocks: WCS/Tool/Spindle/Move) surfaces "here is how you begin." The block
+that actually starts a wizard — `user_root`, labeled **"Define Custom Wizard"** — exists, but sits as the
+SECOND-TO-LAST entry in the ~28-block "Wizard Layout" flyout, below all ten drag-handle types. **I found it
+only because I already knew from reading `userRoot.js` this session that its own label was literally "Define
+Custom Wizard" — a genuine reach-past-the-surface, counted here as the gap it is, not credited as "I figured
+it out."** A person scanning that flyout top-to-bottom has no reason to expect the most important block sits
+at the bottom of a list dominated by canvas-drag-handle primitives.
+
+**2. TWO near-identical "form field" blocks sit side by side in the SAME palette category, and picking the
+wrong one produces a SILENTLY DEAD field.** `formfield` (bindMode/matchvar/key/type fields — self-contained,
+binds to an execution atom by matching its own `var`, no JS needed) and `param_field` (param/label/widget/
+type/default/section only — no binding mechanism visible in its own block face at all; it depends on a
+`blockIndex` binding derived by `deriveBindingsFor` **in JS, outside the Blocks UI entirely**, per this arc's
+own established mechanism). Nothing in the palette visually flags which is which. A person reaching for
+`param_field` by its shorter, simpler-looking face would get a field that renders in the form but is never
+wired to anything the execution side reads — a genuinely silent dead end, not an error. **This is the single
+highest-value finding in this turn**: the more approachable-looking of the two options is the one most likely
+to leave a real author stuck with no signal telling them why nothing they type reaches the G-code.
+
+**3. The live Wizard View / form preview does NOT refresh while actively building.** Built a fully valid
+`param_group` → `formfield` chain, correctly connected in the Presentation mouth (verified via Blockly's own
+model: `presType: 'param_group'`) — the preview panel kept showing "This wizard has no fields yet — add a Form
+field block…" for as long as I kept working, confirmed NOT a timing race (waited 2+ seconds, clicked empty
+canvas to blur focus, still stale). It only picked up the real state after going through "Save wizard…" and
+clicking Save. A person building a form gets zero live feedback on whether their work is taking shape; the
+only way to check is to commit to a save and look at the result.
+
+**4. Mouth-drop-target precision: adjacent mouths, no error on a wrong-mouth drop.** `user_root`'s own
+Presentation and Execution mouths render close together; a drag aimed a few pixels too low lands the dropped
+block in the WRONG mouth silently — my own first attempt at connecting `preview3d` landed it in Execution
+instead of Presentation, with no rejection, no warning, no visual flag distinguishing "wrongly placed" from
+"correctly placed." A panel node sitting in Execution emits nothing (by design, now — t2635's own fix) but
+LOOKS identical on the canvas to one correctly placed in Presentation; nothing tells the author their form
+still has no visualization panel.
+
+**5. Precise canvas drag-and-drop is genuinely hard to land, even with full source knowledge.** Getting a
+flyout block to connect into a SPECIFIC named input (not just "anywhere on the canvas") took several failed
+attempts and ultimately required computing the target CONNECTION's own coordinates programmatically rather
+than eyeballing an offset — even with complete access to Blockly's own internal APIs to verify what went
+wrong each time. A real person has only Blockly's own live snap-highlight (shown during an in-progress drag)
+to judge this by, which is a well-known general difficulty of Blockly-style editors, not unique to this app —
+named here because it compounds directly with findings 3 and 4 (no live form preview to catch a bad drop, and
+adjacent mouths that don't flag a wrong one).
+
+**6. The palette exposes CORNER-SPECIFIC leftover blocks as generic, always-visible entries.** `Wizard Inputs`
+lists `sc_probezfirst`/`sc_travelapproach`/`sc_travelshape`/`sc_wcs`/`sc_synca`/`sc_corner`/`sc_probeseq`/
+`sc_axisorder` (corner's own structural-control blocks, rendered with corner-specific labels like "Probe Z
+First", "Corner", "Probe Order") alongside genuinely generic field types, with nothing marking them as
+op-specific. Pure clutter/discoverability tax on an already long (~28-entry) category, not a hard blocker.
+
+**7. "Save wizard…" also immediately inserts an instance into the CURRENT program — surprising, not
+announced.** After clicking Save, the new op appeared as a real emitted line (`#1=0`) in whatever program was
+open, with no separate confirmation. Not necessarily wrong (a person may want to see their new op placed right
+away), but a first-time author clicking "Save" to persist a definition would not expect it to also modify
+their current program in one step, and the dialog gives no warning that this will happen.
+
+### WHAT ACTUALLY WORKED — named because a gap list that only reports failure is a distorted arc, not a real one
+
+Once the right blocks were found and correctly connected, the pipeline is genuinely real, not a facade:
+`user_root` → `param_group` → `formfield` (renamed via a real click+Ctrl-A+type+Tab gesture, confirmed by
+reading the field back) → `assign` (`#1`) in Execution → "Save wizard…" (name + panel + preview-rig checkboxes
+— a self-documenting dialog: it explicitly said *"No form fields declared — saves a fixed (parameterless)
+wizard. Use a 'Parameter Group' block to add them"* when I tried saving before adding any, which is exactly
+the guidance that eventually pointed at the right mechanism) → registered as a real entry in `listUserOps()`
+→ appeared as a genuine new **"Custom wizards"** group in the STUDIO wiz-bar, fully discoverable like any
+built-in → emitted **correct G-code** (`#1=0`, matching the field's own default) the moment it was placed.
+`preview3d`/`feature_canvas` also connected correctly into Presentation once precisely targeted. This is not
+"expression masquerading as authoring" — a person who found the right blocks (gaps 1+2 above are exactly what
+stands between "found" and "didn't") can genuinely build a working, emitting, form-driven op with zero code.
+
+### WHAT I DID NOT REACH (stated plainly, not glossed over)
+
+Ran out of this turn's own budget before: connecting a drag HANDLE (`point_handle`/`length_handle`/etc.) to a
+field and verifying a canvas drag writes back to it — the dispatch's own explicit completeness bar, not met.
+Did not test `group_box`/`section` nesting for a labelled multi-group form purely through blocks. Did not
+verify the "3D" preview tab renders correctly for a freshly authored op. These are gaps in THIS TURN's own
+coverage, not claims that the mechanisms don't exist — they are simply unverified, and should be picked up
+before this list is treated as exhaustive.
+
+### VERIFY
+
+The wizard was built through the real UI as far as this turn's budget reached (documented step by step above,
+each with what worked / what needed a workaround / what silently failed). Every reach-past-the-surface is
+named with its reason (finding 1's own label-knowledge; the coordinate-computation in finding 5). The gap list
+is counted (7 items) and specific (each names exactly what it blocks). Nothing was fixed — confirmed:
+`git diff --stat` on `web/` is empty, only this WORK-LOG entry is staged. No full suite run — zero product
+changes this turn, matching the dispatch's own "this is a discovery turn" framing.
+
+### NEXT
+
+Findings 1 and 2 are the two worth acting on first: (1) surface "Define Custom Wizard" somewhere a first-time
+author would actually find it (a dedicated entry point, or at minimum moved near the top of Wizard Layout's
+own flyout) — and (2) either make `param_field` bind itself the same self-contained way `formfield` does, or
+visually/textually distinguish the two so picking the wrong one is not a silent dead end. Finding 3 (the
+live-preview staleness) is the next biggest authoring-experience gap — a person cannot iterate without it.
+The unreached drag-handle round trip is the next turn's own natural continuation of this one.
+
