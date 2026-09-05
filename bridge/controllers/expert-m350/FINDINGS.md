@@ -2923,3 +2923,30 @@ directly does nothing.
 `Pause` and `Reset` are announced-class and must not be sent unattended.
 ⚠ Still true that this **cannot clear a latch** — an error halts the interpreter, and this needs the
 interpreter.
+
+## ⭐⭐ THE OFFICIAL LINK CONFIGURATION — from the `M350-LiveG` README `[VENDOR-STATED, verified on machine 2026-09-05]`
+The vendor's README states the required setup for register-3000 injection. **We had never seen it**, and two
+of these parameters had never been checked here.
+
+| | required | **read on our machine** |
+|---|---|---|
+| firmware | **`2026-08-03-00` or higher** | `2026-09-02-00` ✅ |
+| **Pr267** Serial 2 baud | `B115200` | `4` ✅ |
+| **Pr279** Modbus RTU mode | ⭐ **Slave Mode** | `2` ✅ (we can read registers, which requires slave) |
+| ⭐ **Pr296** Serial 2 **parity** | `None` | `0` ✅ |
+| ⭐ **Pr297** Serial 2 **stop bits** | `1` | `0` — ✅ if index-encoded, as `Pr267` is `[VERIFY on the pendant]` |
+
+⇒ **Serial configuration is NOT the cause of the residual loss.** Also settles `#279`: **slave mode is the
+correct and required setting**, so the "poll vs slave" question is closed — it is already right.
+
+### ⚠⚠ THE HARDWARE LINE THE README ADDS — AND IT IS THE BEST REMAINING SUSPECT
+> *"Pin 7, Pin 8, Pin 9 (RS-232 **RXD**, **TXD**, **GND**). **Signal ground (GND) must be common/shared
+> between devices.**"*
+
+⭐ **A marginal or missing signal ground produces exactly our residual symptom**: intermittent frame
+corruption with no content pattern, and **worse at lower baud** (longer frames = more exposure per frame) —
+which is the one observation nothing else explained, since the 19200 collapse contradicts the USB-latency
+theory. `[TO TEST: confirm pin 9 GND is actually landed and common — a physical check at the machine.]`
+
+⚠ Also noted: the vendor's own screenshots show **LiveG V1.9**, while the GitHub *release* page offers only
+**V1.7**. A newer build exists somewhere; its source may document more registers.
