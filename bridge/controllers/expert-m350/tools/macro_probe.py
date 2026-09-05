@@ -107,7 +107,11 @@ def probe(s, expr):
     if not set_var(s, SCRATCH, SENTINEL):
         raise Latched("a plain numeric write to #%d would not stick after retries" % SCRATCH)
     inject(s, "#%d = %s" % (SCRATCH, expr))
-    time.sleep(0.9)
+    # ⛔ 1.8s, NOT 0.9. THE LATCH IS NOT INSTANTANEOUS. Measured 2026-09-05: `[2 ** 3]` raised a syntax
+    # error, but a canary fired ~0.5s later SLIPPED THROUGH and reported the channel healthy, so the
+    # expression was recorded as a harmless no-op. It is a syntax error -- photographed. A canary that
+    # checks too early gives a FALSE ALL-CLEAR, which is worse than no canary at all.
+    time.sleep(1.8)
     v = read_f32(s, REG_READ)
     if v is not None and abs(v - SENTINEL) < 0.5:
         # The sentinel survived, so the expression did not assign. TWO very different causes:
@@ -116,6 +120,7 @@ def probe(s, expr):
         # ⛔ Telling them apart is not optional. Measured 2026-09-05: `[7 MOD 3]` errored and latched,
         # and the batch cheerfully reported "no assignment" for the NEXT expression too -- which had
         # never executed at all. A canary write settles it.
+        time.sleep(1.0)
         if not set_var(s, SCRATCH, 4242.0, tries=2):
             raise Latched("%r raised a syntax error and LATCHED the channel "
                           "(canary write refused afterwards)" % expr)
