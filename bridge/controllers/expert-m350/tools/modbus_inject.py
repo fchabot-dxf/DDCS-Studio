@@ -45,6 +45,14 @@ PROTECTED = [
 ]
 
 
+# ⛔ #2037 IS THE VIRTUAL PANEL BUTTON. Writing it presses a real key: Start 65864, Reset 65863,
+# Pause 65865, plus feed/spindle overrides. It carries no G-code, no axis word and no protected
+# parameter, so the other two checks call it INERT — found 2026-08-26 by dry-running a Start press
+# through this very file. ⇒ A payload that can start the machine must never be reported as harmless.
+BUTTONS = {65864: "START -- runs the loaded program", 65863: "RESET", 65865: "PAUSE",
+           328: "start released", 1364: "feed override", 1367: "spindle override"}
+
+
 def classify(text):
     """Return a list of warnings describing what this payload could do. Empty list = inert.
 
@@ -57,6 +65,12 @@ def classify(text):
     (context/SEATS.md). Ask before sending anything this flags.
     """
     warns = []
+    btn = re.search(r"#\s*2037\s*=\s*(-?\d+)", text)
+    if btn:
+        code = int(btn.group(1))
+        warns.append("VIRTUAL BUTTON PRESS: #2037 = %d -- %s"
+                     % (code, BUTTONS.get(code, "unknown code, effect UNKNOWN")))
+        warns.append("this presses a PANEL KEY. If a program is loaded, START runs it.")
     hit = FORBIDDEN.search(text)
     if hit:
         warns.append("MOTION: contains %r -- this can MOVE THE MACHINE or start the spindle"
