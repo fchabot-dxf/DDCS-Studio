@@ -41,6 +41,18 @@ address** (the vendor map lists them `NULL`). A PC reading over Modbus **cannot 
 value from the PC you must land it in a parameter — and that is when everything below starts to matter.
 ⇒ ⭐ **Keep the parameter footprint to ONE designated, saved-and-restored slot; do the actual work in `#100`+.**
 
+⭐ **THE CATCH IS MEASURED, NOT ASSUMED `[CONFIRMED on machine 2026-09-05]`.** `#100` was set to `12345`
+and the register space `0`–`20000` scanned for that value: **65 blocks answered, zero hits.** The value was
+definitely there — `#1060 = #100` read back `12345`. ⇒ globals really are invisible to Modbus.
+⚠ Only ~1/3 of the scanned range responds at all, so unmapped space could not be searched.
+
+### ✅ THE PROVEN PATTERN — one parameter, one line
+```gcode
+#100 = [ <whatever you are computing> ]    (scratch: free, safe, invisible to Modbus)
+#1060 = #100                                (ONE parameter, only to make it readable from the PC)
+```
+Demonstrated on the machine: `#1060` (`Pr560`) read `12345.0`. Save its original first and put it back.
+
 ## ⛔ THE ONE RULE
 
 **Never write a `#variable` you have not looked up.** Not "probably unused". Not "it read zero".
