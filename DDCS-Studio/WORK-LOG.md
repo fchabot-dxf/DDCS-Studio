@@ -76229,3 +76229,18 @@ one), the size is small — 1.5-2% of the suite, not the double-digit fraction t
 ("re-proving per-row behaviour that provably cannot vary") might have suggested going in. The owner's own call
 whether that trade is worth making.
 
+## t2641 AMENDMENT — two marketing screenshots for the owner's public post
+
+Additive, done last (after the A/B/C + D commits landed and the gate confirmed green), per the amendment's own
+ordering. Drove corner (`user_corner_data`) fresh through the real app — real stock (200×150×25 box), a
+non-default field value (Corner: Front-Right, not the FL default), a real 3D preview (tool + stock + WCS
+readout) and real 2D layout canvas (probe-wall markers + Start), then the SAME placed wizard's block stack in
+the Blocks tab (palette + `user_root` → `Presentation` → FORM/LAYOUT-2D/3D-SIM sections, `Parameter Group:
+Corner` with its field rows, `feature_canvas`+sim-start blocks → `Execution` → STRUCTURAL, in the t2635-recolored
+slate) with the SAME wizard's live Form/3D preview panel alongside it — one wizard, two views, paired as the
+amendment asked. No magenta, no dev-mode chrome, nothing cut off mid-element (two framing passes: the first
+scroll offset clipped block labels by ~30px on the left — `PRESENTATION`→`esentation` — caught by eye and
+corrected).
+
+Saved as `DDCS-Studio/verification/post-wizard-form.png` and `DDCS-Studio/verification/post-wizard-blocks.png`.
+
