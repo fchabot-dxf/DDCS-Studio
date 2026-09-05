@@ -63,13 +63,29 @@ test('(3) the 7 concern sections render in the right mouths (PRESENTATION peers 
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
   await page.waitForTimeout(400);
+  // t2635 — GENERALIZED, not corner-specific: climbs getSurroundParent() repeatedly (was exactly one hop, so
+  // a section nested one level deeper — e.g. inside a split_horizontal's own LEFT/RIGHT pane, the REDIVIDE
+  // composition's own shape — reported mouth:'LEFT'/'RIGHT' instead of the real top-level 'PRESENTATION'/
+  // 'EXECUTION' it ultimately belongs under) until it reaches the block's own `user_root` ancestor, whose
+  // named inputs ARE the mouths this test actually asks about. Works through ANY number of intermediate
+  // structural wrappers (split_horizontal, group_box, a future tab_group, …), not just one.
   const secs = await page.evaluate(() => {
     const ws = window.__blkws;
+    const findInput = (parent, child) => (parent.inputList || []).find((i) => { let c = i.connection && i.connection.targetBlock(); while (c) { if (c === child) return true; c = c.nextConnection && c.nextConnection.targetBlock(); } return false; });
+    const mouthOf = (top) => {
+      let cur = top;
+      while (cur) {
+        const sp = cur.getSurroundParent && cur.getSurroundParent();
+        if (!sp) return null;
+        const inp = findInput(sp, cur);
+        if (inp && sp.type === 'user_root') return inp.name;
+        cur = sp;
+      }
+      return null;
+    };
     return ws.getAllBlocks().filter((b) => b.type === 'section').map((b) => {
       let top = b; while (top.previousConnection && top.previousConnection.targetBlock() && top.previousConnection.targetBlock().type === 'section') top = top.previousConnection.targetBlock();
-      const sp = top.getSurroundParent && top.getSurroundParent();
-      const inp = sp ? (sp.inputList || []).find((i) => { let c = i.connection && i.connection.targetBlock(); while (c) { if (c === top) return true; c = c.nextConnection && c.nextConnection.targetBlock(); } return false; }) : null;
-      return { title: b.getFieldValue('TITLE'), mouth: inp ? inp.name : null };
+      return { title: b.getFieldValue('TITLE'), mouth: mouthOf(top) };
     });
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
@@ -80,7 +96,10 @@ test('(3) the 7 concern sections render in the right mouths (PRESENTATION peers 
 
 // (4) CONCERN COLOUR (t132) — VALUE: each section renders in its DECLARED concern colour (authoring-only), and the colour
 //     SURVIVES a workspace serialize→load round-trip (rides in the block's `data`, never emitted). The emit stays byte-exact.
-const EXPECT_COLOUR = { STRUCTURAL: '#f59e0b', VARIABLES: '#06b6d4', FORM: '#d946ef', 'LAYOUT-2D': '#3b82f6', '3D-SIM': '#6366f1', 'PROJECTED-GCODE': '#0ea5e9', 'G-CODE': '#22c55e' };
+// t2635 (owner amendment) — EXECUTION's own 3 sections moved from unrelated brights to a dark slate ramp
+// (STRUCTURAL lightest → G-CODE darkest), so the two mouths read as two different KINDS of thing — see
+// cornerData.js's own comment at these declarations for the contrast-check reasoning.
+const EXPECT_COLOUR = { STRUCTURAL: '#475569', VARIABLES: '#334155', FORM: '#d946ef', 'LAYOUT-2D': '#3b82f6', '3D-SIM': '#6366f1', 'PROJECTED-GCODE': '#0ea5e9', 'G-CODE': '#1e293b' };
 test('(4) each concern section renders in its declared colour, and it survives a round-trip', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.showApp);

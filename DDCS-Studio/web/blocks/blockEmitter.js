@@ -343,6 +343,28 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         return out;
     }
+    // t2635 (BACKLOG #71/#72 census, t2633) — split_horizontal/split_vertical/group_box/grid_container/
+    // tab_group/tab_page are ALSO declared transparent-at-emit (each block's own `emit: (params, children) =>
+    // children || []`, confirmed at its own declaration site), but were never added to this dispatch's own
+    // hand-list — so a real exec atom nested inside one fell through to the GENERIC leaf dispatch below
+    // (`def.emit(p, dx, dy, dialect)`, line ~560), which passes `dx` — a NUMBER — into the slot each of these
+    // blocks' own `emit` signature expects to be `children`. With `dx===0` (the common case) `dx || []`
+    // silently returns `[]`, DROPPING the nested content from the emitted program with no error, nothing —
+    // the worst kind of failure for code that moves a machine. With a nonzero placement `dx`, `dx || []`
+    // returns the NUMBER itself, and the `.map`/`.length` calls just below THROW. Proven with a dropped-atom
+    // test (not just a branch-coverage one), not assumed: tests/node/transparent-container-emit-2635.test.mjs.
+    // `cam_table` is deliberately NOT added here — its own `emit: () => []` (camField.js:26) is genuinely
+    // metadata-only (its children are field DECLARATIONS, never atoms — see that file's own comment), so it
+    // correctly ignores every argument already; adding it to this transparent-passthrough branch would be
+    // WRONG, not merely redundant. `childrenOf` (not a bare `.forEach`) because split_horizontal/split_vertical's
+    // own `children` is a mouth-keyed {LEFT,RIGHT}/{TOP,BOTTOM} object, not a plain array (ARCHITECTURE.md
+    // INVARIANT #18) — the other four are single-mouth (plain array already), and childrenOf is a safe no-op
+    // for those.
+    if (block.type === 'split_horizontal' || block.type === 'split_vertical' || block.type === 'group_box' || block.type === 'grid_container' || block.type === 'tab_group' || block.type === 'tab_page') {
+        const out = [];
+        childrenOf(block.children).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
+        return out;
+    }
 
     if (!def) return [tag(`( unknown block ${block.type} )`, own)];
 

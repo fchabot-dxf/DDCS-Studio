@@ -1530,16 +1530,43 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
         import('./paneAccordion.js').then((m) => m.makePanesCollapsible(box)).catch(() => {});
     };
 
+    // t2635 (BACKLOG #71/#72, REDIVIDE composition) — hoisted OUT of `traverse` (was a fresh `Set` per call) so
+    // every recursive `traverse()` call in ONE `renderUiTree` pass shares it, keyed by NODE OBJECT rather than
+    // array index: an index is only meaningful within the ONE `nodes` array it was computed against, but a
+    // node consumed by a merge found through `firstRenderNode`/`lastRenderNode` (below) may live several
+    // levels deep inside a DIFFERENT array (e.g. a `section`'s own children) than the array the merge was
+    // detected FROM. A fresh `Set` per `renderUiTree` call (not module-level) — never stale across renders.
+    const __consumed = new Set();
+    // t2635 — the preview3d/feature_canvas adjacency-merge (below) used to check `nodes[i±1].type` directly,
+    // which only ever matched when the two were LITERAL array siblings. `corner-redivide.spec.js`'s own
+    // REDIVIDE structure (t130) wraps EACH of a section's own content in a `section` node for Blockly's
+    // authoring canvas — so two blocks meant to be "adjacent" can end up as each OTHER's neighbor's own sole
+    // child instead of true siblings. `firstRenderNode`/`lastRenderNode` unwrap any TRANSPARENT-at-render
+    // wrapper (`section`, `group_box`, `param_group` — the three render branches below that recurse into a
+    // node's own `children` rather than rendering it directly) to find the REAL node that would render
+    // first/last inside it, so the merge check works the same whether the two nodes are true siblings or each
+    // wrapped one level deep by an (possibly different) transparent container — general, not corner-specific:
+    // ANY op nesting these two adjacent-but-wrapped hits the same fix.
+    const RENDER_TRANSPARENT = new Set(['section', 'group_box', 'param_group']);
+    function firstRenderNode(node) {
+        if (!node) return null;
+        if (!RENDER_TRANSPARENT.has(node.type)) return node;
+        for (const k of childrenOf(node.children)) { const f = firstRenderNode(k); if (f) return f; }
+        return null;
+    }
+    function lastRenderNode(node) {
+        if (!node) return null;
+        if (!RENDER_TRANSPARENT.has(node.type)) return node;
+        const kids = childrenOf(node.children);
+        for (let i = kids.length - 1; i >= 0; i--) { const l = lastRenderNode(kids[i]); if (l) return l; }
+        return null;
+    }
     function traverse(nodes, container) {
         if (!nodes || !Array.isArray(nodes)) return;
-        // t2511 — an indexed loop (was `for...of`), so the preview3d/panel adjacency-merge branch (below) can
-        // PEEK at the next/previous sibling and SKIP it once consumed — a LOCAL index set, never mutating the
-        // author's own uiChildren objects (those may be read again elsewhere; a flag on the data would leak).
-        const __consumed = new Set();
         for (let __i = 0; __i < nodes.length; __i++) {
             const node = nodes[__i];
             if (!node) continue;
-            if (__consumed.has(__i)) continue;   // t2511 — already rendered as part of an adjacent preview3d/panel pair, below
+            if (__consumed.has(node)) continue;   // t2511/t2635 — already rendered as part of an adjacent preview3d/panel pair, below
             if (node.type === 'split_horizontal' || node.type === 'split_vertical') {
                 const isHoriz = node.type === 'split_horizontal';
                 // t2327 — a horizontal split now STACKS below 860px (styles.css's own `.ui-split*` rules,
@@ -1580,7 +1607,15 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(s)}</span>`;
                 const body = document.createElement('div'); body.className = 'wiz-pane-body';
                 sec.append(hdr, body); container.appendChild(sec);
-                applyFold(sec, isSectionCollapsed(s), false);
+                // t2635 — `collapsedDefault` (same field name/shape as group_box's own) is the FALLBACK
+                // `isSectionCollapsed` uses only until a user has EVER toggled this section title — after that,
+                // their own choice always wins (the existing per-title persistence, unchanged). Added because
+                // corner's own empty LAYOUT-2D section (REDIVIDE composition, t2635) otherwise defaults
+                // EXPANDED like every other section, and an empty body's own reserved height measurably shrank
+                // the WORKING 3D-SIM visualization beside it (874×323 → 874×154, measured live) — a real
+                // product regression from an empty section, not a cosmetic one. General: any section can opt
+                // into starting collapsed; nothing else about the mechanism changes.
+                applyFold(sec, isSectionCollapsed(s, !!(node.params && node.params.collapsedDefault)), false);
                 hdr.addEventListener('click', () => { const now = !(sec.getAttribute('data-collapsed') === '1'); applyFold(sec, now, true); setSectionCollapsed(s, now); });
                 
                 if (node.children) {
@@ -1609,13 +1644,20 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // an adjacent `feature_canvas` sibling — checked NEXT first, then PREVIOUS — merges into ONE
                 // combined box (byte-identical to the un-migrated `sim` shape); no adjacent one renders 3D-only.
                 // t2515 — this node type was 'panel', renamed; the adjacency MECHANISM is untouched.
-                const nextIsPanel = nodes[__i + 1] && nodes[__i + 1].type === 'feature_canvas';
-                const prevIsPanel = !nextIsPanel && nodes[__i - 1] && nodes[__i - 1].type === 'feature_canvas' && !__consumed.has(__i - 1);
+                // t2635 — `firstRenderNode`/`lastRenderNode` (see their own header above) unwrap ONE level of
+                // `section`/`group_box`/`param_group` wrapping, so `nodes[i+1]` being a `section` whose OWN
+                // sole/first child is `feature_canvas` still merges — the general fix. `panelNode` is the REAL
+                // matched node (possibly nested), never the wrapper, so `__consumed` (now node-identity keyed)
+                // marks exactly the node that must not render a second time when its OWN wrapper later
+                // recurses into it — the wrapper itself still renders normally (its own header/other children).
+                const nextNode = nodes[__i + 1] ? firstRenderNode(nodes[__i + 1]) : null;
+                const nextIsPanel = nextNode && nextNode.type === 'feature_canvas';
+                const prevNode = !nextIsPanel && nodes[__i - 1] ? lastRenderNode(nodes[__i - 1]) : null;
+                const prevIsPanel = prevNode && prevNode.type === 'feature_canvas' && !__consumed.has(prevNode);
                 if (nextIsPanel || prevIsPanel) {
                     buildVizBox(container, true);
-                    const panelIdx = nextIsPanel ? __i + 1 : __i - 1;
-                    __consumed.add(panelIdx);
-                    const panelNode = nodes[panelIdx];
+                    const panelNode = nextIsPanel ? nextNode : prevNode;
+                    __consumed.add(panelNode);
                     // t2511 — the merged panel's own nested content (if any) still needs to render, exactly as
                     // the standalone `panel` branch below already does for it.
                     if (panelNode.uiChildren) traverse(childrenOf(panelNode.uiChildren), container);
@@ -1712,10 +1754,13 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                 // followed by a `preview3d` sibling, that pairing merges here instead (the preview3d branch
                 // only looks BACKWARD when it does not find one FORWARD, so whichever of the two the loop
                 // reaches first owns the merge — never both, __consumed prevents the second visit).
-                const nextIsPreview3d = nodes[__i + 1] && nodes[__i + 1].type === 'preview3d';
+                // t2635 — firstRenderNode unwraps a wrapping `section`/`group_box`/`param_group`, same fix as
+                // the preview3d branch above (its own header comment has the full account).
+                const nextPreviewNode = nodes[__i + 1] ? firstRenderNode(nodes[__i + 1]) : null;
+                const nextIsPreview3d = nextPreviewNode && nextPreviewNode.type === 'preview3d';
                 if (nextIsPreview3d) {
                     buildVizBox(container, true);
-                    __consumed.add(__i + 1);
+                    __consumed.add(nextPreviewNode);
                     if (node.uiChildren) traverse(childrenOf(node.uiChildren), container);
                     if (node.children) traverse(childrenOf(node.children), container);
                     continue;

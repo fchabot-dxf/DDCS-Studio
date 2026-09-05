@@ -75633,3 +75633,178 @@ thrown `.map`) is worse than anything else found this session. The declarative f
 `transparentAtEmit`/`metadataOnly` rather than five hand-lists agreeing by accident — would close all 7 AT-RISK
 entries at once and make the whole class structurally impossible rather than merely re-patched a sixth time.
 
+## 🔨 turn 2635 — THE emit() FIX FIRST, THEN CORNER'S 4 SECTIONS COME BACK (owner ruling: composition)
+
+The owner answered the REDIVIDE fork from t2631/t2633: keep corner's 4 coloured/labelled sections, alongside
+the working panels — composition, not retirement. Ordered to fix the most severe AT-RISK walker
+(`emit()`'s own transparent-container branch, blockEmitter.js:331) FIRST, with its own proof, since the
+composition work is exactly what would walk into it (nesting a `section` around the split's own children).
+
+### PART 1 — blockEmitter.js:331, fixed and proven
+
+Root cause, confirmed by reading the actual call sites: `emit()`'s own hand-listed transparent-container
+branch (`param_group|guard|section|setup|safetraverse|opunit`) never learned `split_horizontal`/
+`split_vertical`/`group_box`/`grid_container`/`tab_group`/`tab_page` — each of THOSE blocks' own declared
+`emit: (params, children) => children || []` signature does not match what actually reaches it: any node that
+falls through to the GENERIC leaf dispatch gets `def.emit(p, dx, dy, dialect)` — `dx`, a NUMBER, lands in the
+slot each of those six blocks' own signature calls `children`. With `dx===0` (the ordinary case) `dx || []`
+silently returns `[]` — a real exec atom nested inside one of these containers VANISHES from the program with
+no error at all. With a nonzero placement `dx`, `dx || []` returns the number itself, and the `.map`/`.length`
+calls in `emitMapped`'s own leaf tail THROW. (`cam_table` deliberately excluded — its own `emit: () => []` is
+genuinely metadata-only and ignores every argument already, confirmed at camField.js:26; adding it here would
+be wrong, not merely redundant.)
+
+Fixed by adding those 6 types to the SAME transparent-container dispatch (using `childrenOf`, since
+split_horizontal/split_vertical's own `children` is the mouth-keyed `{LEFT,RIGHT}` object, not a plain array).
+
+**Proven with a dropped-atom test, not a branch-coverage one** (`tests/node/transparent-container-emit-2635.test.mjs`,
+7 tests): a real `assign` atom (`#100=42`, chosen because its own `emit: (p) => [...]` ignores dx/dy/dialect
+entirely, so it emits regardless of nesting) nested inside each of the 6 types, including TWO levels deep
+(group_box inside split_horizontal — the exact corner-redivide composition shape) and under a genuinely
+NONZERO dx (a real registered `array` block, `kind:'container'`, `pattern:'single', x0:5` — `def.points(p)`
+returns one point at x=5, so `emit(child, dx+5, ...)` really is nonzero). **Proven not vacuous**: reverted the
+fix, re-ran — all 7 failed for the EXACT predicted reasons (6 returned `""` — the silent drop; the nonzero-dx
+one threw `TypeError: lines.map is not a function` at the exact predicted line) — restored, re-ran, all green.
+Node tier after: 245/245 (238 + 7 new).
+
+### PART 2 — the general mechanism: adjacency-merge and mouth-detection both see through a section boundary now
+
+Two DIFFERENT mechanisms needed the SAME generalization — "a transparent wrapper interposed where there wasn't
+one before must not hide what's inside it from a check that used to look at direct siblings/parents."
+
+**`formWidgets.js`'s own preview3d/feature_canvas adjacency-merge** (t2511) used to check `nodes[i±1].type`
+directly — true only when the two are LITERAL array siblings. Added `firstRenderNode`/`lastRenderNode`
+(unwrap ONE or more levels of `section`/`group_box`/`param_group` — the three RENDER-transparent container
+types — to find the node that would actually render first/last inside them) and switched the adjacency check
+to use them. `__consumed` (previously a per-`traverse()`-call `Set` of ARRAY INDICES, meaningless once the
+matched node lives in a DIFFERENT array than the one the merge was detected from) is now hoisted to
+`renderUiTree`'s own scope, shared across every recursive `traverse()` call in one render pass, and keyed by
+NODE OBJECT IDENTITY instead of index — so a section that later recurses into its own (now-consumed) child
+correctly skips re-rendering it while still rendering its own header and any other children. General, not
+corner-specific: verified zero regression on drill's own already-shipped adjacency-merge (unwrapped case,
+`firstRenderNode` is a same-node no-op) via `drill-form-reproduction-2299`/`geometry-seam-tree-mode-2323`.
+
+**`corner-redivide.spec.js`'s own `byMouth` walk** (test-side) used `getSurroundParent()` exactly ONCE, so a
+`section` nested one level under `split_horizontal` reported `mouth:'LEFT'/'RIGHT'` instead of the real
+top-level `'PRESENTATION'`. Generalized to climb `getSurroundParent()` repeatedly until it reaches the node's
+own `user_root` ancestor, at whichever depth — works through any number of intermediate structural wrappers,
+not hardcoded to exactly one `split_horizontal` hop. This is the test's own DETECTION algorithm being made
+correct for arbitrary nesting, not its assertions being rewritten to a new expected shape.
+
+### PART 3 — corner's 4 sections, composed with the working panels — 2 of 3 unconditionally, 1 flagged
+
+`cornerData.js`'s PRESENTATION mouth: `FORM` wraps the field groups (unchanged content, now titled+coloured);
+`PROJECTED-GCODE` gets its own section (moved out of FORM, not duplicated); `3D-SIM` keeps `preview3d` +
+`feature_canvas` genuinely ADJACENT (their own merge requirement — they stay true array siblings, one level
+deeper under the section, which Part 2's generalized check now sees through) alongside the sim-start markers —
+reproducing the WORKING combined box byte-identical to before this act, using the now-fixed general mechanism,
+not a corner-specific hack.
+
+**`LAYOUT-2D` is still empty — flagged, not silently left.** Splitting `preview3d`/`feature_canvas` into TWO
+SEPARATELY-labelled sections (so LAYOUT-2D could host the 2D pane standalone) was investigated with a dedicated
+research pass before deciding: the 3D/2D boxes' own scene/canvas MOUNTING is genuinely id-local and safe to
+relocate (every reader is either pure `getElementById` or a one-level `.parentElement` walk that stays inside
+the box's own wrapper — verified against every consumer, `wizardManager.js`'s dozen call sites,
+`userOpView.js`'s `viz3dIn`/`vid`/`vel`, `panelTypes.js`'s `renderLayout2D`). But `paneAccordion.js`'s own
+ratio-splitter (`addPaneSplitter`) hard-requires BOTH panes as `:scope > [data-viz-pane]` siblings of ONE
+`.viz-split` (`paneAccordion.js:513-514`) — splitting them loses the drag-resize splitter outright, needs a
+CSS parent-chain audit (`styles.css:2590`/`2608`'s own DIRECT-CHILD chains — landing anywhere but
+`.wiz-2pane`/`.ui-split-pane` re-opens the exact t2357 bug, `pane-ratio-slam-2357.spec.js`'s own case), a
+narrow-width height-rule fix, and touches 6 existing test files (`pane-ratio-slam-2357`, `pane-ratchet-2353`,
+`pane-container-2355`, `polish-batch-1239`, `render-equivalence-1796`, `screenshot-baselines-1792`). A
+properly scoped, separately-verified turn — not something to fold into this one under time pressure, and not
+mine to decide unilaterally which corner fields (if any) should move to give LAYOUT-2D independent, honest
+content instead. Kept `children: []`, t1724's own original, documented shape.
+
+Screenshot baselines regenerated (`modal-corner`, `pane-corner`) — corner's form is legitimately taller now
+(4 section headers instead of 0); confirmed the new render looks correct by viewing the actual screenshot
+(LAYOUT-2D, 3D-SIM with the real visualization, FORM, further groups) before accepting the size change.
+
+### VERIFY
+
+blockEmitter.js fixed with a dropped-atom test, BEFORE the composition work (order followed as dispatched).
+Both mechanisms composing, proven live the SAME way t2631 proved they didn't: `corner-redivide.spec.js` (3)+(4)
+— **both GREEN** (was the stop signal if they weren't). `corner-canvas-mount-2631` (1/1), `corner-form-
+reproduction-2631` (2/2), full corner suite + every cross-op guard + every DOM-structure-sensitive test named
+by the research pass (`pane-ratio-slam-2357`, `pane-ratchet-2353`, `pane-container-2355`, `polish-batch-1239`,
+`render-equivalence-1796`, `screenshot-baselines-1792`): 171/173, the only 2 the same legitimate corner
+screenshot-size change (regenerated). Corner's 4 sections back, 3 of 4 (FORM/3D-SIM/PROJECTED-GCODE) with
+real, working content; LAYOUT-2D flagged empty with the researched reason and the cost of the alternative.
+
+The "grep census = floor not count" framing moved to a durable, always-loaded location per the explicit ask,
+not left in a turn log: `context/VERIFICATION-DISCIPLINE.md` rule 18 (new), extending rule 17's own existing
+migration-verification discipline. `checkLayoutNodes`/`hasTreeLayout` (the two disagreeing hand-lists from the
+t2633 census) queued, not fixed this turn, per instruction.
+
+### PART 4 — the full-suite gate found TWO MORE regressions the targeted batch missed, both real, both fixed
+
+`corner-marker-independence.spec.js` (5) and `layout-partzero-shift-1672.spec.js`'s own live-drag test failed
+on the FULL run, neither in the earlier targeted batch (a genuine gap in that batch's own file list, not a
+flake — both reproduced deterministically in isolation, retried).
+
+**`corner-marker-independence` (5)**: "the drag actually changed the emit" was FALSE — the drag missed the
+handle's real position entirely. Root cause: `openCorner`'s own helper waited for `.fc-handle-move` to EXIST
+in the DOM but never for the feature canvas's own settling lag (t2631's own established finding — the
+ResizeObserver-driven viewBox is rAF-throttled, and REDIVIDE's own added section-nesting is one more layout
+pass for it to settle through) — a race this file never needed to guard before REDIVIDE added that extra
+pass. Fixed with the same `waitForTimeout(600)` precedent from t2631, added once inside the shared `openCorner`
+helper (covers all 5 tests in the file, not just the one caught). Verified NOT a coincidence: all 5 tests green
+after, only test (5) had actually been silently missing the handle.
+
+**`layout-partzero-shift-1672`'s own live-drag test**: threshold `toBeLessThan(150)` failed at a stable,
+reproducing `222.03` — verified this was NOT the same timing race first (bumped its own existing wait from
+700ms to 1200ms, got the byte-identical `222.0280756345911` both times — a genuine timing race would not
+reproduce a value to 10 decimal places twice), so it is a real, PERMANENT geometry change: the feature
+canvas's own available height measurably shrank (874×323 → 874×154, even with LAYOUT-2D collapsed by
+default — 3D-SIM's own header, which must stay visible, plus LAYOUT-2D's own collapsed header line, cost real
+space the pre-REDIVIDE sectionless layout never paid), which grows the world-space distance the SAME
+fixed-pixel drag produces. Widened the threshold to 280 — comfortably below what the ORIGINAL 300/200
+pin-shift inflation bug this test guards against would actually produce (roughly the legitimate delta plus
+~360 world units), so the regression this test exists to catch is still caught.
+
+Both are DIRECT, foreseeable costs of the composition work (not independent bugs) — named here rather than
+folded silently into the fixes above, since a future reader hitting either symptom in a DIFFERENT corner test
+should recognize the same two root causes (settling lag needing an explicit wait; canvas height permanently
+smaller needing threshold updates) rather than re-diagnosing from scratch.
+
+**Node tier: 245/245.** An earlier full run THIS SAME TURN (before the Part 4 fixes) showed 3 failed
+(the 2 regressions above + the 1 pre-existing surfacing flake) / 19 flaky. **Final full suite via `npm test`
+after all fixes: 3168 passed, 0 FAILED, 12 flaky, 28 skipped, e2e exit 0** — the pre-existing surfacing flake
+didn't even fire this run (it's flaky by nature, not always red). This is the first FULLY CLEAN corner-related
+gate all session: `corner-redivide.spec.js` (3)+(4) green, zero corner regressions anywhere in the 3208-test
+suite, zero failed titles of any kind.
+
+### PART 5 — mid-task amendment: EXECUTION's own 3 sections recoloured to a dark slate ramp
+
+Owner ruling, arrived mid-turn (twice — the first wording, "one dark family," was superseded by "keep them
+TELLABLE APART, a dark RAMP not one flat colour," before either landed): EXECUTION's 3 sections were unrelated
+brights (STRUCTURAL amber `#f59e0b`, VARIABLES cyan `#06b6d4`, G-CODE green `#22c55e`) — colliding, unnoticed
+until now, with PRESENTATION's own PROJECTED-GCODE (also cyan, `#0ea5e9`) sharing the same hue across two
+mouths meant to read as different KINDS of thing. Recoloured to a slate ramp, lightest→darkest matching
+STRUCTURAL→VARIABLES→G-CODE: `#475569`/`#334155`/`#1e293b` — no pure `#000` (checked against Blockly's own
+white label text: WCAG contrast ratios ~5.5:1/8:1/11:1, all comfortably above the 4.5:1 AA floor).
+`corner-redivide.spec.js`'s own `EXPECT_COLOUR` map updated to match (the only other file referencing the old
+hex values — grepped, confirmed). Corner only, per the amendment's own explicit scoping — no other op touched.
+
+**Shown, not asserted**, per the amendment's own explicit requirement: a live screenshot of the three sections
+collapsed and stacked (`corner-execution-collapsed.png`) shows all three as clearly-legible white-on-dark
+labels, visually distinguishable from each other at a glance (STRUCTURAL noticeably lighter/blue-grey, G-CODE
+noticeably darker/near-black, VARIABLES between) — both amendment claims (dark family; three tellable apart)
+demonstrated, not argued. Full corner suite (114 tests, every `corner-*.spec.js` file) re-run after: 114/114.
+
+### VERIFY (final)
+
+All of Parts 1-5 verified together: full corner suite 114/114, corner-redivide (3)+(4) green with the NEW
+colours, node tier 245/245. **Final full suite via `npm test`: 3171 passed, 1 failed
+(`probe-port-gate-1880.spec.js`'s own "every one of the 6 probe ops" test — re-ran in isolation with retries,
+3/3 clean; the SAME file showed this exact under-contention-only flakiness at t2631 this same session, not a
+regression), 8 flaky, 28 skipped.** Zero corner-related failures anywhere in the 3208-test suite.
+
+### NEXT
+
+`checkLayoutNodes`/`hasTreeLayout`'s own disagreement (t2633's census, item 3) is the next AT-RISK walker worth
+a dedicated turn — a one-source-of-truth break already documented via `mountFlatPathAnchor`'s own workaround,
+and the advisor's own note that they used `hasTreeLayout` as a progress counter without knowing a rival list
+existed. LAYOUT-2D's own real content (the DOM-split, or a different field allocation) is a genuine open
+decision for whoever picks it up next, costed above.
+

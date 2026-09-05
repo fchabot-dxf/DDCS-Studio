@@ -34,6 +34,14 @@ async function openCorner(page, probeZ) {
   } else {
     await page.waitForSelector('#userVizContainer_tree .fc-handle-move', { timeout: 6000 });
   }
+  // t2635 — the feature canvas's ResizeObserver-driven viewBox is rAF-throttled (featureCanvas.js:122); a
+  // handle existing in the DOM does not mean its own bounding box has settled to its FINAL post-layout
+  // position yet (the tree pane-bodies' own settling lag — see corner-data-repos-handle.spec.js's own note,
+  // t2631). REDIVIDE's own section-nesting (t2635) adds one more layout pass for the canvas to settle
+  // through, which pushed this file's own readMachine()/dragHid() calls (previously fine without an explicit
+  // wait) into that race — verified live: test (5) missed the handle's real position entirely (post-drag emit
+  // unchanged) without this wait, passed with it.
+  await page.waitForTimeout(600);
 }
 
 // full machine state: each emitting handle's screen box + the trace passEnds (world) + the emitted #21..#24 (number | 'EXPR')

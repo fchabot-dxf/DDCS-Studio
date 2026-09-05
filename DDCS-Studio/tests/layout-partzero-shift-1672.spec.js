@@ -216,5 +216,14 @@ test('live drag while WCS-pinned writes the correct un-shifted param (the _disp/
 
   const dist = Math.hypot((after.start0.x || 0) - (before.start0.x || 0), (after.start0.y || 0) - (before.start0.y || 0));
   expect(dist, 'the drag moved the RAW start param a small, sane distance').toBeGreaterThan(3);
-  expect(dist, 'not inflated by the 300/200 pin shift — proves onDrag received the un-shifted local delta').toBeLessThan(150);
+  // t2635 — threshold widened 150→280: corner's REDIVIDE composition (its own 4 labelled sections, owner
+  // ruling) permanently reduces the feature canvas's own available height (measured live: 874×323 → 874×154
+  // even with the now-empty LAYOUT-2D section collapsed by default — 3D-SIM's own header, unavoidable since
+  // it's meant to stay visible, plus LAYOUT-2D's own collapsed header line, cost real space the pre-REDIVIDE
+  // sectionless layout never paid), which shrinks the canvas's own world-per-pixel scale and so grows the
+  // world-space distance the SAME fixed-pixel drag (48,-34 screen px) produces — verified NOT a timing race
+  // first (identical 222.03 result at both 700ms and 1200ms settle waits). 280 stays far below what an
+  // actual 300/200 pin-shift inflation bug would produce (roughly +360 world units on top of the legitimate
+  // small delta, per this test's own comment) — still catches the real regression this guards against.
+  expect(dist, 'not inflated by the 300/200 pin shift — proves onDrag received the un-shifted local delta').toBeLessThan(280);
 });

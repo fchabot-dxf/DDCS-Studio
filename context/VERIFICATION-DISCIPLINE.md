@@ -232,3 +232,34 @@ convention) survived the move onto the new path for every op it now also has to 
    per-node logic has no way to see? If yes, that is exactly this class of gap — extract the decision as ONE
    shared, exported function both paths call (see `sectionizeFor` in `formWidgets.js`), never reimplement it
    locally for the new path — a second copy is how it drifts again.
+
+## 18. ⭐ A grep-based census is a FLOOR, never a count — treat every number it produces as "at least N," and
+never as the sole gate for a "verified clean" claim
+
+Corner's own `_tree`-suffixed-id census (BACKLOG #71/#72's own migration arc) moved FOUR times across three
+turns — 44 (t2597, a first order-of-magnitude estimate) → a recount → 130 files found (t2631) → and even that
+130-file grep STILL missed 3 files entirely (t2631/t2635), because `openWizardViaBar`'s own short `optype:
+'corner'` call form is a textually DIFFERENT surface than the `cornerData|user_corner_data|CORNER_DATA_OPTYPE`
+pattern every earlier census searched for — no refinement of that SAME grep would ever have found them; only
+running the actual `npm test` full suite did. That is not "the count changed because reality changed" — it is
+"the count changed because the search was incomplete each time," and an instrument whose own error bars are
+unknowable in advance cannot license a completeness claim, no matter how many times it is re-run.
+
+**Why this is structural, not carelessness:** a grep pattern is a guess at every TEXTUAL surface form a
+reference to something might take — a full import path, a short alias, an indirect reference through a shared
+helper that itself takes an opType parameter, a runtime-constructed string. There is no way to enumerate that
+set completely by inspection; only the interpreter itself actually exercises the real reference graph.
+Contrast `twin-section-invariant-2381.spec.js`'s own census, which is NOT grep-based — it calls `listUserOps()`
+and classifies each REGISTERED twin by its own live `hasTreeLayout()` state at test-run time. That is
+trustworthy by construction: it asks the running system what is actually true, rather than guessing what text
+might be present in a file. A grep census over source text and a runtime census over live state are not the
+same INSTRUMENT wearing different clothes — one is a guess, the other a measurement.
+
+**How to apply:** a grep census is a cheap way to shrink the search space and explain why the suite went red —
+never the gate that proves something clean. Any claim of the shape "N files reference X, all N fixed, therefore
+done" should instead read "N files matched this grep, all N fixed; the full suite is what says whether that was
+actually all of them." Rule 17 above already says to grep as PART of verifying a migration (its own step 2) —
+this rule is the refinement: that grep step narrows and explains, the full-suite run (step 1, read by FAILED
+TITLE, not count) is what actually closes the claim. Prefer a RUNTIME census (queries live registered state,
+like `twin-section-invariant-2381.spec.js`'s own `hasTreeLayout()` check) over a TEXT census wherever the two
+are both available for the same question — the runtime one cannot have this specific blind spot.

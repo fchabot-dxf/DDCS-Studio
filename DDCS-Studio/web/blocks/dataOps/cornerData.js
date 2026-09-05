@@ -263,51 +263,65 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // `split_horizontal`/`preview3d`/`feature_canvas`/`code_preview` convention (t2511/t2599 onward) — the
     // mechanism that ACTUALLY hosts live content in each of those roles.
     //
-    // ⚠ TRIED restoring REDIVIDE's 4 sections nested inside split_horizontal's own LEFT/RIGHT (mirroring
-    // drillData.js's PATTERN/TOOL/DEPTH & FEED precedent) and PROVED it doesn't compose, not assumed: (1)
-    // corner-redivide.spec.js's own mouth check walks getSurroundParent() expecting each `section` as a DIRECT
-    // PRESENTATION child — nested one level deeper under split_horizontal, `byMouth('PRESENTATION')` returns
-    // [] (verified live); (2) splitting `preview3d`/`feature_canvas` into separate LAYOUT-2D/3D-SIM sections
-    // breaks their own adjacency-merge (formWidgets.js's traverse(), t2511 — they must be ADJACENT SIBLINGS in
-    // ONE array to render as the combined box) — canvasCount dropped to 0 (verified live). Reverted; this is a
-    // genuine, PROVEN architectural fork (REDIVIDE's flat-peer Blockly structure vs the split_horizontal 2-pane
-    // convention every other migrated op uses), not a mechanical gap — flagged to the advisor rather than
-    // picked unilaterally. corner-redivide.spec.js tests (3)/(4) are LEFT RED, on purpose, pending that call.
+    // t2633/t2635 — REDIVIDE's 4 sections are BACK (owner ruling: composition, not retirement — the labelled
+    // sections coexist with the working panels, not one instead of the other). formWidgets.js's own traverse()
+    // was generalized first (t2635, its own header comment) so `section` nesting no longer breaks the
+    // preview3d/feature_canvas adjacency-merge OR the Blocks-tab mouth-detection — verified against t2631's
+    // OWN proof that it broke (this exact structure re-run live: canvas-mount 1/1, form-reproduction 2/2,
+    // corner-redivide (3)+(4) both green — see WORK-LOG t2635 for the full account).
     //
-    // LAYOUT-2D and PROJECTED-GCODE stayed empty since t1724 not because corner has nothing to show (it has
-    // real 2D drag-handles via the sim-start markers, and real G-code via the shared classic wrapper) but
-    // because NEITHER declared child (`shape_*` primitives, `code_preview`) had a real consumer wired to THIS
-    // twin's own view family — this migration is what wires it: `feature_canvas` (2D, hosts the SAME sim-start
-    // marker content the old "3D-SIM" section only fed to 3D) + `preview3d` (3D) fill what LAYOUT-2D/3D-SIM
-    // were reaching for; a REAL `code_preview` node fills what PROJECTED-GCODE never actually got. No new
-    // geometry invented — corner still draws no static shape (t1724's own finding stands: the sim-start
-    // markers + the toolpath trace are the whole 2D vocabulary) — this wires the SAME content through the
-    // mechanism that renders it, closing the exact gap named at t1724.
+    // FORM wraps the field groups (unchanged content, now titled+coloured). 3D-SIM keeps preview3d+
+    // feature_canvas ADJACENT (the merge's own requirement — they stay true array siblings, just one level
+    // deeper under this section, which the generalized adjacency-check now sees through) alongside the
+    // sim-start markers, reproducing the WORKING combined box byte-identical to before this act (t2511's own
+    // guarantee, unbroken). PROJECTED-GCODE gets its own section (moved out of FORM, not duplicated).
+    //
+    // ⚠ LAYOUT-2D IS STILL EMPTY — A NAMED, NOT SILENT, GAP. Splitting preview3d/feature_canvas into TWO
+    // separately-labelled sections (so LAYOUT-2D could host the 2D pane on its own, standalone) was
+    // investigated and found technically POSSIBLE but genuinely costly: the 3D/2D boxes' own mounting is
+    // id-local and safe to relocate, but paneAccordion.js's ratio-splitter (`addPaneSplitter`) requires
+    // BOTH panes as `:scope > [data-viz-pane]` siblings of ONE `.viz-split` — splitting them loses the
+    // drag-resize splitter outright, needs a CSS parent-chain audit (styles.css:2590/2608's own DIRECT-CHILD
+    // chains, the exact t2357 bug class if the new parent isn't `.wiz-2pane`/`.ui-split-pane`), a narrow-width
+    // height-rule fix, and touches 6 existing test files (pane-ratio-slam-2357, pane-ratchet-2353,
+    // pane-container-2355, polish-batch-1239, render-equivalence-1796, screenshot-baselines-1792) — a properly
+    // scoped, separately-verified turn, not a fold-in. Kept `children: []` (t1724's own original, honest
+    // shape) rather than force either a risky DOM split or an unrelated field un-shuffled from FORM just to
+    // avoid an empty box. Flagged, not silently left — see WORK-LOG t2635 and the pass-back note.
     const uiChildren = [{
         type: 'split_horizontal', params: { ratio: '360px:*' },
         children: {
-            LEFT: [{
-                type: 'param_group',
-                params: { group: 'Corner' },
-                children: [
-                    // t2629 — no live shell for corner (RETIRED, t1670's own comment above) — adapted from this
-                    // file's own header description, the same precedent edge's own t2599 usage_text set.
-                    { type: 'usage_text', params: { text: 'Probes a stock corner (two walls) and writes the found position to a work-coordinate register. Set which corner and which wall to probe first; optionally probe the top surface for Z before the walls. Choose how the tool travels between probes (auto or a manual jog-and-wait) and which WCS receives the result.' } },
-                    { type: 'group_box', params: { title: 'IDENTITY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.IDENTITY) },
-                    { type: 'group_box', params: { title: 'GEOMETRY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.GEOMETRY) },
-                    { type: 'group_box', params: { title: 'TOOL & CUT' }, children: cornerFieldRefsOf(CORNER_FIELDS0.TOOL_CUT) },
-                    { type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } },
-                ],
-            }],
+            LEFT: [
+                sec('FORM', '#d946ef', [{
+                    type: 'param_group',
+                    params: { group: 'Corner' },
+                    children: [
+                        // t2629 — no live shell for corner (RETIRED, t1670's own comment above) — adapted from
+                        // this file's own header description, the same precedent edge's own t2599 usage_text set.
+                        { type: 'usage_text', params: { text: 'Probes a stock corner (two walls) and writes the found position to a work-coordinate register. Set which corner and which wall to probe first; optionally probe the top surface for Z before the walls. Choose how the tool travels between probes (auto or a manual jog-and-wait) and which WCS receives the result.' } },
+                        { type: 'group_box', params: { title: 'IDENTITY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.IDENTITY) },
+                        { type: 'group_box', params: { title: 'GEOMETRY' }, children: cornerFieldRefsOf(CORNER_FIELDS0.GEOMETRY) },
+                        { type: 'group_box', params: { title: 'TOOL & CUT' }, children: cornerFieldRefsOf(CORNER_FIELDS0.TOOL_CUT) },
+                    ],
+                }]),
+                sec('PROJECTED-GCODE', '#0ea5e9', [{ type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } }]),
+            ],
             RIGHT: [
+                // t2635 — collapsedDefault:true: an EMPTY section's own expanded body reserves real vertical
+                // height it never uses, measurably shrinking the working 3D-SIM visualization beside it
+                // (874×323 → 874×154, measured live before this fix) — see formWidgets.js's own 'section'
+                // branch for the general mechanism this uses (any section can opt in, not corner-specific).
+                { ...sec('LAYOUT-2D', '#3b82f6', []), params: { title: 'LAYOUT-2D', color: '#3b82f6', collapsedDefault: true } },
                 // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock);
                 // machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain
                 // forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent =
                 // no forceMachine. The per-pass sim-start markers (cornerSimStartsProvider) are the SHARED
                 // anchor source for both panes below — ONE source, never re-declared per view.
-                { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
-                { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
-                ...simstarts,
+                sec('3D-SIM', '#6366f1', [
+                    { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                    ...simstarts,
+                ]),
             ],
         },
     }];
@@ -333,9 +347,16 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
         params: { value: b.type === 'bool' ? !!b.default : b.default },
     }));
     const children = [
-        sec('STRUCTURAL', '#f59e0b', structCtls),              // the structural drivers, derived from CORNER_STRUCT_BINDINGS — amber
-        sec('VARIABLES', '#06b6d4', exec.slice(0, seam)),      // #var defs — cyan
-        sec('G-CODE', '#22c55e', exec.slice(seam)),            // the emit — green
+        // t2635 (owner amendment, superseded once — "one dark family" then "keep them TELLABLE APART, a dark
+        // RAMP not one flat colour") — EXECUTION was 3 unrelated brights (amber/cyan/green), one of which
+        // (VARIABLES cyan) collided with PRESENTATION's own PROJECTED-GCODE cyan — the same hue spanning both
+        // mouths. Replaced with a slate ramp (light→dark = STRUCTURAL→VARIABLES→G-CODE, all in the SAME
+        // low-luminance family so PRESENTATION's brights vs EXECUTION's darks read as two different KINDS of
+        // thing) — no pure #000 (checked against Blockly's own white label text: WCAG contrast ~5.5:1/8:1/11:1
+        // for the three, all comfortably above the 4.5:1 AA floor). Corner only — not a repo-wide restyling.
+        sec('STRUCTURAL', '#475569', structCtls),              // the structural drivers, derived from CORNER_STRUCT_BINDINGS — slate-600 (lightest of the three darks)
+        sec('VARIABLES', '#334155', exec.slice(0, seam)),      // #var defs — slate-700
+        sec('G-CODE', '#1e293b', exec.slice(seam)),            // the emit — slate-800 (darkest)
     ];
 
     return [{ type: 'user_root', params: {}, uiChildren, children }];
