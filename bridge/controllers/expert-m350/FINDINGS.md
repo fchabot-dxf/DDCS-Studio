@@ -2731,3 +2731,45 @@ experiment run after it was formed, rather than fitted to data already in hand.
 mode), contention disappears. ⚠ The vendor manual documents `279` as **"Modbus RTU Enable"**, not a mode
 selector — but a later firmware reportedly adds a **P279 SLAVE** setting, and this machine is now on that
 newer firmware. ⛔ Untested, and it needs a reboot to apply `[TO TEST]`.
+
+## ⭐⭐⭐ THE OFFICIAL SLAVE REGISTER MAP EXISTS — AND IT REFUTES SEVERAL FINDINGS ABOVE `[VENDOR SPEC, 2026-09-02]`
+`M3xx_Modbus_Address_Map_V1_0.xlsx`, from **github.com/foinnc/M350** — cached at
+[`assets/vendor-spec/`](assets/vendor-spec/), which also records **why that repo, not `ddcnc.com`, is the
+source**. ⛔ This file has been telling readers *"there is no slave register map, because there is no
+slave… only foinnc can supply it."* **He has. It was published three days before we looked.**
+
+### ⛔ THERE ARE FOUR BLOCKS, NOT ONE — the `6500 + 2×(N−500)` formula covers only the first
+| Modbus | macro | block |
+|---|---|---|
+| — | `#0`–`#49` | subprogram locals |
+| — | `#50`–`#499` | global variables |
+| `6500`–`8498` | `#500`–`#1499` | user parameters 1 (Pr0–Pr999) |
+| ⭐ **`15000`–`16998`** | ⭐ **`#1500`–`#2499`** | **SYSTEM GLOBAL VARIABLES** |
+| ⭐ **`8500`–`9498`** | ⭐ **`#2500`–`#2999`** | user parameters 2 (Pr1000–Pr1499) |
+| `10000`–`10998` | — | system internal |
+
+⭐ Endianness in the spec is **`CDAB`** for every entry — the word-swapped float32 we reverse-engineered. ✅
+
+### ⛔⛔ WHAT THIS RETRACTS
+1. **"The mapping has an upper bound near `#1999`"** — **FALSE.** `#1500`–`#2499` are simply at a *different
+   base* (`15000`). I extrapolated one formula past its block and read zeros from unmapped space.
+2. **"`#2037` is outside the mirror, therefore the PC cannot clear a latch"** — ⛔ **`#2037` is at reg
+   `16074`, and the spec marks it `R/W`.** I wrote to `9574`, the wrong address. ⇒ **The virtual Reset may
+   work after all** `[TO TEST]`. `#2038` = `16076`, `#2039` = `16078`.
+3. **"`#2500` is not Modbus-readable"** — ⛔ **FALSE. `#2500` is at reg `8500`, `R/W`.** The tool-setter
+   calibration reference can be read *and written* over Modbus; a macro is not required.
+
+### ⚠ WHAT THE SPEC DOES **NOT** CONTAIN
+- ⛔ **Register `3000` is absent.** The map covers `6500`–`16998` only. ⇒ The G-code injection buffer remains
+  **undocumented by the vendor**, consistent with it being newer than this spec's scope. Our delivery
+  troubles are in the one part of the surface with no official definition.
+- ⛔ **No alarm/state/run category exists** — the entire 2,502-row table is only `用户参数变量` (1500),
+  `系统全局变量` (1000), `系统内部变量` (2). ⭐ **This independently confirms the differential sweep:** there
+  is no error-state register, which is why the camera is the only way to see one.
+
+### ⛔ THE PROCESS FAILURE, RECORDED BECAUSE IT COST THE MOST
+Owner: *"i thought you were looking at that — obviously if you're looking at outdated docs it's meant to go
+bad."* Findings were being built on **this file's summary** of a **2025 manual**, describing a **2026
+firmware**, while the vendor's live repo went unread. ⭐ **`Docs/` there holds ~40 more folders never opened
+here**, including `虚拟按键` (virtual keys), `按键键值宏地址#2037`, the full G/M code list, the coordinate
+transform formulas, and the current 4.7 MB system manual.
