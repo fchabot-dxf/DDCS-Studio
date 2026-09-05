@@ -364,3 +364,128 @@ cost four lines of G-code.** Worth the reflex next time: *which moment did each 
 | Do `.break0`/`.break1`/`processing` update **during** a run? | a program running, human present. Baselines committed at `bench/` |
 | Flash `2026-08-03-00`? | after the reboot result, as its own step |
 | Gateway `workOrigin.z` is missing the tool-table term | ⭐ **RENDERRANCHY's** — unblocked, nothing gating it |
+
+---
+
+# ⏸ PAUSE STATE — Fairy, 2026-09-05. **Read this one; the block above is provenance.**
+
+## 1. THE MACHINE — safe, nothing mid-test
+`READY`, green strip, `MPG`, `V21_dwell.nc` loaded but not running, no motion all session. Only a scratch
+macro variable was written. Photographed at pause. Safe to power down.
+
+## 2. ⛔⛔ EMIT HAZARDS — **THIS IS THE PART THAT AFFECTS THE APP**
+All measured on the Expert today, all camera-verified against the pendant.
+
+| | |
+|---|---|
+| ⛔ **THERE IS NO POWER OPERATOR** | `^` **and** `**` both raise `syntax error!` (both photographed). ⇒ **any emitted exponentiation must become repeated multiplication.** Worth grepping the emit paths |
+| ⛔ **`MOD` is a syntax error** | photographed. Do not emit it |
+| ⭐ **arguments are in DEGREES** | `COS[90]`→0, `SIN[90]`→1, `TAN[45]`→1, `ATAN[1,1]`→45. **Never established here before, and it silently changes every emitted arc** |
+| ⭐ **`ATAN[y, x]` comma form re-confirmed** | `ATAN[1, 2]` = **26.565**, independently reproducing §V13's `ATANC=2657` by a different route. ⚠ **The §V13 app-side fix is still RENDERRANCHY's and still pending** — `data/probeToSlot.js:538` and `wizards/alignmentWizard.js:158` still emit the slash form, which this controller rejects |
+| ✅ confirmed working | `SQRT` `COS` `SIN` `TAN` `ABS` `ROUND`(rounds) `FIX`(truncates), and **all six** of `EQ` `NE` `LT` `GT` `LE` `GE` |
+
+## 3. ~~THE G-CODE INJECTION CHANNEL IS LOSSY — ~25% OF FRAMES NEVER ARRIVE~~ ⛔ **RETRACTED — see §5 below.**
+⛔ **This section is WRONG and is kept only as provenance.** The cause was a trailing `
+` we appended and
+the vendor's tool never sends. Removed; delivery is clean. **Do not design around a loss rate.**
+If anything app-side is ever built on register 3000, **it must check the FC16 acknowledgement and resend.**
+Perfect correlation over 18 writes: 13 landed all had a valid ack, 5 lost all had none — the controller never
+received them. Immune to pacing and to bus quiet time; latency is bimodal, **~440 ms or never**.
+⇒ **A multi-line sequence sent blind will usually be missing a line, with no error anywhere.**
+A lost line leaves the variable at its **previous** value, which reads as a plausible answer.
+
+## 4. ⭐⭐ THE PC CAN NOW SEE THE CONTROLLER'S ERROR STATE — VIA A CAMERA
+The error state is **in no register** (a differential sweep of the whole macro mirror, before and after a
+deliberate error, changed nothing). It is only on the pendant: the top-bar cell (`READY` → red `ERROR`) and
+the bottom strip (green → red, **quoting the offending line verbatim**). A USB webcam reads it —
+`camera-vision` skill, **index 1**. ⇒ Fairy no longer has to ask the owner whether something failed.
+⚠ `~/.claude/skills/` does not exist on this seat, so the skill cannot auto-load; it was reached by its
+canonical `Apps/fred-skills` path and needs its per-skill symlink.
+
+## 5. ⚠ WHAT I GOT WRONG — five retractions in one session, all one root cause
+`NE` "broken"; a whitespace-around-operators "rule"; `[3*3]` a "syntax error"; `**` a "silent no-op"; `#915`
+"refuses writes". **Every one came from a lost frame leaving a stale value that I read as a measurement.**
+⭐ **The rule that came out of it:** on this channel a **negative** result (rejected / no-op / refuses) is
+worth nothing without either an acknowledged frame or a photograph of the pendant. **Positives were never at
+risk** — a lost frame cannot invent a correct answer for a specific expression, and the whole operator table
+reproduced 10/10 after the fix.
+
+## 6. STILL OPEN
+| question | needs |
+|---|---|
+| ~~Is `#279` the real fix for the frame loss?~~ ⛔ **CLOSED.** The vendor's `M350-LiveG` README *requires* `#279 = Slave Mode`, and this machine is already set correctly (`2`). Parity `#296` and stop bits `#297` also verified. **Serial config was never the problem** | — done |
+| `G10 L20` — the only item in `bench/05` that moves an axis | human at the machine |
+| `bench/04-modbus-slave-test-plan.md` | written, never run |
+| Gateway `workOrigin.z` missing the tool-table term | ⭐ **RENDERRANCHY's**, still unblocked |
+
+---
+
+## ⭐⭐⭐ LATE ADDITION, 2026-09-05 — TWO THINGS RENDERRANCHY CAN BUILD ON
+
+### 1. LIVE RUN STATE EXISTS: **register `10002`** `[CONFIRMED on machine, owner pressed Start]`
+`0` = idle, `1` = **a program is running**. Confirmed against a 30 s `G04` dwell that moves **no axis** — it
+held `1` throughout, so it is a **program-running flag, not a motion flag**. FC03, 2 registers, float32
+`CDAB`. The `#701`/`#702` completion counters still fire at the end (`251/4 → 252/5`).
+
+⛔ **This retracts "no run-state flag found"**, which this repo has carried for months. That conclusion came
+from diffing 2,400 registers mid-run — but `10002` is in the `10000`–`10998` **system-internal** block,
+which a macro-mirror sweep never touches. Found by reading the vendor's own tool,
+`m350_liveg.py::poll_m350_state_with_strict_crc`.
+
+⇒ ⭐ **Studio can now know a job is running, live, over Modbus** — start edge, running, finish edge — with
+no SMB polling. ⚠ Only `0`/`1` observed; the vendor treats any non-zero as running, so other states may
+exist (feed hold? probing?). Vendor question logged.
+
+### 2. ⛔ THE EMIT HAZARDS FROM EARLIER TODAY STILL STAND — and they are app-side
+- ⛔ **No power operator.** `^` **and** `**` both raise `syntax error!` (photographed). Emitted
+  exponentiation must become repeated multiplication. **Worth grepping the emit paths.**
+- ⛔ **`MOD` is a syntax error.**
+- ⭐ **Arguments are in DEGREES** (`COS[90]`→0, `ATAN[1,1]`→45). Silently changes every emitted arc.
+- ⭐ **`ATAN[y, x]` comma form re-confirmed** — the §V13 slash-form fix in `data/probeToSlot.js:538` and
+  `wizards/alignmentWizard.js:158` is **still pending and still yours.**
+
+### ⚠ AND ONE CORRECTION TO YESTERDAY'S HANDOFF
+The "G-code injection channel loses ~25% of frames" warning I wrote earlier today was **wrong** — the cause
+was a trailing `\n` we were appending that the vendor's tool never sends. Removed; delivery is now clean.
+⛔ **Do not design around a 25% loss rate.** See `FINDINGS.md` for the full retraction.
+
+### ⭐⭐⭐ AND THE LINE NUMBER EXISTS TOO — register `16062` `[CONFIRMED on machine 2026-09-05]`
+Read `10` while `V21_dwell.nc` ran, whose `G04` is **line 10**; `0` when idle. ⇒ **Live executing line
+number.** With `10002` (running flag) this is **real progress tracking over Modbus** — no SMB polling:
+
+| register | meaning |
+|---|---|
+| `10002` | `1` running / `0` idle (program-level, holds through a dwell) |
+| ⭐ `16062` | the line currently executing, `0` when idle |
+| `#701`/`#702` | completion counters, on the finish edge |
+
+⛔ This resolves the contradiction in `FINDINGS.md` — *"vendor-stated 16062 is the line number"* vs *"there
+is no line-number register, one is being added ~2026-08-27"*. **Both were true in sequence**; this machine is
+on `2026-09-02-00`, newer than that promise. ⚠ Untested: whether it counts file lines or executable blocks.
+
+---
+
+## ⛔⛔ ONE MORE, AND IT AFFECTS DIALECT WORK ON **BOTH** CONTROLLERS
+⭐ **New: [`context/DDCS-VARIABLES.md`](DDCS-VARIABLES.md)** — also a `ddcs-variables` skill, and linked from
+`CLAUDE.md`. Written because `#915`-`#918` were used as scratch here for hours and are **H16-H19 tool length
+offsets**.
+
+```
+#0 - #99      SAFE on both controllers. Locals.
+#100 - #499   works on both, but PERSISTS through power-off on both.
+#500 +        a real machine setting on both  (M350: Pr(N-500)).
+#1500 +       ⛔ CONTROLLER-SPECIFIC — the two maps DIVERGE HERE.
+```
+
+⛔⛔ **THE PART THAT MATTERS FOR EMIT/DIALECT WORK — the tool table is in a different place on each:**
+
+| | **V4.1** | **M350** |
+|---|---|---|
+| WCS G54-G59 | ⛔ `#1512`-`#1551` | `#800`-`#844` |
+| H1-H16 tool length | ⛔ `#1560`-`#1576` | `#900`-`#919` |
+| D1-D16 diameter | ⛔ `#1577`-`#1593` | `#920`-`#939` |
+| `#1500`+ in general | ⛔ **the WCS and tool table** | system globals (line no., keys) |
+
+⇒ **Any emitted or generated macro that touches `#1500`+ is safe on one machine and destructive on the
+other.** Source: `bridge/controllers/v4.1/DDCS V4.1 Variables list.xlsx` (the vendor's own list, in-repo).
+⚠ Also: **V4.1 has no Modbus at all**, so every register/injection statement from today is M350-only.

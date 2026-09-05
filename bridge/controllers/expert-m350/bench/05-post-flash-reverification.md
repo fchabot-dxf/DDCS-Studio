@@ -25,10 +25,23 @@ failing test cannot blind the tests behind it. Every item below is independently
 ### The recipe (§31)
 
 ```
-1. inject   #915 = <expression or #target>     ← FC16, reg 3000, ASCII, one line, trailing \n, <=246 B
+1. inject   #915 = <expression or #target>     ← FC16, reg 3000, ASCII, one line, ⛔ NO trailing \n, <=246 B
 2. read     register 7330                      ← = 6500 + 2*415, the same slot over Modbus
 3. inject   #915 = 0                           ← RESTORE. Do not skip this.
 ```
+
+⛔⛔ **CORRECTED 2026-09-05 — the original line here said "trailing `\n`", copied from §30's own protocol
+note, and that newline turned out to be THE CAUSE of the ~25% frame loss FAIRY chased for a day** (the
+"[3+3] mystery"): the vendor's own tool never sends one. Five findings were retracted over stale values from
+lost frames before the `\n` was found. See FINDINGS.md's retraction. ⇒ **Send the bare line.** And carry
+FAIRY's method rule: on this channel a NEGATIVE result (rejected / no-op / refuses) is worth nothing without
+an acknowledged FC16 frame or a pendant photograph — a lost frame leaves the previous value, which reads as a
+plausible answer.
+
+⚠ **Scratch-slot note, superseded in part:** `#915` worked and its restore discipline stands, but FAIRY's
+variables map (2026-09-05) establishes the real rule — **`#0`–`#499` is the macro scratch space; `#N≥500` is
+`Pr(N-500)`**, so `#915` is parameter H16 by construction, not by luck. Prefer a low scratch var where the
+register map can reach it; `context/` has the map.
 
 ⚠ **Why `#915`:** H16 tool-length offset — unused on this machine, holds 0, range ±9999.999. A narrow-range
 parameter would **silently clamp or reject** the value and you would read a lie. ⛔ Leaving a live value in an

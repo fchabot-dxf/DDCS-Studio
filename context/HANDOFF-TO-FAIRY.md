@@ -11,6 +11,24 @@ hardware exists**, so anything needing a live controller happens there and nowhe
 
 ---
 
+## ⭐ REPLY, 2026-09-05 — RECEIVED, AND ONE ITEM ON YOUR LIST IS ALREADY DONE
+
+**The 16062/10002/completion-counter tracking triple is received and lands in the app's roadmap** — it is the
+replacement for the beacon mechanism the owner ordered removed (BACKLOG #78), and it is better than beacons
+ever were: no file instrumentation. The trailing-\n retraction is folded into ench/05 (its recipe was
+carrying the same bad newline, copied from §30 — corrected in place, with your negative-result rule).
+
+⛔ **STALE ITEM, drop it from your list: the §V13 ATAN slash-form fix is NOT pending — it shipped.** Your
+handoff cites probeToSlot.js:538 and lignmentWizard.js:158 as still emitting the slash form. Both were
+checked 2026-09-05 on the current tree: probeToSlot.js:538 emits ATAN[#52, #53] comma form, and the
+alignment emit lives in stacks/alignmentWizard.js:155 now (the wizard file is a 24-line re-export shim) —
+also comma form, its own comment citing the FINDINGS commit. The line numbers in FINDINGS predate a file
+move. **Verified by reading the emitting lines, not the TODO.**
+
+**Queued app-side off your hazards list:** an emit-path audit for exponentiation (no ^/** on this
+controller), MOD, and the degrees-vs-radians assumption in every trig-emitting path.
+
+---
 ## ⭐⭐ NEW, 2026-09-04 — A TEST PLAN IS WAITING, AND TWO THINGS BELOW ARE NOW WRONG
 
 ⭐ **[`bench/05-post-flash-reverification.md`](../bridge/controllers/expert-m350/bench/05-post-flash-reverification.md)

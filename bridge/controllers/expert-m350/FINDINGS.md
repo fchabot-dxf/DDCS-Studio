@@ -559,7 +559,8 @@ form, unequal operands 1,2) → popup **`ATANC=2657`**. So:
   `#54=ATAN[#52, #53]` (comma works on BOTH — V4.1 per S5o/t1583, Expert per V13f). Resolve `trigEvidence.js`
   `alignment-atan`, and flip the emit-asserting specs (`alignment-superset.spec.js`, `cam-slot-sim.spec.js`:
   `ATAN\[#52\]/\[#53\]` → comma). The engine already PARSES comma (`expression.js` t1583), so only the EMIT changes.
-- **Still open:** COS / SIN / SQRT on the Expert (the `V13_trig` abort ate them) ⇒ run `V13c_sqrt`, `V13a_cos`, `V13b_sin`.
+- **~~Still open: COS / SIN / SQRT~~ — CLOSED 2026-09-05 over Modbus, see the trig section at the end of this file.**
+  All three work, and **arguments are in DEGREES**.
 
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
@@ -2233,3 +2234,761 @@ firmware ≥ 2025-12-11-00 and applies to BOTH V1 and V2 equally** — it was pr
 that is refuted. Serial DB9 5V supply (powers an M3X-style accessory) is present on all V2 units but only SOME
 V1 units — check with a multimeter before assuming it's there, or power any external device from USB-C
 instead.
+
+## ⭐ THE TRIG GAP IS CLOSED — SQRT/COS/SIN work, and arguments are in DEGREES `[CONFIRMED on machine 2026-09-05, fw 2026-08-03-00, over Modbus]`
+
+Open since the `V13_trig` whole-file abort of 2026-08-08 ate them (safety rule 3: one bad line rejects the
+whole file, so COS/SIN/SQRT were never *tested* — they were merely *unobservable*). Closed in one command
+using the universal variable reader: inject `#915 = <expr>` at register `3000`, read register `7330`.
+
+| expression | result | |
+|---|---|---|
+| `SQRT[16]` | `4.0` | |
+| `SQRT[2]` | `1.4142135` | |
+| `COS[0]` | `1.0` | |
+| `SIN[0]` | `0.0` | |
+| `TAN[45]` | `1.0` | ⇒ degrees |
+| **`COS[90]`** | **`6.12e-17` (= 0)** | ⭐ **cos 90 in RADIANS is −0.448. This is DEGREES.** |
+| **`SIN[90]`** | **`1.0`** | ⭐ sin 90 in radians is 0.894. **DEGREES.** |
+| `ABS[-5]` | `5.0` | |
+| `ROUND[2.6]` | `3.0` | rounds, not truncates |
+| `FIX[2.9]` | `2.0` | truncates |
+
+⭐ **DEGREES had never been established here**, and it silently changes every emitted arc. It now is.
+
+### ~~`NE` returns 0 for a true inequality~~ — **REFUTED the same night. `NE` IS CORRECT.** `[CONFIRMED 2026-09-05]`
+Re-tested on a scratch variable that was actually accepting writes, sentinel verified before each line:
+`[1 NE 2]`→**1**, `[2 NE 1]`→**1**, `[1 NE 1]`→**0**, `[5 NE 5]`→**0**. All correct.
+⇒ **`EQ` `NE` `LT` `GT` `LE` `GE` are ALL confirmed good on the Expert.** `NE` is safe to emit.
+The original `0.0` was a **stale value left by the `[1 EQ 2]` line before it**, not a measurement. This
+closes the `NE` half of the V13 "`NE`/`LT`/`GT` untested" note.
+
+### ⛔⛔ WHY SOME INJECTED WRITES "DON'T TAKE" — **AN EARLIER LINE ERRORED AND LATCHED THE CHANNEL** `[CONFIRMED on machine 2026-09-05, photographed]`
+Owner's question, and the right one: *"There must be a reason why some writes aren't effective. We need to
+find why."* There is, and it is now proven with the camera:
+
+1. A line with a genuine syntax error **latches** the controller (`ERROR`, red strip, top-left `MPG`→`MDI`).
+2. **While latched, EVERY subsequent injection is silently dropped** — the FC16 write is still ACKed at the
+   wire level, and the line is discarded. No error, no NAK, nothing observable from the PC.
+3. A read-back then returns the variable's **previous** value, which looks exactly like a real answer.
+4. Only **Reset at the pendant** clears it.
+
+⇒ **"Some writes aren't effective" is almost always "an earlier line in the same batch errored."**
+**Photographed twice:** `syntax error!:L1[#916 = ATAN[45]]` and `syntax error!:L1[#916 = [7 MOD 3]]`. In the
+second case a batch reported "no assignment" for the *following* expression too — which had never executed
+at all — and then six further numeric writes vanished for the same reason.
+
+⭐ **`MOD` IS A SYNTAX ERROR ON THIS CONTROLLER.** Do not emit it. `[CONFIRMED, photographed]`
+⚠ `**` (power) is **still untested** — it was queued behind `MOD` and never ran `[TO TEST]`.
+
+### ⛔ RETRACTED — "WHITESPACE AROUND OPERATORS IS REQUIRED" IS FALSE `[REFUTED 2026-09-05, same session]`
+An earlier entry here claimed `[3*3]` was a silent no-op while `[3 * 3]` worked, and generalised it into an
+emit hazard. **Wrong.** Re-run with a *retrying* sentinel: `[9-3]`→**6**, `[9/3]`→**3**, `[2*3]`→**6**. Tight
+packing is fine. ⚠ The original evidence was a clean alternating pass/fail pattern, and I argued explicitly
+that it was "content-dependent, not noise, because the sentinel was verified each time" — but the sentinel
+was verified with a **single unverified write**, which is the exact thing that is unreliable. ⇒ *A control is
+worthless if it is measured by the instrument under suspicion.*
+
+### ⚠ INJECTED WRITES ARE ALSO DROPPED INTERMITTENTLY, WITH NO ERROR AT ALL `[MEASURED 2026-09-05, cause unresolved]`
+Separate from the latch, and it is the reason the latch went undiagnosed so long. Nine numeric writes in a
+row to `#916`, pendant green and `READY` throughout: **the 1st and the 9th silently vanished, the middle
+seven landed.** Value range is not the cause — `-77777` and `99999` both land, so the "±9999" range note
+elsewhere in this file does not apply here.
+
+⇒ **NEVER TRUST AN UNVERIFIED INJECTION.** `tools/macro_probe.py` now writes-reads-retries every numeric
+write (`set_var`), and after any "no assignment" it fires a **canary write** to prove the channel is still
+alive — without that, one bad expression turns every later result in the batch into a stale-value fiction.
+⚠ Root cause of the intermittent drop is **still unknown**; a register-3000 handshake (the buffer reads back
+all-zero when idle, so the controller appears to clear it after consuming) was hypothesised but could not be
+tested — the controller was latched at the time and the buffer never went busy `[TO TEST]`.
+
+### ⛔ AN ERROR *DOES* BLOCK FURTHER INJECTION — claimed, wrongly retracted, then PROVEN `[CONFIRMED on machine 2026-09-05]`
+**Proof:** with `syntax error!:L1[#916 = ATAN[45]]` visibly on the pendant, `#917 = 3141` was injected and
+**dropped** — `#917` stayed at `4321`. The FC16 write is still ACKed at the wire level; the line is discarded.
+
+⚠ **This entry was retracted earlier the same night and the retraction was WRONG.** The "disproof" was that
+an expression injected right after `[3*3]` worked — but `[3*3]` **never raised an error** (above), so nothing
+was ever being tested. ⇒ *A refutation is only as good as the trigger it assumes fired.*
+
+⭐ Consequence: **a read-back after a blocked injection returns the previous value**, which looks exactly like
+a plausible answer. This produced nine consecutive false readings of `1.0` in the trig run. **THE SENTINEL
+MUST BE WRITTEN AND READ BACK** — a dead channel drops the sentinel too, so "read-back differs from sentinel"
+passes every time. `tools/macro_probe.py` does this and halts.
+
+**Clearing:** the owner must press **Reset** `[CONFIRMED — owner, 2026-09-05: "Errors don't resolve on their
+own. I need to press reset."]`. `#2037 = 65863` cannot do it, since that press uses the blocked channel.
+
+### ⚠ SEPARATELY, `#915` REFUSES WRITES EVEN WITH NO ERROR ON SCREEN `[MEASURED 2026-09-05, cause unknown]`
+With the pendant clear, `#916 = 1234` and `#917 = 4321` both landed while `#915 = 555` was dropped and `#915`
+stayed at `1.0`. So this is **not** the latch — it is specific to `#915`. ⛔ **The "universal variable reader"
+documented elsewhere in this file uses `#915` as its scratch slot; it is compromised until this is
+understood. Use `#916` (reg `7332`).**
+
+### ⭐⭐ THE ERROR STATE IS VISIBLE ONLY ON THE SCREEN — AND A USB CAMERA READS IT `[CONFIRMED on machine 2026-09-05]`
+Owner: *"problem is you cant see if an error is blocking"* — the root cause of every wrong call that night.
+
+- ⛔ **It is NOT in the registers.** A differential sweep of `6500`–`10600` (macro `#500`–`#2550`), taken
+  before and after a deliberate syntax error, showed **ZERO changed registers.**
+- ⭐ **It IS on the pendant, in two places:** the **second cell of the top bar** (`READY` → solid **red**),
+  and the **bottom status strip** (green → **red, carrying the message text** `syntax error!:L1[<the exact
+  line>]`). The strip quotes the offending line verbatim, so it identifies *which* injection failed.
+- ⭐⭐ **A USB camera aimed at the pendant closes the loop.** `camera-vision` skill, **index 1 (`HD Camera`)**
+  — index 0 (`USB HD Webcam`) faces the operator, index 2 is `World Facing`:
+  `python <fred-skills>/camera-vision/capture.py --out <scratch>/pendant.jpg --index 1 --open`
+  ⇒ **The PC can now confirm an injected line succeeded without asking the operator.** Verified end-to-end:
+  injected a known-bad line, read `syntax error!` off the photograph unaided.
+  ⚠ Aim it at the **bottom strip** — everything else on that screen is already readable over Modbus.
+  ⚠ The per-seat skills folder did not exist on CNC-FAIRY, so `camera-vision` could not auto-load; it was
+  reached via its canonical `Apps/fred-skills` path. Needs the per-skill symlink (see the skill's own header).
+
+### ⚠ THE POSITION REGISTER LABELS ARE WRONG — `7080` AND `7260` ARE THE SAME AXIS `[CONFIRMED on machine 2026-09-05, camera cross-check]`
+The pendant read `Mach X 5.000` / `Abs X −45.130` while `reg 7260` read `5.0` and `reg 7080` read `−45.130`.
+⇒ **`7080` = WORK (Abs) X and `7260` = MACHINE (Mach) X — both X, not "X and Y"** as labelled elsewhere here.
+`10002` read `0.0` against Abs Z `101.142`, so it is **not** Z either. ⛔ Re-derive the whole position map
+before trusting it; the camera makes this cheap now, since the screen shows the true values next to the reads.
+
+### The ATAN forms in that run measured NOTHING — §V13 already had the answer
+`ATAN` takes **two operands in the comma form** (§V13, `[CONFIRMED 2026-08-08]`). So `ATAN[1]` and `ATAN[45]`
+are one-operand calls that *should* error, `ATAN[1]/[1]` is the slash form already known-rejected, and
+`ATAN[1, 1]` — the only valid form of the four — was dropped by the latch. **§V13 stands unchanged.**
+⇒ Second time in two days a question was taken to the machine that this file already answered (the other:
+`G04 P` is milliseconds). **Read the section before testing the thing the section is about.**
+
+## ⭐ TWO WRITE PATHS, AND ONLY ONE SURVIVES A LATCH `[CONFIRMED on machine 2026-09-05]`
+There are two independent ways to change a macro variable from the PC, and they behave differently:
+
+| path | how | survives a latch? |
+|---|---|---|
+| **G-code injection** | FC16 → reg `3000`, ASCII `#916 = 5` | ⛔ **NO** — silently dropped |
+| **direct register write** | FC16 → reg `6500 + 2×(N−500)`, word-swapped float32 | ⭐ **YES** |
+
+**Proven with the channel latched:** a direct write of `1234.0` to reg `7332` landed and read back, at the
+moment G-code injection was dropping every line. ⇒ **A latch blocks the G-code interpreter, not Modbus.**
+
+### ⛔ BUT THE VIRTUAL BUTTONS ARE NOT REACHABLE THAT WAY — `#2037` IS OUTSIDE THE MIRROR
+Writing `65863` (RESET) to reg `9574` = `6500 + 2×(2037−500)` was **ACKed and discarded**; the register still
+read `0`, and the pendant kept its `ERROR`. A block sweep shows why:
+
+* live data runs to roughly **`#1999`**; `#1650`–`#1999` is already nearly all zero
+* **`#2000`–`#2599` is entirely zero** — `#2037` sits here
+
+⇒ **The `6500 + 2×(N−500)` mapping has an UPPER BOUND near `#1999`**, which this file previously stated
+without one. `#2037` responds only to a *running macro*, i.e. to the injection channel — **the exact thing a
+latch blocks.**
+
+⛔⛔ **THEREFORE THE PC CANNOT CLEAR A LATCH. Only the operator can, at the pendant.** This was claimed
+earlier in this file as an assumption; it is now measured. ⚠ Lead, unattested: M350-LiveG is reported to have
+its **own keypress register** at an address we do not know — if found, it may offer a second route `[TO TEST]`.
+
+⭐ Corroboration: **`#2500` reads `0` over Modbus**, matching the existing note that the tool-setter
+calibration reference is in neither `setting`, `camsetting` nor `uservar` and needs a macro to read.
+
+## ⭐ THE OPERATOR / FUNCTION SET, SETTLED `[CONFIRMED on machine 2026-09-05, camera-verified]`
+
+| works | value | | rejected | |
+|---|---|---|---|---|
+| `SQRT[16]` `SQRT[2]` | 4 · 1.41421 | | ⛔ `MOD` | **syntax error** (photographed) |
+| `COS[0]` `COS[90]` | 1 · 0 | ⇒ **DEGREES** | ⛔ `^` | **syntax error** (photographed) |
+| `SIN[0]` `SIN[90]` | 0 · 1 | ⇒ **DEGREES** | ⚠ `**` | silent no-op, canary passed |
+| `TAN[45]` | 1 | | ⛔ one-operand `ATAN[x]` | **syntax error** |
+| `ABS[-5]` `ROUND[2.6]` `FIX[2.9]` | 5 · 3 · 2 | rounds / truncates | ⛔ `ATAN[y]/[x]` (slash) | rejected — §V13 |
+| `EQ` `NE` `LT` `GT` `LE` `GE` | all correct | | ⛔ `**` | **syntax error** (photographed) |
+| ⭐ `ATAN[1, 2]` | **26.565** | ⭐ `ATAN[1, 1]` → **45.0** | | |
+
+⭐ **`ATAN[1, 2]` = 26.565° independently reproduces §V13's `ATANC=2657`** by a completely different route
+(Modbus injection vs. an on-screen popup), and pins the comma form *and* degrees in one measurement.
+
+⛔⛔ **THERE IS NO POWER OPERATOR — BOTH FORMS ERROR.** `^` and `**` each raise `syntax error!`, both
+photographed. Any emitted exponentiation must be rewritten as repeated multiplication.
+
+### ⛔ THE LATCH IS NOT INSTANTANEOUS — A CANARY FIRED TOO EARLY GIVES A FALSE ALL-CLEAR `[CONFIRMED on machine 2026-09-05]`
+`[2 ** 3]` was first recorded here as a *harmless silent no-op* because the canary write fired ~0.5 s after it
+and **slipped through**. Repeating the same expression, with the canary later, caught the latch — and the
+pendant read `syntax error!:L1[#916 = [2 ** 3]]`. ⇒ **The error takes time to register**, and a check that
+races it reports the channel healthy when it is already dying.
+
+⚠ **A false all-clear is worse than no check at all**, because it launders the next batch's stale reads into
+"measurements". `tools/macro_probe.py` now waits **1.8 s** after the expression and a further **1.0 s** before
+the canary. ⭐ Both verdicts it has produced since were then confirmed against a photograph of the pendant.
+
+## ⭐⭐ WHY AN INJECTED WRITE "DOESN'T TAKE" — **TWO INDEPENDENT CAUSES** `[CONFIRMED on machine 2026-09-05]`
+
+### CAUSE 1 — a latch, from an error earlier in the batch (100% loss until Reset)
+Covered above. Total, persistent, and invisible from the PC. This is the big one.
+
+### CAUSE 2 — ⭐ **BASELINE RANDOM LOSS OF ROUGHLY 10–25%, ON A PERFECTLY HEALTHY CHANNEL**
+Measured with the pendant photographed **green and `READY` before and after**, using only plain numeric
+assignments that cannot raise an error:
+
+| test | result |
+|---|---|
+| 20 unverified writes | **17/20 landed, 3 lost** |
+| 15 writes, polled until the value appeared | **11 arrived in ~440 ms; 4 NEVER arrived** (6 s cutoff) |
+
+⭐ **The latency is bimodal: ~440 ms, or never.** There is no slow tail — a line either executes in well under
+half a second or it is gone. ⇒ A "dropped" write leaves the variable at its **previous value**, which is what
+makes it read as a plausible answer instead of a failure.
+
+⛔ **PACING DOES NOT FIX IT.** Loss vs. the gap left before each line: `0 ms → 2/12`, `250 ms → 0/12`,
+`500 ms → 1/12`, `1000 ms → 2/12`. No relationship. Waiting longer is not the answer, and neither is a
+register-3000 handshake (the buffer was never observed non-zero even immediately after a write).
+⚠ **Root cause remains UNKNOWN** `[TO TEST]`.
+
+### ⇒ THE OPERATING RULE: **NEVER TRUST AN UNVERIFIED INJECTION**
+Write → read back → retry. At ~15% loss, four attempts put the residual failure near **0.05%**. This is what
+`tools/macro_probe.py::set_var` does, and it is not optional: **every wrong finding recorded in this file on
+2026-09-05 traces back to a single unverified write whose stale read-back was taken as a measurement.**
+
+⚠ **This applies to the whole G-code injection channel, not just probing** — anything built on register 3000
+inherits a ~1-in-6 silent failure rate per line. A multi-line sequence sent blind will *usually* be missing a
+line. ⛔ Any future use must verify each line landed, or be idempotent and re-sent.
+
+## ⭐⭐⭐ ROOT CAUSE — **~25% OF WRITE FRAMES NEVER ARRIVE. CHECK THE FC16 ACK.** `[CONFIRMED on machine 2026-09-05]`
+
+The correlation is perfect. 18 plain numeric writes, pendant photographed green and `READY` throughout:
+
+| | valid FC16 ack | no valid ack |
+|---|---|---|
+| **landed** | **13** | 0 |
+| **lost** | 0 | **5** |
+
+⇒ **The controller never received the lost lines. It is a LINK problem, not the controller discarding them.**
+Consistent with everything else measured: immune to pacing (`0/250/500/1000 ms` gaps → `2/0/1/2` lost per 12),
+immune to bus quiet time (quiet wait `3/15`, polling `4/15`), and bimodal latency — a line executes in
+**~440 ms or never**, with no slow tail.
+
+⭐ **Every ack is preceded by 6–11 bytes of junk that is not ours** (`01 00 00 00 00 …`). This controller is a
+Modbus **MASTER** by default, so the most likely mechanism is **its own polling frames colliding with ours**
+on a half-duplex line. `[HYPOTHESIS — the junk is measured, the attribution is not]`
+
+### ⇒ THE FIX: THE ACK IS THE CHEAP TRUTH
+A valid FC16 echo (`01 10 <addr> <count> <crc>`) means the line arrived. **Check it and resend** — this is far
+better than reading the variable back, because it needs no scratch slot, no sentinel, and works for lines that
+assign nothing. `tools/macro_probe.py::inject` now retries up to 6× until acknowledged.
+⭐ **Verified:** a 10-expression battery immediately afterwards ran **10/10 clean, no retries visible, no latch.**
+
+### ⛔ RETRACTED — "`#915` REFUSES WRITES" `[REFUTED 2026-09-05]`
+Pure lost-frame artifact. Re-tested with ack-confirmed injection: `#915` accepts `777`, `0`, `1`, `5`, `-3`,
+every one landing first time. ⭐ **The "universal variable reader" that uses `#915` as its scratch slot is NOT
+compromised** — that warning is withdrawn.
+
+### ⚠ WHAT THIS DOES AND DOES NOT INVALIDATE
+- ⭐ **POSITIVE results stand.** A lost frame cannot invent a correct answer for a specific expression —
+  `SQRT[16]` reading `4` can only come from `SQRT[16]` executing. The whole function/operator table was
+  re-run after the fix and reproduced exactly.
+- ⛔ **NEGATIVE results were the vulnerable class** — "rejected", "no-op", "refuses writes" all look identical
+  to a lost frame. Of the five recorded here, **four were photographed on the pendant** (`MOD`, `^`, `**`,
+  one-operand `ATAN`, each with `syntax error!` quoting the offending line) and stand. The fifth was `#915`,
+  never photographed, and it was wrong.
+- ⭐ **THE RULE:** a negative result on this channel is worth nothing without either an acknowledged frame or
+  a photograph of the pendant. That is the whole lesson of 2026-09-05, and it cost a day of false findings.
+
+## ⛔⛔ CERTAIN EXACT LINES NEVER EXECUTE — DETERMINISTIC, SILENT, RULE UNKNOWN `[CONFIRMED on machine 2026-09-05]`
+
+⭐ **This supersedes the "~25% random frame loss" section above, which was largely my own measurement bug.**
+
+`#916 = [3+3]` **never** assigns. Not sometimes — never, across many attempts. And yet:
+
+| line | result |
+|---|---|
+| `#916 = [3+3]` | ⛔ **never assigns** |
+| `#917 = [3+3]` · `#918 = [3+3]` | ✅ 6 |
+| `#916 =[3+3]` · `#916= [3+3]` · `#916=[3+3]` | ✅ 6 |
+| `#916 = [3+3] ` *(one trailing space)* | ✅ 6 |
+| `#916 = [3 + 3]` · `[3.0+3]` · `[03+3]` | ✅ 6 |
+
+⇒ **Same expression, same semantics — only the bytes differ.** It is not the operator, not the operand
+values, not the result, and not spacing as such (`[9-3]` and `[2*3]` work tight-packed). Other confirmed
+members of the same class: `[4+4]`, `[0+7]`, `[4*4]`, `[4/4]`, `[3/3]`.
+
+⛔ **A CRC THEORY WAS TESTED BY PREDICTION AND REFUTED.** Failures shared a high CRC low byte (`0xFB`,
+`0xFF`), so 10 never-tested expressions were predicted from the CRC alone: **7/10 correct, and the three
+misses are fatal** — `0xFB` and `0xFF` each appear in both a failure *and* a pass (`[3+3]` fails / `[3-3]`
+passes; `[4+4]` fails / `[0*7]` passes). **The rule is genuinely UNKNOWN** `[TO TEST]`.
+
+### ⇒ THE WORKAROUND THAT DOES NOT NEED THE RULE
+**Retry with a trailing space.** Semantically identical, byte-different. `tools/macro_probe.py` does this
+before concluding anything, and it fixes every known member of the class: `[3+3]`→6, `[4+4]`→8, `[0+7]`→7,
+`[3/3]`→1, `[4/4]`→1, `[4*4]`→16, all first retry.
+⛔ **Anything built on register 3000 must do the same** — otherwise a valid line silently does nothing.
+
+### ⭐⭐ CONSEQUENCE: **THERE ARE NO SILENT NO-OPS IN THE ARITHMETIC**
+Every expression previously filed here as a "silent no-op" was this artifact. ⇒ **An expression either
+evaluates, or it raises `syntax error!` and latches. There is no third outcome.** The only genuine negatives
+on this controller are the ones that show an error on the pendant: **`MOD`, `^`, `**`, one-operand `ATAN`,
+and the slash form `ATAN[y]/[x]`** — all photographed, all re-confirmed.
+
+### ⚠ AND HOW THIS WAS MISSED FOR SO LONG — MY OWN TOOL
+`probe()` confirmed its sentinel with a **single read 0.5 s after the write**, while measured execution
+latency is **~440 ms**. So the confirmation regularly beat the line, `set_var` concluded failure and
+**re-injected**, and the duplicate landed *after the next expression* and overwrote its result. That made a
+deterministic effect look random, which is why it was written off as noise twice.
+⭐ Fixed by **polling** for the value instead of guessing a delay, and draining duplicates before the next
+line. ⇒ *A measurement whose instrument retries silently will invent randomness that is not there.*
+
+### ⭐⭐⭐ AND THE MECHANISM: THE LINE IS **NEVER DELIVERED**, NOT "SILENTLY IGNORED" `[CONFIRMED on machine 2026-09-05]`
+Owner asked the right question — *"so no error appeared on the controller, that normal?"* — and checking it
+directly settled the whole thing. Injecting `#916 = [3+3]` raw:
+
+```
+sentinel in place: #916 = -77777.0
+injected '#916 = [3+3]'   FC16 acknowledged: FALSE      <- after SIX retries
+#916 after 3 s          : -77777.0
+pendant                 : READY, green strip, no error  <- photographed
+```
+
+⛔ **The FC16 is never acknowledged, so the controller never received the line.** It cannot assign it and it
+cannot error on it. ⇒ The pendant staying green is not a mystery and not a parser quirk — **it is exactly what
+non-delivery looks like.**
+
+⭐ **THREE OUTCOMES, CLEANLY SEPARATED — and every confusing result this session was the third one:**
+
+| | pendant | variable |
+|---|---|---|
+| delivered + valid | green | assigns |
+| delivered + invalid | **red, `syntax error!`**, latches | unchanged |
+| ⛔ **NOT DELIVERED** | **green, nothing at all** | unchanged |
+
+⭐ **This VINDICATES the FC16-ack finding that was walked back earlier.** No ack = not delivered, and the ack
+is the only cheap, reliable delivery signal. The apparent counter-evidence ("acked lines still didn't
+execute") was the retry bug corrupting the *next* result, not an acked line failing.
+
+⛔ **THE TOOL BUG THAT COST THE SESSION:** `probe()` **ignored `inject()`'s return value** and reported
+"NO ASSIGNMENT" when the truth was "could not deliver". ⇒ *An undeliverable line looked like a rejected
+expression for an entire evening.* Now reported distinctly, with the trailing-space variant tried first.
+⭐ *When a tool can fail in two ways and only reports one, every diagnosis built on it is a coin flip.*
+
+### ✅ THE RECORD WAS RE-VERIFIED AGAINST THE MACHINE — 20/20 `[CONFIRMED on machine 2026-09-05]`
+Owner asked the obvious and necessary question: *"if it weren't received are you recording the result still?"*
+⇒ Every value written into this file was re-measured with the fixed tool and **all 20 matched**: `SQRT[16]`
+`SQRT[2]` `COS[0]` `COS[90]` `SIN[0]` `SIN[90]` `TAN[45]` `ABS[-5]` `ROUND[2.6]` `FIX[2.9]` `ATAN[1, 2]`
+`ATAN[1, 1]`, and all six comparison words.
+
+⭐ **AND THERE IS A STRUCTURAL REASON THE DAMAGE WAS CONTAINED: an undelivered line can only ever cause a
+FALSE NEGATIVE.** Nothing executes, the variable keeps the sentinel, and the tool reports "no assignment".
+It cannot invent `SQRT[16] = 4` — that value can only come from `SQRT[16]` actually running.
+
+⇒ **The contamination went entirely into the NEGATIVE findings**, and every one has been retracted: `NE`
+"broken", "whitespace required", `[3*3]` "syntax error", `**` "silent no-op", `#915` "refuses writes". The
+negatives that survive are the ones with a **photograph of `syntax error!` on the pendant**, which
+non-delivery cannot produce either.
+
+⚠ **The one figure that WAS published wrongly: "~25% random frame loss."** It came from the broken tool and
+should not be relied on. Superseded above; flagged here because it was pushed and the other seat may have
+read it before the correction.
+
+### ⭐ THE `[3+3]` MYSTERY, AS FAR AS IT GOES — **DELIVERY IS PROBABILISTIC AND CONTENT-DEPENDENT** `[MEASURED 2026-09-05, mechanism UNKNOWN]`
+Scanned all 100 `#916 = [a+b]` lines for FC16 acknowledgement, then repeated the interesting ones 5× each.
+
+⭐ **It is not deterministic-vs-random. It is a CONTINUUM of delivery probability, set by the line's bytes:**
+
+| line | delivered | |
+|---|---|---|
+| `[3+3]` `[3/3]` `[3-3]` `[0+7]` `[4+4]` `[7+0]` `[8+1]` `[0/7]` | **0/5** | never |
+| `[3*3]` `[4+1]` | 1/5 | almost never |
+| `[8+4]` | 2/5 | |
+| `[0+5]` `[4+8]` `[1-8]` `[1/8]` | 3–4/5 | |
+| `[2+4]` `[4+7]` `[0+0]` `[1*8]` `[1+6]` | **5/5** | always |
+
+⛔ **THREE CRC THEORIES WERE PROPOSED AND ALL THREE REFUTED BY PREDICTION** — each was tested on expressions
+never previously run, which is the only way this is worth anything:
+1. *CRC low byte ∈ {0xFB, 0xFF}* → 7/10, and `0xFB`/`0xFF` each appear in both a failure and a pass.
+2. *CRC low byte has a nibble == 0xF* → 90/100 but **nine false alarms** (`[4+7]` `0x0F`, `[0+0]` `0x4F` both deliver).
+3. *CRC low byte ≥ 0xFA* → 6/9; `[0-7]` `0xFE` and `[0*7]` `0xFF` deliver 4/5, `[3*3]` `0xFA` delivers 1/5.
+
+⇒ Each rule carved a threshold through a gradient, so it fitted the sample it was built from and failed on
+fresh data. ⭐ **The mechanism is genuinely unknown** and is left that way deliberately rather than fitted a
+fourth time. It smells like signal integrity — some byte patterns survive the wire far worse than others —
+but nothing here establishes that, and the earlier "~25% random loss" and "deterministic per line" framings
+are BOTH wrong: it is one phenomenon with a per-line probability.
+
+⚠ **Also corrected:** the single-shot scan's 11 "undelivered" included `[0+3]` and `[1+6]`, which are 5/5 on
+repeat. **One observation cannot classify a line** — anything quoting a delivery rate needs repeats.
+
+### ⇒ IT DOES NOT NEED TO BE SOLVED TO BE SAFE
+The ACK **detects** it and retrying **defeats** it: retry the identical line, then a byte-different variant
+(a trailing space). `tools/macro_probe.py` does both, and the full 20-value record re-verified 20/20 through
+it. ⛔ **Any future user of register 3000 must do the same** — at these rates a blind multi-line sequence will
+lose lines, and the lost ones produce no error anywhere.
+
+### ⭐⭐⭐ THE FIX FOR THE NEVER-DELIVERED CLASS: **PAD THE PAYLOAD TO 64 BYTES** `[CONFIRMED on machine 2026-09-05]`
+Came from the owner asking whether the docs specify a byte count. ⭐ **The vendor's 246 is a MAXIMUM**
+(*"ASCII code streams up to 246 bytes per single payload"*), not a required size — but padding fixes it anyway:
+
+| line | bare | pad 32 | pad 48 | **pad 64** |
+|---|---|---|---|---|
+| `[3+3]` | 0/5 | 0/5 | 3/5 | **5/5** |
+| `[4+4]` | 0/5 | 5/5 | 4/5 | **5/5** |
+| `[0+7]` | 0/5 | 5/5 | 5/5 | **5/5** |
+| `[7+0]` | 0/5 | 0/5 | 4/5 | **5/5** |
+| `[8+1]` | 0/5 | 4/5 | 5/5 | **5/5** |
+
+⭐ **Monotonic in length**, which is what a wire/framing problem looks like — not anything about parsing.
+
+**What the padding is:** trailing spaces before the newline, nothing more.
+```
+before: '#916 = [3+3]'                          ->  7 registers, 23-byte frame
+after:  '#916 = [3+3]' + 52 spaces (64 chars)   -> 33 registers, 75-byte frame
+```
+G-code ignores trailing whitespace, so the line parses identically.
+
+⛔ **IT FIXES THAT CLASS ONLY.** Background loss across 20 random lines moved just **82% → 87%**. ⇒ **Padding
+and ack-retry are BOTH required**; neither alone is sufficient. With both, 25/25 and the five 0/5 lines run
+5/5 (one at 4/5, ordinary background loss, covered by the retry).
+
+⭐⭐ **AND THE DECISIVE STRUCTURAL POINT: the failure is at the ACK**, which is the Modbus protocol layer —
+*before* the controller parses anything. ⇒ Buffer size, terminators, stale bytes and G-code semantics are all
+**ruled out**; this is framing/signal integrity on the wire. That is also why three CRC theories failed: they
+were modelling a parser that was never involved.
+
+### ⭐⭐ THE LIKELY MECHANISM, FROM THE FIELD LITERATURE: **USB-SERIAL LATENCY SPLITS RTU FRAMES ABOVE 19200 BAUD** `[RESEARCHED 2026-09-05 — plausible, NOT yet tested]`
+Searched for the symptom rather than guessing a fourth CRC rule. It is a **known, named problem**:
+
+> *"At baud rates above 19,200 the inter-character timeout becomes very short, and USB-to-serial converters
+> and software-based serial ports may introduce latency that exceeds these thresholds, **causing frames to be
+> split erroneously**."* — and the standard first move is *"if you see CRC errors at higher baud rates, try
+> reducing the baud rate before anything else."*
+
+⭐ **A split frame fails CRC at the slave, and a Modbus slave answers a bad CRC with SILENCE — no exception,
+no NAK.** ⇒ That is exactly our signature: no ack, no error on the pendant, nothing executed.
+
+**The numbers for this link:** 115200 baud ⇒ one character ≈ **87 µs**, so RTU's 1.5-character inter-character
+limit is ≈ **130 µs**. ⛔ **This machine's FTDI `LatencyTimer` is `16` — the default, and over 100× that gap.**
+(`HKLM\SYSTEM\CurrentControlSet\Enum\FTDIBUS\VID_0403+PID_6001+BG01LT65A\0000\Device Parameters`.)
+
+⚠ **Honest caveat:** FTDI's own app note (AN232B-04) describes the latency timer as governing the **receive**
+path — the chip buffers device→PC data until the buffer fills or the timer expires. Our failure is in the
+**transmit** direction (the line never executes), so the latency timer may not be the actual cause. It is
+cheap and reversible, so it is worth eliminating first, but **the stronger candidate is the baud rate.**
+
+### ⇒ TWO UNTESTED FIXES, IN ORDER OF COST `[TO TEST]`
+1. **`LatencyTimer` 16 → 1** — PC-side only, no controller change, instantly reversible. Needs admin:
+   *Device Manager → Ports → USB Serial Port (COM6) → Port Settings → Advanced → Latency Timer*.
+   ⚠ Baseline to A/B against, measured today: `[3+3]` **0/5** bare, and **82%** delivery across 20 random lines.
+2. ⭐ **DROP THE BAUD RATE** — the field-standard first move, and it addresses the transmit path the latency
+   timer does not. ⛔ Needs the controller's serial parameter changed **and a reboot** (serial params apply
+   only at startup — already established here), so it is a real bench step, not a keystroke.
+
+⭐ If either works, the padding and ack-retry workarounds become belt-and-braces rather than load-bearing.
+
+### ⛔ REFUTED — `LatencyTimer` 16 → 1 CHANGES NOTHING `[MEASURED on machine 2026-09-05]`
+Owner set it via Device Manager and it was re-measured like-for-like (same expressions, same seed, padding
+disabled):
+
+| | LatencyTimer 16 | **LatencyTimer 1** |
+|---|---|---|
+| `[3+3]` `[4+4]` `[0+7]` `[7+0]` `[8+1]` bare | 0/5 each | **0/5 each — identical** |
+| 20 random lines × 3, bare | 49/60 (82%) | **50/60 (83%)** — noise |
+
+⇒ **Not the cause**, exactly as FTDI's AN232B-04 implied: the latency timer governs the **receive** path and
+our failure is in **transmit**. ⛔ **Do NOT put this in any setup guide or tell users to change it** — it is
+not a fix, and unverified tuning advice becomes permanent folklore. (Harmless either way; leave it or revert.)
+
+⭐ **The baud rate remains the untested candidate**, and it is now the *only* one from the literature.
+
+### ⭐ SCOPE — DOES ANY OF THIS AFFECT DDCS STUDIO? **NOT TODAY.** `[CONFIRMED by reading the app, 2026-09-05]`
+Owner asked, and it is worth stating plainly because "Modbus" means two different things in this repo:
+
+| | direction | used by |
+|---|---|---|
+| **register `3000` G-code injection** | **PC is master** → controller | ⛔ **the bridge only.** No app code opens a serial port |
+| **`MSETDATA` / `MGETDATA`** | **controller is master** → PC slave | the app emits these as G-code (`GcodeExecutionEngine._handleModbus`) |
+| **SMB** to `\192.168.0.99\CNCDISK` | PC → controller, files | how Studio actually delivers jobs today |
+
+⇒ **Everything measured here about delivery loss applies to the injection channel only**, which nothing in
+`DDCS-Studio/web/` uses. ⚠ **The one shared risk:** the beacon/instrument feature emits `MSETDATA`, a live
+Modbus transaction **over this same cable**. Different direction, same wire — so a marginal link is a risk to
+that feature too. Not a known fault, but worth watching if beacons ever behave oddly.
+⇒ ⭐ **And it becomes load-bearing the day the app's pull moves from SMB to Modbus** — an open question
+already recorded as RENDERRANCHY's call.
+
+### ⛔⛔ REFUTED — LOWERING THE BAUD MAKES IT **MUCH WORSE** `[MEASURED on machine 2026-09-05]`
+Param `267` ("Serial 2 baud rate", Param page → **System** section) set from `115200` to `19200`, controller
+rebooted. Sync confirmed against ground truth (`reg 7080` = `-45.130001068115234`, matching the pendant).
+
+| | 115200 | **19200** |
+|---|---|---|
+| correct READS of a known register | ~100% | ⛔ **2/20** |
+| 20 random lines × 3, delivery | 82% | ⛔ **30%** |
+| the five 0/5 lines | 0/5 | 1–2/5 |
+
+⇒ **Reverted to 115200.** ⭐ Also note this incidentally **confirms our cable is on Serial 2** — the link
+followed param `267`, so `266` (M3K keyboard) is correctly left alone.
+
+### ⭐⭐ AND THE DIRECTION OF THE EFFECT IS THE REAL FINDING — IT POINTS AT CONTENTION, NOT LATENCY
+⛔ **This refutes the USB-latency hypothesis**, not just the fix. If frames were being split because USB
+latency exceeds the RTU inter-character timeout, **lowering the baud lengthens that timeout and should
+IMPROVE things.** It made them ~6× worse — the opposite direction.
+
+⭐ **What fits instead: bus contention.** The controller is a Modbus **MASTER** by default (`#279` = `2`, and
+the vendor manual's §1 says *"Default master mode"*), and **6–11 bytes of foreign junk precede every FC16
+ack** — traffic that is not ours. At 19200 every frame occupies the wire ~6× longer, so the window in which
+the controller's own transmissions can collide with ours is ~6× wider. ⇒ **The magnitude matches the
+degradation**, and this is the first hypothesis today whose *predicted direction* was confirmed by an
+experiment run after it was formed, rather than fitted to data already in hand.
+
+⇒ ⭐ **NEXT TEST: `#279`.** If the controller can be stopped from initiating transactions (or moved to a slave
+mode), contention disappears. ⚠ The vendor manual documents `279` as **"Modbus RTU Enable"**, not a mode
+selector — but a later firmware reportedly adds a **P279 SLAVE** setting, and this machine is now on that
+newer firmware. ⛔ Untested, and it needs a reboot to apply `[TO TEST]`.
+
+## ⭐⭐⭐ THE OFFICIAL SLAVE REGISTER MAP EXISTS — AND IT REFUTES SEVERAL FINDINGS ABOVE `[VENDOR SPEC, 2026-09-02]`
+`M3xx_Modbus_Address_Map_V1_0.xlsx`, from **github.com/foinnc/M350** — cached at
+[`assets/vendor-spec/`](assets/vendor-spec/), which also records **why that repo, not `ddcnc.com`, is the
+source**. ⛔ This file has been telling readers *"there is no slave register map, because there is no
+slave… only foinnc can supply it."* **He has. It was published three days before we looked.**
+
+### ⛔ THERE ARE FOUR BLOCKS, NOT ONE — the `6500 + 2×(N−500)` formula covers only the first
+| Modbus | macro | block |
+|---|---|---|
+| — | `#0`–`#49` | subprogram locals |
+| — | `#50`–`#499` | global variables |
+| `6500`–`8498` | `#500`–`#1499` | user parameters 1 (Pr0–Pr999) |
+| ⭐ **`15000`–`16998`** | ⭐ **`#1500`–`#2499`** | **SYSTEM GLOBAL VARIABLES** |
+| ⭐ **`8500`–`9498`** | ⭐ **`#2500`–`#2999`** | user parameters 2 (Pr1000–Pr1499) |
+| `10000`–`10998` | — | system internal |
+
+⭐ Endianness in the spec is **`CDAB`** for every entry — the word-swapped float32 we reverse-engineered. ✅
+
+### ⛔⛔ WHAT THIS RETRACTS
+1. **"The mapping has an upper bound near `#1999`"** — **FALSE.** `#1500`–`#2499` are simply at a *different
+   base* (`15000`). I extrapolated one formula past its block and read zeros from unmapped space.
+2. **"`#2037` is outside the mirror, therefore the PC cannot clear a latch"** — ⛔ **`#2037` is at reg
+   `16074`, and the spec marks it `R/W`.** I wrote to `9574`, the wrong address. ⇒ **The virtual Reset may
+   work after all** `[TO TEST]`. `#2038` = `16076`, `#2039` = `16078`.
+3. **"`#2500` is not Modbus-readable"** — ⛔ **FALSE. `#2500` is at reg `8500`, `R/W`.** The tool-setter
+   calibration reference can be read *and written* over Modbus; a macro is not required.
+
+### ⚠ WHAT THE SPEC DOES **NOT** CONTAIN
+- ⛔ **Register `3000` is absent.** The map covers `6500`–`16998` only. ⇒ The G-code injection buffer remains
+  **undocumented by the vendor**, consistent with it being newer than this spec's scope. Our delivery
+  troubles are in the one part of the surface with no official definition.
+- ⛔ **No alarm/state/run category exists** — the entire 2,502-row table is only `用户参数变量` (1500),
+  `系统全局变量` (1000), `系统内部变量` (2). ⭐ **This independently confirms the differential sweep:** there
+  is no error-state register, which is why the camera is the only way to see one.
+
+### ⛔ THE PROCESS FAILURE, RECORDED BECAUSE IT COST THE MOST
+Owner: *"i thought you were looking at that — obviously if you're looking at outdated docs it's meant to go
+bad."* Findings were being built on **this file's summary** of a **2025 manual**, describing a **2026
+firmware**, while the vendor's live repo went unread. ⭐ **`Docs/` there holds ~40 more folders never opened
+here**, including `虚拟按键` (virtual keys), `按键键值宏地址#2037`, the full G/M code list, the coordinate
+transform formulas, and the current 4.7 MB system manual.
+
+## ⭐⭐⭐ THE FIRMWARE IS `2026-09-02-00`, NOT `2026-08-03-00` — AND THE VENDOR DOCS SETTLE THREE THINGS `[CONFIRMED from the pendant + vendor spec, 2026-09-05]`
+⛔ **This file has recorded the wrong firmware version.** The System Info page reads
+**`Software Ver: 2026-09-02-00`** (photographed). That release's one change is *"Expanded Modbus register
+address mapping"* — ⇒ **the official address map applies to this machine exactly.**
+Releases live at **github.com/foinnc/M350/releases**, each with `read.me.txt` + `setting` + V1/V2 zips.
+
+### ⛔ RETRACTED — "`#2500` is not Modbus-readable"
+**`#2500` is at register `8500`** (user-parameter block 2), `R/W`, and it **reads `-1.9204`** — the live
+tool-setter calibration reference. This file said a macro was the only way to read it. Wrong address, not
+unreadable. Same for `#2037` (`16074`) and `#2038` (`16076`).
+
+### ⭐⭐ `#2037` — THE OFFICIAL DOC, AND WHY A REGISTER WRITE CAN NEVER PRESS A KEY
+`assets/vendor-spec/2037_Button_simulation_macro_variable_M350.pdf` (vendor `Docs/按键键值宏地址#2037`):
+> *"Bit0-bit15: key value, actual key value = Table value − 1000; Bit16: press status; 0 loosen, 1 press.
+> Reset: `#2037 = 1*2^16 + (1327−1000) = 65863`."* ⭐ *"**Assign the #2037 assignment statement, and placed
+> in the executable code.**"*
+
+⛔⛔ **THE KEY PRESS IS AN INTERPRETER ACTION, NOT A REGISTER VALUE.** Writing `65863` to reg `16074` lands
+in the mirror and presses nothing — verified: the register write is accepted and the pendant's `ERROR`
+stays. ⇒ **The PC therefore CANNOT clear a latch**, and the reason is now documented rather than inferred:
+a latch halts the interpreter, and the press requires the interpreter. `[CONFIRMED — the original
+conclusion was right, the earlier reasoning ("#2037 is outside the mirror") was wrong.]`
+
+**Key values** (subtract 1000, add `65536` for a press): Reset `1327` · Start `1328` · Pause `1329` ·
+Esc `1027` · Enter `1013` · Backspace `1008` · arrows `1016-1019` · Spindle on/off `1331` · M3/M4/M5
+`1372/1371/1370` · jog `X± 1350/1351  Y± 1352/1353  Z± 1354/1355` · feed `100%/+10%/-10%` `1364/1365/1366` ·
+spindle rate `1367/1368/1369` · Fast `1388` · Start1-3 `1392-1394` · screens: Monitor `1373` Program `1374`
+Param `1375` IO `1376` System Log `1377` System Info `1378` MDI `1348` Manual `1326` Probe `1323`.
+⭐ `#2038` reads the **current key value + press state** — the read side of the same mechanism.
+
+### ⛔ CORRECTION — "THE FC16 ACK IS THE CHEAP TRUTH" IS ONLY HALF RIGHT
+**ACK proves DELIVERY, not EXECUTION.** With an error displayed: **9/10 injections acknowledged, 0/10
+executed.** ⇒ Two independent layers, and they fail independently:
+
+| layer | what fails | how it looks |
+|---|---|---|
+| **transport** (Modbus) | frame lost on the wire | **no ack** |
+| **interpreter** (G-code) | halted by an error | **ack OK, nothing happens** |
+
+⇒ **A latch is an INTERPRETER halt while the transport stays healthy.** That is why an acked line can still
+do nothing, and why "still alive?" checks based on the ack alone are worthless during an error.
+
+## ⭐⭐⭐ RUN STATE **IS** EXPORTED — REGISTER `10002`. THE VENDOR'S OWN TOOL POLLS IT. `[VENDOR SOURCE + read on machine 2026-09-05]`
+From `m350_liveg.py::poll_m350_state_with_strict_crc` (github.com/foinnc/M350-LiveG):
+```python
+read_cmd = calculate_crc(bytes([slave, 0x03, 0x27, 0x12, 0x00, 0x02]))   # 0x2712 = 10002, FC03, 2 regs
+...
+return int(struct.unpack('>f', bytes([res[5], res[6], res[3], res[4]]))[0])   # CDAB word-swap
+```
+⭐ **`0x2712` = register `10002`, float32 CDAB. `0` = idle.** Read live here: **`0.0`** with the machine idle.
+
+**How the vendor uses it — a complete motion-completion protocol:**
+1. send the line, confirm the 8-byte FC16 echo
+2. poll `10002` up to 8× at 20 ms — **leaving `0` means motion STARTED**
+3. then poll at 40 ms until it reads `0` **twice consecutively** — motion FINISHED
+4. if it never left `0`, the move was a zero-stroke (already at target)
+
+⛔⛔ **THIS ANSWERS A QUESTION THIS FILE HAS CARRIED AS OPEN FOR MONTHS** — *"no 'currently running' flag
+found"*, after diffing 2,400 registers mid-run. ⚠ **I read `10002` earlier today, got `0.0`, and dismissed
+it as "not Z either."** It was the answer, in a register I had already sampled. `10002` sits in the
+`10000`–`10998` *system internal variables* block, which is why a macro-variable sweep never surfaced it.
+⇒ ⭐ **Directly relevant to Studio**: this is a real progress/completion signal, not the end-of-run
+counters. `[TO TEST: confirm it becomes non-zero during an actual move — needs the owner at the machine.]`
+
+## ⭐ THE VENDOR'S REGISTER-3000 SEND PATH — AND WHAT IT DOES **NOT** EXPLAIN
+`m350_liveg.py::send_gcode_process`, the reference implementation:
+- ⛔ **NO trailing `\n`** — `gcode_str.encode('ascii')`, pad to even with `\x00`, byte-swap each pair. We
+  append `\n`; the vendor does not.
+- **`serial_conn.flush()`** immediately after `write()`; we never flushed.
+- success = the reply is **exactly the 8-byte echo** `slave 10 <addr> <count> <crc>`.
+- ⭐ **`res[1] == 0x90` is a BUSY exception** — the controller can explicitly answer "busy" (FC16 | 0x80).
+- baud dropdown offers **`9600 / 38400 / 115200`** — ⭐ **`19200` is not offered at all**, which fits our
+  measured collapse at that rate.
+
+### ⛔ BOTH DIFFERENCES TESTED AND REFUTED AS A FIX
+The five known-bad lines, 5 attempts each, unpadded: **`0/5` with our framing, `0/5` with no `\n`, `0/5`
+with no `\n` + `flush`.** ⇒ Neither the terminator nor the flush affects delivery. **Payload LENGTH remains
+the only lever that works** (pad to 64 ⇒ 5/5). The vendor's own tool would hit this too.
+
+## ⭐⭐⭐ SOLVED — THE `[3+3]` MYSTERY WAS **OUR TRAILING NEWLINE** `[CONFIRMED on machine 2026-09-05]`
+
+⛔ **The vendor's tool sends NO terminator.** `m350_liveg.py::send_gcode_process`:
+```python
+raw_bytes = gcode_str.encode('ascii')      # <- no "\n", ever
+if len(raw_bytes) % 2 != 0: raw_bytes += b'\x00'
+```
+We appended `"\n"` in the very first injection experiment and never questioned it again.
+
+| payload, 5 attempts, **executed** | with `\n` | **without `\n`** |
+|---|---|---|
+| `#916 = [3+3]` | **0/5** | ⭐ **5/5** |
+| `#916 = [4+4]` | 0/5 | 3/5 |
+| `#916 = [0+7]` | 0/5 | ⭐ 5/5 |
+| `#916 = [7+0]` | 0/5 | ⭐ 5/5 |
+| `#916 = [8+1]` | 0/5 | ⭐ 5/5 |
+
+⇒ **Every "impossible" line executes once the newline is removed.** `tools/macro_probe.py` now sends the
+payload raw, and a 10-expression battery ran **10/10 with no padding and no retries needed**.
+
+### ⛔ WHAT THIS RETRACTS — MOST OF ONE DAY'S "FINDINGS"
+1. **"Pad to 64 bytes"** — not a fix. It only changed the length enough to dodge the symptom. **Removed.**
+2. **"Certain exact byte sequences are deterministically undeliverable"** — there is no such class. It was
+   one bug with a length-dependent presentation.
+3. **Three CRC hypotheses** — all were curve-fitting to an artifact of our own payload construction.
+4. **"~25% random frame loss"** — inflated by the same cause. ⚠ Some background loss remains (`[4+4]` at
+   3/5), so **the ack-retry stays**, but the headline figure was never a property of the link.
+
+### ⛔⛔ AND THE PROCESS FAILURE, WHICH IS THE REAL LESSON
+**The reference implementation was public the entire time.** `M350-LiveG` is the vendor's own PC tool for
+this exact register, its source is one file in a public repo, and it answers the question in five lines.
+⇒ **Hours went into scope-free hypothesis testing against a spec that could have been read.**
+⭐ Owner, repeatedly, and correctly: *"did you read all the docs?"* · *"maybe it's another baud altogether"*
+· *"obviously if you're looking at outdated docs it's meant to go bad."* **Read the reference
+implementation before characterising a transport.**
+
+## ⭐⭐⭐ RUN STATE CONFIRMED — REGISTER `10002` IS A **PROGRAM-RUNNING** FLAG `[CONFIRMED on machine 2026-09-05, owner pressed Start]`
+Polled `10002` at 4 Hz while the owner ran `V21_dwell.nc` — **a 30 s `G04` dwell that moves NO axis:**
+
+| t (s) | `10002` | counters `#701/#702` | |
+|---|---|---|---|
+| 11.9 | `0` | 251 / 4 | idle |
+| **15.9** | ⭐ **`1`** | 251 / 4 | **Start pressed** |
+| 36.1 | `1` | 251 / 4 | ⭐ **still 1 — through a pure dwell, nothing moving** |
+| 56.3 | `0` | **252 / 5** | finished; completion counters increment here |
+
+⇒ ⭐⭐ **`1` = a program is running, `0` = idle. It is NOT a motion flag** — it stayed `1` for 30 s with
+every axis stationary. Values seen: `{0.0, 1.0}`.
+
+⛔⛔ **THIS CLOSES A QUESTION OPEN FOR MONTHS.** This file records *"no 'currently running' flag found"*
+after diffing 2,400 registers mid-run — that sweep covered the macro mirror, and `10002` is in the
+`10000`–`10998` **system-internal** block, which the mirror sweep never touched. It was found by reading
+`m350_liveg.py::poll_m350_state_with_strict_crc` (FC03 on `0x2712`).
+
+⭐ **FOR THE APP:** this is a **live progress signal**, not a done/not-done counter. Poll `10002` to know a
+job is running; the `#701`/`#702` completion counters remain the end-of-run edge. Together they give
+start → running → finished without any file-share polling.
+⚠ Only `0` and `1` have been observed. The vendor's tool treats *any* non-zero as running, so other values
+may exist (feed hold? probing?) — see `CHANNELS.md` Q4 `[TO TEST]`.
+
+## ⭐⭐ REMOTE KEY PRESS WORKS — INJECT `#2037`, DO NOT WRITE THE REGISTER `[CONFIRMED on machine 2026-09-05, photographed]`
+Injecting `#2037 = 65914` (System Info = key `1378`) **switched the pendant to the System Info page** —
+photographed. ⇒ The vendor doc is exact: the assignment must be **executed as code**. Writing reg `16074`
+directly does nothing.
+
+⛔ **This means the PC can press ANY panel key, `Start` (`65864`) included.** Encoding: `65536 + (keyvalue −
+1000)`. Screen keys are safe and self-evident (Monitor `65909`, System Info `65914`); ⛔ motion, `Start`,
+`Pause` and `Reset` are announced-class and must not be sent unattended.
+⚠ Still true that this **cannot clear a latch** — an error halts the interpreter, and this needs the
+interpreter.
+
+## ⭐⭐ THE OFFICIAL LINK CONFIGURATION — from the `M350-LiveG` README `[VENDOR-STATED, verified on machine 2026-09-05]`
+The vendor's README states the required setup for register-3000 injection. **We had never seen it**, and two
+of these parameters had never been checked here.
+
+| | required | **read on our machine** |
+|---|---|---|
+| firmware | **`2026-08-03-00` or higher** | `2026-09-02-00` ✅ |
+| **Pr267** Serial 2 baud | `B115200` | `4` ✅ |
+| **Pr279** Modbus RTU mode | ⭐ **Slave Mode** | `2` ✅ (we can read registers, which requires slave) |
+| ⭐ **Pr296** Serial 2 **parity** | `None` | `0` ✅ |
+| ⭐ **Pr297** Serial 2 **stop bits** | `1` | `0` — ✅ if index-encoded, as `Pr267` is `[VERIFY on the pendant]` |
+
+⇒ **Serial configuration is NOT the cause of the residual loss.** Also settles `#279`: **slave mode is the
+correct and required setting**, so the "poll vs slave" question is closed — it is already right.
+
+### ⚠⚠ THE HARDWARE LINE THE README ADDS — AND IT IS THE BEST REMAINING SUSPECT
+> *"Pin 7, Pin 8, Pin 9 (RS-232 **RXD**, **TXD**, **GND**). **Signal ground (GND) must be common/shared
+> between devices.**"*
+
+⭐ **A marginal or missing signal ground produces exactly our residual symptom**: intermittent frame
+corruption with no content pattern, and **worse at lower baud** (longer frames = more exposure per frame) —
+which is the one observation nothing else explained, since the 19200 collapse contradicts the USB-latency
+theory. `[TO TEST: confirm pin 9 GND is actually landed and common — a physical check at the machine.]`
+
+⚠ Also noted: the vendor's own screenshots show **LiveG V1.9**, while the GitHub *release* page offers only
+**V1.7**. A newer build exists somewhere; its source may document more registers.
+
+## ⭐⭐⭐ REGISTER `16062` **IS** THE LIVE EXECUTING LINE NUMBER — PROVEN `[CONFIRMED on machine 2026-09-05, owner ran the program]`
+Polled while `V21_dwell.nc` ran:
+
+| t (s) | `10002` (running) | ⭐ `16062` | |
+|---|---|---|---|
+| 3.8 | `1` | ⭐ **`10`** | ⭐ **`G04 P30000` is LINE 10 of that file** — exact match |
+| 31.7 | `0` | `0` | finished; both clear |
+
+⇒ ⭐⭐ **`16062` = the line currently executing, `0` when idle.** Macro `#2031`, float32 `CDAB`, FC03.
+Verified against a file whose only executable line sits at a known position.
+
+⛔⛔ **THIS SETTLES A CONTRADICTION THIS FILE HAS CARRIED FOR MONTHS.** Two entries above disagree:
+*"[VENDOR-STATED] REGISTER 16062 IS THE CURRENT EXECUTING G-CODE LINE NUMBER"* (unattested) and
+*"[CONFIRMED — FROM THE VENDOR] There is no line-number register. One is being ADDED (~2026-08-27)."*
+⇒ **Both were true in sequence.** It did not exist, it was added, and this machine runs
+`2026-09-02-00` — newer than that promise. **It exists and it works.**
+
+### ⭐⭐ WHAT THIS GIVES THE APP — REAL PROGRESS, NOT A DONE FLAG
+Three signals, all live over Modbus, no SMB polling:
+
+| register | meaning |
+|---|---|
+| **`10002`** | `1` = a program is running, `0` = idle (**program**-level, not motion — holds `1` through a dwell) |
+| ⭐ **`16062`** | **the executing line number**, `0` when idle |
+| `#701`/`#702` | completion counters, increment on the finish edge |
+
+⇒ **`16062` ÷ total lines = a genuine progress bar**, and the pair `(10002, 16062)` distinguishes running /
+stalled / finished. ⚠ Whether `16062` counts physical file lines or *executable* blocks is untested on a
+file with comments interleaved — here they coincided `[TO TEST]`.
+
+### ⚠ OPEN — DOES `16062` **ADVANCE**, OR ONLY REPORT THE LINE IT IS PARKED ON? `[TO TEST]`
+Both confirming runs (V21, V22) sat on a **single** `G04` for 20–30 s. So what is proven is that `16062`
+**reports the executing line** — *not* that it tracks progress line by line. ⛔ **A progress bar needs the
+advancing behaviour, and that is untested.**
+
+⇒ **`verify/V23_lineadvance.nc`** is written and ready: three 8-second dwells on lines **8, 11 and 14**, with
+comment spacers so the numbers cannot be confused with adjacency. Expect `16062` to read `8 → 11 → 14`.
+⭐ It writes only `#100`-`#102` — **true scratch on both controllers** (see `context/DDCS-VARIABLES.md`), no
+parameters touched. No motion.
+⚠ Needs: the machine on, the file copied to `CNCDISK`, and the owner to press Start (the copy could not be
+made — the controller was already powered down).
