@@ -2557,3 +2557,22 @@ execute") was the retry bug corrupting the *next* result, not an acked line fail
 "NO ASSIGNMENT" when the truth was "could not deliver". ⇒ *An undeliverable line looked like a rejected
 expression for an entire evening.* Now reported distinctly, with the trailing-space variant tried first.
 ⭐ *When a tool can fail in two ways and only reports one, every diagnosis built on it is a coin flip.*
+
+### ✅ THE RECORD WAS RE-VERIFIED AGAINST THE MACHINE — 20/20 `[CONFIRMED on machine 2026-09-05]`
+Owner asked the obvious and necessary question: *"if it weren't received are you recording the result still?"*
+⇒ Every value written into this file was re-measured with the fixed tool and **all 20 matched**: `SQRT[16]`
+`SQRT[2]` `COS[0]` `COS[90]` `SIN[0]` `SIN[90]` `TAN[45]` `ABS[-5]` `ROUND[2.6]` `FIX[2.9]` `ATAN[1, 2]`
+`ATAN[1, 1]`, and all six comparison words.
+
+⭐ **AND THERE IS A STRUCTURAL REASON THE DAMAGE WAS CONTAINED: an undelivered line can only ever cause a
+FALSE NEGATIVE.** Nothing executes, the variable keeps the sentinel, and the tool reports "no assignment".
+It cannot invent `SQRT[16] = 4` — that value can only come from `SQRT[16]` actually running.
+
+⇒ **The contamination went entirely into the NEGATIVE findings**, and every one has been retracted: `NE`
+"broken", "whitespace required", `[3*3]` "syntax error", `**` "silent no-op", `#915` "refuses writes". The
+negatives that survive are the ones with a **photograph of `syntax error!` on the pendant**, which
+non-delivery cannot produce either.
+
+⚠ **The one figure that WAS published wrongly: "~25% random frame loss."** It came from the broken tool and
+should not be relied on. Superseded above; flagged here because it was pushed and the other seat may have
+read it before the correction.
