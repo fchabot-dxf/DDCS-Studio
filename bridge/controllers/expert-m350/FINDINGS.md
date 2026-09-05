@@ -1951,3 +1951,32 @@ Two candidate routes, neither tried:
   operator-pressed"* line. Needs the owner's ruling on that specific act, not a general permission.
 * **`M98 P<O-number>`** — works today, no new capability. ⛔ But every O-number on this controller is a
   factory routine (`O501` homing, `O502` tool-setter) and they MOVE. Only safe with an O-number we wrote.
+
+### 34. ⭐⭐ RUN STATE IS EXPORTED — as COMPLETION COUNTERS, not a running flag `[CONFIRMED 2026-08-26]`
+Two registers increment by exactly 1 per program run, and they fire **when the program FINISHES**:
+
+```
+idx 201  (reg 6902)      idx 202  (reg 6904)
+```
+* **3 runs -> +3 on both** (owner ran `V21_dwell.nc` three times).
+* **Timing, with a 30 s dwell:** both incremented together, and the owner confirmed from the pendant
+  that the count moves **at the end of the run, not when Start is pressed.** ⇒ **COMPLETION signal.**
+* `idx 202` also **resets to 0 when a file is (re)loaded**; `idx 201` keeps climbing (255 -> 259 over the
+  session, 232 -> 248 across the four weeks before it).
+
+⇒ ⭐ **With §29 this is a job tracker:** live position says WHERE continuously, and a counter increment
+says DONE. Neither needs a beacon, an instrumented program, or a macro on the controller.
+⚠ Still absent: a "currently running" flag. Nothing found that distinguishes busy from idle *while* a
+program runs — 2,400 registers diffed mid-run showed only these two, and only at the end.
+
+### ⛔⛔ `G04 P` IS MILLISECONDS ON THIS CONTROLLER — and it invalidated three of my own tests
+`G04 P8.0` is **8 ms**, not 8 seconds. The vendor-pack sweep already recorded this (*"`G04 P1` is 1
+millisecond, not 1 s"*) and I did not absorb it. Consequences, all mine:
+* every verify macro written today used `P5.0`/`P8.0` and dwelled for **milliseconds** while I described
+  them as holding for seconds. What actually held the screen was the `#1505` dialog waiting for Enter.
+* the "inject a dwell and watch" test sent `G04 P25.0` and polled for 12 s — the dwell had ended in **25
+  ms**. Its "zero registers changed" result was **void**, not evidence.
+* ⚠ **In `CALIBRATE.nc` and every macro copying its shape, the `G04` sits AFTER the `#1505` line** — so it
+  runs only once the operator has already pressed Enter. It is vestigial in all of them.
+⇒ Use `P30000` for 30 s. ⭐ And the general lesson, since it cost most of an evening: **a documented fact
+in this repo that I did not read cost more than any unknown did.**
