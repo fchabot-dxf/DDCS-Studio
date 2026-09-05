@@ -76188,3 +76188,44 @@ Save-dialog's own panel-type dropdown silently failing to commit, NOT `hasTreeLa
 separate investigation — named in `userOps.js`'s header comment so it isn't lost. Part D (test-redundancy
 measurement) lands in its own separate commit, per the dispatch's own "small item, separate commit."
 
+## t2641 PART D — how much of the suite is per-op tests re-proving op-invariant per-row behavior
+
+Measurement only, delegated to a subagent given the volume (955 spec files); nothing deleted, nothing changed.
+
+**Method.** Counted the real suite: `npx playwright test --list` → 3,212 Playwright tests; `tests/node/*.test.mjs`
+→ 197 node tests (total 3,409 — confirms the dispatch's own ~3,208 figure was the Playwright half alone). Built
+a whole-token classifier over all 955 spec filenames against the 32 `SEED_BUILDERS` op names (naive substring
+matching false-positived on `tap`⊂`taper`, `text`⊂`context`, `slot`=CAM-slot vs the milling-slot op, so moved to
+whole-token matching) to separate per-op-scoped files from cross-op/infra files: 268 files, 695 `test()` blocks
+scoped to exactly one op (~22% of the suite). Fully read 15 of those 268 files across 7 ops/families
+(`atc-change-form-reproduction`, `-superset`, `-in-place`, `-twin`, `homing-form-reproduction`,
+`drill-bindings-identity`, `edge-seamless-title`, `text-canvas-mount`) plus the shared
+`tests/support/formReproduction.js` engine 24 files call into (~5.6% direct read), backstopped by a 100%
+filename/family census and 100% automated test-block counting.
+
+**Finding.** The redundancy is real but concentrated, not diffuse. Families like `-superset` (guard-collapse/
+prune emit-equivalence), `-in-place` (per-method field-gating + emit), `-twin` (recompose mechanics), and
+corner's own 47 files (marker/handle/drag geometry — the deliberate "gated pilot") are genuinely op-specific
+per the bounding argument's own NOT-REDUNDANT criteria — confirmed by reading their actual assertions
+(byte-diff G-code sweeps, method×config combinatorics), not just their names. The one family that IS literally
+the pattern the dispatch named: **`*-form-reproduction-*.spec.js`** — 35 files, one per shipped op, 98 `test()`
+blocks, each re-running the same generic claim (does `renderUiTree` place this op's fields the way `renderOpForm`
+did; does an edit reach the model) via `registerFormReproductionSuite()` or an inlined copy. A second, smaller
+family, **`*-canvas-mount-*.spec.js`** (5 files, 5 tests), re-checks that a shared node type mounts for real
+rather than an unwired placeholder, per op.
+
+**The number: roughly 45–60 redundant tests (~1.5–2% of the 3,212-test suite), living in ~40 of 955 spec files
+(~4%).** The other ~630 of the 695 per-op tests (the `-superset`/`-in-place`/`-twin`/`-emit`/geometry files in
+the same per-op set) are NOT redundant by the dispatch's own criteria — a registry-driven cross-op guard could
+not generically assert their op-specific semantics.
+
+Concrete examples: `tests/homing-form-reproduction-2601.spec.js:29` and `tests/atc-change-form-reproduction-2603.spec.js:25`
+run byte-identical structural-placement logic against 33 other op files; `tests/support/formReproduction.js:87`'s
+shared engine is invoked by 24 separate per-op files with only config values differing; `tests/text-canvas-mount-2619.spec.js:11`'s
+generic uiChildren-node-type mount check is duplicated in `corner-`/`pocket-`/`slot-`/`contour-canvas-mount-*.spec.js`.
+
+If the trade is real (a `section-order-parity-2617.spec.js`-style registry guard replacing all 40 files with
+one), the size is small — 1.5-2% of the suite, not the double-digit fraction the dispatch's own framing
+("re-proving per-row behaviour that provably cannot vary") might have suggested going in. The owner's own call
+whether that trade is worth making.
+
