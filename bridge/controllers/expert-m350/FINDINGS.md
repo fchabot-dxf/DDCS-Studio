@@ -559,7 +559,8 @@ form, unequal operands 1,2) → popup **`ATANC=2657`**. So:
   `#54=ATAN[#52, #53]` (comma works on BOTH — V4.1 per S5o/t1583, Expert per V13f). Resolve `trigEvidence.js`
   `alignment-atan`, and flip the emit-asserting specs (`alignment-superset.spec.js`, `cam-slot-sim.spec.js`:
   `ATAN\[#52\]/\[#53\]` → comma). The engine already PARSES comma (`expression.js` t1583), so only the EMIT changes.
-- **Still open:** COS / SIN / SQRT on the Expert (the `V13_trig` abort ate them) ⇒ run `V13c_sqrt`, `V13a_cos`, `V13b_sin`.
+- **~~Still open: COS / SIN / SQRT~~ — CLOSED 2026-09-05 over Modbus, see the trig section at the end of this file.**
+  All three work, and **arguments are in DEGREES**.
 
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
@@ -2233,3 +2234,56 @@ firmware ≥ 2025-12-11-00 and applies to BOTH V1 and V2 equally** — it was pr
 that is refuted. Serial DB9 5V supply (powers an M3X-style accessory) is present on all V2 units but only SOME
 V1 units — check with a multimeter before assuming it's there, or power any external device from USB-C
 instead.
+
+## ⭐ THE TRIG GAP IS CLOSED — SQRT/COS/SIN work, and arguments are in DEGREES `[CONFIRMED on machine 2026-09-05, fw 2026-08-03-00, over Modbus]`
+
+Open since the `V13_trig` whole-file abort of 2026-08-08 ate them (safety rule 3: one bad line rejects the
+whole file, so COS/SIN/SQRT were never *tested* — they were merely *unobservable*). Closed in one command
+using the universal variable reader: inject `#915 = <expr>` at register `3000`, read register `7330`.
+
+| expression | result | |
+|---|---|---|
+| `SQRT[16]` | `4.0` | |
+| `SQRT[2]` | `1.4142135` | |
+| `COS[0]` | `1.0` | |
+| `SIN[0]` | `0.0` | |
+| `TAN[45]` | `1.0` | ⇒ degrees |
+| **`COS[90]`** | **`6.12e-17` (= 0)** | ⭐ **cos 90 in RADIANS is −0.448. This is DEGREES.** |
+| **`SIN[90]`** | **`1.0`** | ⭐ sin 90 in radians is 0.894. **DEGREES.** |
+| `ABS[-5]` | `5.0` | |
+| `ROUND[2.6]` | `3.0` | rounds, not truncates |
+| `FIX[2.9]` | `2.0` | truncates |
+
+⭐ **DEGREES had never been established here**, and it silently changes every emitted arc. It now is.
+
+### ⚠ `NE` RETURNS 0 FOR A TRUE INEQUALITY — one clean reading, needs confirming `[TO TEST]`
+`[1 NE 2]` evaluated to **`0.0`**. It should be 1. Every neighbour in the same run was correct —
+`[1 EQ 1]`→1, `[1 EQ 2]`→0, `[1 LT 2]`→1, `[2 GT 1]`→1, `[1 GT 2]`→0, `[1 LE 1]`→1, `[1 GE 2]`→0 — and the
+reading sits between two that varied, so the channel was demonstrably live and this is not a stale value.
+⇒ Either `NE` is inverted, or it is **not recognised and the expression degrades to something yielding 0**.
+⛔ The dangerous part is that it did **not** raise a syntax error. A silently-wrong operator in an `IF` is
+worse than one that aborts the file. **Do not emit `NE` on the Expert until this is confirmed.** `EQ`, `LT`,
+`GT`, `LE`, `GE` are all now confirmed good, so `IF x EQ y` + inverted branch is the safe workaround.
+
+### ⛔ AN ERROR LATCHES, AND FURTHER INJECTIONS ARE SILENTLY DROPPED `[CONFIRMED on machine 2026-09-05]`
+A syntax error in an injected line raises `ERROR` on the pendant (photographed: `Syntax error!:L1[#915 =
+ATAN[45]]`) and from then on **register 3000 stops accepting anything**. The FC16 write is still ACKed at
+the wire level — the frame succeeds, the line is discarded. The target variable keeps its last good value.
+
+⇒ **A read-back after a dropped injection returns the PREVIOUS result, which looks exactly like a plausible
+answer.** This produced nine consecutive false readings of `1.0` here, the value `TAN[45]` had legitimately
+left behind, including `[3*3]` → `1.0`. It was caught only because the owner glanced at the pendant.
+
+⭐ **THE SENTINEL MUST BE VERIFIED, NOT JUST WRITTEN.** The guard in use wrote a sentinel before each
+expression and assumed a differing read-back meant "evaluated". That is wrong: when the channel is dead the
+sentinel is dropped too, so the stale value never matches the sentinel and every reading passes the check.
+**Correct protocol:** write the sentinel → *read it back* → if it did not land, the channel is latched, STOP
+and report which expression latched it. Clearing requires a `Reset` **at the pendant** — it cannot be done
+with `#2037 = 65863`, because that press would travel through the same dropped channel.
+
+### The ATAN forms in that run measured NOTHING — §V13 already had the answer
+`ATAN` takes **two operands in the comma form** (§V13, `[CONFIRMED 2026-08-08]`). So `ATAN[1]` and `ATAN[45]`
+are one-operand calls that *should* error, `ATAN[1]/[1]` is the slash form already known-rejected, and
+`ATAN[1, 1]` — the only valid form of the four — was dropped by the latch. **§V13 stands unchanged.**
+⇒ Second time in two days a question was taken to the machine that this file already answered (the other:
+`G04 P` is milliseconds). **Read the section before testing the thing the section is about.**
