@@ -112,3 +112,50 @@ free slot all read `0`. Reading zero tells you nothing.
   register does nothing.
 - ⛔ Injected G-code takes **no trailing newline** — the vendor's own tool sends none, and adding one makes
   lines silently fail to execute.
+
+---
+
+# ⛔⛔ TWO CONTROLLERS. THE MAPS DIVERGE ABOVE `#1500`.
+
+⭐ **Source for the V4.1 column: `bridge/controllers/v4.1/DDCS V4.1 Variables list.xlsx` — the vendor's own
+list.** Source for the M350 column: `assets/vendor-spec/M3xx_Modbus_Address_Map_V1_0.xlsx`.
+
+| macro | ⭐ **DDCS V4.1** (bench) | ⭐ **DDCS Expert / M350** (studio) |
+|---|---|---|
+| `#0`-`#99` | ✅ **local / subroutine variables** | ✅ **subprogram locals** |
+| `#100`-`#499` | ⚠ global area 1 — **POWER-OFF RECOVERY** (persists) | ⚠ globals; `uservar` covers `#100`-`#549`, persists |
+| `#500`-`#1499` | ⛔ **SYSTEM PARAMETER AREA** (param page, persists) | ⛔ **`Pr0`-`Pr999`** (param page) |
+| `#1500`+ | ⛔⛔ **global area 2 (volatile) — BUT HOLDS THE WCS AND TOOL TABLE** | system globals (`#2031` line no., `#2037` keys) |
+| `#2500`-`#2999` | *(not present)* | ⛔ `Pr1000`-`Pr1499` |
+
+## ⛔⛔ THE TRAP — WHERE THE TOOL TABLE LIVES IS **NOT** THE SAME
+| | V4.1 | M350 |
+|---|---|---|
+| **WCS G54-G59 / G52** | ⛔ **`#1512`-`#1551`** | ⛔ `#800`-`#844` |
+| **tool offsets X/Y/Z/A** | ⛔ **`#1554`-`#1557`** | ⛔ `#1390`-`#1449` |
+| **H1-H16 tool length** | ⛔ **`#1560`-`#1576`** | ⛔ `#900`-`#919` (H01-H20) |
+| **D1-D16 diameter comp** | ⛔ **`#1577`-`#1593`** | ⛔ `#920`-`#939` |
+| live position | `#1500`-`#1503` mach, `#1506`-`#1509` work | reg `7080`/`7260` over Modbus |
+
+⇒ ⛔ **Carrying the M350 ranges to the V4.1 would write the WCS and tool table while believing `#1500`+ was
+safe scratch.** The reverse is just as bad. **`bridge/controllers/README.md` rule 1 exists for exactly this.**
+
+## ⭐⭐ THEREFORE — THE ONLY RANGE THAT IS PLAIN SCRATCH ON BOTH
+
+```
+#0 - #99      SAFE on both.  Locals. Use these.
+#100 - #499   works on both, but PERSISTS THROUGH POWER-OFF on both. Not a scratchpad.
+#500 +        a real setting on both. Look it up.
+#1500 +       ⛔ CONTROLLER-SPECIFIC. Check which machine you are on. FIRST.
+```
+
+⭐ The owner's instinct was right twice over: *"isn't the real scratch simply 001 to 99?"* — **`#0`-`#99` is
+the answer, and it is the only range that is the same on both controllers.**
+
+## ⚠ OTHER V4.1 DIFFERENCES THAT AFFECT VARIABLE WORK
+- ⛔ **No Modbus at all on V4.1** `[CONFIRMED, two firmware builds checked]` — `MSETDATA`/`MGETDATA` are not
+  in the firmware. ⇒ **Everything in this file about registers, `6500+`, and injection applies ONLY to the
+  M350.** On V4.1 the PC channel is **SMB**: `uservar` = 400×f64, **slot = `#var − 100`**, covering
+  `#100`-`#499`. (M350: 450×f64 → `#100`-`#549`, same formula, on `CNCDISK`.)
+- ⛔ **`#3000` alarm command is unsupported on V4.1** → *"macro variable assignment error"*. Works on M350.
+- `#2037` virtual buttons: ✅ confirmed on M350, `[TO TEST]` on V4.1.
