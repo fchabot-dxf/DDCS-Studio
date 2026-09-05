@@ -47,8 +47,12 @@ next action, and what the last session settled or got wrong. The outbound half i
 1. **TWO CONTROLLERS, and they behave differently** — the **DDCS V4.1** (bench, at home, motorless) and the
    **DDCS Expert / M350** (the studio, real). ⛔ Never carry a finding from one to the other without checking
    [`bridge/controllers/README.md`](bridge/controllers/README.md).
-2. ⛔ **No write operations to a live controller when the owner is not at it.** ⚠ And whether they are at it
-   **cannot be inferred** from which seat is talking — they are on a phone, in every conversation at once. Ask.
+2. ⛔ **No write operations to a live controller when the owner is not at it.** ⭐ **And the owner ruled HOW TO
+   KNOW (2026-08-26): on the Expert, REACHABLE MEANS PRESENT** — they power it down when they leave, so the
+   machine answering *is* the presence signal. ⛔ **Do not ask "are you at it?"** — that tax is exactly what the
+   ruling removed, and asking again reads as not having listened. ⚠ Presence still **cannot be inferred from
+   *which seat* is talking** (phone, every conversation at once) — it is the *controller being on* that says it.
+   ⭐ The bench **V4.1 is exempt entirely** (motorless, on 24/7). Full text: [`context/SETUP.md`](context/SETUP.md).
 3. ⛔ **Two seats share this repo, concurrently.** `git pull --rebase` before committing, expect a rejected
    push, **never force-push**. Normal condition, not an edge case.
 
