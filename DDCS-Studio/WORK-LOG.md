@@ -76329,3 +76329,103 @@ Two named-not-fixed items for whoever picks this up: (1) the general dropdown-de
 `jsonDef()` — a registry-wide reorder, needs its own measurement turn; (2) `devMode.js`'s `blkPanel` scan
 (Save-dialog prefill) missing `uiChildren` — cosmetic confusion only (self-heal already compensates), but it
 IS the shared save path every wizard save goes through.
+
+## t2645 — THE EMIT LINT: a standing guard, sourced from context/DDCS-VARIABLES.md + the FINDINGS' newest
+confirmed hazards, that caught and corrected its own miscalibration before ever reporting a false alarm
+
+Dispatch: build a per-dialect emit-lint rule table (DATA) + ONE registry-driven guard that emits EVERY op ×
+EVERY post through the real `builderOf`/`emitMapped` path and scans it, sourced from FAIRY's newest confirmed
+findings (no power operator, MOD is a syntax error, trig args are in degrees) and `context/DDCS-VARIABLES.md`'s
+own variable-range map. Report the catch list; fix nothing beyond typo-class. Node tier only — no emit code
+touched.
+
+### THE RULE TABLE — `web/wizards/dialects/emitLintRules.js`
+
+Read the actual provenance rather than trusting the dispatch's own summary of it — pulled the exact FINDINGS.md
+sections: **"THE OPERATOR / FUNCTION SET, SETTLED"** (`^` and `**` both photographed as `syntax error!`,
+confirmed 2026-09-05, camera-verified — including the false-all-clear correction where a canary that fired too
+early made `**` look like a harmless no-op) and **"THE TRIG GAP IS CLOSED"** (SQRT/COS/SIN/TAN/ATAN all work
+on the Expert, arguments in DEGREES — `COS[90]≈0`, `SIN[90]=1`). Cross-checked `bridge/controllers/v4.1/
+FINDINGS.md` separately (never carrying an Expert finding to V4.1 unchecked, per `bridge/controllers/
+README.md` rule 1): V4.1 has confirmed evidence ONLY for `ATAN`'s own comma-form degrees (`ATAN[1,1]*100` →
+`4500`); MOD/`^`/`**` are UNTESTED there — no rule claims either way, silence not an assumed pass. DM500 has
+zero evidence for any of this — same silence.
+
+Three rule kinds, each DATA (a plain object array), never hand-rolled per call site:
+- **TOKEN_RULES** — `no-power-operator`/`no-mod-operator` ('error', Expert only), `trig-args-degrees-*`
+  ('info', a unit-awareness reminder, not a violation in itself — Expert covers all 6 trig/SQRT fns, V4.1
+  covers only the confirmed `ATAN`).
+- **VARIABLE_RANGE_RULES**, per dialect — the named-dangerous sub-ranges from `context/DDCS-VARIABLES.md`'s
+  own tables (H/D tool-offset registers, soft limits, home/machine-zero, serial/Modbus config — all 'error';
+  WCS table and the broad Pr0-999/param-page bands — 'warn', since WCS-writing is a whole legitimate wizard
+  category). ⛔ **THE ACTUAL TRAP** (`#1500+` means WCS+tool-table on V4.1 but system globals on the M350) is
+  encoded as two SEPARATE per-dialect tables, never one shared range — the exact cross-controller carry the
+  incident that opened `DDCS-VARIABLES.md` exists to prevent.
+- **PERSISTENT_SCRATCH_RANGE** — `#100-#499` on both controllers, 'info' only, per the dispatch's own explicit
+  "flag it, do not fail it" (persistence may be intended — config headers).
+
+A rule reports a WRITE (`#N = …`, N on the assignment LHS) — a bare read is not flagged, per the dispatch's
+own read/write distinction ("a #1500+ READ may be legitimate… it is WRITES that destroy"). The narrowest
+matching range wins when ranges nest (a write to `#915` sits inside BOTH the specific H16-19 row and the wide
+Pr0-999 row — reports once, as the row that actually names it).
+
+### THE GUARD CAUGHT ITS OWN FIRST-DRAFT MISTAKE — proof the "expect judgment calls" instruction was heeded
+
+First real sweep produced exactly one ERROR-severity hit: `user_homing_data @ ddcs-expert-m350`, a write to
+`#655` (declared 'error' as "software limits, no legitimate wizard reason to touch it"). Checked before
+touching anything, per this session's own already-paid-for lesson (t2641 Part B: an unverified severity
+assumption is not evidence) — `homingData.js:50`'s own field help text reads **"Re-enable #655 (soft limits)
+after homing."** A homing cycle disables soft limits before the machine has an established zero and
+re-enables them once homed; that is not a hazard, it is homing's entire declared job. The rule's own premise
+("no legitimate use") was wrong, not homing's emit. **Corrected the rule's severity to 'warn'** (with the
+correction narrated in the rule's own comment, not silently fixed) rather than either loosening it blind or
+leaving a real wizard's documented, intentional behavior red. Re-swept: zero ERROR hits remain.
+
+### THE CATCH LIST (the deliverable)
+
+Swept **32 ops × 7 posts = 224 (op, post) emits**. **0 ERROR-severity hits.** **11 WARN hits, all from
+`user_homing_data`** on both hardware-verified posts — its own gantry-sync flag/coordinate writes
+(`#880-882`/`#1515-1517`, or the M350's Pr0-999 equivalent) and the `#655` soft-limit re-enable above. Checked
+each: `homingWizard.js`'s own header explicitly documents the `#[880+N]`/`#[1515+N]` addressing scheme by
+name — every one of the 11 is intentional, already-documented homing behavior, not a fresh hazard. **226 INFO
+hits** — `#100-#499` persistent-scratch writes, spread across nearly every op (expected: that is the entire
+declared safe-scratch band, used constantly for ordinary intermediate values) — a visibility nudge, not
+reviewed line-by-line (226 of them, all the same class, matches the dispatch's own framing exactly). One
+`trig-args-degrees-v41-atan` INFO hit (`user_rotary_clock_data`'s own `ATAN[...]` call) — a reminder to
+confirm degrees, not a finding of wrongness (not checked against the wizard's own upstream unit conversion
+this turn — flagged for whoever triages the WARN/INFO list).
+
+**A real, named gap, not silently missed:** corner/edge/middle's own WCS writes on the Expert use INDIRECT
+addressing (`#[#70]=…`, `#[#70+15]=…`, `wizards/dialects/ddcs-expert-m350.js`'s own `wcsWriteIndirect`) — the
+scanner only matches a LITERAL `#123 = …` assignment, so these three ops' own WCS writes produced **zero**
+hits despite being the exact WCS-write behavior the 'warn' severity on that range was calibrated for. Confirmed
+live (grepped their own emit dialect code) rather than assumed. Extending the scanner to resolve `#[expr]`
+symbolically is real future work, named in the rule file's own header — not attempted this turn.
+
+### NON-VACUITY
+
+`tests/node/emit-lint-2645.test.mjs`'s first test plants a violation for every declared rule (a literal `**`,
+`MOD`, a write into each named 'error' range on each dialect, a `COS[...]` call) and its honest equivalent,
+asserting the scanner trips on the bad line and stays silent on the good one — including a token buried inside
+a `(…)` comment, which must never trip anything (the same non-nesting comment shape
+`bridge/controllers/expert-m350/tools/ddcs_lint.py`'s own `scan_comments()` encodes for the real controller
+parser). All pass.
+
+### VERIFY
+
+Rule table declared with provenance per rule (FINDINGS.md section names + the exact confirmed values, not
+paraphrased). Guard is registry-driven (sweeps every `*Data.js`-registered op × every `listPosts()` dialect,
+not a hand-picked subset) and proven not vacuous (planted violations fail, then the fix — this rule table
+itself — passes). Catch list reported per op × post with the rule each hit, above. Nothing fixed beyond the
+one miscalibration correction (the lint's OWN severity, not a wizard's emit — `homingData.js` untouched). Node
+tier: `npm run test:node` — **247 passed, 0 failed** (was 245; +2 for this turn's own two new tests). No e2e
+run — no emit code touched, matching the dispatch's own TIER instruction. `git status` clean except this
+entry and the two new files, confirmed below.
+
+### NEXT
+
+The indirect-addressing gap (corner/edge/middle's own WCS writes invisible to the scanner) is the guard's own
+most valuable next extension — it is exactly the ops most likely to carry a REAL divergent-range hazard, and
+today's clean WCS-range sweep is silent about them, not clean. The registry-wide dropdown-default defect
+(t2643's own NEXT item) and this turn's own `#[expr]` gap are now two separate, named, unmeasured-scope items
+on the board.
