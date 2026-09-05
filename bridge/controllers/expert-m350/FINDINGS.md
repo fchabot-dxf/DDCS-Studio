@@ -2670,3 +2670,34 @@ cheap and reversible, so it is worth eliminating first, but **the stronger candi
    only at startup — already established here), so it is a real bench step, not a keystroke.
 
 ⭐ If either works, the padding and ack-retry workarounds become belt-and-braces rather than load-bearing.
+
+### ⛔ REFUTED — `LatencyTimer` 16 → 1 CHANGES NOTHING `[MEASURED on machine 2026-09-05]`
+Owner set it via Device Manager and it was re-measured like-for-like (same expressions, same seed, padding
+disabled):
+
+| | LatencyTimer 16 | **LatencyTimer 1** |
+|---|---|---|
+| `[3+3]` `[4+4]` `[0+7]` `[7+0]` `[8+1]` bare | 0/5 each | **0/5 each — identical** |
+| 20 random lines × 3, bare | 49/60 (82%) | **50/60 (83%)** — noise |
+
+⇒ **Not the cause**, exactly as FTDI's AN232B-04 implied: the latency timer governs the **receive** path and
+our failure is in **transmit**. ⛔ **Do NOT put this in any setup guide or tell users to change it** — it is
+not a fix, and unverified tuning advice becomes permanent folklore. (Harmless either way; leave it or revert.)
+
+⭐ **The baud rate remains the untested candidate**, and it is now the *only* one from the literature.
+
+### ⭐ SCOPE — DOES ANY OF THIS AFFECT DDCS STUDIO? **NOT TODAY.** `[CONFIRMED by reading the app, 2026-09-05]`
+Owner asked, and it is worth stating plainly because "Modbus" means two different things in this repo:
+
+| | direction | used by |
+|---|---|---|
+| **register `3000` G-code injection** | **PC is master** → controller | ⛔ **the bridge only.** No app code opens a serial port |
+| **`MSETDATA` / `MGETDATA`** | **controller is master** → PC slave | the app emits these as G-code (`GcodeExecutionEngine._handleModbus`) |
+| **SMB** to `\192.168.0.99\CNCDISK` | PC → controller, files | how Studio actually delivers jobs today |
+
+⇒ **Everything measured here about delivery loss applies to the injection channel only**, which nothing in
+`DDCS-Studio/web/` uses. ⚠ **The one shared risk:** the beacon/instrument feature emits `MSETDATA`, a live
+Modbus transaction **over this same cable**. Different direction, same wire — so a marginal link is a risk to
+that feature too. Not a known fault, but worth watching if beacons ever behave oddly.
+⇒ ⭐ **And it becomes load-bearing the day the app's pull moves from SMB to Modbus** — an open question
+already recorded as RENDERRANCHY's call.
