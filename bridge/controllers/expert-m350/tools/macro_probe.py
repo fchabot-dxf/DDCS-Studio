@@ -146,7 +146,17 @@ def probe(s, expr):
     time.sleep(1.0)
     if abs((read_f32(s, REG_READ) or 0) - SENTINEL) > 0.01:
         raise Latched("sentinel was not stable before injecting %r" % expr)
-    inject(s, "#%d = %s" % (SCRATCH, expr), settle=0.0)
+    # ⛔ CHECK DELIVERY. inject() returns False when the FC16 was never acknowledged, which means the
+    # controller NEVER RECEIVED the line -- so it cannot assign and cannot error, and the pendant stays
+    # green and READY. Measured 2026-09-05: `#916 = [3+3]` is never acknowledged, across every retry,
+    # while `#916 = [3+3] ` (one trailing space) is acknowledged immediately. Ignoring this return value
+    # is what made an undeliverable line look like a rejected expression for an entire session.
+    delivered = inject(s, "#%d = %s" % (SCRATCH, expr), settle=0.0)
+    if not delivered:
+        # Same expression, different bytes -- this reliably gets through.
+        delivered = inject(s, "#%d = %s " % (SCRATCH, expr), settle=0.0)
+        if not delivered:
+            return "UNDELIVERABLE (no FC16 ack, even with the trailing-space variant)"
     v = poll_for(s, REG_READ, SENTINEL, window=3.0, match=False)
     if v is not None and abs(v - SENTINEL) < 0.5:
         # ⭐ SOME EXACT LINES NEVER EXECUTE, DETERMINISTICALLY. `#916 = [3+3]` never assigns; `#917 =

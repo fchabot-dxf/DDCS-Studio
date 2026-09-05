@@ -2525,3 +2525,35 @@ latency is **~440 ms**. So the confirmation regularly beat the line, `set_var` c
 deterministic effect look random, which is why it was written off as noise twice.
 ⭐ Fixed by **polling** for the value instead of guessing a delay, and draining duplicates before the next
 line. ⇒ *A measurement whose instrument retries silently will invent randomness that is not there.*
+
+### ⭐⭐⭐ AND THE MECHANISM: THE LINE IS **NEVER DELIVERED**, NOT "SILENTLY IGNORED" `[CONFIRMED on machine 2026-09-05]`
+Owner asked the right question — *"so no error appeared on the controller, that normal?"* — and checking it
+directly settled the whole thing. Injecting `#916 = [3+3]` raw:
+
+```
+sentinel in place: #916 = -77777.0
+injected '#916 = [3+3]'   FC16 acknowledged: FALSE      <- after SIX retries
+#916 after 3 s          : -77777.0
+pendant                 : READY, green strip, no error  <- photographed
+```
+
+⛔ **The FC16 is never acknowledged, so the controller never received the line.** It cannot assign it and it
+cannot error on it. ⇒ The pendant staying green is not a mystery and not a parser quirk — **it is exactly what
+non-delivery looks like.**
+
+⭐ **THREE OUTCOMES, CLEANLY SEPARATED — and every confusing result this session was the third one:**
+
+| | pendant | variable |
+|---|---|---|
+| delivered + valid | green | assigns |
+| delivered + invalid | **red, `syntax error!`**, latches | unchanged |
+| ⛔ **NOT DELIVERED** | **green, nothing at all** | unchanged |
+
+⭐ **This VINDICATES the FC16-ack finding that was walked back earlier.** No ack = not delivered, and the ack
+is the only cheap, reliable delivery signal. The apparent counter-evidence ("acked lines still didn't
+execute") was the retry bug corrupting the *next* result, not an acked line failing.
+
+⛔ **THE TOOL BUG THAT COST THE SESSION:** `probe()` **ignored `inject()`'s return value** and reported
+"NO ASSIGNMENT" when the truth was "could not deliver". ⇒ *An undeliverable line looked like a rejected
+expression for an entire evening.* Now reported distinctly, with the trailing-space variant tried first.
+⭐ *When a tool can fail in two ways and only reports one, every diagnosis built on it is a coin flip.*
