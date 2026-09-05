@@ -8207,13 +8207,24 @@ the instrumenter inserts `#250 = <n>` + `MSETDATA[250,1,0,2,16,300]` checkpoints
 slave as `28416 + n`, decoded against a per-job JSON map into percent/op/line/ETA
 (`bridge/bridge-app/shared/PROTOCOL.md` §1–§2).
 
-⚠ **AND THE DOCS DISAGREE WITH THE OWNER, WHICH IS ITSELF WORTH RECORDING.** `PROTOCOL.md` says *"Proven on
-the machine 2026-06-06 (`CHECKPOINT_TEST.nc`): n = 1/2/3 arrived as 28417/28418/28419, wedge-free"* and calls
-the frame fixed. The owner says it does not work. ⇒ **The proof was a purpose-built three-checkpoint test
-file, never a real instrumented job** — the same narrow-proof-generalised-too-far shape this repo keeps
-finding (cf. the t2599 `edge` comment claiming "faithful reproduction" of a render nobody had called the
-function to observe). Do NOT re-litigate the owner's report against that line; establish what the test proved
-and mark the doc accordingly on the way out.
+⚠⚠ **THE BEACON FEATURE WAS NEVER TESTED TO WORK — owner-stated 2026-09-04, and the tests bear it out.**
+An earlier draft of this entry said the proof was "a test file, never a real instrumented job." That was too
+generous. Measured:
+
+| what | status |
+|---|---|
+| `MSETDATA` **transport** — frames arrive, little-endian packing, wedge-free | ⭐ genuinely PROVEN (2026-06-06, `CHECKPOINT_TEST.nc`) |
+| beacon **failure reporting** — `test_beacon_health_2057.py` | ⭐ tested — but ONLY the sad path: `COM999`, a bad/busy port, "does it report the honest reason" |
+| beacon **feature end-to-end** — instrument a real job → checkpoints fire → map decodes → progress shown | ⛔ **NEVER TESTED, ANYWHERE** |
+
+⇒ `PROTOCOL.md`'s *"Proven on the machine"* line is about the **wire frame**, not the feature. Nothing in the
+suite ever receives and decodes a beacon; the only beacon tests assert that it fails honestly. ⛔ **Do not read
+that line as evidence the mechanism worked** — and mark it on the way out so the next reader does not either.
+Same narrow-proof-generalised-too-far shape as the t2599 `edge` comment claiming "faithful reproduction" of a
+render nobody had called the function to observe.
+
+⭐ **Consequence for the removal turn:** there is no "what regressed?" question and no behaviour to preserve.
+This is deleting a path that never demonstrably ran, not retiring a working one.
 
 ⭐⭐ **THE REPLACEMENT ALREADY EXISTS AND IS BETTER:** Modbus live position polling —
 *"the position registers TRACK LIVE during motion — progress without instrumentation"*
