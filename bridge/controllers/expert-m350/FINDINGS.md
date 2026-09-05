@@ -2888,3 +2888,38 @@ this exact register, its source is one file in a public repo, and it answers the
 ⭐ Owner, repeatedly, and correctly: *"did you read all the docs?"* · *"maybe it's another baud altogether"*
 · *"obviously if you're looking at outdated docs it's meant to go bad."* **Read the reference
 implementation before characterising a transport.**
+
+## ⭐⭐⭐ RUN STATE CONFIRMED — REGISTER `10002` IS A **PROGRAM-RUNNING** FLAG `[CONFIRMED on machine 2026-09-05, owner pressed Start]`
+Polled `10002` at 4 Hz while the owner ran `V21_dwell.nc` — **a 30 s `G04` dwell that moves NO axis:**
+
+| t (s) | `10002` | counters `#701/#702` | |
+|---|---|---|---|
+| 11.9 | `0` | 251 / 4 | idle |
+| **15.9** | ⭐ **`1`** | 251 / 4 | **Start pressed** |
+| 36.1 | `1` | 251 / 4 | ⭐ **still 1 — through a pure dwell, nothing moving** |
+| 56.3 | `0` | **252 / 5** | finished; completion counters increment here |
+
+⇒ ⭐⭐ **`1` = a program is running, `0` = idle. It is NOT a motion flag** — it stayed `1` for 30 s with
+every axis stationary. Values seen: `{0.0, 1.0}`.
+
+⛔⛔ **THIS CLOSES A QUESTION OPEN FOR MONTHS.** This file records *"no 'currently running' flag found"*
+after diffing 2,400 registers mid-run — that sweep covered the macro mirror, and `10002` is in the
+`10000`–`10998` **system-internal** block, which the mirror sweep never touched. It was found by reading
+`m350_liveg.py::poll_m350_state_with_strict_crc` (FC03 on `0x2712`).
+
+⭐ **FOR THE APP:** this is a **live progress signal**, not a done/not-done counter. Poll `10002` to know a
+job is running; the `#701`/`#702` completion counters remain the end-of-run edge. Together they give
+start → running → finished without any file-share polling.
+⚠ Only `0` and `1` have been observed. The vendor's tool treats *any* non-zero as running, so other values
+may exist (feed hold? probing?) — see `CHANNELS.md` Q4 `[TO TEST]`.
+
+## ⭐⭐ REMOTE KEY PRESS WORKS — INJECT `#2037`, DO NOT WRITE THE REGISTER `[CONFIRMED on machine 2026-09-05, photographed]`
+Injecting `#2037 = 65914` (System Info = key `1378`) **switched the pendant to the System Info page** —
+photographed. ⇒ The vendor doc is exact: the assignment must be **executed as code**. Writing reg `16074`
+directly does nothing.
+
+⛔ **This means the PC can press ANY panel key, `Start` (`65864`) included.** Encoding: `65536 + (keyvalue −
+1000)`. Screen keys are safe and self-evident (Monitor `65909`, System Info `65914`); ⛔ motion, `Start`,
+`Pause` and `Reset` are announced-class and must not be sent unattended.
+⚠ Still true that this **cannot clear a latch** — an error halts the interpreter, and this needs the
+interpreter.
