@@ -15,6 +15,22 @@ Param-page section).
 
 # DDCS variable writing — look it up first
 
+## ⭐ FIRST — WRITING A MACRO? THE SCRATCH IS `#0`-`#499`. USE IT.
+
+| range | what |
+|---|---|
+| `#0`-`#49` | **subprogram local variables** |
+| `#50`-`#499` | **global variables** |
+
+⭐ **These are real scratch. Nothing here is a machine parameter, and none of the warnings below apply.**
+⇒ **In macros and injected G-code, compute in `#100`, `#101`, … and the whole problem disappears.**
+Owner, 2026-09-05: *"isn't the real scratch simply 001 to 99?"* — **yes, and that is the right instinct.**
+
+⚠ **THE ONE CATCH, and it is the only reason parameters ever come into it:** `#0`-`#499` have **no Modbus
+address** (the vendor map lists them `NULL`). A PC reading over Modbus **cannot see them**. So to *observe* a
+value from the PC you must land it in a parameter — and that is when everything below starts to matter.
+⇒ ⭐ **Keep the parameter footprint to ONE designated, saved-and-restored slot; do the actual work in `#100`+.**
+
 ## ⛔ THE ONE RULE
 
 **Never write a `#variable` you have not looked up.** Not "probably unused". Not "it read zero".
