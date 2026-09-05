@@ -87,6 +87,11 @@ test('NON-VACUITY: the scanner catches every declared rule on a planted violatio
         { dialect: 'ddcs-v41', bad: '#1560 = 5', good: '#50 = 5', ruleId: 'var-range:H1-H16 tool length' },
         { dialect: 'ddcs-v41', bad: '#1512 = 1', good: '#50 = 1', ruleId: 'var-range:WCS table G54-G59/G52' },
         { dialect: 'ddcs-expert-m350', bad: '#54 = COS[90]', good: 'G0 X10', ruleId: 'trig-args-degrees-expert' },
+        // t2647 — the indirect-write visibility rule: corner/edge/middle's own wcsWriteIndirect shape must
+        // trip it; a PLAIN literal assignment (no #[...] wrapper at all) must not.
+        { dialect: 'ddcs-expert-m350', bad: '#[#70]=1', good: '#100=1', ruleId: 'indirect-write-visible' },
+        { dialect: 'ddcs-expert-m350', bad: '#[#70+15]=1', good: '#115=1', ruleId: 'indirect-write-visible' },
+        { dialect: 'ddcs-expert-m350', bad: '#[#151+3]=#883', good: '#100=#883', ruleId: 'indirect-write-visible' },
     ];
     for (const c of cases) {
         const badHits = scanEmitForLintHits(c.bad, c.dialect).map((h) => h.ruleId);

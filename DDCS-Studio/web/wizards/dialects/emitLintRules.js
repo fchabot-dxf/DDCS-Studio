@@ -22,15 +22,18 @@
  *             intentional — config headers persist on purpose). "The lint's job is to make the choice
  *             VISIBLE, not to ban it."
  *
- * ⚠ KNOWN LIMITATION, named rather than silently missed (t2645): the variable-range scanner matches only a
- * LITERAL assignment, `#123 = …`. It CANNOT see an INDIRECT write — `#[#70] = …`, `#[#70+15] = …` — the exact
- * form corner/edge/middle's own WCS writes use on the Expert (wizards/dialects/ddcs-expert-m350.js's own
- * `wcsWriteIndirect`). Confirmed live: those three ops' own WCS-table writes produced ZERO hits in the first
- * real sweep, while homing's own LITERAL `#[1515+N]`-style writes (computed to a literal number before emit,
- * not left as an indirect expression) were caught correctly. This is the "nearest honest approximation"
- * t2645's own dispatch asked for when a lint cannot fully resolve read vs write — stated here, not hidden:
- * a rule in this table can MISS a real hazard hidden behind indirect addressing. Extending the scanner to
- * evaluate `#[expr]` symbolically is real future work, not attempted this turn.
+ * ⚠ KNOWN LIMITATION (t2645, PARTIALLY ADDRESSED t2647): the variable-range scanner matches only a LITERAL
+ * assignment, `#123 = …` — it CANNOT resolve an INDIRECT write, `#[#70] = …`/`#[#70+15] = …`, to a concrete
+ * register number, because the base variable (`#70`) holds a value computed by an EARLIER line this static
+ * scanner never traces. t2645's own first sweep found this the hard way: corner/edge/middle's own WCS writes
+ * (wizards/dialects/ddcs-expert-m350.js's own `wcsWriteIndirect`) produced ZERO hits, while homing's own
+ * LITERAL `#[1515+N]`-style writes (computed to a literal number before emit) were caught correctly — so the
+ * WCS-range sweep read as clean when it was actually SILENT about an entire idiom.
+ * t2647 closes the VISIBILITY half of that gap (`indirect-write-visible`, TOKEN_RULES below): any `#[#N…]=…`
+ * write now surfaces as a 'warn' hit, naming that an indirect write exists here even though the scanner still
+ * cannot say WHICH numbered register it targets. The RESOLUTION half (tracing the base variable's own prior
+ * assignment to name the real target) is still real future work, not attempted — a rule in this table can
+ * still tell you "review this line" without being able to tell you "this writes the WCS table" for certain.
  */
 
 // ── TOKEN RULES — a forbidden/suspect construct anywhere in the emitted CODE (comments already stripped by
@@ -51,6 +54,24 @@ export const TOKEN_RULES = [
         pattern: /\bMOD\b/,
         message: 'MOD is a syntax error on this controller',
         provenance: 'bridge/controllers/expert-m350/FINDINGS.md "WHY SOME INJECTED WRITES DON\'T TAKE" [CONFIRMED, photographed] — `#916 = [7 MOD 3]` photographed as `syntax error!:L1[#916 = [7 MOD 3]]`',
+    },
+    {
+        // t2647 — the KNOWN LIMITATION this file's own header named at t2641/t2645: corner/edge/middle's own
+        // WCS writes use INDIRECT addressing (`#[#70]=…`, `#[#70+15]=…`, wizards/dialects/ddcs-expert-m350.js's
+        // own wcsWriteIndirect and the dual-gantry `#[#151+N]=…`/`#[#74]=…` idiom, SAVE_WCS_XY_AUTO.nc's own
+        // dump shape) — invisible to the literal `#123 = …` matcher the VARIABLE_RANGE_RULES scan uses, so
+        // those three ops' own WCS-range sweep read as clean when it was actually SILENT. This rule does NOT
+        // resolve the indirection (the base variable, e.g. #70, holds a COMPUTED address this static scanner
+        // cannot trace back through an earlier assignment) — it makes the write VISIBLE, which is what was
+        // asked: "teach the scanner the shape... so the writes become visible (and presumably intentional-
+        // per-dialect) rather than silent." 'warn', not 'error': this is an established, ALREADY-SHIPPED idiom
+        // on 3+ ops, not a hazard in itself — the point is review visibility, not a new gate.
+        id: 'indirect-write-visible',
+        sev: 'warn',
+        dialects: ['ddcs-expert-m350'],
+        pattern: /#\[#\d+(?:\+\d+)?\]\s*=/,
+        message: 'an INDIRECT write (#[#N]=…) targets a computed register address this scanner cannot resolve to a literal number — confirm which named range (WCS table, tool offsets, …) the base variable actually points at; this is the exact shape corner/edge/middle\'s own WCS writes use',
+        provenance: 'wizards/dialects/ddcs-expert-m350.js\'s own wcsWriteIndirect + the dual-gantry #[#151+N]=…/#[#74]=… idiom (SAVE_WCS_XY_AUTO.nc\'s own dump shape) — confirmed live to produce ZERO hits under the plain variable-range scan (t2645), closing that gap to a visibility warning',
     },
     {
         id: 'trig-args-degrees-expert',
