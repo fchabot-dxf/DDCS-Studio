@@ -2382,3 +2382,28 @@ its **own keypress register** at an address we do not know — if found, it may 
 
 ⭐ Corroboration: **`#2500` reads `0` over Modbus**, matching the existing note that the tool-setter
 calibration reference is in neither `setting`, `camsetting` nor `uservar` and needs a macro to read.
+
+## ⭐ THE OPERATOR / FUNCTION SET, SETTLED `[CONFIRMED on machine 2026-09-05, camera-verified]`
+
+| works | value | | rejected | |
+|---|---|---|---|---|
+| `SQRT[16]` `SQRT[2]` | 4 · 1.41421 | | ⛔ `MOD` | **syntax error** (photographed) |
+| `COS[0]` `COS[90]` | 1 · 0 | ⇒ **DEGREES** | ⛔ `^` | **syntax error** (photographed) |
+| `SIN[0]` `SIN[90]` | 0 · 1 | ⇒ **DEGREES** | ⚠ `**` | silent no-op, canary passed |
+| `TAN[45]` | 1 | | ⛔ one-operand `ATAN[x]` | **syntax error** |
+| `ABS[-5]` `ROUND[2.6]` `FIX[2.9]` | 5 · 3 · 2 | rounds / truncates | ⛔ `ATAN[y]/[x]` (slash) | rejected — §V13 |
+| `EQ` `NE` `LT` `GT` `LE` `GE` | all correct | | | |
+| ⭐ `ATAN[1, 2]` | **26.565** | ⭐ `ATAN[1, 1]` → **45.0** | | |
+
+⭐ **`ATAN[1, 2]` = 26.565° independently reproduces §V13's `ATANC=2657`** by a completely different route
+(Modbus injection vs. an on-screen popup), and pins the comma form *and* degrees in one measurement.
+
+⛔ **THERE IS NO POWER OPERATOR.** `^` errors and `**` silently does nothing. Any emitted exponentiation must
+be rewritten as repeated multiplication. ⚠ The `**` no-op is a **single observation** — the canary proved the
+channel was alive afterwards, so it did not error, but an intermittent drop cannot be excluded `[TO TEST:
+repeat it three times]`.
+
+⭐ **How the canary distinguishes these:** after any "no assignment", `tools/macro_probe.py` fires a plain
+numeric write. `**` → canary **passed** ⇒ no-op. `^` → canary **refused** ⇒ it errored and latched. Both
+verdicts were then confirmed against a photograph of the pendant. ⇒ *The tool can now tell a no-op from an
+error without a human looking at the screen* — which is the capability that was missing all session.
