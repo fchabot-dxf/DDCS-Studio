@@ -100,47 +100,65 @@ class Latched(Exception):
     """The controller will not accept a line even after retries."""
 
 
-def set_var(s, var, value, tries=4):
-    """Write a NUMERIC value and CONFIRM it landed, retrying. Returns True if confirmed.
+def poll_for(s, reg, want, window=3.0, match=True):
+    """Poll until reg equals `want` (match=True) or differs from it (match=False). Returns the value.
 
-    ⭐ SINGLE INJECTIONS ARE DROPPED INTERMITTENTLY. Measured 2026-09-05: nine numeric writes in a row,
-    the 1st and the 9th silently vanished, the middle seven landed, with the pendant green and READY
-    throughout. There is no error and no NAK -- the FC16 write is ACKed and the line is simply gone.
-    ⇒ Never trust an un-verified injection. This is the single most expensive fact learned that night:
-    every wrong finding traced back to reading a stale value left by a dropped line.
+    ⛔ POLL, NEVER A SINGLE TIMED READ. Execution latency is ~440 ms, so a read at 0.5 s regularly beats
+    the line and reports a failure that did not happen. Measured 2026-09-05: that false failure made
+    set_var re-inject, and the DUPLICATE landed AFTER the next expression and overwrote its result --
+    which is why `[3+3]` appeared to "sometimes fail" while `[5+5]` passed. The controller was fine
+    every time; the tool was corrupting its own measurement.
     """
-    reg = 6500 + 2 * (var - 500)
-    for _ in range(tries):
-        inject(s, "#%d = %s" % (var, value))
-        time.sleep(0.5)
+    t0 = time.time()
+    v = None
+    while time.time() - t0 < window:
         v = read_f32(s, reg)
-        if v is not None and abs(v - float(value)) < 0.01:
+        if v is not None:
+            hit = abs(v - want) < 0.01
+            if hit == match:
+                return v
+        time.sleep(0.05)
+    return v
+
+
+def set_var(s, var, value, tries=4):
+    """Write a numeric value and confirm it landed, polling rather than guessing a delay."""
+    reg = 6500 + 2 * (var - 500)
+    value = float(value)
+    for attempt in range(tries):
+        inject(s, "#%d = %s" % (var, value), settle=0.0)
+        v = poll_for(s, reg, value, window=3.0)
+        if v is not None and abs(v - value) < 0.01:
+            if attempt:
+                # ⚠ A RETRY WAS NEEDED, so a duplicate of this line may still be in flight. Let it
+                # drain BEFORE anything else is injected, or it will land on top of the next result.
+                time.sleep(2.0)
             return True
     return False
 
 
 def probe(s, expr):
-    """Evaluate one expression. Raises Latched if a plain numeric write will not stick.
-
-    The sentinel is written AND CONFIRMED, with retries. Only then is the expression injected, so a
-    surviving sentinel afterwards means the EXPRESSION did not assign -- not that the channel is down.
-    """
+    """Evaluate one expression. Raises Latched if a plain numeric write will not stick."""
     if not set_var(s, SCRATCH, SENTINEL):
         raise Latched("a plain numeric write to #%d would not stick after retries" % SCRATCH)
-    inject(s, "#%d = %s" % (SCRATCH, expr))
-    # ⛔ 1.8s, NOT 0.9. THE LATCH IS NOT INSTANTANEOUS. Measured 2026-09-05: `[2 ** 3]` raised a syntax
-    # error, but a canary fired ~0.5s later SLIPPED THROUGH and reported the channel healthy, so the
-    # expression was recorded as a harmless no-op. It is a syntax error -- photographed. A canary that
-    # checks too early gives a FALSE ALL-CLEAR, which is worse than no canary at all.
-    time.sleep(1.8)
-    v = read_f32(s, REG_READ)
+    # The sentinel must be STABLE before the expression goes out -- a late duplicate arriving after it
+    # would restore the sentinel and be misread as "the expression did not assign".
+    time.sleep(1.0)
+    if abs((read_f32(s, REG_READ) or 0) - SENTINEL) > 0.01:
+        raise Latched("sentinel was not stable before injecting %r" % expr)
+    inject(s, "#%d = %s" % (SCRATCH, expr), settle=0.0)
+    v = poll_for(s, REG_READ, SENTINEL, window=3.0, match=False)
     if v is not None and abs(v - SENTINEL) < 0.5:
-        # The sentinel survived, so the expression did not assign. TWO very different causes:
-        #   (a) a harmless no-op, and the channel is still fine, or
-        #   (b) IT RAISED A SYNTAX ERROR AND LATCHED, so every later line is silently dropped.
-        # ⛔ Telling them apart is not optional. Measured 2026-09-05: `[7 MOD 3]` errored and latched,
-        # and the batch cheerfully reported "no assignment" for the NEXT expression too -- which had
-        # never executed at all. A canary write settles it.
+        # ⭐ SOME EXACT LINES NEVER EXECUTE, DETERMINISTICALLY. `#916 = [3+3]` never assigns; `#917 =
+        # [3+3]`, `#916 =[3+3]` and `#916 = [3+3] ` all do. Same expression, same semantics -- only the
+        # bytes differ. The rule is UNKNOWN (a CRC-low-byte theory was tested by prediction and refuted:
+        # 0xFB and 0xFF each appear in both a failure and a pass). ⇒ Retry with a TRAILING SPACE, which
+        # is semantically identical and byte-different. Do this before concluding anything about the
+        # expression itself, or a perfectly valid one gets recorded as rejected.
+        inject(s, "#%d = %s " % (SCRATCH, expr), settle=0.0)
+        v = poll_for(s, REG_READ, SENTINEL, window=3.0, match=False)
+    if v is not None and abs(v - SENTINEL) < 0.5:
+        # No assignment within the window. Either a harmless no-op, or it errored and latched.
         time.sleep(1.0)
         if not set_var(s, SCRATCH, 4242.0, tries=2):
             raise Latched("%r raised a syntax error and LATCHED the channel "

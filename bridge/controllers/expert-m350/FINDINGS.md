@@ -2482,3 +2482,46 @@ compromised** — that warning is withdrawn.
   never photographed, and it was wrong.
 - ⭐ **THE RULE:** a negative result on this channel is worth nothing without either an acknowledged frame or
   a photograph of the pendant. That is the whole lesson of 2026-09-05, and it cost a day of false findings.
+
+## ⛔⛔ CERTAIN EXACT LINES NEVER EXECUTE — DETERMINISTIC, SILENT, RULE UNKNOWN `[CONFIRMED on machine 2026-09-05]`
+
+⭐ **This supersedes the "~25% random frame loss" section above, which was largely my own measurement bug.**
+
+`#916 = [3+3]` **never** assigns. Not sometimes — never, across many attempts. And yet:
+
+| line | result |
+|---|---|
+| `#916 = [3+3]` | ⛔ **never assigns** |
+| `#917 = [3+3]` · `#918 = [3+3]` | ✅ 6 |
+| `#916 =[3+3]` · `#916= [3+3]` · `#916=[3+3]` | ✅ 6 |
+| `#916 = [3+3] ` *(one trailing space)* | ✅ 6 |
+| `#916 = [3 + 3]` · `[3.0+3]` · `[03+3]` | ✅ 6 |
+
+⇒ **Same expression, same semantics — only the bytes differ.** It is not the operator, not the operand
+values, not the result, and not spacing as such (`[9-3]` and `[2*3]` work tight-packed). Other confirmed
+members of the same class: `[4+4]`, `[0+7]`, `[4*4]`, `[4/4]`, `[3/3]`.
+
+⛔ **A CRC THEORY WAS TESTED BY PREDICTION AND REFUTED.** Failures shared a high CRC low byte (`0xFB`,
+`0xFF`), so 10 never-tested expressions were predicted from the CRC alone: **7/10 correct, and the three
+misses are fatal** — `0xFB` and `0xFF` each appear in both a failure *and* a pass (`[3+3]` fails / `[3-3]`
+passes; `[4+4]` fails / `[0*7]` passes). **The rule is genuinely UNKNOWN** `[TO TEST]`.
+
+### ⇒ THE WORKAROUND THAT DOES NOT NEED THE RULE
+**Retry with a trailing space.** Semantically identical, byte-different. `tools/macro_probe.py` does this
+before concluding anything, and it fixes every known member of the class: `[3+3]`→6, `[4+4]`→8, `[0+7]`→7,
+`[3/3]`→1, `[4/4]`→1, `[4*4]`→16, all first retry.
+⛔ **Anything built on register 3000 must do the same** — otherwise a valid line silently does nothing.
+
+### ⭐⭐ CONSEQUENCE: **THERE ARE NO SILENT NO-OPS IN THE ARITHMETIC**
+Every expression previously filed here as a "silent no-op" was this artifact. ⇒ **An expression either
+evaluates, or it raises `syntax error!` and latches. There is no third outcome.** The only genuine negatives
+on this controller are the ones that show an error on the pendant: **`MOD`, `^`, `**`, one-operand `ATAN`,
+and the slash form `ATAN[y]/[x]`** — all photographed, all re-confirmed.
+
+### ⚠ AND HOW THIS WAS MISSED FOR SO LONG — MY OWN TOOL
+`probe()` confirmed its sentinel with a **single read 0.5 s after the write**, while measured execution
+latency is **~440 ms**. So the confirmation regularly beat the line, `set_var` concluded failure and
+**re-injected**, and the duplicate landed *after the next expression* and overwrote its result. That made a
+deterministic effect look random, which is why it was written off as noise twice.
+⭐ Fixed by **polling** for the value instead of guessing a delay, and draining duplicates before the next
+line. ⇒ *A measurement whose instrument retries silently will invent randomness that is not there.*
