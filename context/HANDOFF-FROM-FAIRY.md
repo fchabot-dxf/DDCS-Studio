@@ -384,7 +384,10 @@ All measured on the Expert today, all camera-verified against the pendant.
 | ⭐ **`ATAN[y, x]` comma form re-confirmed** | `ATAN[1, 2]` = **26.565**, independently reproducing §V13's `ATANC=2657` by a different route. ⚠ **The §V13 app-side fix is still RENDERRANCHY's and still pending** — `data/probeToSlot.js:538` and `wizards/alignmentWizard.js:158` still emit the slash form, which this controller rejects |
 | ✅ confirmed working | `SQRT` `COS` `SIN` `TAN` `ABS` `ROUND`(rounds) `FIX`(truncates), and **all six** of `EQ` `NE` `LT` `GT` `LE` `GE` |
 
-## 3. ⭐⭐ THE G-CODE INJECTION CHANNEL IS LOSSY — ~25% OF FRAMES NEVER ARRIVE
+## 3. ~~THE G-CODE INJECTION CHANNEL IS LOSSY — ~25% OF FRAMES NEVER ARRIVE~~ ⛔ **RETRACTED — see §5 below.**
+⛔ **This section is WRONG and is kept only as provenance.** The cause was a trailing `
+` we appended and
+the vendor's tool never sends. Removed; delivery is clean. **Do not design around a loss rate.**
 If anything app-side is ever built on register 3000, **it must check the FC16 acknowledgement and resend.**
 Perfect correlation over 18 writes: 13 landed all had a valid ack, 5 lost all had none — the controller never
 received them. Immune to pacing and to bus quiet time; latency is bimodal, **~440 ms or never**.
@@ -410,7 +413,7 @@ reproduced 10/10 after the fix.
 ## 6. STILL OPEN
 | question | needs |
 |---|---|
-| ⭐ **Is `#279` (poll vs slave mode) the real fix for the 25% frame loss?** Every ack arrives behind 6–11 bytes of junk that is not ours, and the controller is a Modbus **MASTER** by default — its own polling frames colliding with ours would explain everything. The junk is measured; the attribution is a **hypothesis** | Fairy, machine on. Changing `#279` needs a reboot to take effect |
+| ~~Is `#279` the real fix for the frame loss?~~ ⛔ **CLOSED.** The vendor's `M350-LiveG` README *requires* `#279 = Slave Mode`, and this machine is already set correctly (`2`). Parity `#296` and stop bits `#297` also verified. **Serial config was never the problem** | — done |
 | `G10 L20` — the only item in `bench/05` that moves an axis | human at the machine |
 | `bench/04-modbus-slave-test-plan.md` | written, never run |
 | Gateway `workOrigin.z` missing the tool-table term | ⭐ **RENDERRANCHY's**, still unblocked |
@@ -459,3 +462,30 @@ number.** With `10002` (running flag) this is **real progress tracking over Modb
 ⛔ This resolves the contradiction in `FINDINGS.md` — *"vendor-stated 16062 is the line number"* vs *"there
 is no line-number register, one is being added ~2026-08-27"*. **Both were true in sequence**; this machine is
 on `2026-09-02-00`, newer than that promise. ⚠ Untested: whether it counts file lines or executable blocks.
+
+---
+
+## ⛔⛔ ONE MORE, AND IT AFFECTS DIALECT WORK ON **BOTH** CONTROLLERS
+⭐ **New: [`context/DDCS-VARIABLES.md`](DDCS-VARIABLES.md)** — also a `ddcs-variables` skill, and linked from
+`CLAUDE.md`. Written because `#915`-`#918` were used as scratch here for hours and are **H16-H19 tool length
+offsets**.
+
+```
+#0 - #99      SAFE on both controllers. Locals.
+#100 - #499   works on both, but PERSISTS through power-off on both.
+#500 +        a real machine setting on both  (M350: Pr(N-500)).
+#1500 +       ⛔ CONTROLLER-SPECIFIC — the two maps DIVERGE HERE.
+```
+
+⛔⛔ **THE PART THAT MATTERS FOR EMIT/DIALECT WORK — the tool table is in a different place on each:**
+
+| | **V4.1** | **M350** |
+|---|---|---|
+| WCS G54-G59 | ⛔ `#1512`-`#1551` | `#800`-`#844` |
+| H1-H16 tool length | ⛔ `#1560`-`#1576` | `#900`-`#919` |
+| D1-D16 diameter | ⛔ `#1577`-`#1593` | `#920`-`#939` |
+| `#1500`+ in general | ⛔ **the WCS and tool table** | system globals (line no., keys) |
+
+⇒ **Any emitted or generated macro that touches `#1500`+ is safe on one machine and destructive on the
+other.** Source: `bridge/controllers/v4.1/DDCS V4.1 Variables list.xlsx` (the vendor's own list, in-repo).
+⚠ Also: **V4.1 has no Modbus at all**, so every register/injection statement from today is M350-only.
