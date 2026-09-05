@@ -2256,30 +2256,45 @@ using the universal variable reader: inject `#915 = <expr>` at register `3000`, 
 
 ⭐ **DEGREES had never been established here**, and it silently changes every emitted arc. It now is.
 
-### ⚠ `NE` RETURNS 0 FOR A TRUE INEQUALITY — one clean reading, needs confirming `[TO TEST]`
-`[1 NE 2]` evaluated to **`0.0`**. It should be 1. Every neighbour in the same run was correct —
-`[1 EQ 1]`→1, `[1 EQ 2]`→0, `[1 LT 2]`→1, `[2 GT 1]`→1, `[1 GT 2]`→0, `[1 LE 1]`→1, `[1 GE 2]`→0 — and the
-reading sits between two that varied, so the channel was demonstrably live and this is not a stale value.
-⇒ Either `NE` is inverted, or it is **not recognised and the expression degrades to something yielding 0**.
-⛔ The dangerous part is that it did **not** raise a syntax error. A silently-wrong operator in an `IF` is
-worse than one that aborts the file. **Do not emit `NE` on the Expert until this is confirmed.** `EQ`, `LT`,
-`GT`, `LE`, `GE` are all now confirmed good, so `IF x EQ y` + inverted branch is the safe workaround.
+### ~~`NE` returns 0 for a true inequality~~ — **REFUTED the same night. `NE` IS CORRECT.** `[CONFIRMED 2026-09-05]`
+Re-tested on a scratch variable that was actually accepting writes, sentinel verified before each line:
+`[1 NE 2]`→**1**, `[2 NE 1]`→**1**, `[1 NE 1]`→**0**, `[5 NE 5]`→**0**. All correct.
+⇒ **`EQ` `NE` `LT` `GT` `LE` `GE` are ALL confirmed good on the Expert.** `NE` is safe to emit.
+The original `0.0` was a **stale value left by the `[1 EQ 2]` line before it**, not a measurement. This
+closes the `NE` half of the V13 "`NE`/`LT`/`GT` untested" note.
 
-### ⛔ AN ERROR LATCHES, AND FURTHER INJECTIONS ARE SILENTLY DROPPED `[CONFIRMED on machine 2026-09-05]`
-A syntax error in an injected line raises `ERROR` on the pendant (photographed: `Syntax error!:L1[#915 =
-ATAN[45]]`) and from then on **register 3000 stops accepting anything**. The FC16 write is still ACKed at
-the wire level — the frame succeeds, the line is discarded. The target variable keeps its last good value.
+### ⚠ `[3*3]` IS A SYNTAX ERROR — spacing or `*` `[MEASURED 2026-09-05, cause unknown]`
+Reproduced twice in one run as a deliberate control. `[1 NE 2]` (spaces around the operator) parses; `[3*3]`
+(no spaces) does not. ⇒ **either `*` is not valid in this position, or the parser requires whitespace around
+operators.** Untested: `[3 * 3]`. Worth settling before assuming any tight-packed arithmetic emits safely.
 
-⇒ **A read-back after a dropped injection returns the PREVIOUS result, which looks exactly like a plausible
-answer.** This produced nine consecutive false readings of `1.0` here, the value `TAN[45]` had legitimately
-left behind, including `[3*3]` → `1.0`. It was caught only because the owner glanced at the pendant.
+### ⛔⛔ RETRACTED — "AN ERROR LATCHES THE CHANNEL" IS FALSE `[REFUTED 2026-09-05, same night]`
+**This section previously claimed a syntax error makes register 3000 stop accepting anything. It does not.**
+Directly disproven twice:
+- `#916` and `#917` accepted writes at the very moment `#915` was refusing them (`1234.0` and `4321.0` both
+  landed and read back) — so the channel was fully alive the whole time.
+- After the deliberate `[3*3]` syntax error, **the very next expression `[1 NE 2]` evaluated correctly.**
+  A syntax error does not block the line after it.
 
-⭐ **THE SENTINEL MUST BE VERIFIED, NOT JUST WRITTEN.** The guard in use wrote a sentinel before each
-expression and assumed a differing read-back meant "evaluated". That is wrong: when the channel is dead the
-sentinel is dropped too, so the stale value never matches the sentinel and every reading passes the check.
-**Correct protocol:** write the sentinel → *read it back* → if it did not land, the channel is latched, STOP
-and report which expression latched it. Clearing requires a `Reset` **at the pendant** — it cannot be done
-with `#2037 = 65863`, because that press would travel through the same dropped channel.
+⭐ **WHAT IS ACTUALLY TRUE: `#915` ALONE FROZE.** It stuck at `1.0` — the value `TAN[45]` legitimately left
+there — and rejected every subsequent write (`555.0` dropped while `#916` took `1234.0` in the same run).
+**Cause unknown.** `Reset` at the pendant did not free it. ⚠ **The "universal variable reader" documented
+elsewhere in this file uses `#915` as its scratch slot — that tool is compromised until this is understood.
+Use `#916` (reg `7332`) meanwhile.**
+
+⭐ **THE LESSON SURVIVES THE RETRACTION, AND IS THE REAL FINDING:** a read-back from a frozen target returns
+the previous value, which looks exactly like a plausible answer. Nine expressions in a row read `1.0`,
+including `[3*3]`, which is not 9. **THE SENTINEL MUST BE WRITTEN *AND READ BACK*.** The old guard assumed a
+read-back differing from the sentinel meant "evaluated"; when the target is frozen the sentinel is dropped
+too, so the stale value never matches and every reading passes. `tools/macro_probe.py` reads the sentinel
+back and halts. ⛔ **It was the OWNER GLANCING AT THE PENDANT that caught this, not any check of mine.**
+
+### ⛔ THE UNDERLYING GAP: THE PC CANNOT SEE THE ERROR STATE `[OPEN — the blocker]`
+Owner, 2026-09-05: *"problem is you cant see if an error is blocking."* That is the root cause of every
+mistake in this whole entry. A **differential sweep of registers 6500–10600 (macro `#500`–`#2550`), taken
+before and after a deliberate syntax error, showed ZERO changed registers** — the error is not exposed
+anywhere in the macro-variable mirror. ⇒ Until an error/alarm indicator is found, **every injected-expression
+result is provisional**, and the sentinel read-back is the only defence.
 
 ### The ATAN forms in that run measured NOTHING — §V13 already had the answer
 `ATAN` takes **two operands in the comma form** (§V13, `[CONFIRMED 2026-08-08]`). So `ATAN[1]` and `ATAN[45]`
