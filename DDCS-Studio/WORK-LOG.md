@@ -76429,3 +76429,109 @@ most valuable next extension — it is exactly the ops most likely to carry a RE
 today's clean WCS-range sweep is silent about them, not clean. The registry-wide dropdown-default defect
 (t2643's own NEXT item) and this turn's own `#[expr]` gap are now two separate, named, unmeasured-scope items
 on the board.
+
+## t2647 — BACKLOG #79: live job tracking over Modbus, extending t2063's own PositionPoller
+
+Dispatch: build the Studio-side half of BACKLOG #79 (the controller side is proven — FINDINGS.md 2026-09-05).
+Poll registers `10002` (run state) + `16062` (executing line) over the existing serial link, extend the t2063
+`PositionPoller` machinery rather than writing a second poller, surface in the Gateway tab's existing Track
+view, gate M350-only the honest available way (profile/dialect — #78's own capability table doesn't exist
+yet), no percent (16062's unit is untested), ship as built + synthetic-slave-proven, LIVE-UNTESTED, and say so.
+
+### THE DECODE — confirmed byte order, cross-checked before trusting it
+
+`bridge/bridge-app/fairy/master.py`: added `decode_float32_cdab`/`encode_float32_cdab`, re-deriving the
+vendor's own `m350_liveg.py::poll_m350_state_with_strict_crc` word-swap recipe
+(`struct.unpack('>f', bytes([res[5], res[6], res[3], res[4]]))`) in terms of pymodbus's own already-parsed
+`regs` list rather than raw response bytes. **Cross-checked byte-for-byte against the vendor's own formula**
+(reconstructed synthetic response bytes from my own encode function, ran both decode paths, compared) before
+wiring it anywhere — this is a CONFIRMED byte order (FINDINGS.md "RUN STATE IS EXPORTED" + "REGISTER 16062 IS
+THE LIVE EXECUTING LINE NUMBER", both 2026-09-05, against real runs), unlike `work_position`/`machine_position`
+which `position_status()`'s own docstring correctly still leaves raw — that reasoning ("decoding would be a
+second unverified guess") no longer applies to THESE two registers specifically, so decoding them here is not
+the same move t2073 deliberately declined to make.
+
+Added `"line_number": {addr: 16062, count: 2}` to the SAME `REGISTERS` dict `PositionPoller` already defaults
+to — a fresh poller polls it automatically, no second poller, no opt-in. Updated `"state"`'s own note text to
+the newer, precise confirmed meaning (program-running flag, not a motion flag, holds through a dwell) without
+touching its key name or address (a pre-existing test references `REGISTERS["state"]` by key).
+
+**Caught a stale test premise before it became a silent regression:** `test_master_2059.py`'s own
+`test_read_an_unknown_register_key_refuses_loudly` used `"line_number"` as its own example of a key that
+*doesn't exist* (`t2046/t2055 both confirmed no such register is documented`). Adding it for real made that
+test's own premise false — fixed by swapping in a placeholder that will never be real, not by weakening the
+assertion.
+
+### `Ops.job_tracking_status()` / `GET /api/tracking` — the decoded surface, kept separate from the raw one
+
+New method in `ops.py`, mirroring `position_status()`'s own shape but DECODING (since the byte order is
+confirmed here): `{enabled, connected, error, running, line, read_at}`. `running`: BACKLOG #79's own explicit
+rule — ANY non-zero `state` counts as running, never idle (`abs(x) > 1e-6`, not `== 1.0` — an unknown value
+must not read as idle). `line`: rounded to the nearest int (confirmed values are exact integers, but a live
+serial poll is never assumed byte-perfect). Named in its own docstring exactly where BACKLOG #78's real
+capability gate belongs once it exists — this method has NO controller-family check of its own; the actual
+M350-only gate lives entirely in Studio (`gatewayPanel.js`'s pre-existing `requiresModbus`, keyed off the
+connected controller's family) and, in practice, nothing calls this on a V4.1 setup at all since V4.1 has no
+Modbus to configure `--position-poll` against in the first place.
+
+### Studio — the SAME Track view, a new decoded block, no percent
+
+`web/ui/gateway/views/tracker.js`: added `renderJobTracking()` alongside the existing `renderPosition()` (the
+t2073 raw stub) — same silent-until-enabled convention, same M350-only gate (this view's own pre-existing
+`requiresModbus: true`, `gatewayPanel.js`'s `viewUnavailable()` — nothing new needed there). Shows
+`RUNNING`/`IDLE` + `Line N` + the read timestamp. ⛔ No percent, deliberately — BACKLOG #79's own explicit
+constraint (16062's unit is untested) — and the code comment says so, naming this as the HONEST available
+gate, not #78's eventual real one. `client.js` gained `getTracking()` → `/api/tracking`, same one-line pattern
+as the existing `getPosition()`.
+
+### VERIFY
+
+**Python (bridge pytest):** `tests/test_job_tracking_2647.py` — decode/encode round-trip + a cross-check
+against the vendor's own byte-level formula; `job_tracking_status()` unit tests (no poller, not-connected,
+idle, running, the any-nonzero-is-running rule, no raw-register leakage); and **the real wire round trip**
+against a genuine in-process synthetic Modbus slave, exercising the EXACT sequence FINDINGS.md's own V21/V23
+runs measured on the real machine: idle → Start pressed (running, line 10) → line advance (11 → 14, the V23
+sequence) → finish edge (both clear). All 11 new tests pass; full bridge suite 139 passed, 0 failed (was 128 —
++11 new, 1 pre-existing test's own stale premise fixed, not weakened).
+
+**Studio (test:changed + node):** `tests/gateway-job-tracking-2647.spec.js` (4 tests, modeled directly on the
+existing `gateway-position-stub-2073.spec.js`'s own mock-the-endpoints technique) — hidden when disabled,
+decoded RUNNING/IDLE + line render when connected, honest error when not connected, and an explicit
+`not.toMatch(/%/)` assertion enforcing the no-percent constraint. The pre-existing position-stub spec still
+passes unchanged. Node tier: 247 passed, 0 failed (unchanged — no emit code touched). No full e2e run, per the
+dispatch's own TIER instruction (no shared render touched).
+
+**The HANDOFF-TO-FAIRY ask**, written into `context/HANDOFF-TO-FAIRY.md`: run it live against the real Expert
+(minutes, at the machine — start a short job, watch the tab), plus FAIRY's own already-written-and-ready
+`V23_lineadvance.nc` to resolve whether 16062 counts file lines or executable blocks (the thing that unlocks a
+real percentage later). **Not claimed as verified — built + synthetic-slave-proven, live-untested, stated as
+such in both the handoff and here.**
+
+`git status` clean except this entry and the new/changed files, confirmed below.
+
+### NEXT
+
+Once FAIRY (or the owner) confirms the live run and the 16062 unit question, a real percentage becomes
+possible — gated on both. The #78 capability-table gate, when it lands, is where `job_tracking_status()`'s own
+docstring already says a controller-family check belongs.
+
+## t2647 (SMALL ITEM, separate commit) — the emit lint's indirect-addressing gap, partially closed
+
+t2645's own NEXT item, picked up same turn per the dispatch's own explicit ask: teach the emit-lint scanner
+the `wcsWriteIndirect` SHAPE (`web/wizards/dialects/ddcs-expert-m350.js`'s own `#[#70]=…`/`#[#70+N]=…`, and the
+dual-gantry `#[#151+N]=…`/`#[#74]=…` idiom) so corner/edge/middle's own WCS writes become VISIBLE instead of
+silent — NOT full resolution (the base variable's own value is computed by an earlier line this static
+scanner still cannot trace back through).
+
+Added `indirect-write-visible` to `TOKEN_RULES` (`emitLintRules.js`): `/#\[#\d+(?:\+\d+)?\]\s*=/`, 'warn'
+severity (an established, already-shipped idiom on 3+ ops — visibility, not a new hazard), Expert-only (the
+one dialect this idiom is confirmed on). Re-swept: `user_corner_data`, `user_edge_data`,
+`user_lathe_faceprobe`, `user_middle_data`, `user_lathe_odprobe`, and `user_wcs_data` now all surface their own
+indirect WCS writes as WARN hits — exactly the ops the t2645 header named as silently uncovered. Updated that
+same header's own KNOWN LIMITATION note to record this as PARTIALLY addressed (visibility, not resolution)
+rather than leaving the older, now-half-stale account in place.
+
+Non-vacuity: three new planted cases (`#[#70]=1`, `#[#70+15]=1`, `#[#151+3]=#883`) against their own literal
+equivalents — all pass. Full node tier re-run: 247 passed, 0 failed (unchanged count — this extends an
+existing test file, adds no new one). `git status` clean except this entry and `emitLintRules.js`/
+`emit-lint-2645.test.mjs`, confirmed below.

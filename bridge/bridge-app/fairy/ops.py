@@ -13,6 +13,7 @@ import datetime
 import json
 import os
 import re
+import struct
 
 from . import __version__, cncdisk, identity
 from .config import Config, ROLE_GATEWAY, effective_role, role_conflict
@@ -156,6 +157,49 @@ class Ops:
             "connected": bool(st.get("ok")),
             "error": st.get("error"),
             "raw": {k: v for k, v in latest.items() if k != "ts"},
+            "read_at": datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None,
+        }
+
+    def job_tracking_status(self):
+        """t2647 (BACKLOG #79) — the decoded half of the same PositionPoller position_status() leaves raw.
+        `state`/`line_number` are NOT the same evidentiary state as work_position/machine_position: their
+        byte order (float32 CDAB) is CONFIRMED on the owner's own machine (expert-m350/FINDINGS.md "RUN STATE
+        CONFIRMED" + "REGISTER 16062 IS THE LIVE EXECUTING LINE NUMBER", both 2026-09-05, against a real run)
+        — not the "second unverified guess" position_status()'s own docstring warns about for the position
+        registers, which remain unattested. So THIS method decodes, where position_status() deliberately does
+        not.
+
+        ⛔ M350-ONLY, and the gate here is the HONEST available one, not the real one: BACKLOG #79's own
+        capability table (#78) does not exist yet, so this returns exactly what the poller measures with no
+        controller-family check of its own — the actual gate lives in Studio (gatewayPanel.js's own
+        `requiresModbus`, keyed off the connected controller's family) and in practice nothing calls this at
+        all on a V4.1 setup, since V4.1 has no Modbus and so never configures --position-poll to begin with.
+        When #78 lands, this method is where an explicit family check belongs.
+
+        `running`: BACKLOG #79's own rule — ANY non-zero `state` counts as running, never idle (the vendor's
+        own tool treats it this way; only 0.0/1.0 have been observed, but an unknown value must not read as
+        idle). `line`: rounded to the nearest int — the confirmed values are exact integers (10.0, 0.0), but a
+        live poll is never assumed byte-perfect from a shared serial line. Never raises; {"enabled": False}
+        when no poller runs, and a per-field None when a value hasn't decoded successfully yet."""
+        from .master import decode_float32_cdab
+        if self.position_poller is None:
+            return {"enabled": False}
+        st = self.position_poller.status()
+        latest = self.position_poller.latest() or {}
+        ts = latest.get("ts")
+        running, line = None, None
+        if "state" in latest:
+            try: running = abs(decode_float32_cdab(latest["state"])) > 1e-6
+            except (ValueError, struct.error): running = None
+        if "line_number" in latest:
+            try: line = round(decode_float32_cdab(latest["line_number"]))
+            except (ValueError, struct.error): line = None
+        return {
+            "enabled": True,
+            "connected": bool(st.get("ok")),
+            "error": st.get("error"),
+            "running": running,
+            "line": line,
             "read_at": datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None,
         }
 

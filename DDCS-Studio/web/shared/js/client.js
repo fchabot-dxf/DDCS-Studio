@@ -56,6 +56,7 @@ export function makeClient(opts = {}) {
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
     getPosition: () => call("/api/position"),   // t2073 — {enabled, connected, error, raw, read_at}; an HONEST STUB (raw undecoded registers, no job-progress claim — see Ops.position_status)
+    getTracking: () => call("/api/tracking"),   // t2647 (BACKLOG #79) — {enabled, connected, error, running, line, read_at}; the SAME poller, DECODED (float32 CDAB, confirmed on the owner's own M350 — see Ops.job_tracking_status)
     // t2076 — BYO cloud (Drive backend). status is CSRF-guarded (it discloses the connection state); start
     // returns the consent URL and the gateway opens the SYSTEM browser (an embedded webview can't run Google's flow).
     googleStatus: () => call("/api/oauth/google/status", { headers: { "X-DDCS-Local": "1" } }),

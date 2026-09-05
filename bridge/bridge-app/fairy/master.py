@@ -34,14 +34,52 @@ sites. `count` is REGISTERS per block (each float32 axis value spans 2 registers
 truncating.
 """
 
+import struct
 import threading
 import time
 
 REGISTERS = {
     "work_position": {"addr": 7080, "count": 10, "note": "WORK coords X,Y,Z,A,B — 5 x float32 (2 regs each)"},
     "machine_position": {"addr": 7260, "count": 10, "note": "MACHINE coords X,Y,Z,A,B — 5 x float32"},
-    "state": {"addr": 10002, "count": 2, "note": "system state (IDLE/BUSY/RESET) — 32-bit int"},
+    # t2647 (BACKLOG #79) — note text updated to the newer, CONFIRMED meaning (was "IDLE/BUSY/RESET — 32-bit
+    # int", the t2063 placeholder before this was ever bench-proven). Address/count UNCHANGED — a caller
+    # (test_position_poller_2063.py) references REGISTERS["state"] directly by key, so the key name stays.
+    # CONFIRMED [expert-m350/FINDINGS.md "RUN STATE CONFIRMED", 2026-09-05, owner pressed Start on
+    # V21_dwell.nc]: 1.0 = a program is RUNNING (program-level — holds through a G04 dwell, NOT a motion
+    # flag), 0.0 = idle. Float32 CDAB (decode_float32_cdab below) — vendor source m350_liveg.py's own
+    # poll_m350_state_with_strict_crc, re-derived from register values (not the raw byte stream) here.
+    "state": {"addr": 10002, "count": 2, "note": "program running (1.0) vs idle (0.0), float32 CDAB — NOT a motion flag, holds through a dwell"},
+    # t2647 (BACKLOG #79) — the executing line number. CONFIRMED [FINDINGS.md "REGISTER 16062 IS THE LIVE
+    # EXECUTING LINE NUMBER", 2026-09-05]: float32 CDAB, 0.0 at idle, matches the file's own line number
+    # exactly (verified against V21_dwell.nc's G04 on line 10 -> read back 10.0). Macro mirror #2031.
+    # ⚠ UNTESTED: whether this counts physical file lines or executable blocks on a file with interleaved
+    # comments (FINDINGS.md, same section) — do not draw a percentage off it; show "line N" only (BACKLOG #79).
+    "line_number": {"addr": 16062, "count": 2, "note": "executing line number, float32 CDAB, 0.0 at idle (macro #2031)"},
 }
+
+
+def decode_float32_cdab(regs):
+    """Decode a 2-register Modbus read into the float32 value it represents, per the CDAB word-swap the
+    vendor's own m350_liveg.py uses (confirmed live, expert-m350/FINDINGS.md "RUN STATE IS EXPORTED"):
+    `struct.unpack('>f', bytes([res[5], res[6], res[3], res[4]]))` where res[3:5] are the FIRST register's own
+    big-endian bytes and res[5:7] the SECOND's. In terms of pymodbus's own parsed `regs` list (`regs[0]` =
+    first register, `regs[1]` = second, each already a 16-bit int) that is: pack regs[1] then regs[0], each
+    big-endian within itself, and interpret the resulting 4 bytes as a big-endian float32. Raises ValueError
+    on anything but exactly 2 registers — a caller passing the wrong register block is a bug to surface, not
+    a value to guess at."""
+    if len(regs) != 2:
+        raise ValueError(f"decode_float32_cdab needs exactly 2 registers, got {len(regs)}")
+    return struct.unpack(">f", struct.pack(">HH", regs[1], regs[0]))[0]
+
+
+def encode_float32_cdab(value):
+    """The exact inverse of decode_float32_cdab — packs a float into the 2-register [reg0, reg1] shape a
+    synthetic Modbus slave's datastore expects, so a test can plant a KNOWN value and assert the decoded
+    round-trip rather than asserting on raw register ints it would otherwise have to hand-compute."""
+    b = struct.pack(">f", value)   # big-endian float32 bytes: A B C D
+    reg1 = (b[0] << 8) | b[1]      # A B — the SECOND register (high half, CDAB's own word-swap)
+    reg0 = (b[2] << 8) | b[3]      # C D — the FIRST register (low half)
+    return [reg0, reg1]
 
 
 class ModbusMasterError(Exception):

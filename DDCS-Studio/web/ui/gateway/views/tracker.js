@@ -27,7 +27,8 @@ export default {
   mount(ctx) {
     this.wrap = el("section", { class: "block bigtrack" });
     this.posBlock = el("section", { class: "block bt-position", style: "display:none" });   // t2073 — hidden until enabled
-    ctx.root.append(this.wrap, this.posBlock);
+    this.jobTrackBlock = el("section", { class: "block bt-jobtrack", style: "display:none" });   // t2647 — hidden until enabled
+    ctx.root.append(this.wrap, this.jobTrackBlock, this.posBlock);
     this.onPoll(ctx);
   },
 
@@ -42,7 +43,38 @@ export default {
       .filter((i) => ["delivering", "running", "delivered", "stalled"].includes(i.state))
       .sort((a, b) => (a.jobId < b.jobId ? 1 : -1))[0];
     this.render(active);
-    this.renderPosition(ctx);   // t2073 — independent of job state (Poll-mode position isn't wired to job tracking)
+    this.renderPosition(ctx);      // t2073 — independent of job state (Poll-mode position isn't wired to job tracking)
+    this.renderJobTracking(ctx);   // t2647 (BACKLOG #79) — same poller, decoded: run state + executing line
+  },
+
+  // t2647 (BACKLOG #79) — the DECODED half of renderPosition's own raw stub: run state + executing line
+  // number, both float32 CDAB and CONFIRMED on the owner's own M350 (expert-m350/FINDINGS.md, 2026-09-05),
+  // unlike work_position/machine_position which stay raw because their byte order is still unattested. Silent
+  // (block stays hidden) for every gateway that hasn't enabled --position-poll, same convention as
+  // renderPosition — this must never appear as a broken feature for the majority who use beacons instead.
+  // ⛔ NO PERCENT — BACKLOG #79's own explicit constraint: whether register 16062 counts physical file lines
+  // or executable blocks is UNTESTED (a hardware question, FAIRY's to resolve, not ours) — showing "line N"
+  // sidesteps it entirely rather than drawing a percentage off an unconfirmed denominator.
+  // ⛔ M350-ONLY, via THIS VIEW'S OWN `requiresModbus` gate above — the real capability gate (BACKLOG #78's
+  // own table) does not exist yet, so this is the honest available substitute (profile/dialect-derived,
+  // gatewayPanel.js's own viewUnavailable()), named here so nobody mistakes it for the eventual real gate.
+  async renderJobTracking(ctx) {
+    let tr;
+    try { tr = await ctx.client.getTracking(); } catch { return; }   // gateway-unreachable already shown by render() above
+    if (!tr || !tr.enabled) { this.jobTrackBlock.style.display = "none"; return; }
+    this.jobTrackBlock.style.display = "";
+    if (!tr.connected) {
+      this.jobTrackBlock.replaceChildren(
+        el("div", { class: "section-label" }, "Live job tracking — Modbus poll (register 10002/16062)"),
+        el("div", { class: "muted" }, tr.error || "not connected"));
+      return;
+    }
+    this.jobTrackBlock.replaceChildren(
+      el("div", { class: "section-label" }, "Live job tracking — Modbus poll (register 10002/16062)"),
+      el("div", { class: "bt-stats" },
+        stat("state", tr.running ? "RUNNING" : "IDLE"),
+        stat("line", tr.line != null ? String(tr.line) : "—"),
+        stat("read at", tr.read_at || "—")));
   },
 
   // t2073 — AN HONEST STUB, not a job-progress feature. Poll-mode reads (t2059/2063) are bench-proven to

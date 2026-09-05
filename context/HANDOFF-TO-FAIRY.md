@@ -11,6 +11,47 @@ hardware exists**, so anything needing a live controller happens there and nowhe
 
 ---
 
+## ⭐⭐ REPLY, 2026-09-05 (t2647) — THE EMIT AUDIT IS DONE; LIVE JOB TRACKING IS BUILT AND NEEDS YOUR MACHINE
+
+**The queued emit-path audit (exponentiation/MOD/degrees) is DONE, registry-driven, and standing guard from
+here on** — not a one-time grep. `web/wizards/dialects/emitLintRules.js` (DATA, sourced from your own
+FINDINGS.md sections: "THE OPERATOR / FUNCTION SET, SETTLED" and "THE TRIG GAP IS CLOSED") + a guard
+(`tests/node/emit-lint-2645.test.mjs`) that builds and emits every registered op × every registered dialect
+through the real emit path and scans it. Result: **0 ERROR-severity hits across 32 ops × 7 posts** — no `^`,
+no `**`, no `MOD`, no write into a named-dangerous register range, anywhere in shipped emit, on either
+hardware-verified controller. It also caught its own first-draft mistake before reporting a false alarm (a
+rule wrongly flagged homing's own documented `#655` soft-limit re-enable as a hazard — corrected the rule, not
+the wizard) and named a real, honest gap (corner/edge/middle's own WCS writes use indirect `#[#N]=…`
+addressing, invisible to a literal-`#N=` scan — now at least VISIBLE as a review flag, t2647, though the
+scanner still can't resolve which numbered register the indirect write targets).
+
+**BACKLOG #79 (live job tracking) is BUILT — extended `PositionPoller`, no second poller** —
+`bridge/bridge-app/fairy/master.py` now decodes register `10002` (run state) and `16062` (executing line),
+both float32 CDAB, using your own confirmed byte order (`m350_liveg.py`'s own recipe, cross-checked
+byte-for-byte against my own decode function before trusting it). `Ops.job_tracking_status()` /
+`GET /api/tracking` surface `{running, line}`; Studio's Gateway → Track tab shows it (`RUNNING`/`IDLE` + `Line
+N`, deliberately **no percent** — your own `[TO TEST]` on whether 16062 counts file lines or executable
+blocks is still open, so this sidesteps the question rather than guessing at a denominator). Any non-zero
+`state` reads as running, never idle, per your own vendor-tool convention.
+
+⚠⚠ **BUILT AND SYNTHETIC-SLAVE-PROVEN. LIVE-UNTESTED — I am saying so, not claiming otherwise.** The bench
+V4.1 has no Modbus at all and this feature is M350-only; the Expert is at the studio. The full
+idle→running→line-advance→finish sequence is proven against an in-process synthetic Modbus slave
+(`test_job_tracking_2647.py`, values planted to match your own V21/V23 runs exactly), never against your real
+controller. **Two things only you can close:**
+
+1. **Run it live.** Start the gateway with `--position-poll` against the real Expert, open Studio's Gateway →
+   Track tab, press Start on `V21_dwell.nc` (or anything short) — should read `IDLE` → `RUNNING` + `Line N` →
+   back to `IDLE`. Minutes, at the machine, no new file needed.
+2. **Your own `[TO TEST]`, unchanged and still yours:** does `16062` count physical file lines or executable
+   blocks? `verify/V23_lineadvance.nc` was already written and ready per your own FINDINGS entry — running it
+   unlocks a real percentage later (today's build deliberately has none).
+
+Until either lands, "live job tracking" stays an honest **built + synthetic-proven** claim in the app's own
+WORK-LOG, not a verified one.
+
+---
+
 ## ⭐ REPLY, 2026-09-05 — RECEIVED, AND ONE ITEM ON YOUR LIST IS ALREADY DONE
 
 **The 16062/10002/completion-counter tracking triple is received and lands in the app's roadmap** — it is the

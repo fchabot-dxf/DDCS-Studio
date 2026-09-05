@@ -52,10 +52,14 @@ def test_read_an_unknown_register_key_refuses_loudly():
     m = ModbusMaster("COM_UNUSED", 115200, 1)
     m._client = object()   # anything non-None — the unknown-key check must fire BEFORE any client call
     try:
-        m.read("line_number")   # doesn't exist — t2046/t2055 both confirmed no such register is documented
+        # t2647 — "line_number" WAS this test's own stand-in for "doesn't exist" (t2046/t2055: no such
+        # register was documented at the time), but BACKLOG #79 confirmed and declared it (register 16062,
+        # master.py's own REGISTERS) — so it is a real key now and would no longer prove this test's own
+        # point. A key that will never be real (a typo shape no register map would ever declare) instead.
+        m.read("totally_unregistered_key_xyz")
         assert False, "must raise, never return silently"
     except ModbusMasterError as e:
-        assert "unknown register key" in str(e) and "line_number" in str(e)
+        assert "unknown register key" in str(e) and "totally_unregistered_key_xyz" in str(e)
 
 
 def test_close_before_connect_is_a_harmless_noop():
