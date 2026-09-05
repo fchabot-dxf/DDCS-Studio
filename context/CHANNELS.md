@@ -79,3 +79,21 @@ are there users whose reports carry extra weight — e.g. a V4.1 or V3 owner?
 
 ⭐ That last one matters: **V4.1 + V3 users outnumber Expert users**, so a report from one is an escalation —
 and it is now reproducible at the dev seat's own bench V4.1 rather than needing the studio.
+
+## ⭐⭐ THE VENDOR DEVELOPS IN THE OPEN ON GITHUB — CHECK IT FIRST `[found 2026-09-05]`
+
+⛔ **`ddcnc.com` is NOT the channel to watch.** Its newest published DDCS-Expert firmware is **2025-06-19**,
+older than the build on the Expert. The live channel is:
+
+| repo | what | last seen |
+|---|---|---|
+| ⭐ **github.com/foinnc/M350** | firmware + a `Docs/` tree of ~40 folders | updated 2026-09-02 |
+| **github.com/foinnc/M350-LiveG** | the official PC tool — reference impl for register `3000` | updated 2026-09-02 |
+| github.com/foinnc/M3X-M350-IoT-Bridge | the M3X IoT box | 2026-08-21 |
+
+⭐ **A question this project logged as "only the vendor can answer" was answered there without us noticing:**
+the official slave register map (`M3xx_Modbus_Address_Map_V1_0.xlsx`, committed 2026-09-02). Cached at
+`bridge/controllers/expert-m350/assets/vendor-spec/`. It refuted three findings on arrival.
+
+⇒ **Watch these repos.** Anything cached in this repo is a snapshot; check the upstream commit date before
+trusting a Modbus fact. ⚠ `ddcnc.com`'s TLS cert is expired — fetchers refuse it, `curl -k` works.
