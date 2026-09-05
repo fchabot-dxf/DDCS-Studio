@@ -29,8 +29,8 @@ import sys
 import time
 
 REG_INJECT = 3000
-SCRATCH = 915
-REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7330
+SCRATCH = 916   # NOT 915 -- #915 refuses writes, cause unknown (FINDINGS 2026-09-05)
+REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7332
 SENTINEL = -77777.0
 
 
@@ -76,26 +76,50 @@ def inject(s, text, settle=0.9):
 
 
 class Latched(Exception):
-    """The controller is in an error state and is dropping injected lines."""
+    """The controller will not accept a line even after retries."""
+
+
+def set_var(s, var, value, tries=4):
+    """Write a NUMERIC value and CONFIRM it landed, retrying. Returns True if confirmed.
+
+    ⭐ SINGLE INJECTIONS ARE DROPPED INTERMITTENTLY. Measured 2026-09-05: nine numeric writes in a row,
+    the 1st and the 9th silently vanished, the middle seven landed, with the pendant green and READY
+    throughout. There is no error and no NAK -- the FC16 write is ACKed and the line is simply gone.
+    ⇒ Never trust an un-verified injection. This is the single most expensive fact learned that night:
+    every wrong finding traced back to reading a stale value left by a dropped line.
+    """
+    reg = 6500 + 2 * (var - 500)
+    for _ in range(tries):
+        inject(s, "#%d = %s" % (var, value))
+        time.sleep(0.5)
+        v = read_f32(s, reg)
+        if v is not None and abs(v - float(value)) < 0.01:
+            return True
+    return False
 
 
 def probe(s, expr):
-    """Evaluate one expression. Raises Latched if the channel is not accepting lines.
+    """Evaluate one expression. Raises Latched if a plain numeric write will not stick.
 
-    ⭐ The sentinel is written AND READ BACK. If it did not land, nothing after it can be trusted,
-    so this raises rather than returning a number.
+    The sentinel is written AND CONFIRMED, with retries. Only then is the expression injected, so a
+    surviving sentinel afterwards means the EXPRESSION did not assign -- not that the channel is down.
     """
-    inject(s, "#%d = %s" % (SCRATCH, SENTINEL))
-    time.sleep(0.5)
-    back = read_f32(s, REG_READ)
-    if back is None or abs(back - SENTINEL) > 0.5:
-        raise Latched("sentinel did not land (read %s, wanted %s) -- register %d is being dropped"
-                      % (back, SENTINEL, REG_INJECT))
+    if not set_var(s, SCRATCH, SENTINEL):
+        raise Latched("a plain numeric write to #%d would not stick after retries" % SCRATCH)
     inject(s, "#%d = %s" % (SCRATCH, expr))
     time.sleep(0.9)
     v = read_f32(s, REG_READ)
     if v is not None and abs(v - SENTINEL) < 0.5:
-        return None          # sentinel survived => the expression itself was rejected
+        # The sentinel survived, so the expression did not assign. TWO very different causes:
+        #   (a) a harmless no-op, and the channel is still fine, or
+        #   (b) IT RAISED A SYNTAX ERROR AND LATCHED, so every later line is silently dropped.
+        # ⛔ Telling them apart is not optional. Measured 2026-09-05: `[7 MOD 3]` errored and latched,
+        # and the batch cheerfully reported "no assignment" for the NEXT expression too -- which had
+        # never executed at all. A canary write settles it.
+        if not set_var(s, SCRATCH, 4242.0, tries=2):
+            raise Latched("%r raised a syntax error and LATCHED the channel "
+                          "(canary write refused afterwards)" % expr)
+        return None
     return v
 
 
@@ -119,7 +143,7 @@ def main():
                 print("   !! Press Reset AT THE PENDANT. It cannot be cleared over Modbus.")
                 print("   !! " + "=" * 66)
                 return 1
-            print("   %-18s -> %s" % (e, "REJECTED (syntax error, not latched yet)"
+            print("   %-18s -> %s" % (e, "NO ASSIGNMENT (silent -- check the pendant)"
                                       if v is None else v))
         inject(s, "#%d = 0" % SCRATCH)
     finally:

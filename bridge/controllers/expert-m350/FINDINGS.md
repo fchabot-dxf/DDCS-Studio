@@ -2263,38 +2263,89 @@ Re-tested on a scratch variable that was actually accepting writes, sentinel ver
 The original `0.0` was a **stale value left by the `[1 EQ 2]` line before it**, not a measurement. This
 closes the `NE` half of the V13 "`NE`/`LT`/`GT` untested" note.
 
-### ⚠ `[3*3]` IS A SYNTAX ERROR — spacing or `*` `[MEASURED 2026-09-05, cause unknown]`
-Reproduced twice in one run as a deliberate control. `[1 NE 2]` (spaces around the operator) parses; `[3*3]`
-(no spaces) does not. ⇒ **either `*` is not valid in this position, or the parser requires whitespace around
-operators.** Untested: `[3 * 3]`. Worth settling before assuming any tight-packed arithmetic emits safely.
+### ⛔⛔ WHY SOME INJECTED WRITES "DON'T TAKE" — **AN EARLIER LINE ERRORED AND LATCHED THE CHANNEL** `[CONFIRMED on machine 2026-09-05, photographed]`
+Owner's question, and the right one: *"There must be a reason why some writes aren't effective. We need to
+find why."* There is, and it is now proven with the camera:
 
-### ⛔⛔ RETRACTED — "AN ERROR LATCHES THE CHANNEL" IS FALSE `[REFUTED 2026-09-05, same night]`
-**This section previously claimed a syntax error makes register 3000 stop accepting anything. It does not.**
-Directly disproven twice:
-- `#916` and `#917` accepted writes at the very moment `#915` was refusing them (`1234.0` and `4321.0` both
-  landed and read back) — so the channel was fully alive the whole time.
-- After the deliberate `[3*3]` syntax error, **the very next expression `[1 NE 2]` evaluated correctly.**
-  A syntax error does not block the line after it.
+1. A line with a genuine syntax error **latches** the controller (`ERROR`, red strip, top-left `MPG`→`MDI`).
+2. **While latched, EVERY subsequent injection is silently dropped** — the FC16 write is still ACKed at the
+   wire level, and the line is discarded. No error, no NAK, nothing observable from the PC.
+3. A read-back then returns the variable's **previous** value, which looks exactly like a real answer.
+4. Only **Reset at the pendant** clears it.
 
-⭐ **WHAT IS ACTUALLY TRUE: `#915` ALONE FROZE.** It stuck at `1.0` — the value `TAN[45]` legitimately left
-there — and rejected every subsequent write (`555.0` dropped while `#916` took `1234.0` in the same run).
-**Cause unknown.** `Reset` at the pendant did not free it. ⚠ **The "universal variable reader" documented
-elsewhere in this file uses `#915` as its scratch slot — that tool is compromised until this is understood.
-Use `#916` (reg `7332`) meanwhile.**
+⇒ **"Some writes aren't effective" is almost always "an earlier line in the same batch errored."**
+**Photographed twice:** `syntax error!:L1[#916 = ATAN[45]]` and `syntax error!:L1[#916 = [7 MOD 3]]`. In the
+second case a batch reported "no assignment" for the *following* expression too — which had never executed
+at all — and then six further numeric writes vanished for the same reason.
 
-⭐ **THE LESSON SURVIVES THE RETRACTION, AND IS THE REAL FINDING:** a read-back from a frozen target returns
-the previous value, which looks exactly like a plausible answer. Nine expressions in a row read `1.0`,
-including `[3*3]`, which is not 9. **THE SENTINEL MUST BE WRITTEN *AND READ BACK*.** The old guard assumed a
-read-back differing from the sentinel meant "evaluated"; when the target is frozen the sentinel is dropped
-too, so the stale value never matches and every reading passes. `tools/macro_probe.py` reads the sentinel
-back and halts. ⛔ **It was the OWNER GLANCING AT THE PENDANT that caught this, not any check of mine.**
+⭐ **`MOD` IS A SYNTAX ERROR ON THIS CONTROLLER.** Do not emit it. `[CONFIRMED, photographed]`
+⚠ `**` (power) is **still untested** — it was queued behind `MOD` and never ran `[TO TEST]`.
 
-### ⛔ THE UNDERLYING GAP: THE PC CANNOT SEE THE ERROR STATE `[OPEN — the blocker]`
-Owner, 2026-09-05: *"problem is you cant see if an error is blocking."* That is the root cause of every
-mistake in this whole entry. A **differential sweep of registers 6500–10600 (macro `#500`–`#2550`), taken
-before and after a deliberate syntax error, showed ZERO changed registers** — the error is not exposed
-anywhere in the macro-variable mirror. ⇒ Until an error/alarm indicator is found, **every injected-expression
-result is provisional**, and the sentinel read-back is the only defence.
+### ⛔ RETRACTED — "WHITESPACE AROUND OPERATORS IS REQUIRED" IS FALSE `[REFUTED 2026-09-05, same session]`
+An earlier entry here claimed `[3*3]` was a silent no-op while `[3 * 3]` worked, and generalised it into an
+emit hazard. **Wrong.** Re-run with a *retrying* sentinel: `[9-3]`→**6**, `[9/3]`→**3**, `[2*3]`→**6**. Tight
+packing is fine. ⚠ The original evidence was a clean alternating pass/fail pattern, and I argued explicitly
+that it was "content-dependent, not noise, because the sentinel was verified each time" — but the sentinel
+was verified with a **single unverified write**, which is the exact thing that is unreliable. ⇒ *A control is
+worthless if it is measured by the instrument under suspicion.*
+
+### ⚠ INJECTED WRITES ARE ALSO DROPPED INTERMITTENTLY, WITH NO ERROR AT ALL `[MEASURED 2026-09-05, cause unresolved]`
+Separate from the latch, and it is the reason the latch went undiagnosed so long. Nine numeric writes in a
+row to `#916`, pendant green and `READY` throughout: **the 1st and the 9th silently vanished, the middle
+seven landed.** Value range is not the cause — `-77777` and `99999` both land, so the "±9999" range note
+elsewhere in this file does not apply here.
+
+⇒ **NEVER TRUST AN UNVERIFIED INJECTION.** `tools/macro_probe.py` now writes-reads-retries every numeric
+write (`set_var`), and after any "no assignment" it fires a **canary write** to prove the channel is still
+alive — without that, one bad expression turns every later result in the batch into a stale-value fiction.
+⚠ Root cause of the intermittent drop is **still unknown**; a register-3000 handshake (the buffer reads back
+all-zero when idle, so the controller appears to clear it after consuming) was hypothesised but could not be
+tested — the controller was latched at the time and the buffer never went busy `[TO TEST]`.
+
+### ⛔ AN ERROR *DOES* BLOCK FURTHER INJECTION — claimed, wrongly retracted, then PROVEN `[CONFIRMED on machine 2026-09-05]`
+**Proof:** with `syntax error!:L1[#916 = ATAN[45]]` visibly on the pendant, `#917 = 3141` was injected and
+**dropped** — `#917` stayed at `4321`. The FC16 write is still ACKed at the wire level; the line is discarded.
+
+⚠ **This entry was retracted earlier the same night and the retraction was WRONG.** The "disproof" was that
+an expression injected right after `[3*3]` worked — but `[3*3]` **never raised an error** (above), so nothing
+was ever being tested. ⇒ *A refutation is only as good as the trigger it assumes fired.*
+
+⭐ Consequence: **a read-back after a blocked injection returns the previous value**, which looks exactly like
+a plausible answer. This produced nine consecutive false readings of `1.0` in the trig run. **THE SENTINEL
+MUST BE WRITTEN AND READ BACK** — a dead channel drops the sentinel too, so "read-back differs from sentinel"
+passes every time. `tools/macro_probe.py` does this and halts.
+
+**Clearing:** the owner must press **Reset** `[CONFIRMED — owner, 2026-09-05: "Errors don't resolve on their
+own. I need to press reset."]`. `#2037 = 65863` cannot do it, since that press uses the blocked channel.
+
+### ⚠ SEPARATELY, `#915` REFUSES WRITES EVEN WITH NO ERROR ON SCREEN `[MEASURED 2026-09-05, cause unknown]`
+With the pendant clear, `#916 = 1234` and `#917 = 4321` both landed while `#915 = 555` was dropped and `#915`
+stayed at `1.0`. So this is **not** the latch — it is specific to `#915`. ⛔ **The "universal variable reader"
+documented elsewhere in this file uses `#915` as its scratch slot; it is compromised until this is
+understood. Use `#916` (reg `7332`).**
+
+### ⭐⭐ THE ERROR STATE IS VISIBLE ONLY ON THE SCREEN — AND A USB CAMERA READS IT `[CONFIRMED on machine 2026-09-05]`
+Owner: *"problem is you cant see if an error is blocking"* — the root cause of every wrong call that night.
+
+- ⛔ **It is NOT in the registers.** A differential sweep of `6500`–`10600` (macro `#500`–`#2550`), taken
+  before and after a deliberate syntax error, showed **ZERO changed registers.**
+- ⭐ **It IS on the pendant, in two places:** the **second cell of the top bar** (`READY` → solid **red**),
+  and the **bottom status strip** (green → **red, carrying the message text** `syntax error!:L1[<the exact
+  line>]`). The strip quotes the offending line verbatim, so it identifies *which* injection failed.
+- ⭐⭐ **A USB camera aimed at the pendant closes the loop.** `camera-vision` skill, **index 1 (`HD Camera`)**
+  — index 0 (`USB HD Webcam`) faces the operator, index 2 is `World Facing`:
+  `python <fred-skills>/camera-vision/capture.py --out <scratch>/pendant.jpg --index 1 --open`
+  ⇒ **The PC can now confirm an injected line succeeded without asking the operator.** Verified end-to-end:
+  injected a known-bad line, read `syntax error!` off the photograph unaided.
+  ⚠ Aim it at the **bottom strip** — everything else on that screen is already readable over Modbus.
+  ⚠ The per-seat skills folder did not exist on CNC-FAIRY, so `camera-vision` could not auto-load; it was
+  reached via its canonical `Apps/fred-skills` path. Needs the per-skill symlink (see the skill's own header).
+
+### ⚠ THE POSITION REGISTER LABELS ARE WRONG — `7080` AND `7260` ARE THE SAME AXIS `[CONFIRMED on machine 2026-09-05, camera cross-check]`
+The pendant read `Mach X 5.000` / `Abs X −45.130` while `reg 7260` read `5.0` and `reg 7080` read `−45.130`.
+⇒ **`7080` = WORK (Abs) X and `7260` = MACHINE (Mach) X — both X, not "X and Y"** as labelled elsewhere here.
+`10002` read `0.0` against Abs Z `101.142`, so it is **not** Z either. ⛔ Re-derive the whole position map
+before trusting it; the camera makes this cheap now, since the screen shows the true values next to the reads.
 
 ### The ATAN forms in that run measured NOTHING — §V13 already had the answer
 `ATAN` takes **two operands in the comma form** (§V13, `[CONFIRMED 2026-08-08]`). So `ATAN[1]` and `ATAN[45]`
