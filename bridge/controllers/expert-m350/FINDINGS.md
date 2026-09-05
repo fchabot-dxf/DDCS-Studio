@@ -1821,6 +1821,336 @@ profile — RENDERRANCHY's call, flagged not built]`
 ⭐ Note Studio does not emit `G43` today: the only occurrence in `web/` is inside the V4.1's *extracted vendor*
 macro, never in an emit path.
 
+### 26. ⭐⭐⭐ MODBUS POSITION POLLING WORKS — the reboot was the whole fix `[CONFIRMED 2026-08-26]`
+**Captured immediately before flashing firmware `2026-09-02-00`, whose only release note is
+*"Expanded Modbus register address mapping."*** ⇒ if the addresses move, this is the before-state.
+
+**Baseline: firmware `2026-04-10-00`, `#279 = 2` (Slave), COM6 @ 115200 8N1, slave id 1, read-only FC03.**
+
+```
+7080   work position    01031ba8000a42c9  ->  01 03 14 851f c234 2d0e 4425 b021 42c7 3c6a 4425 0000 0000
+7260   machine position 01031c5c000a024f  ->  01 03 14 0000 40a0 0000 c0a0 0000 c0a0 0000 c0a0 0000 0000
+10002  state            0103271200026eba  ->  01 03 04 0000 0000
+```
+
+**Decoded — and it matches the pendant on every axis:**
+```
+              X          Y          Z          A        B
+7080 work   -45.1300   660.7040    99.8440   660.9440   0.0000    == the pendant's "Abs"
+7260 mach     5.0000    -5.0000    -5.0000    -5.0000   0.0000    == the pendant's "Mach"
+10002 state       0
+```
+
+⭐ **ENCODING: word-swapped float32 — LOW WORD FIRST.** `0000 40a0` → `0x40a00000` → `5.0`. Two registers
+per axis, five axes per block. ⛔ Not plain big-endian; a straight `>f` over the payload gives garbage.
+
+⇒ **Three things settled at once:**
+1. ⭐ **The reboot was the entire fix.** `#279` was set but serial parameters only apply at startup, and the
+   machine had not restarted since. Every earlier probe answered a single `0x00` byte — *"no slave answering"*,
+   exactly as diagnosed, and NOT a wrong register map.
+2. ⭐ **The register map is CORRECT.** `7080` / `7260` / `10002` were second-hand from
+   foinnc/M3X-M350-IoT-Bridge and carried as `[unattested]` for months. They are right.
+   ⛔ Strike every note calling them suspect.
+3. ⭐ `master.py`'s `ModbusMaster` needs no address change — only the word-swap decode, which it does not do
+   yet (it returns raw registers by design).
+
+⚠ **A live-slave caveat worth keeping:** the first bytes of each reply are line noise (`010000…`, `000000f2…`)
+before the real `01 03 <len>` frame. A parser must **find the frame**, not assume it starts at byte 0 —
+pymodbus reported *"Incomplete message received"* on exactly this.
+
+⛔ **AFTER THE FLASH, RE-RUN THIS FIRST.** The new firmware expands the register mapping, so these three
+addresses are the first thing to re-verify — before anything is built on them.
+
+### 27. ⛔⛔ SYSTEM MACROS CANNOT BE EDITED OVER SMB — the controller restores its own at boot `[CONFIRMED 2026-08-26]`
+Four files were written to SYSDISK over SMB and **read back byte-correct**. After the next power-cycle:
+
+```
+sysstart.nc   661B -> 6B   (factory stub)        ⛔ reverted
+fndzero.nc    375B -> 59B                        ⛔ reverted
+fndY.nc       288B -> 15B                        ⛔ reverted
+slib-g.nc     patched (4 edits) -> factory       ⛔ reverted
+SETPROBE.nc   455B -> 455B                       ✅ SURVIVED
+```
+
+⭐ **The rule is exact: a file whose name is in the FLASH PAYLOAD is restored at boot. A new file is not.**
+`SETPROBE.nc` is not a firmware file, so nothing existed to put back. ⇒ **Any system macro shipped by the
+firmware is effectively read-only over the network**, no matter what a write reports.
+
+⚠ **A successful write and a correct read-back prove NOTHING here.** Both happened, and both were undone by
+the reboot. ⛔ Verify persistence across a power-cycle, not at write time.
+
+⇒ **This invalidated the documented restore procedure** in `RESTORE-CUSTOM-MACROS/README.md`, which said to
+copy the files onto SYSDISK after a flash. It cannot work. The README now carries the corrected route.
+
+### ⭐ THE ROUTE THAT WORKS — put the customisations IN the flash payload
+Patch `install/slib-g.nc` **on the USB stick** and drop the custom `sysstart.nc` / `fndzero.nc` / `fndY.nc` /
+`SETPROBE.nc` in beside it, then flash. The controller's own copy then IS the patched one, so there is
+nothing for it to revert to. `[CONFIRMED — owner, 2026-08-26: "Works perfectly."]`
+
+⚠ Two traps found while doing it:
+* `patch-slib-g.py` leaves a **`slib-g.nc.prepatch`** next to its target — ⛔ delete it before flashing, it
+  must not ship inside the payload.
+* The release ships a bare **`setting`** as a separate asset. ⛔ It must never go in `install/`; the OEM
+  read-me states that restores factory parameters, wiping axes, envelope, tool table and probe config.
+
+⭐ **What this cost, and the tell:** a flash reverts `slib-g.nc`, which re-arms the factory tool-setter bug —
+the rapid `G53 Z#637` descent **through** the setter before any `G31` runs. It also reverts `fndzero.nc` /
+`fndY.nc`, so homing stops syncing A to Y and **racks the gantry** (observed: A `−5.178` vs Y `−5.000`).
+⇒ ⛔ **After ANY flash, assume every system macro is factory until verified** — and verify by content, not by
+file size or a hash against a stale capture.
+
+### 28. ⭐⭐⭐ THE WHOLE PARAMETER TABLE IS READABLE OVER MODBUS — one formula `[CONFIRMED 2026-08-26]`
+*(Firmware `2026-09-02-00`, read-only FC03, slave 1, COM6 @ 115200 8N1.)*
+
+```
+Modbus register = 6500 + 2 × (setting index)        word-swapped float32, LOW WORD FIRST
+```
+
+**Verified on 21 parameters, 21/21 exact**, spread across the whole table and checked against
+`SYSDISK/setting` decoded independently:
+
+| param | reg | value | | param | reg | value |
+|---|---|---|---|---|---|---|
+| `#64` Maximum speed | 6628 | 12000 | | `#166` X positive soft limit | 6832 | 756 |
+| `#82` Max spindle speed | 6664 | 24000 | | `#279` Modbus RTU | 7058 | 2 |
+| `#122-124` home positions | 6744-48 | 5 / −5 / −5 | | `#295` Feed rate max | 7090 | 300 |
+| `#131/132` probe count/speed | 6762/64 | 2 / 800 | | `#305` **G54 X** | 7110 | 50.130 |
+| `#135-137` fixed probe XYZ | 6770-74 | 682 / −775 / −3 | | `#400` H01 tool length | 7300 | 0 |
+| `#155` soft limits enabled | 6810 | 1 | | `#930` **T01 Z offset** | 8360 | −68.336 |
+
+⭐⭐ **THIS CLOSES THE ADDRESS CHAIN.** Every representation of a controller value is now one index:
+```
+macro #N   ↔   setting[N−500]   ↔   eng entry #(N−500)   ↔   Modbus reg 6500 + 2×(N−500)
+```
+⇒ The `7080` / `7260` / `10002` position registers were never special — `7080 = 6500 + 2×290` and
+`7260 = 6500 + 2×380`. They are **the same flat space**, and `7100` is `setting[300]`, the WCS table's
+row 0, which reads `47.650` over Modbus exactly as it does in the file.
+
+⇒ ⭐ **The bridge can read the entire machine state live over serial** — WCS table, tool table, soft limits,
+probe config, positions — with **no SMB, no file, no staleness question**. That is a materially better
+instrument than the file for anything the app pulls.
+
+⚠ **NOT yet established:** whether the position slots TRACK during motion or only reflect the last flush.
+The machine was stationary, and the file happened to agree with Modbus on every slot, so the two cannot be
+separated from this session. ⇒ **One jog while polling settles it** — a bench item, human present.
+
+### The flash did NOT move anything `[CONFIRMED]`
+`2026-09-02-00`'s only release note is *"Expanded Modbus register address mapping."* Re-probed after the
+flash: `7080` / `7260` / `10002` return **identical values** to the pre-flash baseline (§26). ⇒ the release
+**ADDED** reach, it did not relocate what existed. ⛔ Do not treat a Modbus firmware note as a reason to
+re-derive addresses without measuring first.
+
+⚠ **A discovery trap worth keeping:** the slave answers **every** address, returning zeros for unmapped
+ones — no exception frames. So "does it answer?" maps nothing; only **non-zero content** does. The populated
+region is roughly `6600`–`9101`.
+
+### 29. ⭐⭐⭐ THE POSITION REGISTERS TRACK LIVE DURING MOTION `[CONFIRMED 2026-08-26]`
+The open question from §28, settled by one continuous jog while polling `7260` (machine X/Y/Z):
+
+```
+t= 0.56s   X= 11.714   Y= -269.850
+t= 2.23s   X= 11.714   Y= -287.328     <- mid-move
+t= 8.31s   X= 11.714   Y= -359.446     <- mid-move
+t=17.68s   X= 11.714   Y= -478.944     <- mid-move
+t=18.24s   X= 15.134   Y= -480.962     <- Y stops, X starts
+t=20.45s   X= 38.778   Y= -480.962
+```
+**35 distinct positions in 20 s**, sweeping smoothly across a 211 mm Y move and then an X move.
+⇒ ⛔ **Not a flush and not a stop-value — the register follows the axis continuously.** `[CONFIRMED]`
+
+⭐⭐ **THIS IS THE PROGRESS SOURCE THE PROJECT HAS BEEN APPROXIMATING.** Live machine position, read over
+serial, with **no instrumentation of the G-code at all** — no beacons, no `MSETDATA` checkpoints, no
+`checkpoint_insert.py` pass, nothing added to the emitted program. ⇒ The beacon architecture exists to answer
+"how far along is this job", and this answers it directly and continuously.
+⚠ It gives POSITION, not a line number. Turning position into progress still needs the cursor design
+(`JOB-PROGRESS-PLAN.md`) — but the input to that cursor now exists and is free.
+
+**Sample rate: 1.9 Hz as measured — and that is MY loop, not the link.** The poll used a fixed 45 ms sleep
+plus a 0.5 s read timeout. A ~30-byte FC03 round trip at 115200 8N1 is well under 10 ms, so the ceiling is far
+higher; treat 1.9 Hz as a floor to tune, not a property of the controller.
+
+⚠ **Read-only throughout** — plain FC03, never `MGETDATA`. The machine was jogged by the owner, by hand, at
+the pendant; nothing here commanded motion.
+
+### 30. ⭐⭐⭐ G-CODE INJECTION OVER MODBUS WORKS — the PC can make the controller execute a line `[CONFIRMED 2026-08-26]`
+The `2026-08-03-00` feature, proven on `2026-09-02-00`. `#1505=-5000(MODBUS OK)` was written over serial and
+**`[0000]:MODBUS OK` appeared on the pendant.** ⇒ the controller **parses and EXECUTES** what is injected — it
+is not a buffer someone else has to read.
+
+**THE PROTOCOL, all of it:**
+```
+function   FC16 (write multiple registers)
+register   3000
+payload    ASCII G-code, one line, trailing \n, ≤ 246 bytes (firmware's own limit)
+packing    ⭐ LITTLE-ENDIAN WITHIN EACH REGISTER — FIRST character in the LOW byte
+buffer     drains after the controller consumes it (FC03 readback returns zeros)
+```
+
+⭐⭐ **THE BYTE ORDER IS THE WHOLE PROTOCOL, and the controller told us it.** Packed big-endian first, the
+pendant answered:
+```
+sent:      # 1 5 0 5 = - 5 0 0 0 ( M O D B U S   O K )
+error:     1 # 0 5 = 5 5 - 0 0 ( 0 O M B D S U O   ) K      <- every byte pair reversed
+```
+⇒ ⭐ **A syntax error that echoes your payload back is a gift** — it named the defect exactly. Same
+convention as the word-swapped float32s (§28): **this controller is little-endian throughout.**
+
+### ⛔⛔ WHAT THIS CHANGES, AND THE LINE IT CROSSES
+This is the **first capability in this project that lets the PC command the machine.** Everything before it
+was read-only by construction. It answers the ROADMAP's standing open experiment — *"remote start without the
+panel — this is the gate for hands-free delivery→run"* — and it does so with **no G-code instrumentation and
+no macro on the controller**.
+
+⛔ **The standing rule still holds: delivery is automatic, RUNNING is operator-pressed.** A channel that can
+send `#1505` can send `G1 Z-50 F1000`. Nothing about this finding relaxes that rule; it makes it load-bearing.
+
+⇒ ⭐ **The guard lives in code, not in intent:**
+`controllers/expert-m350/tools/modbus_inject.py` **refuses in code** any payload containing a G or M code, an
+axis letter followed by a value, a feed/spindle word, or a tool change — checked before the port is opened,
+and unit-tested against `G0 X10`, `G1 Z-5 F100`, `M3 S12000`, `X10.5`, `M30`, `T2`. ⛔ Removing that guard is
+a deliberate act requiring the owner's ruling, not a convenience while debugging.
+
+⚠ **Untested and deliberately so:** whether an injected line can START a loaded program, and what happens if
+one is injected while a program is running. Both need the owner present and a reason.
+
+### 31. ⭐⭐⭐ A UNIVERSAL VARIABLE READER — injection + a scratch register reaches ANY variable `[CONFIRMED 2026-08-26]`
+Modbus maps `setting` indices 0..~1300 (§28) and nothing above. Injection (§30) closes the gap:
+
+```
+1. inject   #915 = #<target>          (#915 = H16 tool length offset -- unused, 0, range +/-9999)
+2. read     register 7330             (= 6500 + 2*415, the same slot over Modbus)
+3. inject   #915 = 0                  (restore)
+```
+**Proven on six variables the register map cannot reach:**
+
+| variable | | value |
+|---|---|---|
+| `#2500` | tool-setter calibration reference | **−0.4612** |
+| `#1927` | last probe touch Z | −5.000 |
+| `#1300` | current tool number | 1 |
+| `#578` | active coordinate system | 1 (G54) — matches `setting[78]` ✓ |
+| `#792` | live workpiece Z | 99.844 — matches the DRO ✓ |
+
+⇒ ⭐ **Every variable on the controller is now readable from the PC over one serial cable** — persistent
+vars, probe results, live state, anything the macro language can name. Combined with §28 (the parameter
+table) and §29 (live positions), the controller has no interior left that the bridge cannot see.
+
+⚠ **Choose the scratch slot carefully.** `#915` works because H16 is unused here, holds 0, and has a
+±9999.999 range — a narrow-range parameter would silently clamp or reject the value. ⛔ Restore it; leaving a
+value in an H slot is exactly the latent hazard §17/§22 chased.
+
+### ⭐ AND IT ANSWERS THE CALIBRATION QUESTION: `#2500` SURVIVED
+`#2500 = −0.4612`, not zero — so the flash did not lose it, and the patched `slib-g` O502 will write
+`#1430 = touch − #2500` against a real reference.
+
+⚠ **That it EXISTS is confirmed. That it is CORRECT is not.** The expected relation is
+`#2500 = [setter touch #1927] − [that tool's #1430]`, and with the current readings (`#1927 = −5.000`,
+`#1430 = −68.336`) that would be `63.336`, not `−0.4612`. ⇒ `#1927` reads like a stale home position rather
+than a real touch, so the mismatch is probably a stale input, not a bad reference — **but it is not proven.**
+⇒ ⛔ The physical check is the only real one, and it is the documented one: **jog to `G54 Z0`; the tip should
+sit on the spoilboard.** Off by ~2× means the sign is flipped. Do that before trusting a tool change.
+
+### 32. ⛔⛔ A RUNNING OR PAUSED MACRO'S WRITES ARE NOT VISIBLE OVER MODBUS UNTIL IT COMPLETES `[CONFIRMED 2026-08-26]`
+`CALIBRATE.nc` was run. It computes `#2500 = [#34 - #36]` and only THEN puts up a `#1505` dialog. While it
+sat at that dialog, waiting for Enter:
+
+```
+#2500  read 0.0000        #1927  read 0.0000
+```
+After Enter — the macro completing, nothing else changing:
+```
+#2500  read -1.9204       #1927  read -70.2480
+#1927 - #1430 = -70.2480 - (-68.3276) = -1.9204  == stored #2500   ✓ exact
+```
+⇒ The store had ALREADY executed, two lines before the dialog. **The values were simply not readable yet.**
+
+⭐ **Contrast with a single INJECTED line, which commits immediately** — `#631 = 3` was readable at once (§30).
+⇒ The rule is not "macro writes are slow"; it is **"an in-flight macro's state is not exported."**
+
+⚠⚠ **THIS CONSTRAINS JOB TRACKING, and it is the useful half.** Live POSITION tracks continuously during
+motion (§29) — that is unaffected. But **any variable a running program maintains reads STALE**, so a progress
+design that polls a macro-kept counter or cursor will silently read the value from before the program started.
+⇒ ⛔ Build progress on POSITION and the state register, not on variables the program writes.
+
+### ⚠ AND THE PROCESS LESSON, because it recurred four times in one day
+Read `#2500 = 0`, I declared the calibration had failed and asked the owner what had gone wrong. Nothing had.
+The owner then said: *"the dialogue appeared but i didnt press enter before i said i ran calibrate."*
+
+That is the **fourth** time on 2026-08-26 that a real measurement was read correctly and its SIGNIFICANCE was
+called wrong: the probe-set tool offset being non-zero (that is what tool offsets are FOR), the unset Z−
+soft limit (the one bound whose value changes per job), the "stale setting file" (two readings from different
+moments), and this. ⇒ ⭐ **Every one dissolved when the owner supplied ordinary context the measurement could
+not carry.** ⛔ Before calling a reading a fault, ask what was happening at the machine when it was taken.
+
+### 33. ⭐⭐ MULTI-LINE SEQUENCES RUN OVER MODBUS — the PC can execute a test program unaided `[CONFIRMED 2026-08-26]`
+`V20_read_2500.nc`'s whole body was injected line by line and executed — the `#1505` message appeared on the
+pendant and the value read back correctly. **No pendant interaction, no loaded file, no macro on the disk.**
+
+```
+#915 = #2500                                        ok
+#1510 = #2500                                       ok
+#1511 = #1430                                       ok
+#1505 = -5000(V20 via modbus ref=%.3f tool=%.3f)    ok   -> message appeared
+read back #2500 via register 7330: -1.9204          ✓
+```
+⚠ ~0.9 s between lines. Faster was not tried; the controller must finish one line before the next arrives.
+
+⇒ **What this seat can now do to the Expert, unaided:**
+| | how |
+|---|---|
+| read any parameter | `6500 + 2×index` (§28) |
+| read any variable | inject to a scratch slot, read back (§31) |
+| read live position | tracks continuously during motion (§29) |
+| execute any single line | injection (§30) |
+| **execute a SEQUENCE** | ⭐ this section |
+| ⛔ **start a loaded `.nc` file** | **NO PROVEN WAY** |
+
+### ⛔ THE REMAINING GAP — starting a loaded program
+Injected lines execute in what behaves like an MDI context. ⭐ **That is almost certainly why the state test
+found nothing**: a full-region diff (2,400 registers) across an injected `G04 P25.0` dwell, and again across
+four passes while a program was run from the pendant, showed **zero changed registers**. ⇒ Either run-state is
+not exported at all, or injected lines never enter it. **Not distinguishable until a program can be started
+and watched.**
+
+⚠ This is the ROADMAP's own standing question — *"remote start without the panel: does `sysstart` re-Select
+and run a PC-named file, or a `#2037` virtual Start button? This is the gate for hands-free delivery→run."*
+
+Two candidate routes, neither tried:
+* **`#2037` virtual buttons** — documented in the `ddcs-expert` skill as pressing panel buttons from G-code.
+  ⛔ If a virtual Start exists, **the PC can press Start** — which is exactly the *"running is
+  operator-pressed"* line. Needs the owner's ruling on that specific act, not a general permission.
+* **`M98 P<O-number>`** — works today, no new capability. ⛔ But every O-number on this controller is a
+  factory routine (`O501` homing, `O502` tool-setter) and they MOVE. Only safe with an O-number we wrote.
+
+### 34. ⭐⭐ RUN STATE IS EXPORTED — as COMPLETION COUNTERS, not a running flag `[CONFIRMED 2026-08-26]`
+Two registers increment by exactly 1 per program run, and they fire **when the program FINISHES**:
+
+```
+idx 201  (reg 6902)      idx 202  (reg 6904)
+```
+* **3 runs -> +3 on both** (owner ran `V21_dwell.nc` three times).
+* **Timing, with a 30 s dwell:** both incremented together, and the owner confirmed from the pendant
+  that the count moves **at the end of the run, not when Start is pressed.** ⇒ **COMPLETION signal.**
+* `idx 202` also **resets to 0 when a file is (re)loaded**; `idx 201` keeps climbing (255 -> 259 over the
+  session, 232 -> 248 across the four weeks before it).
+
+⇒ ⭐ **With §29 this is a job tracker:** live position says WHERE continuously, and a counter increment
+says DONE. Neither needs a beacon, an instrumented program, or a macro on the controller.
+⚠ Still absent: a "currently running" flag. Nothing found that distinguishes busy from idle *while* a
+program runs — 2,400 registers diffed mid-run showed only these two, and only at the end.
+
+### ⛔⛔ `G04 P` IS MILLISECONDS ON THIS CONTROLLER — and it invalidated three of my own tests
+`G04 P8.0` is **8 ms**, not 8 seconds. The vendor-pack sweep already recorded this (*"`G04 P1` is 1
+millisecond, not 1 s"*) and I did not absorb it. Consequences, all mine:
+* every verify macro written today used `P5.0`/`P8.0` and dwelled for **milliseconds** while I described
+  them as holding for seconds. What actually held the screen was the `#1505` dialog waiting for Enter.
+* the "inject a dwell and watch" test sent `G04 P25.0` and polled for 12 s — the dwell had ended in **25
+  ms**. Its "zero registers changed" result was **void**, not evidence.
+* ⚠ **In `CALIBRATE.nc` and every macro copying its shape, the `G04` sits AFTER the `#1505` line** — so it
+  runs only once the operator has already pressed Enter. It is vestigial in all of them.
+⇒ Use `P30000` for 30 s. ⭐ And the general lesson, since it cost most of an evening: **a documented fact
+in this repo that I did not read cost more than any unknown did.**
+
 ## Evidence sources & verification method — where the ground truth actually lives `[method note, migrated from local memory 2026-09-02]`
 
 Ground truth for a DDCS G-code FORM = the **dumps** under `bridge/controllers/`, never the wizard generator

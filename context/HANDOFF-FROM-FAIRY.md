@@ -244,6 +244,58 @@ gating it. The gateway's `workOrigin.z` is missing the tool-table term (`#1430` 
 
 ---
 
+# ▶ SESSION STATE — Fairy, 2026-08-26. ACTIVE, not paused. Read this first.
+
+*Supersedes the 2026-08-25 PAUSE STATE, which is kept below it for provenance. Its "next action — reboot the
+controller, then re-probe Modbus" is DONE, and it produced most of what is here.*
+
+## 1. THE MACHINE — on, flashed, restored, in production shape
+```
+firmware   2026-09-02-00   (was 2026-04-10-00; flashed 2026-08-26)
+macros     custom sysstart / fndzero / fndY / SETPROBE + the patched slib-g
+           -> BAKED INTO THE FLASH PAYLOAD (see §3), not copied over SMB
+homing     verified: A syncs to Y. Owner: "Works perfectly."
+Modbus     #279 = 2 (Slave). WORKING.
+```
+⛔ **Do not switch `#279` to `Poll`** — that is the old beacon path and it would lose everything below.
+
+## 2. ⭐⭐ WHAT MODBUS NOW GIVES — this is the headline
+* `reg = 6500 + 2 × (setting index)`, word-swapped float32. **21/21 parameters verified.**
+* ⇒ the WHOLE machine state is readable live over serial: WCS table, tool table, soft limits, probe
+  config, positions. **No SMB, no file, no staleness question.**
+* ⭐ **Positions TRACK LIVE during motion** — 35 distinct samples across a 211 mm jog. So live job progress
+  needs **no G-code instrumentation at all**: no beacons, no `MSETDATA`, no `checkpoint_insert.py`.
+* ⚠ It gives POSITION, not a line number. The cursor design (`JOB-PROGRESS-PLAN.md`) is still needed — but
+  its input now exists and is free.
+* ⚠ 1.9 Hz measured is MY loop (45 ms sleep + 0.5 s timeout), not the link. Tune it.
+
+Full detail: `bridge/controllers/expert-m350/FINDINGS.md` §26–29.
+
+## 3. ⛔ THE OPERATIONAL RULE THAT CHANGED
+**System macros CANNOT be edited over SMB.** Written, read back byte-correct, and factory again after the
+next power-cycle. A file whose name is in the flash payload is restored at boot; a NEW file survives.
+⇒ **Put customisations INTO `install/` on the USB and flash.** Corrected procedure in
+`RESTORE-CUSTOM-MACROS/README.md`. ⚠ After ANY flash, assume every system macro is factory until verified
+**by content** — a flash re-arms the tool-setter rapid-descent bug and un-syncs the gantry.
+
+## 4. ⚠ WHAT I GOT WRONG, AND IT KEPT HAPPENING
+Three alarming readings dissolved once the owner applied ordinary knowledge of his own machine:
+the non-zero tool offset (that is what tool offsets are FOR), the unset Z− soft limit (the only bound whose
+correct value changes per job), and a "stale setting file" that came from comparing two different moments.
+⇒ ⭐ **Measure freely; be slow to call a measurement a hazard.** And on a machine in production, months of
+good parts are evidence that outranks a formula.
+
+## 5. STILL OPEN
+| question | needs |
+|---|---|
+| Are macro vars (`#2500`+) readable past the setting range, e.g. `6500+2×2000`? | ⭐ nothing — read-only, testable now |
+| What does `state` (`10002`) read while a program RUNS? | a program running |
+| Register `3000` G-code injection (2026-08-03 feature) | ⛔ a WRITE. Our master is read-only by design — an owner decision, not a next step |
+| Should the app's pull move from SMB to Modbus? | ⭐ RENDERRANCHY's call — the instrument is now strictly better |
+| `workOrigin.z` missing the tool-table term | RENDERRANCHY, unblocked |
+
+---
+
 # ⏸ PAUSE STATE — Fairy, 2026-08-25. Read this first.
 
 *This file has grown by append; the sections above are the session in order. **This block is the current

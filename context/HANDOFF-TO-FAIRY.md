@@ -11,6 +11,32 @@ hardware exists**, so anything needing a live controller happens there and nowhe
 
 ---
 
+## ⭐⭐ NEW, 2026-09-04 — A TEST PLAN IS WAITING, AND TWO THINGS BELOW ARE NOW WRONG
+
+⭐ **[`bench/05-post-flash-reverification.md`](../bridge/controllers/expert-m350/bench/05-post-flash-reverification.md)
+— written this session from the Ranchy seat, NOT RUN.** The owner asked for it and asked that this seat see it.
+Five items, priority-ordered, most of them free now that injection exists. The headline is not the list: it is
+that **injection executes ONE LINE AT A TIME, so the whole-file-reject failure mode is gone** — which is the
+only reason `COS`/`SIN`/`SQRT` have been unknown for months (`V13_trig.nc` aborted on its ATAN line and blinded
+everything after it). Item 3, a differential variable sweep, is a METHOD rather than a test and retires most of
+the standing `[HYPOTHESIS]` entries at once.
+
+⛔ **SUPERSEDED IN §0 BELOW — the presence rule.** This file was written 2026-08-25. **The owner ruled the very
+next day**, and [`SETUP.md`](SETUP.md) now carries it: *"if im asking to read or write to the ddcs its because
+it on and im here, otherwise i shut it down, except the bench machine."*
+⇒ **On the Expert, REACHABLE MEANS PRESENT.** ⛔ **Do not ask "are you at it?"** — that tax is exactly what the
+ruling removed, and asking again reads as not having listened. The bench V4.1 is exempt entirely (motorless).
+What still holds: presence cannot be inferred from *which seat* is talking. **§0's "gated on a person standing
+there" wording predates the ruling — read it through this note.** (`CLAUDE.md` carried the same stale line until
+today; the correction had no delivery mechanism and the staleness did.)
+
+⚠ **AND THE BRANCH CLAIM IN §0 IS STALE TOO.** `wizards-as-data-blocks` is now ~160 commits ahead of `main` and
+**not merged** — the owner has explicitly not merged it. `git pull` on `main` does **not** give you the wizard
+work, and anything written on that branch does not reach this seat. That is why this plan was committed straight
+to `main`.
+
+---
+
 ## 0. BEFORE ANYTHING — the machine-switch mechanics
 
 ⛔ **THE LOOP STATE DOES NOT TRAVEL.** `.handoff/` and its epoch are per-machine. A session on Fairy starts a

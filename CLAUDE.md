@@ -37,7 +37,7 @@ hardware, with whom. The project itself is documented in `ROADMAP.md`, `ARCHITEC
 
 ## ⏸ CURRENT SESSION STATE
 
-⭐ **[`context/HANDOFF-FROM-FAIRY.md`](context/HANDOFF-FROM-FAIRY.md) → the PAUSE STATE block at the bottom.**
+⭐ **[`context/HANDOFF-FROM-FAIRY.md`](context/HANDOFF-FROM-FAIRY.md) → the SESSION STATE block.**
 Whichever seat you are, that is what a returning session should open first: the machine's state, the single
 next action, and what the last session settled or got wrong. The outbound half is
 [`context/HANDOFF-TO-FAIRY.md`](context/HANDOFF-TO-FAIRY.md).
