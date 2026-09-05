@@ -29,6 +29,7 @@ import sys
 import time
 
 REG_INJECT = 3000
+MAX_PAYLOAD = 246
 SCRATCH = 916   # NOT 915 -- #915 refuses writes, cause unknown (FINDINGS 2026-09-05)
 REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7332
 SENTINEL = -77777.0
@@ -60,19 +61,39 @@ def read_f32(s, reg):
     return struct.unpack(">f", struct.pack(">HH", hi, lo))[0]
 
 
-def inject(s, text, settle=0.9):
+def inject(s, text, settle=0.9, tries=6):
+    """Send one G-code line to register 3000, RETRYING UNTIL THE FC16 IS ACKNOWLEDGED.
+
+    ⭐⭐ ROOT CAUSE, measured 2026-09-05: ~25% of write frames never arrive intact, and the correlation
+    is perfect -- 13/13 landed writes had a valid FC16 ack, 5/5 lost writes had NO valid ack. The
+    controller never received them. It is a LINK problem, not the controller dropping lines, and it is
+    immune to pacing and to bus quiet time. Every ack is also preceded by 6-11 bytes of junk that is not
+    ours; the controller is a Modbus MASTER by default, so its own polling frames appear to collide with
+    ours. => THE ACK IS THE CHEAP TRUTH: check it and resend, rather than reading the variable back.
+
+    Returns True if the write was acknowledged.
+    """
     payload = (text + "\n").encode("ascii")
-    if len(payload) > 246:
-        raise SystemExit("%d bytes exceeds the firmware's 246-byte limit" % len(payload))
+    if len(payload) > MAX_PAYLOAD:
+        raise SystemExit("%d bytes exceeds the firmware's %d-byte limit" % (len(payload), MAX_PAYLOAD))
     if len(payload) % 2:
         payload += b"\x00"
     # LITTLE-ENDIAN within each register: FIRST character in the LOW byte.
     regs = [payload[i] | (payload[i + 1] << 8) for i in range(0, len(payload), 2)]
-    s.reset_input_buffer()
-    s.write(frame(bytes([1, 0x10]) + struct.pack(">HHB", REG_INJECT, len(regs), len(regs) * 2)
-                  + b"".join(struct.pack(">H", r) for r in regs)))
-    time.sleep(settle)
-    s.read(256)
+    body = (bytes([1, 0x10]) + struct.pack(">HHB", REG_INJECT, len(regs), len(regs) * 2)
+            + b"".join(struct.pack(">H", r) for r in regs))
+    echo = bytes([1, 0x10]) + struct.pack(">HH", REG_INJECT, len(regs))
+    for _ in range(tries):
+        s.reset_input_buffer()
+        s.write(frame(body))
+        time.sleep(0.35)
+        r = s.read(256)
+        i = r.find(echo)
+        if i >= 0 and len(r) >= i + 8 and struct.unpack("<H", r[i + 6:i + 8])[0] == crc16(r[i:i + 6]):
+            time.sleep(max(0.0, settle - 0.35))
+            return True
+        time.sleep(0.15)                      # frame collided -- back off and resend
+    return False
 
 
 class Latched(Exception):

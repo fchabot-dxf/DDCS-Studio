@@ -2442,3 +2442,43 @@ Write → read back → retry. At ~15% loss, four attempts put the residual fail
 ⚠ **This applies to the whole G-code injection channel, not just probing** — anything built on register 3000
 inherits a ~1-in-6 silent failure rate per line. A multi-line sequence sent blind will *usually* be missing a
 line. ⛔ Any future use must verify each line landed, or be idempotent and re-sent.
+
+## ⭐⭐⭐ ROOT CAUSE — **~25% OF WRITE FRAMES NEVER ARRIVE. CHECK THE FC16 ACK.** `[CONFIRMED on machine 2026-09-05]`
+
+The correlation is perfect. 18 plain numeric writes, pendant photographed green and `READY` throughout:
+
+| | valid FC16 ack | no valid ack |
+|---|---|---|
+| **landed** | **13** | 0 |
+| **lost** | 0 | **5** |
+
+⇒ **The controller never received the lost lines. It is a LINK problem, not the controller discarding them.**
+Consistent with everything else measured: immune to pacing (`0/250/500/1000 ms` gaps → `2/0/1/2` lost per 12),
+immune to bus quiet time (quiet wait `3/15`, polling `4/15`), and bimodal latency — a line executes in
+**~440 ms or never**, with no slow tail.
+
+⭐ **Every ack is preceded by 6–11 bytes of junk that is not ours** (`01 00 00 00 00 …`). This controller is a
+Modbus **MASTER** by default, so the most likely mechanism is **its own polling frames colliding with ours**
+on a half-duplex line. `[HYPOTHESIS — the junk is measured, the attribution is not]`
+
+### ⇒ THE FIX: THE ACK IS THE CHEAP TRUTH
+A valid FC16 echo (`01 10 <addr> <count> <crc>`) means the line arrived. **Check it and resend** — this is far
+better than reading the variable back, because it needs no scratch slot, no sentinel, and works for lines that
+assign nothing. `tools/macro_probe.py::inject` now retries up to 6× until acknowledged.
+⭐ **Verified:** a 10-expression battery immediately afterwards ran **10/10 clean, no retries visible, no latch.**
+
+### ⛔ RETRACTED — "`#915` REFUSES WRITES" `[REFUTED 2026-09-05]`
+Pure lost-frame artifact. Re-tested with ack-confirmed injection: `#915` accepts `777`, `0`, `1`, `5`, `-3`,
+every one landing first time. ⭐ **The "universal variable reader" that uses `#915` as its scratch slot is NOT
+compromised** — that warning is withdrawn.
+
+### ⚠ WHAT THIS DOES AND DOES NOT INVALIDATE
+- ⭐ **POSITIVE results stand.** A lost frame cannot invent a correct answer for a specific expression —
+  `SQRT[16]` reading `4` can only come from `SQRT[16]` executing. The whole function/operator table was
+  re-run after the fix and reproduced exactly.
+- ⛔ **NEGATIVE results were the vulnerable class** — "rejected", "no-op", "refuses writes" all look identical
+  to a lost frame. Of the five recorded here, **four were photographed on the pendant** (`MOD`, `^`, `**`,
+  one-operand `ATAN`, each with `syntax error!` quoting the offending line) and stand. The fifth was `#915`,
+  never photographed, and it was wrong.
+- ⭐ **THE RULE:** a negative result on this channel is worth nothing without either an acknowledged frame or
+  a photograph of the pendant. That is the whole lesson of 2026-09-05, and it cost a day of false findings.
