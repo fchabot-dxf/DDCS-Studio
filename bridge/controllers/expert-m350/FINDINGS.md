@@ -2610,3 +2610,33 @@ The ACK **detects** it and retrying **defeats** it: retry the identical line, th
 (a trailing space). `tools/macro_probe.py` does both, and the full 20-value record re-verified 20/20 through
 it. ⛔ **Any future user of register 3000 must do the same** — at these rates a blind multi-line sequence will
 lose lines, and the lost ones produce no error anywhere.
+
+### ⭐⭐⭐ THE FIX FOR THE NEVER-DELIVERED CLASS: **PAD THE PAYLOAD TO 64 BYTES** `[CONFIRMED on machine 2026-09-05]`
+Came from the owner asking whether the docs specify a byte count. ⭐ **The vendor's 246 is a MAXIMUM**
+(*"ASCII code streams up to 246 bytes per single payload"*), not a required size — but padding fixes it anyway:
+
+| line | bare | pad 32 | pad 48 | **pad 64** |
+|---|---|---|---|---|
+| `[3+3]` | 0/5 | 0/5 | 3/5 | **5/5** |
+| `[4+4]` | 0/5 | 5/5 | 4/5 | **5/5** |
+| `[0+7]` | 0/5 | 5/5 | 5/5 | **5/5** |
+| `[7+0]` | 0/5 | 0/5 | 4/5 | **5/5** |
+| `[8+1]` | 0/5 | 4/5 | 5/5 | **5/5** |
+
+⭐ **Monotonic in length**, which is what a wire/framing problem looks like — not anything about parsing.
+
+**What the padding is:** trailing spaces before the newline, nothing more.
+```
+before: '#916 = [3+3]'                          ->  7 registers, 23-byte frame
+after:  '#916 = [3+3]' + 52 spaces (64 chars)   -> 33 registers, 75-byte frame
+```
+G-code ignores trailing whitespace, so the line parses identically.
+
+⛔ **IT FIXES THAT CLASS ONLY.** Background loss across 20 random lines moved just **82% → 87%**. ⇒ **Padding
+and ack-retry are BOTH required**; neither alone is sufficient. With both, 25/25 and the five 0/5 lines run
+5/5 (one at 4/5, ordinary background loss, covered by the retry).
+
+⭐⭐ **AND THE DECISIVE STRUCTURAL POINT: the failure is at the ACK**, which is the Modbus protocol layer —
+*before* the controller parses anything. ⇒ Buffer size, terminators, stale bytes and G-code semantics are all
+**ruled out**; this is framing/signal integrity on the wire. That is also why three CRC theories failed: they
+were modelling a parser that was never involved.

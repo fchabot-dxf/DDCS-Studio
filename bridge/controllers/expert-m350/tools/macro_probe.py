@@ -30,6 +30,7 @@ import time
 
 REG_INJECT = 3000
 MAX_PAYLOAD = 246
+PAD_TO = 64
 SCRATCH = 916   # NOT 915 -- #915 refuses writes, cause unknown (FINDINGS 2026-09-05)
 REG_READ = 6500 + 2 * (SCRATCH - 500)   # 7332
 SENTINEL = -77777.0
@@ -73,6 +74,13 @@ def inject(s, text, settle=0.9, tries=6):
 
     Returns True if the write was acknowledged.
     """
+    # ⭐ PAD TO 64 BYTES. Measured 2026-09-05: some exact lines are NEVER acknowledged -- `#916 = [3+3]`,
+    # `[4+4]`, `[0+7]`, `[7+0]`, `[8+1]` all delivered 0/5 bare. Padded to 64 they deliver 5/5, and the
+    # effect is monotonic in length (32 mixed, 48 mostly, 64 clean). Trailing spaces are semantically
+    # inert here. ⚠ It fixes THAT CLASS ONLY -- background loss over 20 random lines moved 82% -> 87%,
+    # so the ack-retry below is still required. The vendor's 246 bytes is a MAXIMUM, not a required size.
+    if len(text) < PAD_TO:
+        text = text.ljust(PAD_TO)
     payload = (text + "\n").encode("ascii")
     if len(payload) > MAX_PAYLOAD:
         raise SystemExit("%d bytes exceeds the firmware's %d-byte limit" % (len(payload), MAX_PAYLOAD))
