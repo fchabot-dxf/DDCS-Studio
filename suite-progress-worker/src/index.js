@@ -29,7 +29,7 @@ const PAGE = `<!doctype html>
      the left, the stat rows sit beside it, the running spec spans. Portrait keeps the ruled
      rows-only layout untouched. */
   @media (min-width: 700px){
-    .wrap{max-width:980px;display:grid;grid-template-columns:1.1fr 1fr;
+    .wrap{max-width:980px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
           grid-template-areas:"banner banner" "head head" "hero rows" "spec spec" "foot foot";
           gap:16px;align-content:start}
     .banner{grid-area:banner} h1{grid-area:head} .hero{grid-area:hero;justify-content:center}
@@ -37,10 +37,25 @@ const PAGE = `<!doctype html>
     .pct{font-size:clamp(90px, 11vw, 150px)}
     .r{padding:14px 0} .r b{font-size:30px} .r.time b{font-size:22px}
   }
-  /* Short landscape (a phone on its side): shrink the hero so everything fits one screen. */
-  @media (min-width: 700px) and (max-height: 480px){
-    .pct{font-size:56px} .bar{height:14px} .r{padding:7px 0} .r b{font-size:20px}
-    .wrap{gap:8px;padding:10px 16px}
+  /* Landscape phone: EVERYTHING on one screen, no scrolling. The whole layout compacts —
+     small hero, tight rows, one-line spec, footer dropped. */
+  @media (orientation: landscape) and (max-height: 620px){
+    .wrap{max-width:100%;gap:8px;padding:8px 14px;min-height:100dvh;
+          display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+          grid-template-areas:"banner banner" "head head" "hero rows" "spec spec";
+          align-content:start}
+    .banner{grid-area:banner;padding:6px 12px;font-size:13px}
+    h1{grid-area:head} .hero{grid-area:hero;justify-content:center;gap:8px}
+    .rows{grid-area:rows;padding:0 14px} .spec{grid-area:spec;padding:8px 14px}
+    .pct{font-size:clamp(44px, 9vh, 72px)}
+    .state{font-size:13px}
+    .bar{height:12px}
+    .count{font-size:18px} .count small{font-size:13px}
+    .r{padding:5px 0} .r b{font-size:18px} .r.time b{font-size:15px}
+    .r span{font-size:11px}
+    .spec div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+    .spec span{font-size:10px}
+    .foot{display:none}
   }
   h1{font-size:13px;margin:0;letter-spacing:.1em;text-transform:uppercase;
      color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center}
