@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1269 — FACING, the lathe family's GATED PILOT. OD / parting / drilling do not start until this is right.
@@ -11,6 +11,10 @@ import { test, expect } from '@playwright/test';
  * an IF/GOTO loop that runs on the controller, so the operator can change the allowance or the depth of cut ON THE
  * MACHINE and the program adapts. That makes the emit a RECIPE — and it means proving it works requires RUNNING the
  * loop, which is what the sim assertions do.
+ *
+ * t2689 — TIER MIGRATION BATCH 2: moved browser→node. This file needed zero twin-seeding fix (unlike part-drill/
+ * pilot/polygon/probe/matrix in the same batch) — every test here calls pure functions from wizards/lathe/facing.js
+ * directly, never uo.listUserOps()/getUserDef(), so there is no registry to seed. Mechanical conversion only.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 

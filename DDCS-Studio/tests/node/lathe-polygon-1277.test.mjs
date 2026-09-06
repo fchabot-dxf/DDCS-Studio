@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1277 — POLYGON TURNING: the family's axis-mode member.
@@ -11,10 +11,16 @@ import { test, expect } from '@playwright/test';
  * macro language shows no evidence of trig (59 captured factory macros use ABS ten times and COS/SIN never; the
  * parser dump holds no uppercase grammar tokens at all, not even ABS; and the lowercase asin/acos/atan/sqrt names a
  * Studio tool cites as "the parser's vocabulary" are the binary's libm imports — with cos and sin absent even there).
+ *
+ * t2689 — TIER MIGRATION BATCH 2: moved browser→node. boot() seeds the polygon twin via createUserOp (batch 1's
+ * registerUserOp-vs-listUserOps bug applies here too), fresh-if-missing per call.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { polygonDataDef, POLY_DATA_OPTYPE } = await import('/blocks/dataOps/polygonData.js');
+    if (!uo.listUserOps().some((d) => d.opType === POLY_DATA_OPTYPE)) uo.createUserOp(polygonDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsSetMachine, null, { timeout: 15000 });
 };

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1275 — PARTING / GROOVING and CENTRE DRILLING, both inheritors. The mechanisms were proven on facing and OD; what
@@ -9,10 +9,21 @@ import { test, expect } from '@playwright/test';
  *   at Z−13: the typed Z is the FACE of the feature, and the blade occupies its own width on the material side of it.
  *   Pecking 2 from a bar radius of 10: 8, 6 — landing exactly on the floor.
  *   DRILLING — depth 15 pecking 5 bottoms at −5, −10, −15, on the CENTRELINE (X0, never a radius).
+ *
+ * t2689 — TIER MIGRATION BATCH 2: moved browser→node. Two tests (`BOTH TWINS register…`, `BOTH SURVIVE THE .wiz
+ * ROUND TRIP…`) query uo.listUserOps() for 'user_lathe_parting'/'user_lathe_centerdrill' — batch 1's own registry
+ * bug applies here too: registerUserOp only populates USER_DEFS (getUserDef), not the separate readStore()-backed
+ * store listUserOps() reads. boot() seeds both twins via createUserOp, fresh-if-missing per call (the .wiz round
+ * trip test deletes+reimports one, and node's module state persists across tests in one process).
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { partingDataDef, PART_DATA_OPTYPE } = await import('/blocks/dataOps/partingData.js');
+    const { centerDrillDataDef, CDRILL_DATA_OPTYPE } = await import('/blocks/dataOps/centerDrillData.js');
+    if (!uo.listUserOps().some((d) => d.opType === PART_DATA_OPTYPE)) uo.createUserOp(partingDataDef());
+    if (!uo.listUserOps().some((d) => d.opType === CDRILL_DATA_OPTYPE)) uo.createUserOp(centerDrillDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
 };

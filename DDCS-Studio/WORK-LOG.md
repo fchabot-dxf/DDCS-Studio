@@ -78636,3 +78636,90 @@ comment documents). NOT re-argued — RE-RUN standalone: **6/6 passed cleanly**,
 previously-failed titles. Real verdict: **0 regressions from this turn's own changes.** `git status` clean
 except this entry, the two new node test files, and the two deleted browser specs.
 
+## t2689 — TIER-MIGRATION BATCH 2: the lathe-math cluster — 6 of 10 files shape-gated in, 4 shape-gated out, one
+"too heavy" self-description overridden by measurement
+
+Dispatched to scale batch 1's proven many-small-test shape across 10 named lathe files
+(`DDCS-Studio/scratchpad/dispatch-tier-migration-batch2.md`), shape-gating each first rather than moving blind.
+Result: **6 files converted (44 tests), 4 skipped and flagged for real reasons found by reading, not guessed.**
+
+### THE SHAPE GATE — what actually got read, per file
+
+- **lathe-part-drill-1275** (11), **lathe-polygon-1277** (7), **lathe-facing-1269** (5) — pure `import()`+
+  `evaluate` against G-code/data, no DOM, no render. Moved whole-file, no surprises.
+- **lathe-pilot-1271** (8) and **lathe-probe-1299** (10) — each had ONE test that builds a real
+  `<button>` via `innerHTML` (pilot) or opens a wizard + reads `window.__ddcsLastViz` (probe) — genuine browser
+  dependencies register.mjs's own doc calls out by name (a structural-only `document`: `innerHTML` is a plain
+  string property, `querySelector` always returns `null`; no real Three.js render). Split those two tests into
+  `tests/lathe-pilot-1271-dom.spec.js` and `tests/lathe-probe-1299-scene.spec.js`, left in the browser tier;
+  moved the other 7 and 9 respectively.
+- **lathe-matrix** (5) — the one file whose OWN header comment says "too heavy for a per-change fast tier."
+  Measured FIRST rather than trusting that self-description (this batch's whole point, after batch 1's
+  middle-superset regression): standalone browser run timed **4.84s total across all 5 tests** — nothing like
+  middle-superset's 14336-combo sweep (the file's ~50 emit/trace/carve configs are cheap per-call). Converted
+  and re-measured: 5/5 pass in ~2.1s, no regression. The file's comment is about relative merge-gate weight vs.
+  a per-op spec, not an absolute giant-sweep hazard — measurement overruled the self-description, as it should.
+- **lathe-tool-table-1325** (4), **lathe-overlay-1283** (2) — SKIPPED, flagged. Both drive a REAL rendered DOM
+  tree (`SP.openToolLibrary()` builds a modal via `innerHTML`/`appendChild`, then the test queries
+  `#toollib-rows tr`; the overlay test calls `getComputedStyle(el)` to check `position:fixed`/flex-centering).
+  register.mjs's document stub cannot support either — `querySelectorAll` always returns `[]` regardless of
+  what was appended, and `getComputedStyle` isn't even a stubbed global. This is exactly the "needs more than
+  the stub, not a candidate for this tier" case register.mjs's own doc names — a finding, not a gap to patch
+  (jsdom/middle-tier work is explicitly out of this dispatch's scope).
+- **lathe-surfaces-1295** (5), **lathe-preview-1297** (5) — SKIPPED, flagged, for a THIRD reason not in the
+  dispatch's own named 3D-UI exclusion list (lathe-model/world/visible/honest-3d/blocks-bar/feel/handle-hit/
+  drag-responsive) but the same underlying shape: both read `window.__ddcsLastViz` after a real
+  `page.click('#view-toggle')` + a settle `waitForTimeout` — a genuine Three.js render + UI drive, not a pure
+  import+evaluate. Named explicitly here since they WERE on the dispatch's target list; the shape-gate caught
+  it anyway.
+
+### THE REGISTRATION FIX — reused verbatim from batch 1
+
+Every twin-seeding `boot()` uses `createUserOp` (never `registerUserOp`) with an existence check first
+(`if (!uo.listUserOps().some(...)) uo.createUserOp(...)`) — `registerUserOp` only populates `USER_DEFS`
+(what `getUserDef`/`builderOf` read), while these files' own tests query `listUserOps()`, which reads the
+separate `readStore()`/localStorage-backed store only `createUserOp` populates. Confirmed this is how the
+BUILT-IN lathe twins normally get seeded too: `web/app.js`'s `seedDefaultPortedUserOps()` (called from
+`DDCSStudio.init()`, never reached by the node harness's `page.goto` stub, which only imports
+`settingsPanel.js`) does the identical create-or-update dance over its own `SEED_BUILDERS` array — so this
+isn't a node-tier workaround, it's the same seeding contract the real app runs, just invoked directly instead
+of via the app's boot sequence. Fresh-if-missing per call (not memoized) matters here too: `lathe-part-drill`
+and `lathe-pilot`'s own `.wiz` round-trip tests delete their twin mid-test, and node's module state persists
+across every test in one process (unlike the browser's per-test `page.goto` reset).
+
+### THE MEASURED DELTA
+
+| File | Tests | Browser | Node | Delta |
+|---|---|---|---|---|
+| lathe-part-drill-1275 | 11 | 8.74s | 1.59s | ~5.5x |
+| lathe-probe-1299 | 9 of 10 | 10.61s (10) | 0.89s (9) | ~12x |
+| lathe-pilot-1271 | 7 of 8 | 6.60s (8) | 0.77s (7) | ~8.6x |
+| lathe-polygon-1277 | 7 | 5.27s | 1.57s | ~3.4x |
+| lathe-facing-1269 | 5 | 4.09s | 1.56s | ~2.6x |
+| lathe-matrix | 5 | 4.84s | 2.10s | ~2.3x |
+
+The per-file multiple is smaller than batch 1's 7-16x for the files with FEWER tests (facing, matrix, polygon):
+the fixed ~200ms Node process-and-module-graph-load cost (visible as the first test's own outlier duration in
+every file above) amortizes over fewer tests. The shape still wins every time measured — no file in this batch
+regressed — but the "many small tests" framing should specifically mean MANY, not just "smaller than a giant
+sweep": a 4-5 test file reclaims real but modest time per file, and the win compounds across the ~217-file
+backlog rather than each file individually.
+
+### VERIFY
+
+`npm run test:node`: 326/326 (282 prior + 44 this batch, exactly: 11 + 9 + 7 + 7 + 5 + 5).
+
+Full suite (`npm test`), read from `test-results` output directly (BACKLOG #87 still open, live page not
+trusted): `test:node` exit 0 (326/326); `test:e2e` collected **3163 tests — down from the prior run's 3207 by
+EXACTLY 44**, confirming the migration accounting (44 moved out of the browser tier entirely, the 2 split-off
+tests relocated to new filenames but stayed in-tier so contributed no net change). DONE: 3124 passed, 1
+failed, 10 flaky, 28 skipped. **One failed title**, `probe-port-gate-1880.spec.js › every one of the 6 probe
+ops gates its own Port field under V4.1 — not just Corner` — the SAME title already named as the established
+contention-class flake in t2687's own entry, in a file this turn's diff never touches. Re-run standalone
+(`--workers 1`): **passed clean, 1/1**. Real verdict: **0 regressions from this turn's own changes.**
+
+`git status` clean except this entry, 6 new `tests/node/*.test.mjs` files, 2 new split-off browser specs
+(`lathe-pilot-1271-dom.spec.js`, `lathe-probe-1299-scene.spec.js`), and 6 deleted browser specs (the whole-file
+moves). The 4 skipped files (`lathe-tool-table-1325`, `lathe-overlay-1283`, `lathe-surfaces-1295`,
+`lathe-preview-1297`) are untouched.
+

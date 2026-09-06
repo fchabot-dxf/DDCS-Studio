@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1297 — THE LATHE CONFIG MATRIX. ~50 configurations across all five lathe wizards, each run the whole way through
@@ -11,9 +11,13 @@ import { test, expect } from '@playwright/test';
  *
  * MERGE-GATE WEIGHT, deliberately: ~50 emits/traces/carves is too heavy for a per-change fast tier, and it earns its
  * place in the full suite instead. (Ported from the advisor's probe script, whose derivations are the ones here.)
+ *
+ * t2689 — TIER MIGRATION BATCH 2: shape-gated before moving (batch 1's middle-superset lesson: a giant compute sweep
+ * can REGRESS in node). MEASURED first: this file's own comment claims "too heavy for a per-change fast tier," but
+ * the actual browser run timed 4.84s total across all 5 tests — nothing like middle-superset's 14336-combo sweep.
+ * Converted and re-measured: 5/5 pass in well under a second, no regression. boot() seeds all 5 lathe turning twins
+ * via createUserOp (batch 1's registerUserOp-vs-listUserOps bug applies here too), fresh-if-missing per call.
  */
-test.use({ viewport: { width: 1400, height: 950 } });
-
 const EPS = 0.13;                                  // half a profile step
 const near = (a, b, e = EPS) => Math.abs(a - b) <= e;
 const BAR_R = 10;                                  // every op's default bar: Ø20 → radius 10
@@ -33,6 +37,17 @@ const setBar = (page, diameter = 20, stickOut = 60) => page.evaluate(async ({ d,
 }, { d: diameter, so: stickOut });
 
 const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { facingDataDef, FACING_DATA_OPTYPE } = await import('/blocks/dataOps/facingData.js');
+    const { odTurnDataDef, OD_DATA_OPTYPE } = await import('/blocks/dataOps/odTurnData.js');
+    const { partingDataDef, PART_DATA_OPTYPE } = await import('/blocks/dataOps/partingData.js');
+    const { centerDrillDataDef, CDRILL_DATA_OPTYPE } = await import('/blocks/dataOps/centerDrillData.js');
+    const { polygonDataDef, POLY_DATA_OPTYPE } = await import('/blocks/dataOps/polygonData.js');
+    for (const [fn, optype] of [[facingDataDef, FACING_DATA_OPTYPE], [odTurnDataDef, OD_DATA_OPTYPE],
+                                 [partingDataDef, PART_DATA_OPTYPE], [centerDrillDataDef, CDRILL_DATA_OPTYPE],
+                                 [polygonDataDef, POLY_DATA_OPTYPE]]) {
+        if (!uo.listUserOps().some((d) => d.opType === optype)) uo.createUserOp(fn());
+    }
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(async () => {

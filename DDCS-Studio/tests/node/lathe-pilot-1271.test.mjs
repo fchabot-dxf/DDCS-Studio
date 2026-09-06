@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1271 — THE FACING PILOT'S REMAINING MECHANISMS: the twin, the library round trip, and axis gating.
@@ -7,10 +7,22 @@ import { test, expect } from '@playwright/test';
  * asserted on its own terms rather than "the wizard opens". The emit itself was proven in t1269 against hand-derived
  * passes; this file is about CITIZENSHIP — is facing a real op, does it survive being shared, and does the app tell
  * the truth about what this machine can run.
+ *
+ * t2689 — TIER MIGRATION BATCH 2: moved browser→node. boot() seeds the facing twin via createUserOp (batch 1's
+ * registerUserOp-vs-listUserOps bug applies here too), fresh-if-missing per call since the .wiz round-trip test
+ * deletes it and node's module state persists across tests in one process.
+ *
+ * ONE TEST STAYED BEHIND: "(4) THE GATING IS APPLIED AND REVERSIBLE" builds a real `<button>` via `innerHTML` and
+ * then finds it with `host.querySelector('[data-optype="pocket"]')` — register.mjs's document is structural-only
+ * (innerHTML is a plain string property, querySelector always returns null), so it needs a real DOM. Split into
+ * tests/lathe-pilot-1271-dom.spec.js, left in the browser tier.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { facingDataDef, FACING_DATA_OPTYPE } = await import('/blocks/dataOps/facingData.js');
+    if (!uo.listUserOps().some((d) => d.opType === FACING_DATA_OPTYPE)) uo.createUserOp(facingDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsSetMachine, null, { timeout: 15000 });
 };
@@ -132,41 +144,6 @@ test('(4) AXIS GATING — a lathe workspace greys the Y-needing mill ops, and sa
     expect(r.lathe.unknown, 'an op with no declared need is never gated on a guess').toEqual([]);
     expect(r.mill.axes, 'a mill declares all three').toEqual(['X', 'Y', 'Z']);
     expect(r.mill.pocket, 'and pocketing is fine there').toEqual([]);
-});
-
-test('(4) THE GATING IS APPLIED AND REVERSIBLE — greyed, never hidden, and it comes back', async ({ page }) => {
-    await boot(page);
-    const r = await page.evaluate(async () => {
-        const G = await import('/ui/axisGating.js');
-        const M = await import('/data/workspaceMachine.js');
-        // two entries as the bar renders them
-        const host = document.createElement('div');
-        host.innerHTML = '<button data-optype="pocket" title="Pocket">Pocket</button>'
-                       + '<button data-optype="user_lathe_facing" title="Facing">Facing</button>';
-        document.body.appendChild(host);
-
-        M.setMachine({ kind: 'lathe' }, false);
-        G.applyAxisGating(host);
-        const pocket = host.querySelector('[data-optype="pocket"]');
-        const facing = host.querySelector('[data-optype="user_lathe_facing"]');
-        const gated = {
-            pocketGated: pocket.classList.contains('axis-gated'),
-            pocketVisible: getComputedStyle(pocket).display !== 'none',   // GREY, not hidden
-            pocketTitle: pocket.title,
-            facingGated: facing.classList.contains('axis-gated'),
-        };
-        M.setMachine({ kind: 'mill' }, false);
-        G.applyAxisGating(host);
-        const restored = { pocketGated: pocket.classList.contains('axis-gated'), pocketTitle: pocket.title };
-        host.remove();
-        return { gated, restored };
-    });
-    expect(r.gated.pocketGated, 'the impossible op is greyed').toBe(true);
-    expect(r.gated.pocketVisible, 'and STILL THERE — hiding would answer a question nobody asked').toBe(true);
-    expect(r.gated.pocketTitle, 'the tooltip is the whole explanation').toMatch(/needs a Y axis/);
-    expect(r.gated.facingGated, 'the lathe op is not greyed').toBe(false);
-    expect(r.restored.pocketGated, 'switching back to a mill un-greys it').toBe(false);
-    expect(r.restored.pocketTitle, 'and its own tooltip returns').toBe('Pocket');
 });
 
 test('(3) THE HALF-PROFILE CANVAS draws the MODEL — bar, centreline, datum, allowance', async ({ page }) => {
