@@ -158,8 +158,11 @@ const PAGE = `<!doctype html>
   function render(t){
     var m;
     g('raw').textContent = t;   // the raw view mirrors every delivery, live
-    // the reporter's own status word: running mid-run, passed/failed at onEnd
-    status = (m = t.match(/·\\s*(running|passed|failed)\\b/)) ? m[1] : '';
+    // The reporter NEVER writes a bare status word — t2409's own owner ruling made the
+    // verdict a RATIO ("4/4 passed") so reds can't read as a crash at a glance. So:
+    // "running" mid-run; a ratio + "passed" = finished (fail count colors it); else unknown.
+    status = /·\\s*running\\b/.test(t) ? 'running'
+           : (/\\d+\\s*\\/\\s*\\d+ passed/.test(t) ? 'finished' : '');
     if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { pctNow = m[1]; g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
     if ((m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/))) { g('done').textContent = m[1]; g('total').textContent = m[2]; }
     if ((m = t.match(/✅\\s*(\\d+)/))) g('pass').textContent = m[1];
@@ -192,12 +195,13 @@ const PAGE = `<!doctype html>
       b.className = 'banner dead';
       b.textContent = '💀 Run DIED mid-flight at ' + (pctNow || '?') + '% — heartbeat ' + mm + ' min old';
       g('state').textContent = 'dead';
-    } else if (status === 'passed' || status === 'failed') {
-      var ok = status === 'passed' && failsNow === 0;
+    } else if (status === 'finished') {
+      var ok = failsNow === 0;
       b.className = ok ? 'banner finished-ok' : 'banner finished-bad';
       b.textContent = ok ? '✔ FINISHED — all green'
                          : '⚑ FINISHED — ' + failsNow + ' failed';
       g('state').textContent = 'finished ' + (ageMin < 1 ? 'just now' : mm + ' min ago');
+      g('eta').textContent = '—';
     } else {
       b.className = 'banner';
       b.textContent = '';
@@ -269,9 +273,9 @@ const PAGE = `<!doctype html>
     if (status === 'running' && p >= 90 && !rang90) {
       rang90 = true; beep([[660, 0, 140], [880, 180, 220]]);                    // two-tone: almost there
     }
-    if ((status === 'passed' || status === 'failed') && !rangDone) {
+    if (status === 'finished' && !rangDone) {
       rangDone = true; rang90 = true;
-      if (status === 'passed' && failsNow === 0)
+      if (failsNow === 0)
         beep([[523, 0, 130], [659, 150, 130], [784, 300, 130], [1047, 450, 320]]); // major arpeggio: all green
       else
         beep([[440, 0, 250], [330, 300, 400]]);                                    // falling: finished with reds
