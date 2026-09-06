@@ -65,6 +65,16 @@ const PAGE = `<!doctype html>
   .bell{background:none;border:1px solid var(--edge);border-radius:8px;color:var(--muted);
         font-size:15px;padding:3px 9px;cursor:pointer;line-height:1}
   .bell.on{color:var(--warn);border-color:var(--warn)}
+  .mode{background:none;border:1px solid var(--edge);border-radius:8px;color:var(--muted);
+        font-size:12px;font-weight:700;padding:4px 9px;cursor:pointer;line-height:1;
+        letter-spacing:.05em}
+  #rawcard{display:none;background:var(--card);border:1px solid var(--edge);border-radius:14px;
+           padding:14px 16px}
+  #rawcard pre{margin:0;font:12.5px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;
+               overflow-wrap:anywhere;color:var(--ink)}
+  body.md .hero, body.md .rows, body.md .spec, body.md .banner, body.md .foot{display:none}
+  body.md #rawcard{display:block}
+  body.md .wrap{display:flex;flex-direction:column;max-width:760px}
   .pct{font-size:clamp(64px, 22vw, 110px);font-weight:800;line-height:.95;
        font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .state{font-size:15px;color:var(--muted)}
@@ -95,7 +105,8 @@ const PAGE = `<!doctype html>
 <div class="wrap">
   <div class="banner" id="banner"></div>
   <h1><span id="tier">Suite · RenderRanchy</span>
-      <span class="live"><button class="bell on" id="bell" title="bell / silent — rings at 90% and at the finish">🔔</button><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
+      <span class="live"><button class="mode" id="mode" title="styled view / the raw progress.md">MD</button><button class="bell on" id="bell" title="bell / silent — rings at 90% and at the finish">🔔</button><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
+  <div id="rawcard"><pre id="raw">waiting for data…</pre></div>
   <div class="hero">
     <div>
       <div class="pct" id="pct">—</div>
@@ -143,6 +154,7 @@ const PAGE = `<!doctype html>
   }, 1000);
   function render(t){
     var m;
+    g('raw').textContent = t;   // the raw view mirrors every delivery, live
     // the reporter's own status word: running mid-run, passed/failed at onEnd
     status = (m = t.match(/·\\s*(running|passed|failed)\\b/)) ? m[1] : '';
     if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { pctNow = m[1]; g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
@@ -204,6 +216,17 @@ const PAGE = `<!doctype html>
       try { localStorage.setItem('bell', soundOn ? '1' : '0'); } catch(_){}
       bellUi();
       if (soundOn) beep([[880, 0, 90]]); else pendingSeq = null;   // going silent drops anything queued
+    };
+    // styled dashboard vs the raw progress.md — a view preference, remembered
+    var md = false;
+    try { md = localStorage.getItem('view') === 'md'; } catch(_){}
+    function modeUi(){ document.body.className = md ? 'md' : '';
+      g('mode').textContent = md ? 'UI' : 'MD'; }
+    modeUi();
+    g('mode').onclick = function(){
+      md = !md;
+      try { localStorage.setItem('view', md ? 'md' : 'ui'); } catch(_){}
+      modeUi();
     };
   });
   function unlockAudio(){
