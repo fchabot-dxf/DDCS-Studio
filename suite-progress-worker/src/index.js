@@ -49,12 +49,15 @@ const PAGE = `<!doctype html>
   .spec span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
   .spec div{font-family:ui-monospace,Consolas,monospace;font-size:13px;
             overflow-wrap:anywhere;margin-top:4px}
-  .stale{display:none;background:var(--bad);color:#fff;border-radius:10px;
-         padding:10px 14px;font-size:14px;font-weight:600}
+  .banner{display:none;border-radius:12px;padding:12px 16px;font-size:16px;font-weight:700;
+          color:#fff;text-align:center}
+  .banner.finished-ok{display:block;background:var(--ok)}
+  .banner.finished-bad{display:block;background:var(--warn)}
+  .banner.dead{display:block;background:var(--bad)}
   .foot{font-size:12px;color:var(--muted);text-align:center}
 </style></head><body>
 <div class="wrap">
-  <div class="stale" id="stale">⚠ No fresh data — the run finished, died, or nothing is pushing.</div>
+  <div class="banner" id="banner"></div>
   <h1><span>Full suite · RenderRanchy</span>
       <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
   <div>
@@ -75,15 +78,16 @@ const PAGE = `<!doctype html>
   <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved</div>
 </div>
 <script>
-  var hb = 0, wsOpen = false;
+  var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
   function g(id){ return document.getElementById(id); }
   function render(t){
     var m;
-    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
+    // the reporter's own status word: running mid-run, passed/failed at onEnd
+    status = (m = t.match(/·\\s*(running|passed|failed)\\b/)) ? m[1] : '';
+    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { pctNow = m[1]; g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
     if ((m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/))) { g('done').textContent = m[1]; g('total').textContent = m[2]; }
-    g('state').textContent = t.indexOf('running') >= 0 ? 'running' : 'not running — last known state below';
     if ((m = t.match(/✅\\s*(\\d+)/))) g('pass').textContent = m[1];
-    if ((m = t.match(/❌\\s*(\\d+)/))) g('fail').textContent = m[1];
+    if ((m = t.match(/❌\\s*(\\d+)/))) { failsNow = +m[1]; g('fail').textContent = m[1]; }
     if ((m = t.match(/⚠\\s*(\\d+)/)))  g('flaky').textContent = m[1];
     if ((m = t.match(/⊘\\s*(\\d+)/)))  g('skip').textContent = m[1];
     if ((m = t.match(/⏱\\s*([\\dhms ]+?)\\s*·/))) g('elapsed').textContent = m[1].trim();
@@ -98,9 +102,27 @@ const PAGE = `<!doctype html>
   }
   function tick(){
     if (!hb) return;
-    var mm = Math.round((Date.now() - hb) / 60000);
-    g('age').textContent = mm < 1 ? (wsOpen ? 'live' : 'recent') : mm + ' min old';
-    g('stale').style.display = mm >= 5 ? 'block' : 'none';
+    var ageMin = (Date.now() - hb) / 60000;
+    var mm = Math.round(ageMin);
+    g('age').textContent = ageMin < 1 ? (wsOpen ? 'live' : 'recent') : mm + ' min old';
+    var b = g('banner');
+    // Three distinct states, using the reporter's OWN semantics (a running heartbeat
+    // older than 120s means the run died — documented in the reporter itself):
+    if (status === 'running' && ageMin * 60 > 120) {
+      b.className = 'banner dead';
+      b.textContent = '💀 Run DIED mid-flight at ' + (pctNow || '?') + '% — heartbeat ' + mm + ' min old';
+      g('state').textContent = 'dead';
+    } else if (status === 'passed' || status === 'failed') {
+      var ok = status === 'passed' && failsNow === 0;
+      b.className = ok ? 'banner finished-ok' : 'banner finished-bad';
+      b.textContent = ok ? '✔ FINISHED — all green'
+                         : '⚑ FINISHED — ' + failsNow + ' failed';
+      g('state').textContent = 'finished ' + (ageMin < 1 ? 'just now' : mm + ' min ago');
+    } else {
+      b.className = 'banner';
+      b.textContent = '';
+      g('state').textContent = status === 'running' ? 'running' : 'waiting for data…';
+    }
   }
   function connect(){
     try {
