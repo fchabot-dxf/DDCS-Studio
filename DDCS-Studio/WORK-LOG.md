@@ -78476,3 +78476,80 @@ entry for this same op: a real gap named with its exact cost, not forced past th
 No code changed — nothing to run beyond what already passed on the prior commit. `git status` clean except
 this entry.
 
+## t2685 — SURFACING SKIM: the "Type 2" sim-only marker the dispatch asked for is ALREADY BUILT (t1648) —
+measured, proven with new coverage, documented; no new mechanism
+
+t2683 refuted feeding a marker INTO surfacing skim's own emit (the true seat is a runtime jog, unknowable at
+authoring time). This turn's own redesign is different in kind — a marker whose position is SIM-ONLY, read
+only by the preview, never by emit — and the owner settled a general vocabulary for it: **TYPE 1
+(absolute/G90)** — position IS emitted, dragging changes the G-code (surfacing Normal: `originX`/`originY`).
+**TYPE 2 (relative/G91)** — position is sim-only, dragging changes only the preview (surfacing Skim:
+`jogX`/`jogY`). THE BUILD asked for: (1) a declared sim/preview start marker, (2) defaulting to the current-
+correct start, (3) draggable in the preview, (4) the drag reaches no emit path.
+
+**MEASURED FIRST, per the dispatch's own explicit instruction — and the finding is that all four are already
+true, built at t1648, extended at t1674**:
+1. `startMarkerTarget(zMode)` (surfacingData.js:233) already declares the marker target, mode-keyed: Normal →
+   `originX`/`originY` (Type 1), Skim → `jogX`/`jogY` (Type 2) — the SAME declaration BOTH faces (twin +
+   built-in) read.
+2. **Default = the current-correct start, confirmed live, not assumed**: `jogX`/`jogY` have no entry in
+   `SURFACING_DEFAULTS` at all — they resolve purely through `_n(p.jogX, 0)`'s own fallback in
+   `surfacingPreviewGeometry`/`surfacingView.js`. A live query (`U.defaultParams(def)`, `surfacingPreviewGeometry`)
+   confirmed the Skim marker renders at **(0, 0)** by default today — the SAME point Normal mode's own
+   `originX`/`originY` default to (a coincidence of both defaulting to 0, not a declared relationship) — the
+   stock's own origin corner, a sensible, already-correct default. Nothing to change here.
+3. Draggable: `sf_pos` (the ONE declared point-handle target both modes share, per `startMarkerTarget`'s own
+   mode-keyed mapping) — already wired, already drag-tested (t1648/t1674, both faces).
+4. Writes nothing to emit: `jogX`/`jogY` are never bound to any socket — dragging writes through a dedicated
+   fallback store (`previewOnlyParams`/`setPreviewOnlyWriteHandler`, t1648) specifically because the standard
+   form-write-back path assumes every param binds to a real DOM `[data-param]` element, which these don't.
+
+**Confirmed via 9 ALREADY-GREEN tests, re-run this turn, unchanged and still green**
+(`surfacing-start-position-1648.spec.js`, `surfacing-skim-rect-follows-marker-1674.spec.js`): draggable in
+BOTH the wizard and the twin face; mode-independent (jogX/Y and originX/Y persist independently across a
+flip); emit BYTE-IDENTICAL under a real drag, both faces; the preview-seed shape is one-sourced (wizard and
+twin call the SAME `startMarkerVarSeed`).
+
+**New coverage this turn, filling the ONE combination the existing suites don't already exercise**
+(`surfacing-skim-marker-type2-2685.spec.js`):
+- Emit byte-identical across a **normal+skim+DATUM** sweep (`stockAttach`/`pathDatum` ∈ {nn, cc, pp}) × three
+  wildly different jogX/jogY pairs each — the dispatch's own exact bar, not previously swept together with
+  datum. All 6 zMode×datum combinations: identical emit regardless of jogX/jogY.
+- **Structural proof**, live not grepped-by-hand: fetched `surfaceraster.js`'s (the ACTUAL emit builder) own
+  raw source text and asserted it contains NEITHER `jogX` NOR `jogY` anywhere — not "unread today," no code
+  path that COULD read them, confirmed by the file's own bytes at test time, self-updating if that ever
+  changes.
+- The requested screenshot: `verification/t2685-surfacing-skim-marker.png` — the real wizard, switched to
+  Skim mode (confirmed via the live form field's own value, not assumed), showing the "pos" marker rendered
+  at its default (0,0).
+
+**Why `def.sim.starts` (the dispatch's own named alternative) would be the WRONG mechanism, cost reported as
+asked**: read corner's own `CORNER_SIM_STARTS`/`cornerSimStartsProvider` (cornerData.js:136-200, ~70 lines) —
+built for CHAINED, MULTI-PASS markers whose positions are COMPUTED from a closed `anchor:'frac'|'edge'|
+'radial'|'lathe'` vocabulary over the STOCK geometry (corner's own 2-3 probe passes, each derived from the
+previous). Surfacing's skim marker is the opposite shape on every axis that matters: exactly ONE marker, not
+chained; a FREE point with NO computed anchor at all (the file's own t1648 comment: "the marker is a FREE jog
+point... carries NO datum-corner anchor"); a value the operator TYPES/DRAGS, never derived from stock. Forcing
+`def.sim.starts` here would mean inventing a NEW anchor kind ("no anchor, pure operator entry") the existing
+`makeProvider` vocabulary has no slot for — not a cost-saving reuse, a mismatched-shape retrofit. The EXISTING
+`jogX`/`jogY` + `previewOnlyParams` mechanism is already the right-shaped, cheaper answer.
+
+**Captured in code** (surfacingData.js, `START_MARKER_TARGET`'s own header, extended — comment-only, no
+functional change): the Type 1/Type 2 vocabulary, generalized past this one op, for the next wizard that
+needs a start-position marker — matching BACKLOG #88's own "declare the concept now, build the engine when a
+real 2nd/3rd case earns it" ruling (this op is the 1st real Type-2 case; the vocabulary is worth writing down
+even though nothing new needed building for it).
+
+**No new mechanism, no op behavior change** — one comment-only doc addition, three new tests (all pass,
+non-vacuous by construction: the datum sweep genuinely varies 3 different jogX/jogY pairs per combination,
+and the structural-proof assertion would fail immediately if `jogX`/`jogY` ever appeared in the emit
+builder's own source).
+
+### VERIFY
+
+Full suite run despite the change being doc+test-only, per the dispatch's own explicit TIER instruction —
+read from `test-results/summary.json`'s own `stats`, not the live page (#87 still open): test:node 236/236.
+test:e2e `expected:3219, unexpected:0, flaky:6, skipped:28`. Zero failed titles. `git status` clean except
+this entry, the one comment-only doc change (`surfacingData.js`), and the new test file
+(`surfacing-skim-marker-type2-2685.spec.js`) + its one screenshot.
+

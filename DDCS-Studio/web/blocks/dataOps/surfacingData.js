@@ -230,6 +230,24 @@ export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack()
 // `startMarkerTarget(zMode)`, so there is exactly one place that ever states "skim writes jogX/jogY, normal writes
 // originX/originY" — a second wizard with a relative-vs-WCS mode would export + reuse the SAME shape (see
 // WORK-LOG for the rollout survey), not restate it.
+//
+// ⭐ t2685 — THE VOCABULARY THIS MAPPING IS AN INSTANCE OF (owner-settled, captured here for the next wizard that
+// needs a start-position marker, not just surfacing): a preview marker is one of exactly TWO types, and the
+// G-code's own MOVE KIND (G90 vs G91) decides which. TYPE 1, absolute/G90 — the position IS EMITTED; dragging
+// the marker changes the G-code (Normal/WCS here: originX/originY, a real bound field). TYPE 2, relative/G91 —
+// the position is SIM-ONLY; dragging changes only the preview, never the emit (Skim here: jogX/jogY). A G91 move
+// carries a DISTANCE, not a standalone coordinate — the absolute reference it's relative to is a runtime/machine
+// fact (here: wherever the operator physically jogs, read from `#790/#791/#792` at RUN TIME — see
+// `surfaceraster.js`'s own "a skim body is measured from wherever the operator jogged to"), unknowable at
+// authoring time, so a Type 2 marker's own position is necessarily a PREVIEW GUESS, never a real coordinate.
+// t2685 confirmed (not built — this exact marker already existed, built at t1648, proven byte-identical-emit
+// at t1648/t1674/t2685) that Skim's own `jogX`/`jogY` mechanism already IS a correctly-shaped Type 2 marker:
+// declared target, defaults to the current-correct start, draggable in the preview, its own write-back
+// (`previewOnlyParams`, panelTypes.js) reaches nothing an emit builder ever reads. `surfaceraster.js` (the
+// actual G-code builder) carries zero references to `jogX`/`jogY` — not merely unread today, no code path
+// that could read them. See WORK-LOG t2685 for the full measurement and why `def.sim.starts`
+// (`cornerSimStartsProvider`'s own shape) would be the WRONG mechanism here: it's built for CHAINED,
+// stock-anchor-computed multi-pass markers, not a single free-floating, no-anchor operator guess.
 export const START_MARKER_TARGET = {
     normal: { x: 'originX', y: 'originY' },
     skim: { x: 'jogX', y: 'jogY' },
