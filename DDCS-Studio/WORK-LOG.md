@@ -77850,3 +77850,41 @@ next full run, with a different symptom).
 
 Documentation-only addition to an existing, established file — no code path touched, no suite to run.
 `git status` clean except this entry and `context/VERIFICATION-DISCIPLINE.md`.
+
+## t2671 — THE LAST TWO NAMED CRUMBS, then the loop PARKS
+
+Two small, docs-only closes, grounded the same way as t2669's own rewrite (checked source, not assumed):
+
+1. **`CONFIGS.md`'s Rendezvous vocabulary row** described only R2. Now names all THREE backends
+   (`config.backend`: `local`/`r2`/`drive`), with the same `[TO TEST]`/shipped distinction t2669's
+   `ARCHITECTURE.md` rewrite already established (`r2.py` excluded from the shipped exe, `boto3` not
+   bundled; `drive.py` stdlib-only and the real default cloud path since BACKLOG #81/t2659).
+2. **`ROADMAP.md`'s last unmarked beacon mention** (Phase 2's own "Verify" line, "sim-beacon tracked job")
+   — every OTHER beacon mention in the file already carries `[REMOVED t2649, BACKLOG #78]`; this was the one
+   that didn't. Struck through + tagged the same way, matching the file's own established convention rather
+   than inventing a new one.
+
+Grepped both files afterward: zero unmarked beacon mentions remain in `ROADMAP.md`, and `CONFIGS.md`'s own
+one other beacon mention (line 64) was already correctly tagged.
+
+### VERIFY
+
+Docs-only, no suite (per this turn's own TIER). Both edits read back cleanly (table renders, strikethrough
+renders). `git status` clean except this entry and the two edited files.
+
+### THE LOOP PARKS HERE
+
+Per this turn's own explicit instruction: no further self-generated dispatch after this one. Everything filed
+this session is either done, owner-gated, or FAIRY-gated (BACKLOG #80's own queue, itself parked on "fairy
+wont be running soon"). Inventing work to avoid parking is exactly the scope-creep this instruction is
+guarding against.
+
+**State for a returning session:** the suite is clean (`npm test` last read zero failed, t2667), both
+standing test-suite reds are closed with their root causes recorded, the beacon-era doc debt is closed
+(ARCHITECTURE.md/README.md rewritten t2669, CONFIGS.md/ROADMAP.md's last crumbs closed here), and
+`context/VERIFICATION-DISCIPLINE.md` now names the scaling-budget family at 3 members. **The next-arc pick is
+with the owner** — no item in this file, `BACKLOG.md`, or the two ARCs' own docs is currently blocking that
+choice. Named candidates on the table (not a recommendation, just what's visible): the tracking-percent UI
+(BACKLOG #80 item 2, itself FAIRY-gated), CAM hand-edit, macOS packaging, Blockly drag-feel (gap 5, named
+t2661/t2665 but not sized), controller porting (V4.1-first, per `master-ddcs-file-is-reframed-backup`'s own
+`[[porting-to-other-controllers]]` pointer), or a fresh owner idea.

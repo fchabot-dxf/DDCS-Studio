@@ -10,7 +10,7 @@ is the module-level map; this file is the **deployment + vocabulary + future-sea
 |---|---|---|
 | **Console** | the web app (App 1) — operator-facing UI | one HTML/CSS/JS codebase; submit · queue/tracker · files · admin |
 | **Gateway** | fairy (App 2) — the Python service at the machine | holds machine identity, **negotiates the config**, bridges to the controller |
-| **Rendezvous** | where Console and Gateway meet | **R2** (cloud) — they never connect directly in cloud mode |
+| **Rendezvous** | where Console and Gateway meet | one of THREE backends (`config.backend`): **local** (single-PC testing), **R2** (the developer's own bucket — written, `[TO TEST]` live, and structurally excluded from the shipped exe, `boto3` not bundled), or **Drive** (the operator's OWN Google Drive — stdlib-only, ships in the exe, the real cloud path; auto-selected once they sign in and never explicitly choose otherwise, BACKLOG #81). In cloud mode (R2 or Drive) Console and Gateway never connect directly. |
 | **API** | the Cloudflare Worker fronting R2 | authed proxy so the browser holds no keys. **Not** "gateway" — that's fairy. |
 | **Protocol** | the contract both obey | [`shared/PROTOCOL.md`](shared/PROTOCOL.md) |
 

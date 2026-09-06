@@ -32,8 +32,8 @@ types" (tracked/deliver-only) split it drove are gone — every job now delivers
 - **Build:** vanilla **ES6 modules + manager classes**; **view registry**; **client seam** (`LocalClient` first);
   views **Submit · Queue/Tracker · Files · Admin**; **connection-status-aware** UI (live/mirror/offline);
   self-contained (no CDN).
-- **Verify:** Gateway local-server + browser → deliver-only submit, sim-beacon tracked job, file list+delete,
-  admin config. **Offline config works end-to-end.**
+- **Verify:** Gateway local-server + browser → deliver-only submit, ~~sim-beacon tracked job~~
+  **[REMOVED t2649, BACKLOG #78]**, file list+delete, admin config. **Offline config works end-to-end.**
 
 ## Phase 3 — Cloud path  — ✅ DONE (deployed live 2026-06-07)
 - **Goal:** cloud config — submit from anywhere; Gateway polls R2.
