@@ -78408,3 +78408,71 @@ confirmed twice. `git status` clean except this entry, the two source files, the
 one collateral test fix (`rect-handle-block.spec.js`, the now-hidden VALUEFIELD UI step removed), and the
 four new screenshots.
 
+## t2683 — SURFACING'S SKIM ANCHOR: MEASURED, NOT BUILT — the "seat marker" the dispatch's own model needs
+does not exist, and t1648 already tried and rejected the closest thing to it
+
+Dispatched as proposal (b) — surfacing's skim start (`jogX`/`jogY`) reframed from raw form-field coordinates
+to a MARKER-anchored offset (the owner's own anchor+offset model: absolute = anchor is origin, relative =
+anchor is a marker). The dispatch's own explicit safety valve: "CONFIRM there's a real seat marker to anchor
+to BEFORE building… if it's pure runtime, say so and report what declaring one costs — do not invent a marker
+that isn't there." **Measured. It's pure runtime. Reported, not built — same call t2673 already made for this
+exact op's own `sf_pos`/`sf_size` handles, for an adjacent reason.**
+
+**What was actually read, before anything else** (`surfacingData.js`, `surfaceraster.js`, `surfacingView.js`,
+and t1648's own WORK-LOG entry — the turn that FIRST built this exact mechanism):
+- `startMarkerTarget(zMode)` (surfacingData.js:233-237): Normal → `{x:'originX', y:'originY'}`, a REAL bound
+  field (placeonstock's own offX/offY, reaches emit). Skim → `{x:'jogX', y:'jogY'}` — confirmed, by the
+  file's own t1648-era comment AND independently by `surfaceraster.js`'s own emit code (below), that these
+  are NEVER bound to any emit socket at all.
+- `surfaceraster.js:308-361,388-390,436-462,880-1011`: a skim body's ACTUAL emitted G-code reads the LIVE
+  WORK POSITION straight off the controller's own active-WCS registers (`#790/#791/#792`, `FRAME_SRC`) **AT
+  MACHINE RUNTIME** — "a skim body is measured from wherever the operator jogged to" (the file's own words,
+  line 354). The wizard has NO knowledge of and NO control over that position at authoring or preview time —
+  it is determined by where a human physically jogs the tool the moment the program actually runs, after this
+  turn's own work is long finished being useful.
+- `startMarkerVarSeed(params)` (surfacingData.js:243-245): `jogX`/`jogY` seed `#790/#791/#792` for the
+  PREVIEW/TRACE ONLY — "the emitted program is untouched (it already reads the live frame at the machine)".
+  Confirmed a THIRD way: `surfacingDataDef()` itself (line 379-406) declares no `def.sim`/`simStartsProvider`
+  at all — nothing `opSimStarts`/`resolveRelToIndex` (the machinery every existing marker, including t2677's
+  own `relToRow`, resolves through) has anything to find for this op. `def.entryPoint` is a DIFFERENT, already-
+  named concept (the program-start emitting-square marker), not the skim seat.
+- **t1648's own WORK-LOG entry (turn 1648, quoted in full above in this file) explicitly considered this
+  exact question** — whether jogX/jogY should ride the SAME marker mechanism `simStartParams` gives
+  alignment/rotaryClock's own relative-reposition deltas — and REJECTED it: "`simStartParams` was built for
+  markers with NO bound field at all… a different shape than 'target flips between a real field and a
+  preview-only field by mode.'" Built instead: a small, DELIBERATELY NOT-marker-shaped fallback write-back
+  store (`previewOnlyParams`/`setPreviewOnlyWriteHandler`) specifically because jogX/jogY have no bound socket
+  a marker's own resolution machinery could ever write through.
+
+**Why a marker genuinely can't be declared here, not just "hasn't been yet"**: every existing marker
+(`simstart` rows, `opSimStarts`/`resolveRelToIndex`) resolves a position COMPUTED FROM THIS OP'S OWN DECLARED
+PARAMS at authoring/preview time — that is the whole contract `relToRow`/`markerAnchorCoord` (t2679) depend
+on. Skim's true "seat" is not computable at all until a human physically jogs the machine at run time — it is
+a MACHINE RUNTIME fact, the exact class ["GUI plugs into authored, visible things"](memory) and BACKLOG #88
+already rule OUT of the authoring-visible search/anchor surface (a value needing a non-human, machine-side
+name is plumbing, not authoring — the same reasoning that already excludes controller `#N` vars from
+`anchorValueField.js`'s own candidate list). Forcing a marker anyway would mean either (a) wrapping jogX/jogY
+in a `simstart` row whose own "resolved position" is just jogX/jogY's OWN current value again — a zero-content
+relabel, not a second independent anchor source, and not what "marker+offset" is supposed to mean — or (b)
+inventing a genuinely new, unprecedented "runtime-only, no-real-geometry" marker KIND with no clear meaning
+and no other consumer. Either is a real design decision, not a representation fix, and the dispatch's own
+absolute bar ("emit must stay byte-identical… if it changes ANY emitted output, STOP") already forecloses (b)
+regardless, since a real anchor mechanism would need to resolve to SOMETHING at preview time that (a) shows
+this op's own `sf_pos` handle just doesn't have available.
+
+**What this turn does NOT touch, and why nothing is broken**: no code changed. `jogX`/`jogY` stay exactly
+what t1648 built them as — a deliberately non-marker-shaped preview-only pair, honestly representing "the
+operator's own best-guess preview of where they'll jog," not a mislabeled absolute coordinate pretending to
+be authoritative (the emit itself never reads them at all, so there is no "lying" reaching the machine — the
+dishonesty the dispatch named lives, if anywhere, in the FACE not saying this is a guess/preview, which is a
+labeling question t2681's own `def.labels` mechanism could address on a FUTURE turn without any marker at
+all — named here, not built, since this turn's own scope was the marker fix specifically).
+
+Reported back to the advisor for the next design decision — same shape as t2673's own "measured, not built"
+entry for this same op: a real gap named with its exact cost, not forced past the ceiling that gap describes.
+
+### VERIFY
+
+No code changed — nothing to run beyond what already passed on the prior commit. `git status` clean except
+this entry.
+
