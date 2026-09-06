@@ -58,7 +58,7 @@ const PAGE = `<!doctype html>
 </style></head><body>
 <div class="wrap">
   <div class="banner" id="banner"></div>
-  <h1><span>Full suite · RenderRanchy</span>
+  <h1><span id="tier">Suite · RenderRanchy</span>
       <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
   <div>
     <div class="pct" id="pct">—</div>
@@ -121,6 +121,9 @@ const PAGE = `<!doctype html>
       if (l.charAt(0) === '\`' && l.indexOf('.spec.js') > 0) g('spec').textContent = l.replace(/\`/g, '');
     }
     if ((m = t.match(/heartbeat (\\S+?)[\\s—]/))) hb = Date.parse(m[1]) || 0;
+    // The tier, DECLARED by the reporter (tier: <npm script>) once it learns to say it —
+    // displayed verbatim, never inferred from test counts.
+    if ((m = t.match(/tier:\\s*([\\w:.-]+)/))) g('tier').textContent = m[1] + ' · RenderRanchy';
     tick();
   }
   function tick(){
