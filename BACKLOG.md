@@ -8306,6 +8306,15 @@ order.]**
 5. **`bench/04-modbus-slave-test-plan.md`** — written, never run.
 6. **The five vendor questions** drafted with measurements (`context/CHANNELS.md`, commit `8fb3855b`) — send
    when the owner wants; the measurements behind them do not go stale.
+7. **`verify/V20_read_2500.nc` line 3's comment carries a `[` bracket inside `(...)`** — flagged red by
+   `trig-lift-plan-1466.spec.js` LOCK 5 (t2667, checked against the lint's own rule, not just the red): the
+   comment closes at the first `)`, so `[touch - #2500]` and everything after it on that line parses as CODE
+   on a real DDCS run — the exact hazard `verify/HANDOFF.md`'s safety rule 1 exists for (machine-learned twice,
+   already fixed once in V13_trig.nc for the same reason). Needs rewriting in prose (mirrors the fix already
+   applied to V12/V13/V14/V15) before this macro's next machine visit — one line, no logic change, but a
+   controller-verify macro's exact bytes are FAIRY's own to touch, not blind-edited from this seat. LOCK 5
+   itself stays live for every OTHER macro; this one file is named skip-with-reason pointing HERE
+   (`trig-lift-plan-1466.spec.js`) until fixed.
 
 ⚠ **Standing consequence while this list sleeps:** the main-branch deploy does NOT wait on item 1. Tracking
 ships labelled live-untested (the release note already says so); FAIRY's check upgrades the label, it does not

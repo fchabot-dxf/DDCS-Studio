@@ -60,9 +60,19 @@ export async function handleScreenPos(page, hid) {
  * @param {number} opts.dy             total vertical pointer delta (px)
  * @param {number} [opts.steps=10]     number of intermediate mouse-move frames
  * @param {number} [opts.frameDelayMs=16]  wait between frames (one paint tick)
- * @param {number} [opts.settleMs=400] wait after pointer-up before sampling the "after" position — long enough
- *                                     to catch a POST-release snap-back (t2447's own bug lands exactly here,
- *                                     one render after `active` goes null), short enough to stay a fast test
+ * @param {number} [opts.settleMs=400] the MINIMUM wait after pointer-up before sampling the "after" position —
+ *                                     long enough to catch a POST-release snap-back (t2447's own bug lands
+ *                                     exactly here, one render after `active` goes null). t2667 (BACKLOG #57's
+ *                                     own scaling-budget class, root-caused): a FIXED sleep races real wall-
+ *                                     clock render completion — fine uncontended, but under the full suite's
+ *                                     real 4-worker contention the paint the sleep was timed for can still be
+ *                                     mid-flight when it ends, sampling a transient position instead of the
+ *                                     settled one (the recurring `sf-pos-snapback` load-flake, clean in every
+ *                                     isolated run this session and many prior ones). Now POLLS the handle's
+ *                                     own rect until two consecutive samples agree (settled), instead of
+ *                                     trusting the clock — waits exactly as long as the render actually takes,
+ *                                     never less (still catches a real snap-back, which settles at the WRONG
+ *                                     place, not never), never blocked by contention eating a fixed budget.
  * @returns {{before:{x,y}, mid:{x,y}, after:{x,y}}}  real screen positions; throws if the handle never appears
  */
 export async function dragHandleRenderTruth(page, hid, { dx, dy, steps = 10, frameDelayMs = 16, settleMs = 400 } = {}) {
@@ -79,10 +89,28 @@ export async function dragHandleRenderTruth(page, hid, { dx, dy, steps = 10, fra
     }
     const mid = await handleScreenPos(page, hid);
     await page.mouse.up();
-    await page.waitForTimeout(settleMs);
-    const after = await handleScreenPos(page, hid);
+    await page.waitForTimeout(settleMs);   // the minimum settle every existing call already tunes per-gesture
+    const after = await settledHandleScreenPos(page, hid);
 
     return { before, mid, after };
+}
+
+/** t2667 — poll `handleScreenPos` until two consecutive samples (50ms apart) report the SAME position (≤0.5px),
+ *  or `ceilingMs` elapses (a genuinely-stuck/never-settling render, itself worth surfacing rather than hidden
+ *  behind an infinite wait). Ceiling generous on purpose (4s): this only extends the wait when contention
+ *  actually starves the render, and a real defect that never settles still fails the SAME assertion afterward
+ *  — polling longer costs nothing but wall-clock, it can never turn a genuine bug green. */
+async function settledHandleScreenPos(page, hid, ceilingMs = 4000) {
+    const pollMs = 50;
+    let prev = await handleScreenPos(page, hid);
+    const deadline = Date.now() + ceilingMs;
+    while (Date.now() < deadline) {
+        await page.waitForTimeout(pollMs);
+        const cur = await handleScreenPos(page, hid);
+        if (prev && cur && Math.hypot(cur.x - prev.x, cur.y - prev.y) <= 0.5) return cur;
+        prev = cur;
+    }
+    return prev;
 }
 
 /**

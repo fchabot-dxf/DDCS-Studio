@@ -246,6 +246,17 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 for (const entry of PREVIEW_MUTATIONS) {
     test(`t2463 manifest [${entry.id}]: RED under the mutation, GREEN once removed — ${entry.defect}`, async ({ page }) => {
+        // t2667 — root-caused the recurring sf-pos-snapback load-flake: NOT the settle-wait race
+        // dragRenderTruth.js's own settledHandleScreenPos now closes (a real, separate contributor) — under
+        // the full suite's real 4-worker contention, this run's own failure timed out INSIDE the drag gesture
+        // itself (page.mouse.move, before any settle logic even runs), blowing Playwright's default 60s test
+        // timeout. Each entry here does TWO full boot+drag cycles (mutated, then clean) in one test — real
+        // work, not a hang — that occasionally exceeds 60s under genuine scheduling contention, the SAME class
+        // field-help-798/t2621 already named for an all-ops loop, just a wall-clock budget here instead of a
+        // count-scaled one (no natural "ops.length" to scale against — the per-entry work is roughly constant,
+        // just contention-sensitive). Applied to every entry, not just sf-pos-snapback: all of them share this
+        // same double-boot-and-probe shape and are equally exposed.
+        test.setTimeout(120_000);
         // ── phase 1: mutated — the gate must go RED ──────────────────────────────────────────────────
         await applyMutations(page, entry.files);
         const probe = probeFor(entry);
