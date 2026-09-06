@@ -77836,3 +77836,17 @@ R2 (cloud)" vocabulary line is now incomplete (Drive exists and is the real defa
 still carries a beacon mention in its own opening paragraph — neither was in this turn's dispatch (only
 ARCHITECTURE.md/README.md + the JOB-RULES.md/PROTOCOL.md verify), so left untouched rather than scope-creeping
 into two more files on the strength of the same investigation.
+
+## t2669 (SMALL ITEM, separate commit) — the scaling-budget family note in VERIFICATION-DISCIPLINE.md
+
+`context/VERIFICATION-DISCIPLINE.md` rule 19, new: t2667's own second `sf-pos-snapback` cause made the
+scaling-budget family a THIRD member (`form-kernel-720`/t2621, `field-help-798`/t2625, now the manifest's own
+wall-clock ceiling). Documented so the fourth instance is recognized on sight rather than re-diagnosed from
+scratch, with the concrete "don't accept an isolated green as proof under a contention-class fix" lesson
+t2667 itself just relearned live (its own settle-poll fix passed 9/9 in isolation and STILL failed on the
+next full run, with a different symptom).
+
+### VERIFY
+
+Documentation-only addition to an existing, established file — no code path touched, no suite to run.
+`git status` clean except this entry and `context/VERIFICATION-DISCIPLINE.md`.

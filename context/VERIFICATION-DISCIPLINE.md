@@ -263,3 +263,42 @@ this rule is the refinement: that grep step narrows and explains, the full-suite
 TITLE, not count) is what actually closes the claim. Prefer a RUNTIME census (queries live registered state,
 like `twin-section-invariant-2381.spec.js`'s own `hasTreeLayout()` check) over a TEXT census wherever the two
 are both available for the same question — the runtime one cannot have this specific blind spot.
+
+## 19. ⭐ THE SCALING-BUDGET FAMILY — a fixed timing constant that was fine uncontended becomes a real,
+reproducible flake under the full suite's actual worker contention; three members now, recognize the fourth
+on sight
+
+Three independent instances, same underlying shape: a test's own timing budget (a Playwright test timeout, a
+settle sleep) was sized against how long its work takes ALONE, and the full suite's real parallel-worker
+contention (not a hypothetical — the actual 4-worker run this repo gates on) can genuinely push real,
+honestly-necessary work past that budget. None of these were logic bugs; all three were fixed by giving the
+test more real room, not by making the work faster or "fixing a race" in the product.
+1. **`form-kernel-720.spec.js`'s own (e) test (t2621)** — an open/close loop over all ~32 registered twins,
+   inheriting Playwright's default 60s test timeout. Fine uncontended; timed out under real contention once
+   the per-op work grew heavier. Fixed with `test.setTimeout(Math.max(90_000, ops.length * 6000))` — a
+   budget SCALED to the actual loop size, not a bigger magic number guessed once.
+2. **`field-help-798.spec.js` (t2625)**, the SAME class caught by a full-suite run surfacing a NEW failure a
+   migration had introduced (see rule 17's own account) — an all-registered-op loop with no scaling budget at
+   all, timing out at the identical ~14m mark across two full runs. Fixed with the identical
+   `test.setTimeout(Math.max(90_000, ops.length * 6000))` pattern, not a novel one.
+3. **`preview-mutation-manifest-2463.spec.js`'s `sf-pos-snapback` (t2667)** — no all-ops loop this time (no
+   natural `ops.length` to scale against), but the SAME shape in a different dimension: each manifest entry
+   does two full boot+drag cycles in one test, real work that occasionally exceeded the default 60s test
+   timeout under genuine scheduling contention — caught only by re-running the FULL suite a second time after
+   an earlier, real-but-insufficient fix (a settle-wait race in `dragHandleRenderTruth.js`) had already landed
+   and passed in isolation. Fixed with a flat `test.setTimeout(120_000)` (no count to scale against, so a
+   generous fixed ceiling instead).
+
+**How to apply, once you recognize this shape (a test that is fine alone but flakes specifically under the
+full suite, with a timeout or a just-short-of-threshold numeric miss as the symptom):**
+1. **Don't accept "flake, re-ran clean" as the fix.** An isolated green after touching the test proves the
+   change didn't break it standing alone — it does NOT prove the change addressed contention, which by
+   definition only shows up under the full suite's real parallel load. Re-run the FULL suite (not just the
+   one file) before calling a contention-class fix verified — instance 3 above was caught exactly this way:
+   the first fix passed 9/9 in isolation and STILL failed on the next full run, with a different symptom.
+2. **Size the budget to the real variable, when one exists** — `ops.length`/entry count/whatever the test's
+   own work scales with — rather than a bigger constant picked once. When no such variable exists (a single
+   test doing a fixed amount of real, interactive work, like instance 3), a generous FIXED ceiling
+   (2-3x the default) is the right shape instead — there is nothing to scale against.
+3. **Never shrink the work to fit the clock** — the fix is room, not speed. These are honest tests doing
+   honest work; the failure is a mismatch between the budget and real contention, not the test being slow.
