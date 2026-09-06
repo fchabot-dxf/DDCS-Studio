@@ -127,27 +127,8 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
-  <details class="spec" style="cursor:pointer">
-    <summary style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">what this page shows, and how to know it's telling the truth</summary>
-    <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px">
-      Every number comes from <b>the suite's own reporter</b> writing <code>test-results/progress.md</code> —
-      this page parses that file verbatim and never computes results of its own. The MD button shows the raw
-      file, so the styled view can always be checked against its source.<br><br>
-      <b>States:</b> <i>running</i> = the reporter says so and its heartbeat is fresh ·
-      <i>finished</i> = the reporter's final ratio line (green = zero failed) ·
-      <i>💀 dead</i> = still says running but the heartbeat passed the reporter's own 120s rule ·
-      <i>N min old</i> = the age of the last delivery, from the heartbeat inside the data, never this device's guess.<br><br>
-      <b>Clocks:</b> elapsed/ETA tick locally, anchored to the heartbeat — and freeze the moment the run
-      stops being provably alive, so a dead run's clock cannot lie.<br><br>
-      <b>Tier:</b> stamped by the reporter from the invoking npm script — declared, never inferred from
-      test counts.<br><br>
-      Delivery: file event → push → Durable Object → WebSocket (green dot = live; grey = polling fallback).
-      No model, no tokens, anywhere. Trust but verify:
-      <a href="/raw" style="color:var(--muted)">the raw data</a> ·
-      <a href="https://github.com/fchabot-dxf/DDCS-Studio/commits/main/suite-progress-worker" style="color:var(--muted)">every change to this page, with its reason</a>
-    </div>
-  </details>
-  <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved</div>
+  <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved ·
+    <a href="https://github.com/fchabot-dxf/DDCS-Studio/commits/main/suite-progress-worker" style="color:var(--muted)">changelog</a></div>
 </div>
 <script>
   var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
