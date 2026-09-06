@@ -344,10 +344,19 @@ test('DRIVE THE APP, THE t2525 BAR: a formfield placed FIRST (must-match picker 
         const r = h.getBoundingClientRect();
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     });
+    // t2651 (BACKLOG #78 census follow-up) — was a HORIZONTAL drag (handleRect.x + 60), which "worked" only
+    // because a fresh length_handle silently defaulted to AXIS=X (Blockly's own field_dropdown bug, t2643/
+    // t2649's census) regardless of its declared default. This block's own default is AXIS=Y — confirmed by
+    // this SAME file's other three tests, which already inject `axis: 'Y'` explicitly and (test 3's own
+    // comment) call it "the handle sits at the anchor + the param default (axis Y...)". canvasWidgets.js's
+    // `length` widget reads ONLY `w.y - d.ay` for a non-'x' axis (never w.x), so a horizontal-only drag now
+    // produces zero real delta along the handle's own axis — this test was unknowingly asserting the fresh-
+    // block default bug, not the t2525 mechanism it names. Fixed to drag VERTICALLY, matching the block's own
+    // real (now correctly-applied) default.
     await page.mouse.move(handleRect.x, handleRect.y);
     await page.mouse.down();
-    await page.mouse.move(handleRect.x + 60, handleRect.y, { steps: 15 });
-    await page.mouse.move(handleRect.x + 60, handleRect.y, { steps: 2 });
+    await page.mouse.move(handleRect.x, handleRect.y - 150, { steps: 15 });
+    await page.mouse.move(handleRect.x, handleRect.y - 150, { steps: 2 });
     await page.mouse.up();
     await page.waitForTimeout(300);
     const after = await page.evaluate(() => document.querySelector('#wiz_user_form [data-param="reach"]').value);

@@ -2,7 +2,14 @@ import { test, expect } from '@playwright/test';
 
 /**
  * t848 — RIDERS: (1) drill default = single; (2) pull-seed settings.machine.rapidRate from the dump G0-rate register;
- * (3) the gateway instrument estimate reads the ONE engine-trace time model (== the editor); (4) label humanization.
+ * (4) label humanization.
+ *
+ * t2651 (BACKLOG #78 census follow-up, found by the full-suite run, a genuine t2649 gap) — was ALSO (3): the
+ * gateway instrument estimate reads the ONE engine-trace time model (== the editor). It compared the beacon
+ * instrumenter's own `map.total_est_time_s` (`web/shared/js/instrument/instrument.js`) against the editor's
+ * `estimateProgram()`, proving the two independent implementations never diverged. The instrumenter is DELETED
+ * (t2649, BACKLOG #78, owner-directed 2026-09-04) — there is no more second estimate to compare against, so
+ * the claim this test made is void, not merely relocated. Removed rather than left importing a dead module.
  */
 test.beforeEach(async ({ page }) => { await page.goto('http://localhost:3211'); await page.waitForFunction(() => window.ddcsStudio); });
 
@@ -57,18 +64,6 @@ test('(2b) the seeded rapidRate stays a user-editable settings.machine field (ho
     });
     expect(r.absent, 'absent register → null (keep the honest default)').toBeNull();
     expect(r.setting, 'settings.machine.rapidRate is the editable field, default 6000').toBe(6000);
-});
-
-test('(3) the GATEWAY estimate == the EDITOR estimate (one engine-trace time model)', async ({ page }) => {
-    const r = await page.evaluate(async () => {
-        const { instrument } = await import('/shared/js/instrument/instrument.js');
-        const { estimateProgram } = await import('/engine/timeEstimate.js');
-        const prog = 'G21 G90\nG0 X50\nG1 X150 Y100 F800\nG1 X150 Y0\nG0 Z5\nM30';
-        const gateway = instrument(prog, { rapid: 6000 }).map.total_est_time_s;
-        const editor = estimateProgram(prog, { rapidRate: 6000 }).seconds;
-        return { gateway, editor };
-    });
-    expect(r.gateway, 'the gateway total_est_time_s reads the same engine estimate as the editor').toBeCloseTo(r.editor, 1);
 });
 
 test('(4) LABELS: drill/bore x0/y0/offZ + the entry pair are humanized (no bare camelCase)', async ({ page }) => {

@@ -477,8 +477,10 @@ function jsonDef(def) {
     // independently-hideable caption too, not just the enabler subset — `apply()` (registerDynExtension, below)
     // toggles it in the SAME loop that already toggles the value field/socket.
     const dynamicGated = !!(def.dynamic && def.fieldsFor);
+    let hasDropdown = false;   // t2651 — whether this block needs ddcs_dropdown_defaults wired in below
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
+        if (k === 'dropdown') hasDropdown = true;
         // t2385 (BACKLOG #42 piece 1) — a def MAY declare its own `labels: {field: 'friendly text'}` map so
         // the block FACE reads a human word (e.g. `dflt` -> "default") while the STORAGE key never changes —
         // `def.labels` is per-def, not the shared bare-field-name `DESCRIPTIONS` map above (that one is keyed
@@ -535,30 +537,17 @@ function jsonDef(def) {
         else if (k === 'picker' && RELTO_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'relTo', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
-        // t2643 (BACKLOG #71/#72) — ⚠ GENERAL DEFECT NAMED, NOT GENERALLY FIXED: Blockly's own built-in
-        // `field_dropdown` ALWAYS selects `options[0]` for a freshly-created block — its `fromJson` has no
-        // "initial value" property at all (confirmed live: adding a `value` key to the args0 object, tried
-        // first, was silently ignored — every custom field class above accepts `value`/`text`, but this is
-        // Blockly's own stock class, a different contract). So `def.defaults[f]` is NEVER consulted for ANY
-        // dropdown-kind field on ANY block in the registry — only each field's OWN OPTION ORDER decides its
-        // fresh-drag value. Fixing this in general (reordering every dropdown's own options to put its declared
-        // default first) is an UNMEASURED, registry-wide blast radius — the exact class of mistake t2641's own
-        // Part B just got burned by. Named here, left for its own turn, not guessed at under this turn's
-        // narrower mandate.
-        // ⭐ THE ONE INSTANCE FIXED HERE, contained: `feature_canvas.panel` — PANEL_TYPES' own key order (hence
-        // `optionsFor`'s returned order, since it's `Object.keys(PANEL_TYPES)`) put `'form'` (viz:false, hides
-        // the WHOLE visualization pane) first, so every freshly-dragged feature_canvas silently got the one
-        // option that makes it look completely empty. This IS t2639's own blank-canvas dead end, confirmed live
-        // (tests/panel-default-2643.spec.js): a fresh drag serialized PANEL='form'. Fixed by reordering THIS
-        // field's own options only (not PANEL_TYPES itself, which other consumers — the Save dialog's <select>,
-        // devMode.js — read in its own declared order for unrelated reasons) so 'form2d' (this block's own
-        // declared default, featureCanvas.js) sorts first; every other option stays reachable, just reordered.
+        // t2643 (BACKLOG #71/#72) — GENERAL DEFECT: Blockly's own built-in `field_dropdown` ALWAYS selects
+        // `options[0]` for a freshly-created block — its `fromJson` has no "initial value" property at all
+        // (confirmed live: adding a `value` key to the args0 object, tried first, was silently ignored —
+        // every custom field class above accepts `value`/`text`, but this is Blockly's own stock class, a
+        // different contract). So `def.defaults[f]` is never consulted by THIS declaration — the menu is
+        // built here in each field's own natural reading order (X/Y/Z, not "declared-default-first"; t2643's
+        // own `feature_canvas.panel` reorder hack is retired, see below), and `ddcs_dropdown_defaults`
+        // (registered near the other block extensions, below) applies `def.defaults[f]` to the field's VALUE
+        // once at init time instead — the declaration and the default are two separate concerns again.
         else if (k === 'dropdown') {
-            let opts = optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]);
-            if (f === 'panel' && def.type === 'feature_canvas') {
-                const i = opts.findIndex((o) => o[1] === def.defaults[f]);
-                if (i > 0) opts = [opts[i], ...opts.slice(0, i), ...opts.slice(i + 1)];
-            }
+            const opts = optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]);
             args0.push({ type: 'field_dropdown', name: FN(f), options: opts, tooltip: desc });
         }
         else if (k === 'checkbox') args0.push({ type: 'field_checkbox', name: FN(f), checked: def.defaults[f] !== false, tooltip: desc });
@@ -591,6 +580,7 @@ function jsonDef(def) {
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only
     if (def.kind === 'cam_field' || def.kind === 'param_field') block.extensions = [...(block.extensions || []), 'ddcs_camfield'];   // t1093/t1105 — lock the `param` routing key read-only (a hand-edit corrupts the binding join); param_field shares the lock
+    if (hasDropdown) block.extensions = [...(block.extensions || []), 'ddcs_dropdown_defaults'];   // t2651 — apply def.defaults into every dropdown field, once, at init (registerDropdownDefaultsExtension, below)
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -875,6 +865,51 @@ function registerCamFieldExtension(Blockly) {
     } catch (e) { /* already registered */ }
 }
 
+// t2651 (BACKLOG #78 census follow-up, t2649) — GENERAL FIX for t2643's own named-not-fixed defect: Blockly's
+// stock `field_dropdown` has no "initial value" property, so a fresh block always gets `options[0]` regardless
+// of `def.defaults[f]`. The census (t2649) measured this as 19 registry-wide mismatches (92 dropdown fields
+// scanned), 6 of them one shared root cause (SELECTS.axis lists X before Z). Reordering every field's own
+// options to put its declared default first — the fix t2643 used for the one case it contained
+// (`feature_canvas.panel`) — was REJECTED as the general fix: it would scramble the VISIBLE menu order
+// everywhere a list is reused (X/Y/Z is how a machinist reads axes; no default is worth a Z/X/Y menu), so it
+// fights the common case to fix the rare one. This applies `def.defaults[f]` directly to the field's VALUE
+// instead, once, at init — the menu keeps its own natural declared order, unconditionally, everywhere
+// (t2643's own per-field reorder in jsonDef() above is retired: this extension supersedes it).
+//
+// BLAST RADIUS IS FRESH DRAGS ONLY. A saved/loaded block's field values are applied by Blockly's OWN
+// deserializer strictly AFTER init() runs — the same ordering `ddcs_seccolor`/`ddcs_opunit` above already
+// document ("JSON load sets fields/shadows AFTER init") — so whatever this extension sets during init is
+// overwritten the instant a real saved value exists. Only a block with no saved value yet (a fresh flyout
+// drag) keeps what this extension set. Verified, not assumed: tests/dropdown-default-mechanism-2651.spec.js
+// drags a fresh block (gets the declared default) and round-trips a SAVED wizard byte-identical (the loader's
+// own value wins over this extension's).
+//
+// NEVER THROWS: an illegal default (a stale value left behind after an options list changes, or a genuine
+// typo) cannot be silently coerced into a legal one, so it falls back to today's behaviour (options[0], i.e.
+// simply leaving the field alone) with a LOUD console.warn — never a thrown error, which via
+// `defineBlocksWithJsonArray` would be one bad def taking the WHOLE PALETTE down with it.
+function registerDropdownDefaultsExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_dropdown_defaults', function () {
+            try {
+                const def = DEF_BY_TYPE[this.type];
+                if (!def || !def.defaults) return;
+                for (const f of fieldsOf(def)) {
+                    if (fieldKind(def, f) !== 'dropdown') continue;
+                    const declared = def.defaults[f];
+                    if (declared === undefined) continue;
+                    const field = this.getField(FN(f));
+                    if (!field) continue;
+                    const opts = optionsFor(def, f).map((o) => Array.isArray(o) ? o : [o, o]);
+                    const legal = opts.some((o) => String(o[1]) === String(declared));
+                    if (legal) field.setValue(String(declared));
+                    else console.warn(`ddcs_dropdown_defaults: ${this.type}.${f} declares default ${JSON.stringify(declared)}, not a legal option (${JSON.stringify(opts.map((o) => o[1]))}) — leaving the field at its own initial value.`);
+                }
+            } catch (e) { /* never break a block's init over a cosmetic default */ }
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
@@ -887,6 +922,7 @@ export function installBlockly(Blockly) {
     registerSecColorExtension(Blockly);
     registerOpunitExtension(Blockly);   // t1071 — the opunit chip's friendly label + read-only routing key
     registerCamFieldExtension(Blockly);   // t1093 — the cam_field chip's read-only param routing key
+    registerDropdownDefaultsExtension(Blockly);   // t2651 — apply def.defaults into every dropdown field's VALUE, once, at init
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 

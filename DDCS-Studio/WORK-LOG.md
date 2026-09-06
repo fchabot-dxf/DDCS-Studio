@@ -76746,3 +76746,110 @@ beacon bug" are unchanged — neither is documentation a reader consults to unde
 
 Docs-only — no code, no tests touched. `git status` clean except this entry and the five doc files,
 confirmed below.
+
+## t2651 — TEACH THE BRIDGE TO READ def.defaults INTO DROPDOWNS (the general fix, census settled the fork)
+
+The census (t2649) settled the fork AGAINST the reorder pass: 6 of the 19 wrong blocks share `SELECTS.axis`
+listing X before Z — reordering that list to fix defaults would scramble the VISIBLE menu order everywhere it
+appears (X/Y/Z is how a machinist reads axes), trading a silent-default bug for a confusing menu. The
+declaration `def.defaults` already exists; dropdowns were the one field kind the bridge never read it into.
+Closed that instead.
+
+**The mechanism (`web/blocks/blockly/bridge.js`):** a new Blockly extension, `ddcs_dropdown_defaults`,
+registered on every block that has at least one dropdown-kind field (`hasDropdown` tracked in `jsonDef()`'s
+own field loop). At block init, for each dropdown field it checks whether `def.defaults[f]` is among the
+field's own declared options (`String()`-compared, so `confirm.mode`'s own number-vs-string mismatch coerces
+correctly); if legal, `field.setValue(String(declared))`; if not, `console.warn(...)` and leaves the field at
+its own initial value (options[0]) — **never throws**, so one bad def can't take the whole palette down via
+`defineBlocksWithJsonArray`. t2643's own per-field reorder hack (`feature_canvas.panel`'s options array
+re-sorted inside `jsonDef()`) is RETIRED — this extension supersedes it, so the menu goes back to
+`PANEL_TYPES`' own natural declared order (verified: `getOptions()` now returns `[form, form3d, form2d,
+form3d+2d, commscreen]`, not the t2643-reordered list).
+
+**The boundary, verified not assumed** (the dispatch's own explicit ask):
+- **Fresh drags get the declared default.** `ws.newBlock(type)` now returns `def.defaults[f]` for every one
+  of the 19 census-flagged blocks, confirmed live (`tests/dropdown-default-mechanism-2651.spec.js`).
+- **A real saved value survives untouched.** `Blockly.serialization.blocks.append({type, fields:{...}}, ws)`
+  — the exact API `dropdown-domain-2393.spec.js`'s own pre-existing "LIVE" tests already use for the identical
+  claim — still returns the EXPLICIT saved value, not the declared default. Blockly's own deserializer applies
+  saved field values strictly AFTER `init()` runs (the same ordering `ddcs_seccolor`/`ddcs_opunit`'s own
+  comments already documented: "JSON load sets fields/shadows AFTER init"), so this extension's one-shot,
+  no-`setTimeout`, no-`onChange` write is naturally overwritten the instant a real saved value exists — only a
+  block that never had one (a fresh flyout drag) keeps what it set.
+- **An illegal default cannot crash the palette.** Live-mutated `PALETTE`'s own `probe.axis` default to a
+  nonexistent value, created a fresh `probe` block: no throw, `console.warn` fired naming the bad value, the
+  field fell back to `X` (today's behaviour) rather than committing garbage.
+- **Menus never reorder.** `probe.AXIS`'s own options still read `[X,Y,Z,A,B,C]` — confirmed live, the
+  mechanism changes VALUES only, exactly the property the reorder-pass fork was rejected for not having.
+
+**Non-vacuity** (checked out `bridge.js` to its pre-t2651 HEAD, re-ran the new spec): 3 of the 6 new tests
+FAIL against the pre-fix code (the census-mismatch value test, the reorder-retirement test, the illegal-
+default-warning test) while the 3 controls (confirm.mode's type coercion, axis's own menu order, the
+saved-value survival test) correctly stay green either way — proving the 3 that matter are real assertions,
+not tautologies, and the 3 controls aren't coincidentally-always-true either.
+
+**THE CENSUS, RE-RUN AS THE VERIFICATION INSTRUMENT** (the dispatch's own explicit ask — "re-run it after, the
+19 must read 0"): t2649's own census compared `def.defaults[f]` against the RAW DECLARED option order, a
+comparison this fix deliberately never changes (see above — menus don't reorder). Re-purposed instead: a new
+sweep (`tests/dropdown-default-mechanism-2651.spec.js`'s own "CENSUS" test) drives a REAL `ws.newBlock()` for
+every one of the same 92 dropdown fields across the whole `PALETTE` and reads the LIVE value a person
+authoring in Blocks actually sees. **Result: 0 of 92 wrong** (was 19). Kept as a standing test, not a
+throwaway script — any future op def with a mismatched default now fails immediately, the same
+"cannot-silently-reopen" property `dropdown-domain-2393.spec.js`'s own spec already gives the option-DOMAIN
+question.
+
+**TWO REAL REGRESSIONS FOUND BY THE FULL SUITE, BOTH FIXED — the moved tests, named as the dispatch asked:**
+
+1. **`tests/length-handle-block.spec.js`'s own "DRIVE THE APP" test WAS ASSERTING THE BUG.** `length_handle`'s
+   declared default is `axis: 'Y'` — confirmed by this SAME file's other three tests, which already inject
+   `axis: 'Y'` explicitly and (test 3's own pre-existing comment) call it "the handle sits at the anchor + the
+   param default (axis Y...)". Before this turn, a fresh `length_handle` dragged through the real UI silently
+   got `AXIS=X` (the options[0] bug) regardless — and this ONE test's own mouse-drag gesture was hard-coded
+   HORIZONTAL (`handleRect.x + 60`), which "worked" only because of that bug: `canvasWidgets.js`'s own
+   `length` widget reads ONLY `w.y - d.ay` for a non-`'x'` axis, so once the real default (Y) applied, a
+   horizontal-only drag produced zero delta along the handle's own axis. Fixed by dragging VERTICALLY instead
+   — matching the block's own real, always-intended default, and matching what the other three tests in the
+   same file already knew. (Also had to drag UP rather than down: this fixture's `min: 0` clamp sits below the
+   DFLT start value, and this app's canvas Y increases upward on screen — dragging down clamped straight to
+   the floor, silently reproducing an unmoved value. Confirmed live, not reasoned: 3/3 runs green after the
+   fix, 3/3 red before it, at both a small and a large drag distance in the wrong direction.)
+2. **`tests/riders-848.spec.js`'s own test (3), a genuine t2649 GAP this turn's full-suite run caught.**
+   Imported the beacon instrumenter (`web/shared/js/instrument/instrument.js`, deleted by t2649) to compare
+   its own `map.total_est_time_s` against the editor's `estimateProgram()` — proving the two independent time
+   estimates never diverged. t2649's own beacon-reference grep sweep missed this: the test names neither
+   "beacon" nor any beacon-specific vocabulary, just imports the module directly for an unrelated-sounding
+   claim ("one engine-trace time model"). With the instrumenter deleted there is no more second estimate to
+   compare against — the claim is void, not relocatable. Removed the one test; the file's other 3 (drill
+   defaults, dump-import rapid-rate seeding, label humanization) are untouched and unrelated.
+   **Broader sweep run after finding this** (`grep -rl "shared/js/instrument\|checkpoint_insert"` across the
+   whole repo, not just for the word "beacon"): the only other hits are historical-reference COMMENTS this
+   turn or t2649 itself already wrote (naming the deleted module for context), never a live import. No third
+   gap found.
+
+**Confirmed pre-existing, unrelated to this turn (not fixed, not counted against it) — two independent full
+runs, before and after the two fixes above:**
+- `trig-lift-plan-1466.spec.js` LOCK 5 — the SAME out-of-scope verify-macro comment-lint failure named in
+  t2641's and t2643's own entries (confirmed again via `git log` — untouched by anything this turn changed).
+  Failed in BOTH full runs.
+- Run 1 only: `lathe-drag-responsive-2505.spec.js`'s "click-to-edit on polyFlats" — failed once under the full
+  parallel suite, passed 3/3 in isolation afterward with zero code changes in between; touches no dropdown
+  field at all (`grep` confirms). Did not recur in run 2.
+- Run 2 only: `preview-mutation-manifest-2463.spec.js`'s `[sf-pos-snapback]` entry — a mutation test (surfacing
+  `sf_pos` point/move handle snap-back on release), unrelated to dropdowns or beacons; its own comment already
+  names itself as potentially "scheduling-sensitive" under load. Passed clean in isolation
+  (`ok=false`→`ok=true`, the RED-then-GREEN sequence the manifest expects). Did not recur in run 1.
+  Both are load-dependent flakes under 4-worker contention on a 3200+-test suite (t2643's own entry logged 13
+  flaky names from an unrelated set the same way) — not a regression from this turn, and not the SAME flake
+  twice, which is itself evidence against a real intermittent bug in either.
+
+**Full suite (`npm test`), two complete runs:**
+- **Run 1** (before the two fixes above): node 236/236; e2e 3175 passed, **4 failed**, 15 flaky, 28 skipped.
+  The 4 failures were exactly `length-handle-block.spec.js` + `riders-848.spec.js` (both fixed above) +
+  `trig-lift-plan-1466.spec.js` (pre-existing) + `lathe-drag-responsive-2505.spec.js` (flake, confirmed above).
+- **Run 2** (after both fixes): node 236/236 (re-run standalone during the fix, unaffected — no emit code
+  touched); e2e **3179 passed, 2 failed**, 13 flaky, 27 skipped. The 2 remaining failures are
+  `trig-lift-plan-1466.spec.js` (pre-existing) and `preview-mutation-manifest-2463.spec.js` (flake, confirmed
+  above) — zero failures traceable to this turn's own work in either run once resolved.
+
+`git status` clean except this entry, `bridge.js`, `tests/dropdown-default-mechanism-2651.spec.js`,
+`tests/length-handle-block.spec.js`, and `tests/riders-848.spec.js`, confirmed below.
