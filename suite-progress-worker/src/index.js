@@ -47,9 +47,6 @@ const PAGE = `<!doctype html>
   .live{display:inline-flex;align-items:center;gap:10px}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--skip)}
   .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
-  .bell{background:none;border:1px solid var(--edge);border-radius:8px;color:var(--muted);
-        font-size:15px;padding:3px 9px;cursor:pointer;line-height:1}
-  .bell.on{color:var(--warn);border-color:var(--warn)}
   .pct{font-size:clamp(64px, 22vw, 110px);font-weight:800;line-height:.95;
        font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .state{font-size:15px;color:var(--muted)}
@@ -80,7 +77,7 @@ const PAGE = `<!doctype html>
 <div class="wrap">
   <div class="banner" id="banner"></div>
   <h1><span id="tier">Suite · RenderRanchy</span>
-      <span class="live"><button class="bell" id="bell" title="ring at 90% and at the finish">🔕</button><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
+      <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
   <div class="hero">
     <div>
       <div class="pct" id="pct">—</div>
@@ -174,15 +171,24 @@ const PAGE = `<!doctype html>
       g('state').textContent = status === 'running' ? 'running' : 'waiting for data…';
     }
   }
-  // ---- the bell: ring at 90% and at the finish. Audio needs one user tap to unlock
-  // (browser policy), so it's a toggle — remembered per device, confirmed with a tick.
-  var soundOn = false, rang90 = false, rangDone = false, lastDone = 0, actx = null;
-  try { soundOn = localStorage.getItem('bell') === '1'; } catch(_){}
-  function beep(seq){       // seq: [ [freq, startMs, lenMs], ... ]
-    if (!soundOn) return;
+  // ---- the bell: ring at 90% and at the finish. Browsers unlock audio on the first real
+  // gesture — and a scroll's own touch counts — so there's no toggle: the instinctive
+  // scroll-on-load arms it. A bell firing before any touch queues and rings on the first one.
+  var rang90 = false, rangDone = false, lastDone = 0, actx = null, pendingSeq = null;
+  function unlockAudio(){
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') actx.resume();
+      if (pendingSeq) { var s = pendingSeq; pendingSeq = null; beep(s); }
+    } catch(_){}
+  }
+  ['pointerdown','touchend','keydown'].forEach(function(ev){
+    document.addEventListener(ev, unlockAudio, { once: true, passive: true });
+  });
+  function beep(seq){       // seq: [ [freq, startMs, lenMs], ... ]
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') { actx.resume(); pendingSeq = seq; return; }
       var t0 = actx.currentTime;
       seq.forEach(function(n){
         var o = actx.createOscillator(), gn = actx.createGain();
@@ -196,16 +202,6 @@ const PAGE = `<!doctype html>
     } catch(_){}
     if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch(_){} }
   }
-  function bellUi(){ var b = g('bell'); b.textContent = soundOn ? '🔔' : '🔕'; b.className = soundOn ? 'bell on' : 'bell'; }
-  document.addEventListener('DOMContentLoaded', function(){
-    bellUi();
-    g('bell').onclick = function(){
-      soundOn = !soundOn;
-      try { localStorage.setItem('bell', soundOn ? '1' : '0'); } catch(_){}
-      bellUi();
-      if (soundOn) beep([[880, 0, 90]]);            // the unlock tap doubles as the confirm tick
-    };
-  });
   function checkBells(){
     var doneN = +g('done').textContent || 0;
     // a NEW run: progress went backwards — re-arm both bells
