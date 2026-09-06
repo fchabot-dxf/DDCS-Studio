@@ -73,7 +73,12 @@ test('CONNECTED: the Cloud tab shows WHO you are signed in as, and the way out',
     await expect(bar).toContainText('maker@example.com');
     await expect(bar.locator('#wsmCloudOut'), 'and the disconnect it carried').toBeVisible();
 
+    // t2657 (BACKLOG #82) — this "Sign out" is the SAME act as the header chip's own: it now unloads the whole
+    // workspace, not just this tab's account state, and (nothing else on the canvas here is dirty) does so
+    // silently, ending in a reload rather than an in-place re-render — so the old "the SAME modal now shows
+    // #wsmCloudSignIn" assertion no longer applies; the modal itself goes away with the page. The reload
+    // completing is what the "Signed out" notice (ui/signOutFlow.js) proves.
     await bar.locator('#wsmCloudOut').click();
-    await expect(page.locator('#wsmCloudSignIn'), 'signing out returns to the one sign-in button').toBeVisible();
+    await expect(page.locator('.toast'), 'the reload completed — this Sign out is the same unload the header chip triggers').toContainText('Signed out', { timeout: 15000 });
     expect(await page.evaluate(() => localStorage.getItem('ddcs_cloud_token')), 'the token really is gone').toBeNull();
 });

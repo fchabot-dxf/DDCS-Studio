@@ -95,7 +95,11 @@ export const BACKUP_STORES = [
     { id: 'wizardValues', label: 'Wizard last-used values', ...lsPrefix(LASTVALS_PREFIX), count: (v) => (v ? Object.keys(v).length : 0), unit: 'wizards' },
     { id: 'variables', label: 'User variables (your #var values)', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
     { id: 'displayPrefs', label: 'What the 3D preview shows', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
-    { id: 'panePrefs', label: 'Window layout (which panes are open, their sizes)', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
+    // t2657 (BACKLOG #82) — `perViewer: true` marks a row as the VIEWER'S chrome, not the workspace's data: it
+    // rides the .ddcs file (so a workspace CAN carry its own pane layout) but survives a sign-out unload, per the
+    // owner's own ruling that per-viewer conveniences (theme, folds) are not the private machine data sign-out
+    // exists to clear. See resetWorkspaceToPristine below — the ONE place this flag is read.
+    { id: 'panePrefs', label: 'Window layout (which panes are open, their sizes)', perViewer: true, ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
     // The project VOLUME is written by CLEAR-then-import (its importAllEntries puts entry by entry, so a bare import
     // would MERGE the file's projects into whatever this browser held — the blend a whole-file open must not produce).
     // t1309 — THE ITEM GRAIN, declared where the store is. Every other row answers "did this change"; a program volume
@@ -158,6 +162,20 @@ export async function restoreBackup(obj) {
     // now arrives the one way it should: the declared `machine` row's own write, which adopts the file's controller.
     // The caller stamps the FILENAME (one-name rule) before marking saved — see ui/workspaceManager.js.
     return { restored, reset, failed };
+}
+
+/**
+ * t2657 (BACKLOG #82) — RESET THE WORKSPACE TO ITS PRISTINE STATE: every declared store CLEARED via its own
+ * `clear()`, the SAME per-store default every whole-file open already resets to (restoreBackup, above) — so the
+ * signed-out state cannot drift from what a real open (or a fresh visitor's first boot, which never wrote these
+ * keys at all) produces. `perViewer`-flagged rows (pane layout/fold state) are SKIPPED — the owner's own ruling
+ * is that per-viewer chrome is not the private machine data sign-out exists to clear.
+ */
+export async function resetWorkspaceToPristine() {
+    for (const s of BACKUP_STORES) {
+        if (s.perViewer) continue;
+        try { await s.clear(); } catch (_) { /* best-effort, matches restoreBackup's own tolerance */ }
+    }
 }
 
 /** Save the whole workspace → download one .ddcs file. The no-FSA fallback path; `fileName` is the name the user typed

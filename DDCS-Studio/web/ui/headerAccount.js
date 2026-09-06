@@ -23,7 +23,8 @@
  * consent screen into sensitive scopes and drag the app into Google verification. Initials are the fallback, and a
  * broken/expired photo URL falls back to them too rather than showing a dead image.
  */
-import { getAccount, connect, disconnect, backfillIdentity } from './cloudAccount.js';
+import { getAccount, connect, backfillIdentity } from './cloudAccount.js';
+import { signOutAndUnload, announceSignedOutIfPending } from './signOutFlow.js';   // t2657 (BACKLOG #82) — sign-out unloads the workspace, not just the account
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -67,7 +68,7 @@ function openMenu(anchor, acct) {
     m.addEventListener('click', (e) => {
         const b = e.target.closest('[data-act]');
         if (!b) return;
-        if (b.dataset.act === 'signout') { disconnect(); closeMenu(); }
+        if (b.dataset.act === 'signout') { closeMenu(); signOutAndUnload(); }
     });
 }
 
@@ -146,6 +147,9 @@ export function renderHeaderAccount() {
 window.addEventListener('ddcs:cloud-account', renderHeaderAccount);
 
 export function initHeaderAccount() {
+    // t2657 (BACKLOG #82) — the ONE boot-time check for a sign-out that just happened (the reload sign-out
+    // itself triggers). Read-once: a plain refresh with no pending notice is a silent no-op.
+    announceSignedOutIfPending();
     // ⭐ t2113 - THE AVATAR IS THE ONE SURFACE THAT SHOWS THE PICTURE, so it is the one that must ask for it.
     // The backfill lived only in renderCloudLogin(), which fires when Settings (Network) or the Project
     // Manager drawer opens - surfaces a user may never touch. So a session that connected before t2077 kept

@@ -26,7 +26,8 @@ import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '
 import { envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
-import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
+import { getAccount, connect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
+import { signOutAndUnload } from './signOutFlow.js';   // t2657 (BACKLOG #82) — this tab's own "Sign out" is the SAME act as the header chip's, so it shares the same unload
 import { busyRow, busyOverlay, clearBusyOverlay } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -46,10 +47,18 @@ const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirector
  * @returns {Promise<boolean>} may the caller proceed
  */
 export async function confirmDiscardBuffer(what) {
+    return confirmDiscardWithMessage(`Opening ${what} replaces everything in this workspace, and you have changes that are not in a file yet.`);
+}
+
+/**
+ * t2657 (BACKLOG #82) — the SAME unsaved gate, a DIFFERENT act's own wording. Sign-out unloads the workspace
+ * (ui/signOutFlow.js) — a destructive replace exactly like opening a different file — so it shares this gate
+ * rather than growing a second "am I about to lose something" prompt with its own, possibly-diverging rules.
+ * @returns {Promise<boolean>} may the caller proceed
+ */
+export async function confirmDiscardWithMessage(message) {
     if (!wouldLoseWork({ workspace: true })) return true;
-    const choice = await threeWay(
-        `Opening ${what} replaces everything in this workspace, and you have changes that are not in a file yet.`,
-    );
+    const choice = await threeWay(message);
     if (choice === 'cancel') return false;
     if (choice === 'save') {
         const r = await saveWorkspace();
@@ -413,7 +422,7 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
         }
         const signin = e.target.closest('#wsmCloudSignIn');
         if (signin) { await cloudSignIn(ov); return; }
-        if (e.target.closest('#wsmCloudOut')) { disconnect(); await renderPlace(ov); return; }   // t1243 — the badge's disconnect, transferred
+        if (e.target.closest('#wsmCloudOut')) { await signOutAndUnload(); return; }   // t1243 — the badge's disconnect, transferred; t2657 — now the SAME unload the header chip's own Sign out does
         const del = e.target.closest('[data-wsm-del]');
         if (del) {
             const c = (ov.__cards || [])[Number(del.dataset.wsmDel)];

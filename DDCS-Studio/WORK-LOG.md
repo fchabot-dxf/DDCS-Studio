@@ -77097,3 +77097,107 @@ works. `devMode.js` untouched this turn. The throwaway reproduction probes are d
 a genuinely-connected uiChildren-nested `feature_canvas`. `git log -L` confirming `flattenBlocks`'s uiChildren
 recursion predates t2643. No code changed; no test added (nothing to pin — the claimed bug does not exist to
 regress against). `git status` clean except this entry.
+
+## t2657 — BACKLOG #82: SIGN-OUT UNLOADS, with the notice
+
+Dispatch: sign-out (the account chip) used to clear only the cloud token — the loaded workspace (machine
+config, envelope, offsets, custom wizards, G-code) stayed fully open. Found live on the owner's own phone
+2026-09-05: on a shared/borrowed device the next person picks up the previous user's entire machine. Owner
+ruling: sign-out unloads the workspace back to the SAME pristine state a fresh visitor gets, with a "Signed
+out" notice once it completes. Four edges, all ruled: unsaved changes prompt first; token expiry alone never
+unloads; both shells (web/desktop) get the same behavior; per-viewer chrome (theme, folds) survives.
+
+### THE MECHANISM — reused, not reinvented
+
+`data/backup.js`'s `restoreBackup()` already resets a workspace to default by calling every `BACKUP_STORES`
+row's own declared `clear()` — the EXACT mechanism a real workspace Open already uses, and the exact one a
+fresh visitor's first boot never needed to run (those keys simply never existed). Rather than build a second
+"pristine" concept, `resetWorkspaceToPristine()` (new, `data/backup.js`) reuses this per-store `clear()` set
+directly — zero chance of drifting from what "fresh" already means everywhere else in the app.
+
+**The one thing that must NOT reuse it wholesale:** `panePrefs` (pane layout/fold state) is a declared
+`BACKUP_STORES` row too, but the owner's own ruling is that per-viewer chrome survives sign-out — it is the
+viewer's, not the workspace's. Rather than hand-roll a parallel exclusion list at the sign-out call site
+(which a future new store could silently fall out of), `panePrefs` gained a declared `perViewer: true` flag
+right where it already lives, and `resetWorkspaceToPristine()` is the ONE place that reads it (`if
+(s.perViewer) continue`). `displayPrefs` ("what the 3D preview shows") was considered for the same flag but
+left OUT deliberately — unlike pane folds, it isn't one of the owner's own two named examples ("theme,
+folds"), and the safer default for a privacy-driven feature is to clear anything not unambiguously chrome.
+
+**Enumerated, not assumed — what CLEARS vs SURVIVES:**
+- CLEARS: cloud account (token/identity, `cloudAccount.js`'s own `disconnect()` — separate from BACKUP_STORES
+  entirely, per that file's own header: "sensitive keys... are NOT backed up"), settings (incl. envelope/
+  offsets), machine identity, custom wizards, CAM pack, wizard bar layout, presets, wizard last-used values,
+  user variables, display prefs, saved programs (projects/IDB), the "this workspace IS file X" association
+  (`forgetWorkspaceFile()`), and the remembered save-file handle (`adoptSaveHandle(null)` — otherwise the
+  NEXT person's first Ctrl+S would silently overwrite the DEPARTING user's .ddcs file, a real privacy hazard
+  the dispatch didn't name explicitly but the "map what unload touches" instruction surfaced).
+- SURVIVES: pane layout/fold state (`perViewer`), theme (never a backed-up store at all, so it was never at
+  risk) — the viewer's own chrome.
+
+### THE UNSAVED GATE — shared, not duplicated
+
+`ui/workspaceManager.js`'s `confirmDiscardBuffer` (Open's own "you're about to lose something" prompt) was
+refactored into a private `confirmDiscardWithMessage(message)` core + two thin exported wrappers — the
+existing `confirmDiscardBuffer(what)` (byte-identical behavior, confirmed: `replace-confirm-2184.spec.js`'s
+existing 3 tests all still pass unchanged) and a new `confirmDiscardWithMessage` sign-out itself calls with
+its own wording. Sign-out is a destructive replace exactly like opening a different file, so it shares the
+gate rather than growing a second, possibly-diverging "am I about to lose something" prompt.
+
+### THE NOTICE — a read-once marker across the reload it needs
+
+The unload ends in `location.reload()` (same pattern a real workspace Open already uses, so every module
+re-reads the reset state from scratch instead of this code hand-patching each one's in-memory copy). A toast
+can't survive that reload directly, so `ui/signOutFlow.js` (new) sets a one-shot localStorage marker right
+before reloading — the SAME shape `data/backup.js`'s own `markPendingOpen`/`takePendingOpen` pair already
+established for "a reload-in-flight is special, tell the next boot" — consumed once by
+`announceSignedOutIfPending()`, called from `headerAccount.js`'s existing `initHeaderAccount()` boot hook.
+
+### ONE ACT, TWO DOORS — and a real regression caught before it reached the full suite
+
+The header chip's "Sign out" and the Workspace Manager's own Cloud-tab "Sign out" link both operate on the
+SAME one account (`headerAccount.js`'s own header doc: "ONE ACCOUNT DOOR" — this project already unified two
+sign-IN surfaces for exactly this reason). Both now route through the one `signOutAndUnload()` in
+`ui/signOutFlow.js` rather than each calling `disconnect()` bare, so the two doors cannot silently diverge in
+what "sign out" means. Wiring the Cloud tab's own link through this broke a PRE-EXISTING test
+(`header-account-row-742.spec.js`'s "CONNECTED" test), which expected the old in-place re-render (no reload)
+behavior — caught by running that file directly, not left for the full suite to find. Updated its assertion
+to the new, INTENDED behavior (wait for the "Signed out" toast, proving the reload completed, rather than
+expecting `#wsmCloudSignIn` in the same now-gone modal) — this is the ruled behavior change working as
+designed, not a regression to work around.
+
+### BOTH SHELLS
+
+`headerAccount.js` (and everything it now imports) is loaded from the ONE shared `web/` tree both the browser
+and the desktop exe serve (`[[desktop-packaging-pywebview]]` — pywebview points at the same `index.html`, no
+separate desktop-only header implementation exists — confirmed via grep, no `pywebview`/`isDesktop` branching
+anywhere in `headerAccount.js`). No separate desktop wiring needed; stated rather than assumed.
+
+### NON-VACUITY
+
+`tests/signout-unload-2657.spec.js` (5 tests, the four ruled edges): reverted `backup.js`/`workspaceManager.js`
+/`headerAccount.js` to HEAD and deleted the new `signOutFlow.js` — **4 of 5 fail** (the 5th, the expiry test,
+legitimately passes both before and after: it pins an invariant that was already safe, a real regression guard
+against a future change wiring expiry to unload, not decoration). Restored the fix — all 5 green again, 2/2
+stable re-runs.
+
+**One real test-design bug caught along the way, not shipped:** the first draft of the "silent" test seeded a
+custom wizard directly into `ddcs_user_ops` via localStorage — which itself diverges the workspace from its
+just-taken boot baseline and makes `isWorkspaceDirtyToFile()` true, contradicting "nothing to lose" as its own
+premise (the prompt fired, correctly, exposing the test's own contradiction, not a product bug). Split into a
+genuinely-silent test (nothing seeded) and folded the "clears workspace data / pane survives" assertions into
+the existing Discard test, which already goes through the prompt on purpose. Also hit and fixed a genuine
+Playwright race: `page.waitForNavigation()` can lose to a reload fast enough to fire before the listener
+registers (measured, reproducible, not a flake) — switched to waiting on the "Signed out" toast itself, a
+product-observable signal that can only paint post-reload, sidestepping Playwright's own navigation-event
+timing entirely.
+
+### VERIFY
+
+`tests/signout-unload-2657.spec.js` (5/5, 2 stable runs) + `tests/header-account-row-742.spec.js` (4/4, fixed)
++ `tests/replace-confirm-2184.spec.js` (unchanged, 5/5 — the shared gate's refactor is byte-identical) +
+`tests/header-account-2077.spec.js` + `tests/avatar-backfill-2113.spec.js` + `tests/cloud-connected-validated-
+2359.spec.js` (unaffected, 24/24 combined). The clear/survive map is stated above, not assumed. Both shells
+confirmed via the shared-file-tree fact, not a second build. `git status` clean except this entry and the
+files named below.
+
