@@ -8350,7 +8350,37 @@ defaults-and-visibility, not a wizard.
   CANNOT START the gateway at all (exit 2, unrecognized argument). Fix it in the same turn; it is one line
   and it is the double-click path the README points users at.
 
-**t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
+⚠ **CORRECTION to fix-shape item 1, same night, from the live end-to-end test:** "default `machine_name` to
+the PC hostname" is **WRONG against the app's own design.** The phone's heartbeat reader keys the Drive folder
+by the **WORKSPACE STEM** (`readGatewayHeartbeat(fileSavedStem())`, t2101/t2145: *"the Drive folder the
+gateway publishes under is keyed by the workspace's name — now the last-saved .ddcs file's name"*) — while the
+gateway keys it by config `machine_name`. Setting the hostname put the heartbeat in `RENDERRANCHY/` while the
+phone looked in `MILLING-DDDD4.1/` — measured live, both folder trees visible in the owner's Drive at once.
+⇒ **The two ends must share ONE key, and the ruled key is the workspace stem** (one-workspace-one-machine).
+The real fix-shape: the gateway learns the workspace name (Setup names it, or the delivered `.ddcs`/first job
+names it), never invents a hostname convention. Items 2 and 3 stand unchanged.
+
+### 82. ⛔ SIGNING OUT LEAVES THE WORKSPACE LOADED — owner: "thats shouldnt be"
+
+**[OPEN, owner-ruled 2026-09-05, found live on their own phone mid-test.]**
+
+**The symptom:** sign out of the Google account (the account chip) — the loaded workspace stays: machine
+config, envelope, offsets, custom wizards, G-code, all still open and editable. On a phone or any shared
+device, the next person to pick it up holds the previous user's entire machine.
+
+**The ruling:** sign-out unloads the workspace. Studio returns to its pristine signed-out state.
+
+**Design notes for whoever builds it, from the standing principles:**
+- ⚠ Unsaved changes are the one wrinkle: [[persistence-user-owned-file]] — localStorage is TEMPORARY, the
+  `.ddcs` file is the owned artifact. If the in-memory workspace differs from the last-saved `.ddcs`, prompt
+  to save BEFORE completing sign-out (one dialog, not a wizard) — silently discarding edits on sign-out is
+  data loss wearing a privacy costume.
+- The pristine state after sign-out = the same state a fresh visitor gets (default machine, no profile) —
+  nothing bespoke, no new UI surface.
+- Check the DESKTOP app too: the same account chip exists there; the same rule applies, though the privacy
+  case is weaker on a single-user PC. One behaviour, both shells.
+- Scope guard: this is sign-OUT only. Token expiry / silent-refresh failure must NOT unload anything —
+  a dropped token is ignorance, not a departure (same distinction as `unreadable` vs `unseen`, t2113).
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
 pre-existing standalone `feature_canvas` branch. A DIFFERENT, genuinely new defect was found instead, live:
