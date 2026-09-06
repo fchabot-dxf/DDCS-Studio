@@ -8,6 +8,9 @@ const PAGE = `<!doctype html>
 <meta charset="utf-8">
 <title>Suite Progress</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101214">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23101214'/%3E%3Ctext x='50' y='58' font-size='58' text-anchor='middle' dominant-baseline='middle'%3E🧪%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23101214'/%3E%3Ctext x='50' y='58' font-size='58' text-anchor='middle' dominant-baseline='middle'%3E🧪%3C/text%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#f4f4f2; --card:#ffffff; --ink:#1c1e21; --muted:#6b7280;
