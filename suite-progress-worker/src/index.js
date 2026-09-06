@@ -124,17 +124,32 @@ const PAGE = `<!doctype html>
       g('state').textContent = status === 'running' ? 'running' : 'waiting for data…';
     }
   }
+  var sock = null;
   function connect(){
     try {
-      var ws = new WebSocket('wss://' + location.host + '/live');
+      var ws = sock = new WebSocket('wss://' + location.host + '/live');
       ws.onopen = function(){ wsOpen = true; g('dot').className = 'dot on';
         try { ws.send('hi'); } catch(_){} };   // the DO answers with current state
       ws.onmessage = function(e){ if (e.data && e.data.length > 10) render(e.data); };
       ws.onclose = function(){ wsOpen = false; g('dot').className = 'dot';
-        setTimeout(connect, 3000 + Math.random() * 4000); };
+        setTimeout(connect, 2000 + Math.random() * 3000); };
       ws.onerror = function(){ try { ws.close(); } catch(_){} };
-    } catch(_) { setTimeout(connect, 8000); }
+    } catch(_) { setTimeout(connect, 6000); }
   }
+  // Phones kill idle sockets (NAT timeouts, background suspension). A 25s ping keeps the
+  // path warm — and since the DO answers any message with current state, each ping doubles
+  // as a refresh, so even a silent gap self-corrects.
+  setInterval(function(){
+    if (wsOpen && sock && sock.readyState === 1) { try { sock.send('hi'); } catch(_){} }
+  }, 25000);
+  // Coming back from the lock screen / another app: reconnect and catch up immediately.
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') {
+      if (!wsOpen || !sock || sock.readyState !== 1) { try { sock && sock.close(); } catch(_){} connect(); }
+      else { try { sock.send('hi'); } catch(_){} }
+      pull();
+    }
+  });
   function pull(){
     if (wsOpen && hb) return;   // socket healthy AND we have data: no polling at all
     fetch('/raw', { cache: 'no-store' })
@@ -142,7 +157,7 @@ const PAGE = `<!doctype html>
       .then(function(t){ if (t && t.length > 10) render(t); })
       .catch(function(){});
   }
-  connect(); pull(); setInterval(pull, 20000); setInterval(tick, 30000);
+  connect(); pull(); setInterval(pull, 12000); setInterval(tick, 30000);
 </script>
 </body></html>`;
 
