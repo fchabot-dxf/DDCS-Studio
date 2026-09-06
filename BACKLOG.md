@@ -8381,6 +8381,23 @@ device, the next person to pick it up holds the previous user's entire machine.
   case is weaker on a single-user PC. One behaviour, both shells.
 - Scope guard: this is sign-OUT only. Token expiry / silent-refresh failure must NOT unload anything —
   a dropped token is ignorance, not a departure (same distinction as `unreadable` vs `unseen`, t2113).
+
+### 83. On a CLIENT, hide the CONNECTION section — owner: "i dont like seeing it on client"
+
+**[OPEN, owner-ruled 2026-09-05, from the live phone test. SMALL — a candidate small-item for the next
+Studio-side turn.]**
+
+**The symptom:** the Status tab's CONNECTION section reports the LOCAL gateway. On a device whose identity
+pill already says "This PC is a client", that section can never be anything but a red `unreachable` /
+`no gateway on this device` — a permanent alarm colour for a state that is definitionally true and already
+stated one line up.
+
+**The ruling:** when the device is a client (the same condition that renders the client identity pill), the
+CONNECTION section does not render at all. The CONTROLLER section (the remote gateway's heartbeat — green
+"Remote gateway is running / Machine is powered on") carries all the signal a client needs, and stays.
+
+Scope guard: display only, `ui/gateway/views/status.js` — no polling change, no role logic change; the
+role condition already exists for the pill. On a GATEWAY device nothing changes.
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
 pre-existing standalone `feature_canvas` branch. A DIFFERENT, genuinely new defect was found instead, live:
