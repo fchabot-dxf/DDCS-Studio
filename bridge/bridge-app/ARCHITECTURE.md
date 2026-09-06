@@ -1,5 +1,15 @@
 # bridge-app — Architecture
 
+⚠⚠ **STALE, t2651: every mention of "Instrument"/"Slave"/"beacon" below describes the progress-tracking
+mechanism REMOVED by BACKLOG #78 (t2649, owner-directed 2026-09-04 — never demonstrably ran end-to-end).**
+`fairy/slave.py`, `fairy/telemetry.py`, `checkpoint_insert.py`, and the whole `web/shared/js/instrument/`
+directory are DELETED; every job now delivers synchronously (claim → deliver → `delivered`/`failed`, no
+watch phase, no per-job map). The replacement is BACKLOG #79's live Modbus position/run-state polling
+(`fairy/master.py`'s `PositionPoller`) — continuous, no file instrumentation, never attached to a job's own
+status object. **The current contract is [`shared/PROTOCOL.md`](shared/PROTOCOL.md)**, kept up to date;
+this file's own module map/diagrams below are NOT — left as historical context for the beacon-era design
+rather than rewritten wholesale (out of t2651's own scope), but do not build against them.
+
 Extensive, module-by-module design for the DDCS Expert job bridge. The system is **two independent
 ("parallel") apps** that communicate only through a cloud bucket. This document is the map: every module,
 **where it runs**, and **what it does**. Code should follow this structure.

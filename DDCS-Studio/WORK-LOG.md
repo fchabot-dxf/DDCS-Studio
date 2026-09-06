@@ -76695,3 +76695,54 @@ paper over the order bug while leaving the type one live.
 call sites — that fork, and whether 19 is small enough to hand-patch at all vs. teaching the bridge a real
 initial-value mechanism, is the advisor's to route with the number in hand, per the dispatch's own framing.
 `git status` clean except this entry, confirmed below.
+
+## t2651 (SMALL ITEM, separate commit) — sweep the 87 stale beacon references in bridge-app docs
+
+Per the dispatch's own explicit ask (docs-only, so the next reader of `ARCHITECTURE.md`/`README.md`/
+`ROADMAP.md`/`CONFIGS.md`/`fairy/README.md` does not design against a mechanism that no longer exists).
+`WORK-LOG.md`'s own append-only history stays untouched, per the dispatch's own explicit carve-out.
+
+**`bridge/bridge-app/ARCHITECTURE.md`** — the whole document's own module map/diagrams (§1/§3/§4/§6/§7/§8)
+are built around Instrument/Slave/the beacon frame as CURRENT architecture; genuinely rewriting every
+diagram/table to the current merged-app reality is a separate, larger task (this doc was already stale well
+beyond beacons — most of its own "Build order & status" checklist items are still unchecked from an early
+design phase, predating the app that actually shipped). Added one prominent, impossible-to-miss notice at the
+top of the file instead: what's removed, what replaced it, and a pointer to `PROTOCOL.md` (kept current) as
+the actual contract — rather than a partial per-line edit that would leave the document internally incoherent
+(e.g. a module table row for `Slave` half-edited to remove the word "beacon" while the row itself still
+describes a deleted file).
+
+**`bridge/bridge-app/README.md`** — same top-of-file notice; additionally rewrote the self-contained "Scope"
+callout (the two-job-types split) to state the current one-job-type reality, fixed the `web/`/`fairy/`/
+`shared/` one-liners in "Two parallel apps, one bucket" to stop presenting beacons as live, and marked the
+"Beacons = MSETDATA..." architectural-decision bullet `[REMOVED t2649]` with its replacement named. Left the
+"Status"/"Build order" checklist sections untouched — genuine historical build-phase records (already-checked
+`[x]` items), the same category WORK-LOG's own history gets left alone.
+
+**`bridge/bridge-app/ROADMAP.md`** — fixed the "Foundation already built" summary (presented as CURRENT
+truth, not historical) to drop the beacon receiver/two-job-types claims; marked Phase 4 (the phase that BUILT
+the JS instrumenter) `[REMOVED t2649]` since everything it built is now deleted; marked Phase 6 ("Live on the
+Expert: real Modbus beacons end-to-end") as VOID with its real successor (BACKLOG #79, already CONFIRMED
+live) named — this was the one phase still marked open/actionable that could no longer ever be completed as
+written. Left Phase 2's own historical "sim-beacon tracked job" VERIFY record alone (a log of what was tested
+once, not a forward-looking claim).
+
+**`bridge/bridge-app/CONFIGS.md`** — fixed the "No-retention model" section's two-job-types line (still
+presented as current design) and the auto-discovery bullet's "breaks beacon attribution" rationale (now a
+non-sequitur since there's no more beacon attribution to break — replaced with the actual remaining hazard,
+a delivery/position-poll race between two gateways on one controller).
+
+**`bridge/bridge-app/fairy/README.md`** — this one got a full fix rather than a top-notice, since (unlike the
+other three) it is a compact, actively-consulted module quick-reference, not an aspirational design doc:
+rewrote the loop description, replaced the `slave.py` module-table row with `master.py` (BACKLOG #79's real
+module), fixed `tracker.py`'s own signature description to match its t2649 rewrite, fixed the CLI usage
+examples (`--position-poll --port COM6` is now how you opt into live tracking; plain `--port COM6` alone no
+longer means anything), and rewrote the Status checklist to mark the removal and record BACKLOG #79's own
+now-CONFIRMED-live status in the slot the void beacon goal used to occupy.
+
+`bridge/bridge-app/tests/test_drive_backend_2076.py`'s own incidental `total_beacons` test-fixture data
+(t2649's own earlier decision) and `fairy/backend/drive.py`'s one historical-framing comment referencing "the
+beacon bug" are unchanged — neither is documentation a reader consults to understand current architecture.
+
+Docs-only — no code, no tests touched. `git status` clean except this entry and the five doc files,
+confirmed below.

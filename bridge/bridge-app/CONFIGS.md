@@ -60,8 +60,9 @@ Tauri is a **build tool**, not a platform — it compiles the HTML console into 
 ## 5. No-retention model (recap; full text in PROTOCOL §3)
 G-code is opaque + always regenerable, so the Gateway **deletes `inbox/<jobId>.*` the instant delivery
 succeeds** — the file then lives on the **controller's CNCDISK** (the de-facto retention; same-session re-run
-= re-select + Start at the panel). Only `status/<jobId>.json` (metadata, no G-code) persists. Two job types,
-keyed off the map: **tracked** (Fusion cut, beacons) vs **deliver-only** (probe/util, no beacons).
+= re-select + Start at the panel). Only `status/<jobId>.json` (metadata, no G-code) persists. Every job is
+delivered the same way (t2649, BACKLOG #78 — was two types, tracked-via-beacons vs. deliver-only; the beacon
+mechanism that split them is removed).
 
 ---
 
@@ -82,8 +83,8 @@ The controller has no reliable built-in unique ID over SMB, so identity is **gat
   job onto the wrong controller). Identity travels with the controller's disk (survives re-IP; detects swaps).
 - Doubles as the heartbeat descriptor + the future multi-tenant gateway↔machine binding.
 - **Auto-discovery (later):** scan for the DDCS SMB fingerprint (`CNCDISK`+`SYSDISK`) / an FTDI COM port →
-  **propose** gateway role → user **confirms** (never silently claim — two gateways for one controller breaks
-  beacon attribution).
+  **propose** gateway role → user **confirms** (never silently claim — two gateways for one controller could
+  still race on delivery or the Modbus position poll).
 
 ---
 

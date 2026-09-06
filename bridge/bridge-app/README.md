@@ -1,16 +1,21 @@
 # bridge-app — DDCS Expert job bridge
 
+⚠ **STALE, t2651: this file's own "beacons"/"Instrument" mentions below describe the progress-tracking
+mechanism REMOVED by BACKLOG #78 (t2649, owner-directed 2026-09-04 — never demonstrably ran end-to-end).**
+Every job now delivers synchronously — no "tracked vs deliver-only" split, no map, no watch phase. The
+replacement is BACKLOG #79's live Modbus position/run-state polling. Current contract:
+[`shared/PROTOCOL.md`](shared/PROTOCOL.md).
+
 Push a CNC job from anywhere, watch it run on the **DDCS Expert (M350)** — without exposing the
 machine to the internet. This is the application the rest of the repo's findings were building toward.
 
 > Targets the **Expert** specifically (uses Expert-only Modbus `MSETDATA` + the confirmed SMB write to
 > CNCDISK). Not for the V4.1 bench. See [`../controllers/expert-m350/FINDINGS.md`](../controllers/expert-m350/FINDINGS.md).
 
-> **Scope (decided 2026-06-07):** two job types, keyed off whether the job is instrumented with beacons
-> (the "beacons" toggle, set in `web/`):
-> - **Tracked** (Fusion cut): instrumented → has a map → fairy watches beacons → progress bar.
-> - **Deliver-only** (DDCS-Studio probe/util): no map → delivered and done, no beacons. (DDCS Studio tags
->   its generated files so they're self-identifying; these never need beacons.)
+> **Scope (t2649, BACKLOG #78, 2026-09-04):** every job delivers the same way — claim, write to the
+> controller, mark `delivered`/`failed`. No per-job map, no watch phase (the beacon mechanism this "two job
+> types" scope note used to describe — tracked-via-beacons vs. deliver-only — is REMOVED; see
+> [`shared/PROTOCOL.md`](shared/PROTOCOL.md) §1-2/§4).
 >
 > **No bucket retention either way:** the `.nc` is deleted from the bucket the instant it's delivered — the
 > file then lives on the **controller's CNCDISK**, which is where same-session re-runs come from (re-select +
@@ -27,12 +32,12 @@ asleep, it auto-completes on wake."
 ```
 
 - **`web/`** — the centralized web app (Cloudflare Pages + Worker). Everything the operator touches:
-  **send code · insert beacons · queue · live tracker.** Open from the ASUS, a phone, anywhere.
+  **send code · queue · live tracker.** Open from the ASUS, a phone, anywhere.
 - **`fairy/`** — the headless bridge on CNC-FAIRY (the only PC cabled to the Expert). No UI. A loop:
-  **poll R2 → write `.nc` to the Expert (SMB) → run the Modbus slave → post status to R2.** Outbound-only,
-  never internet-reachable.
-- **`shared/`** — [`PROTOCOL.md`](shared/PROTOCOL.md): the contract both apps obey (beacon frame, map
-  schema, R2 bucket layout, job lifecycle). Read this first — it's the seam.
+  **poll R2 → write `.nc` to the Expert (SMB) → mark delivered.** Optionally also polls the controller's own
+  Modbus registers for live position/run-state (BACKLOG #79). Outbound-only, never internet-reachable.
+- **`shared/`** — [`PROTOCOL.md`](shared/PROTOCOL.md): the contract both apps obey (R2 bucket layout, status
+  object, job lifecycle). Read this first — it's the seam.
 
 **Design docs:** [`CONFIGS.md`](CONFIGS.md) (vocabulary · deployment configs · shells · distribution · future
 seams) · [`ROADMAP.md`](ROADMAP.md) (build phases) · [`ARCHITECTURE.md`](ARCHITECTURE.md) (module map).
@@ -43,8 +48,10 @@ Vocabulary: **Console** (web app) ↔ **Gateway** (fairy) ↔ **Rendezvous** (R2
   un-exposed. Full argument: [`../TRANSPORT_DECISION.md`](../archive/TRANSPORT_DECISION.md).
 - The **transfer to the Expert is a plain SMB file copy** to `\\192.168.0.99\CNCDISK` (confirmed R/W
   2026-06-06). The cloud hop only gets bytes *to* CNC-FAIRY across the isolating guest WiFi.
-- **Beacons** = `MSETDATA` progress pushes (proven wedge-free); the slave counts them → `%`, op, line, ETA.
-  Reference implementation + spec: [`../controllers/expert-m350/tools/checkpoint_insert.py`](../controllers/expert-m350/tools/checkpoint_insert.py) (built, self-test passing).
+- **[REMOVED t2649] Beacons** used to be `MSETDATA` progress pushes decoded into `%`/op/line/ETA — the
+  transport was proven wedge-free, but the feature itself never demonstrably ran end-to-end (BACKLOG #78's
+  own evidence table). Replaced by BACKLOG #79's live Modbus position/run-state polling — continuous, no
+  file instrumentation.
 
 ## Safety (non-negotiable)
 - **Delivery is automatic; running is not.** The file lands on the controller hands-free, but the

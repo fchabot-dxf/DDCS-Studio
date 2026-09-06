@@ -4,9 +4,11 @@ Scoped to the **bridge only** (DDCS Studio is a *compatibility target*, not buil
 [`CONFIGS.md`](CONFIGS.md) §8). Each phase ships something usable; seams get baked in as we pass them.
 Vocabulary + configs + seam map: [`CONFIGS.md`](CONFIGS.md). The contract: [`shared/PROTOCOL.md`](shared/PROTOCOL.md).
 
-**Foundation already built** (the Gateway core): poller · transfer · slave (sim + Modbus) · cncdisk explorer ·
-backend (local + R2) · two job types · no-retention. 24 self-test checks green; **SMB delivery + CNCDISK
-explorer proven live on the V4.1 (2026-06-07).**
+**Foundation already built** (the Gateway core): poller · transfer · cncdisk explorer · backend (local + R2)
+· no-retention. 24 self-test checks green; **SMB delivery + CNCDISK explorer proven live on the V4.1
+(2026-06-07).** ⚠ [REMOVED t2649, BACKLOG #78] the "slave (sim + Modbus)" beacon receiver and the "two job
+types" (tracked/deliver-only) split it drove are gone — every job now delivers the same way; see
+[`shared/PROTOCOL.md`](shared/PROTOCOL.md). Live position/run-state polling (BACKLOG #79) is the replacement.
 
 ---
 
@@ -46,11 +48,10 @@ explorer proven live on the V4.1 (2026-06-07).**
   R2 write). Gateway cloud mode runs on CNC-FAIRY; **not yet run against a live machine — that's Phase 6.**
   See [`web/DEPLOY.md`](web/DEPLOY.md).
 
-## Phase 4 — JS instrumenter + beacon settings — ✅ DONE
-- **Goal:** Submit turns a raw `.nc` into a tracked job in the browser.
-- **Build:** port `checkpoint_insert.py` → `gcode-parse.js` + `instrument.js` (**self-test parity** with Python);
-  **beacon toggle** (on→tracked / off→deliver-only) + settings (**count · pacing · var/marker**).
-- **Verify:** JS self-test matches Python on the frame; toggle drives tracked vs deliver-only.
+## Phase 4 — JS instrumenter + beacon settings — ✅ DONE, then **[REMOVED t2649, BACKLOG #78]**
+- Everything this phase built (`checkpoint_insert.py`/`gcode-parse.js`/`instrument.js`, the beacon toggle,
+  the count/pacing/var/marker settings) was deleted 2026-09-04 — owner-directed, never demonstrably ran
+  end-to-end. Kept here as a historical record of what Phase 4 built, not as a description of anything live.
 
 ## Phase 5 — Packaging / distribution
 - **Goal:** download one exe from the page → run → offline system.
@@ -71,8 +72,9 @@ explorer proven live on the V4.1 (2026-06-07).**
 - **Verify:** run the exe on a clean profile → localhost console works. (Code-signing / SmartScreen = later.)
 
 ## Phase 6 — Live on the Expert
-- **Goal:** the one thing only testable there — real Modbus beacons end-to-end.
-- **Verify:** instrumented job → delivered → operator Start → beacons → console bar advances; done vs stalled.
+- **[REMOVED t2649, BACKLOG #78]** Its own goal ("real Modbus beacons end-to-end") is void — the beacon
+  mechanism it meant to verify live is deleted. BACKLOG #79's live position/run-state polling is CONFIRMED on
+  the owner's own M350 (`expert-m350/FINDINGS.md`, 2026-09-05) — this phase's real successor, already done.
 
 ---
 
