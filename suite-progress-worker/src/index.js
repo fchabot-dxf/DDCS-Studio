@@ -129,7 +129,8 @@ const PAGE = `<!doctype html>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
   <div class="spec" id="histcard" style="display:none"><span>recent runs</span>
     <div id="hist" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.9;overflow-wrap:anywhere"></div></div>
-  <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved</div>
+  <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved ·
+    <a href="https://github.com/fchabot-dxf/DDCS-Studio/commits/main/suite-progress-worker" style="color:var(--muted)">site changelog</a></div>
 </div>
 <script>
   var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
