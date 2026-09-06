@@ -7066,7 +7066,7 @@ Restored immediately after. Full account: WORK-LOG t2591.
 
 ---
 
-### 70. `polygon`'s `polyFlats` handle hangs a real pointer-drag sequence when the drag pushes across-flats toward
+### 70. [✅ FIXED t2505 — root pinned via a live CPU profile, drag routed through the incremental path; header unmarked until the 2026-09-07 sweep] `polygon`'s `polyFlats` handle hangs a real pointer-drag sequence when the drag pushes across-flats toward
 a small value — a NEW finding, surfaced as a side effect of L5's own port, NOT caused by it (reproduces
 identically on the pre-port hand-written code too). t2503 — CONFIRMED REAL, not a harness artifact (measured,
 not guessed); mechanism still NOT pinned (`polygonStack`/`polygonSweeps` regeneration checked and RULED OUT as
@@ -7295,7 +7295,7 @@ changed, zero touching any of the other five lathe ops). 101 existing lathe/canv
 
 ---
 
-### 71. There is NO real-UI authoring path for an INTERACTIVE preview handle (drag-to-resize / drag-to-
+### 71. [✅ CLOSED t2663/t2665 — this entry's own title is now FALSE: a wizard with a live, writing-back drag handle was built from scratch through the real UI, in BOTH binding modes, to the full built-in bar. The gap list that work produced closed 10/10 at t2665. Header unmarked until the 2026-09-07 sweep] There is NO real-UI authoring path for an INTERACTIVE preview handle (drag-to-resize / drag-to-
 reposition) on a custom wizard built from scratch in the Blocks tab — confirmed by actually building one
 
 *(filed t2509, the arc's own thesis-test turn: build a surfacing-equivalent wizard from an empty canvas, driven
@@ -8198,7 +8198,7 @@ touched, not the recompose/emit machinery), `atc_check_data`, `atc_length_data` 
 row-diff test plus a live "does a real canvas mount" proof, plus its own full pre-existing test suite. Full
 account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).
 
-### 78. ⛔ REMOVE THE BEACON PROGRESS MECHANISM ENTIRELY — owner: "beacons dont work remove them"
+### 78. [✅ REMOVED t2649 — slave/telemetry/instrumenter deleted, UI stripped, PROTOCOL.md marked wire-frame-vs-feature, delivery+tracking proven intact after] ⛔ REMOVE THE BEACON PROGRESS MECHANISM ENTIRELY — owner: "beacons dont work remove them"
 
 **[DONE t2649. The mechanism, its per-job map, `slave.py`/`telemetry.py`/`checkpoint_insert.py`/the JS
 instrumenter, and every UI surface that rendered its progress (History Duration/Last-time, the queue/tracker
@@ -8251,7 +8251,7 @@ known-harmful call rather than greying out a button. ⛔ No feature may test the
 consumer reads the table (this repo has just spent an arc digging out `checkLayoutNodes` vs `hasTreeLayout` —
 two hand-lists answering one question, disagreeing).
 
-### 79. ⭐⭐ LIVE JOB TRACKING over Modbus — poll `10002`/`16062`, show run state + executing line in Studio
+### 79. [✅ BUILT t2647, shipped V2026.09.05.2 as synthetic-proven + LIVE-UNTESTED (the release note says so); the live check and the percent display stay gated on #80 items 1–2] ⭐⭐ LIVE JOB TRACKING over Modbus — poll `10002`/`16062`, show run state + executing line in Studio
 
 **[OPEN, owner-directed 2026-09-05: "we can add it to the backlogs". The controller side is PROVEN; only the
 app side is missing.]**
@@ -8320,7 +8320,7 @@ order.]**
 ships labelled live-untested (the release note already says so); FAIRY's check upgrades the label, it does not
 gate the deploy. — advisor, per the owner's own "fairy wont be running soon".
 
-### 81. ⭐ THE DESKTOP APP'S GATEWAY PUBLISHES NOTHING OUT OF THE BOX — cloud reachability is silently off for every fresh install
+### 81. [✅ FIXED t2659, shipped V2026.09.06.4 — auto-discovery of the one machine folder, drive default when a token exists, the state line both ways, the .bat repaired, the banner crash fixed at the entrypoint; the phone-side first-run remainder labelled honestly] ⭐ THE DESKTOP APP'S GATEWAY PUBLISHES NOTHING OUT OF THE BOX — cloud reachability is silently off for every fresh install
 
 **[OPEN, measured live on the owner's own machine 2026-09-05, owner-confirmed the intent: "so the fix applies
 to all users not only me right?" — this entry IS that fix; the owner's own config was hand-edited as the
@@ -8369,7 +8369,7 @@ phone looked in `MILLING-DDDD4.1/` — measured live, both folder trees visible 
 The real fix-shape: the gateway learns the workspace name (Setup names it, or the delivered `.ddcs`/first job
 names it), never invents a hostname convention. Items 2 and 3 stand unchanged.
 
-### 82. ⛔ SIGNING OUT LEAVES THE WORKSPACE LOADED — owner: "thats shouldnt be"
+### 82. [✅ SHIPPED t2657, V2026.09.06.3 — unload to the real pristine path, save prompt via the shared discard gate, the Signed out notice, token-expiry proven NOT to unload, and the save-handle cleared (the hazard nobody named)] ⛔ SIGNING OUT LEAVES THE WORKSPACE LOADED — owner: "thats shouldnt be"
 
 **[OPEN, owner-ruled 2026-09-05, found live on their own phone mid-test.]**
 
@@ -8394,7 +8394,7 @@ emptier screen. One toast/inline line in the app's established notice style; no 
 - Scope guard: this is sign-OUT only. Token expiry / silent-refresh failure must NOT unload anything —
   a dropped token is ignorance, not a departure (same distinction as `unreadable` vs `unseen`, t2113).
 
-### 83. On a CLIENT, hide the CONNECTION section — owner: "i dont like seeing it on client"
+### 83. [✅ SHIPPED t2653, V2026.09.06.1 — narrowed to askMachine AND no-local-daemon by reading deriveStatus's own source, so a client with a real local daemon keeps its row] On a CLIENT, hide the CONNECTION section — owner: "i dont like seeing it on client"
 
 **[OPEN, owner-ruled 2026-09-05, from the live phone test. SMALL — a candidate small-item for the next
 Studio-side turn.]**
@@ -8411,7 +8411,7 @@ CONNECTION section does not render at all. The CONTROLLER section (the remote ga
 Scope guard: display only, `ui/gateway/views/status.js` — no polling change, no role logic change; the
 role condition already exists for the pill. On a GATEWAY device nothing changes.
 
-### 84. Splash screen on the exe for loading time — owner-requested
+### 84. [✅ WIRED t2657 — PyInstaller --splash + pyi_splash.close(), proven with a real local 47MB build; ⚠ the ON-SCREEN render itself stays LIVE-UNTESTED until the next launched exe (port 8765 was held by a live gateway)] Splash screen on the exe for loading time — owner-requested
 
 **[OPEN, owner-requested 2026-09-05.]**
 
@@ -8492,3 +8492,19 @@ it.
 
 **Nothing here blocks anything else in this file or the arc's own other work** — filed so the count and the
 per-shape reasoning live in the record, not scattered across turn logs.
+
+### 86. ⏸ THE BLOCK EDITOR'S GENERAL DRAG FEEL (gap 5 of the t2639 authoring list) — OWNER-PARKED, recorded here so it stops living only in turn logs
+
+**[PARKED by the owner's own routing, 2026-09-06 — the one survivor of the 10-gap authoring list (9 closed
+at t2665). Filed 2026-09-07 because it was the only owner-pending item with no numbered home.]**
+
+t2661 measured it: general Blockly-editor drag precision has **no scoped, low-risk code fix** — any real
+improvement (looser snapping app-wide, a different drag-preview algorithm) reaches into Blockly's own core
+drag/connection machinery, the same wall as the two parked Blockly-core bugs (t2581 gesture-creation, the
+serialization rhyme — both themselves waiting on the owner's 5-minute hands-on repro, scripted in the
+2026-09-07 conversation). Gap 4's own scoped fix (the user_root mouth spacer, measured 47.7px→70.2px) took
+the one part of drag feel that COULD be fixed locally.
+
+**What re-opens it:** the owner caring enough to fund a Blockly-core deep-dive turn, OR the hands-on repro
+proving the t2581 dead-gesture state hits real humans (which would promote that pair from parked to urgent
+and this entry would ride along).
