@@ -77055,3 +77055,45 @@ a load-dependent flake. `trig-lift-plan-1466.spec.js` LOCK 5 — the SAME pre-ex
 lint failure named in t2641's and t2643's own entries (file untouched since commit `880ef211`, well before this
 turn — confirmed via `git log`).
 
+## t2655 (SMALL ITEM, separate commit) — the devMode.js blkPanel prefill bug, investigated: does NOT reproduce
+
+Dispatch (citing t2643's own NEXT item): "the Save-dialog prep scans only `children`, never `uiChildren`, so it
+always shows the panel dropdown needlessly." t2643's own entry states this was "confirmed live: `.blk-dev-savedlg
+.blk-dev-paneltype` DOES render even with a feature_canvas already on the canvas."
+
+**Re-investigated live, not re-derived from the dispatch's own summary — and it does not reproduce.**
+
+1. `flattenBlocks(blocks, out, currentGroup)` (`userOps.js`) recurses into BOTH `b.uiChildren` AND `b.children`
+   for every node it visits — confirmed by reading it directly, and confirmed via `git log -L` that this
+   recursion (`if (b.uiChildren) flattenBlocks(b.uiChildren, out, g);`) was added at commit `fb3f439a`, well
+   before t2643's own turn. It did not change between t2643 and now.
+2. Built two independent, cleanly-CONNECTED reproductions of "a `user_root` with a `feature_canvas` nested in
+   its own `uiChildren` (PRESENTATION chain), about to be saved": (a) `Blockly.serialization.blocks.append`
+   with an explicit `inputs.PRESENTATION.block` connection (Blockly's own JSON connection API — no geometric
+   snap uncertainty); (b) a real UI flyout-drag of `user_root`+`feature_canvas`, matching
+   `panel-default-2643.spec.js`'s own exact drag technique. Both land the feature_canvas genuinely CONNECTED
+   (confirmed for (b) via a live wiring check: `presentationInput.connection.targetBlock() === theFeatureCanvasBlock`).
+3. In both, `devMode.js`'s own `panelDeclared = !!init.declPanel` (where `init.declPanel = blkPanel` from the
+   `prepareCandidate` scan) resolved **true** — `blkPanel` WAS found — so the dialog's `panelRow` renders empty
+   (`panelDeclared ? '' : <select class="blk-dev-paneltype">...`), matching the CORRECT, no-bug behavior, not
+   the dispatch's claimed always-shows-the-dropdown symptom.
+
+**Conclusion: no fix applied.** The structural defect as described ("scans children, never uiChildren") is not
+present in the current code — `flattenBlocks` already reaches a uiChildren-nested `feature_canvas` through a
+top-level `user_root`, and did so before t2643 too. t2643's own "confirmed live" observation was most likely a
+construction artifact of that session's own manual/informal check (my own first attempt at a real UI drag
+reproduction independently hit exactly this class of mistake: a flyout-drop that visually looks placed but
+never actually connects into the block tree — `fcParentBlockType: null` — which would ALSO leave the panel
+"declared" from `flattenBlocks`'s point of view since a disconnected top-level block still appears in the bare
+stack's own `children` array directly, so this specific artifact doesn't even explain a false dropdown — but it
+illustrates how easy an unconfirmed manual check is to get wrong here). No committed test exists that ever
+exercised the save-dialog panel row for a canvas+handle wizard, so this was never caught as a false claim before.
+
+Per this project's own "plan text is not evidence" / "an unverified severity assumption is not evidence"
+(t2641 Part B) discipline: reporting a non-reproducing bug honestly beats forcing a fix onto code that already
+works. `devMode.js` untouched this turn. The throwaway reproduction probes are deleted, not committed.
+
+**Verify:** the two clean reproductions above, both showing `panelDeclared: true` / no dropdown row rendered for
+a genuinely-connected uiChildren-nested `feature_canvas`. `git log -L` confirming `flattenBlocks`'s uiChildren
+recursion predates t2643. No code changed; no test added (nothing to pin — the claimed bug does not exist to
+regress against). `git status` clean except this entry.
