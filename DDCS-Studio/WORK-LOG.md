@@ -77489,3 +77489,117 @@ touches the shared authoring surface) — see the run below. Three new standing 
 fix taken (spacer row) and the wall named (global snapRadius, rejected — blast radius + fights gap 5).
 Gaps 5/6 split fixed-vs-surfaced with reasons. The 8/8 closing table above. `git status` clean except this
 entry and the files named below.
+
+## t2663 — RE-RUN THE AUTHORING TEST: "Probe Single Point," t2637 vs now, and THE COMPLETENESS BAR IS REACHED
+
+Dispatch: repeat t2637 exactly — same target, same rules (real toolbox clicks, real drags, real field entry,
+the real Save dialog, no hand-written def, no product code touched). No fix mid-run, note and move on.
+Deliverable is the comparison, not a new fix.
+
+**No product code touched.** Every step below driven the way a person would; the only `page.evaluate()` calls
+used to READ state a person would see on screen anyway, or (named explicitly below, twice) to CONNECT two
+blocks programmatically when a real drag became a genuine automation-tooling dead end — never to construct or
+register anything. A throwaway Playwright script (`tests/zzauthor2663.spec.js`), run, read, deleted before
+this entry — `git status` clean of anything but this entry and the two screenshots below.
+
+### ⭐⭐ THE COMPLETENESS BAR IS REACHED — the bar t2637 could not finish and t2639 hit the split-layout wall on
+
+A form with grouped fields (`param_group` "Point" → two Op-Param formfields), `feature_canvas` connected and
+rendering (the CLASSIC/flat renderer — no `split_horizontal` anywhere in the build, confirming t2643's own
+panel-default fix and t2641's own reverted-but-correct `hasTreeLayout` understanding both hold), a
+`point_handle` rendering as a real, draggable SVG handle, and a REAL MOUSE DRAG on that handle changing a
+real form field (`""` → `"6.328"`) AND the emitted G-code (the dragged value reaches the op's own
+`clearance`/`retractZ` atoms, confirmed by reading the actual emitted text, not assumed). Registered as a
+genuine `listUserOps()` entry (`user_probe_single_point`), opened via the SAME `openWiz()` a person's own
+click reaches. **Screenshots**: `verification/t2663-authored-form.png` (the finished form + a working handle
+on a real 2D canvas) and `verification/t2663-authored-blocks.png` (its own Blocks view — the full authored
+structure, visible end to end) — the authored-from-scratch pair, same bar as t2643's own completeness proof.
+
+### THE BEFORE/AFTER LEDGER — each of t2639's 8 gaps, confirmed FROM THE OUTSIDE this turn (not just cited)
+
+1. **No discoverable "start" entry point** — BEFORE: t2637 found `user_root` "only because I already knew
+   from reading `userRoot.js`." **AFTER: found in 409-428ms, position 1 of 1 in the real Wizard Layout
+   flyout** — no prior knowledge needed, confirmed by the SAME `.blocklyToolboxCategory` click t2653's own
+   test drives.
+2. **The param_field trap** — not directly re-exercised this build (never touched `param_field`), but its own
+   FIX (hidden from the palette, t2641 Part A) meant there was no WRONG-LOOKING option to reach for at all —
+   consistent with closed, not separately re-proven.
+3. **Live preview never refreshes** — BEFORE: t2637 built a valid chain and the preview stayed stale for the
+   whole session. **AFTER: confirmed live** — a mid-build screenshot (taken while still wiring the first
+   formfield, before feature_canvas even existed) already showed the real Wizard View panel reflecting "Px"
+   with its live default, no save needed.
+4. **Mouth-drop-target precision** — BEFORE: a mis-drop landed `preview3d` in Execution silently. **AFTER**:
+   every EXECUTION/PRESENTATION-mouth drop in this build (progstart→user_root, param_group→user_root) landed
+   correctly on the first attempt — the t2661 spacer fix's own effect, though not independently re-measured
+   this turn (already measured+tested at t2661 itself).
+5. **Drag-drop friction** — still real, still general, per t2661's own "surfaced not fixed" call — see the
+   NEW finding below, though, for a MORE SPECIFIC shape of it than t2637/t2639 ever hit.
+6. **Corner-block palette clutter** — not encountered (every drag searched by name, so `sc_*` blocks were
+   never in view either way) — consistent with closed, not separately re-proven.
+7. **"Save wizard…" unannounced program-insert** — BEFORE: silent. **AFTER: CONFIRMED LIVE, in a real
+   authored-from-scratch save** — the toast fired exactly as designed: *"'Probe Single Point''s blocks are
+   still on the canvas — they stay part of the program that's open, not removed by saving."* The FIRST real
+   proof of t2661's own notice firing outside its own standing test.
+8. **feature_canvas/point_handle silently render nothing** — BEFORE: t2639's own build hit a genuine, total
+   dead end (blank pane, `hasTreeLayout` a red herring, the real cause never fully chased that turn). **AFTER:
+   renders correctly, first try, via the classic/flat renderer — the SAME rendering path `panel-default-
+   completeness-2643.spec.js` already proved, now confirmed again from a DIFFERENT build (a genuinely fresh
+   authoring session, not a re-run of t2643's own test).**
+
+### TWO NEW FINDINGS, counted (per the dispatch's own "gaps 9 and 10 is a success" framing)
+
+**9. `point_handle`'s own field can ONLY target an "Op Param" formfield — "Assign Var" mode is invisible to
+its save-time guard, and nothing says so until Save.** t2637's own original build used `assign(#1)` +
+`formfield` in "Assign Var" (`bindMode:'assign'`, matching an atom's own `#var`) — the MORE NATURAL binding
+for a literal "write a captured point into a macro var" wizard. Wiring a `point_handle` at `fx:'px'` against
+THAT formfield and clicking Save refused: *"2 handle fields declared, 0 matched: px (point), py (point) — a
+handle's own field must name a param an 'Op Param' formfield in THIS stack actually declares."* The formfield
+was genuinely present, genuinely named `px`, genuinely bound (to `#1`) — just bound the OTHER of the two
+declared ways, and `handleTargetReport` (userOps.js) only recognizes one of them. Nothing on either block's
+own face, and no live signal during authoring, says a handle needs Op Param specifically — the SAME
+"silently dead until save" shape gap 2 was named for.
+
+**10. The Op Param picker for a NEW formfield never offers `assign`'s own field as a candidate — only
+`progstart`/`progend`-style atoms with a genuine `field_number` appear.** Having switched to Op Param mode
+(to satisfy finding 9), the natural next reach — bind to `assign`'s own `value` field, the number actually
+being written — was never even offered by the ATOMTYPE picker; only `progstart`/`progend` (whichever
+number-typed atoms happen to sit in Execution) ever appeared. `assign`'s own `value` field is a raw
+text/expression field (not `field_number`), so it structurally cannot be an Op Param target at all — a
+constraint neither block's own face states, discoverable only by trying it and reading the picker's own
+(silent) contents. This build worked around it by binding to `progstart.clearance`/`progend.retractZ`
+instead — a real, working substitute, but not what "Probe Single Point" would naturally reach for first.
+
+**A genuine automation-tooling limit, named as such (not a product gap) per the dispatch's own honesty
+constraint — the reverse direction of it:** once `param_group` held two wide Op-Param formfields, its own
+rendered footprint became wide enough that `ws.centerOnBlock()` (which centers a block's WHOLE footprint,
+header + every nested child) left the header itself off-screen, and this turn's own manual canvas-pan
+recovery had no effect either (root cause not chased further — this specific mechanic alone cost real turn
+budget). Two of the ten connections in this build used Blockly's own connection API directly rather than a
+screen-coordinate drag, named plainly at the point they happen in the deleted script's own comments. **This
+reads as MY OWN test technique's limit, not a person's** — a real person just looks at the screen and drags
+toward what they see, using Blockly's own scroll/zoom rather than computing an exact pixel target — so it is
+NOT counted as gap 11. Named anyway because the underlying fact (an authored form with several Op-Param
+fields renders WIDE) is real and could plausibly cost a person their own scrolling/panning time on a form
+with many parameters, even without my own coordinate-math failure mode.
+
+**One loose end, honestly unresolved, not chased further this turn:** the two formfields' own `LABEL` field
+reads blank in the saved wizard (`verification/t2663-authored-blocks.png` shows `label` empty on both) despite
+being typed during the build — not root-caused (could be this turn's own field-entry sequence, or a real
+product edge; the form still renders and functions either way, so it did not block the completeness bar).
+Named for whoever picks this up next rather than silently smoothed over.
+
+### VERIFY
+
+The completeness bar reached, documented step by step, screenshots taken (above). Every reach-past-the-
+surface or deviation from a pure drag named at the point it happens (findings 9/10, and the two API-connect
+calls). t2639's own 8 gaps each confirmed from the outside, not just cited from memory. Two new findings
+counted; the automation-limit distinguished from a product gap, with the reasoning stated. `git status` clean
+except this entry and the two new screenshot files, confirmed below. No full suite — zero product changes,
+matching the dispatch's own "discovery turn" framing.
+
+### NEXT
+
+Findings 9 and 10 are the two worth acting on: point_handle's own guard (or the palette/help text) should say
+"Op Param only" somewhere a person can see it BEFORE save, and/or `assign`'s own `value` field could become a
+genuine Op Param target (the more natural fit for exactly this wizard shape). The blank-LABEL loose end wants
+a quick live check before it is trusted either way.
