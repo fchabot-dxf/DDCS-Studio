@@ -34,11 +34,41 @@
  * pool) and commits ONLY from that list. Resolved at render time by `panelTypes.js`'s own
  * `markerAnchorCoord`/`resolveAnchorCoord` (anchorSources.js) — `userOps.js`'s `handleBindingsFromStack`
  * keeps ax/ay RAW (a number or a name string) all the way through, same "raw at derive" doctrine either way.
+ *
+ * t2681 — THE FACE, made readable (the owner: search approved, but "field fx fy x y ax ay relToRow label" is
+ * a wall of engineer names). Same `dynamic`/`fieldsFor`/`labels` precedent `formField.js` already established
+ * (its own header has the full account): `allFields` declares every field the block CARRIES (unchanged data
+ * model, round-trip unaffected); `fieldsFor` returns only what a person authoring actually needs to SEE.
+ *   - `x`/`y` are ALWAYS excluded — read directly off `handleBindingsFromStack` (userOps.js): it never reads
+ *     `p.x`/`p.y` at all. They exist ONLY as a display snapshot `handleBindingsToBlocks`'s own REVERSE
+ *     direction writes when regenerating a block from live bindings (mirrors `length_handle`'s own `value`
+ *     field) — editing them is a silent no-op, so per the dispatch's own "never authored, drop from the
+ *     face" rule they are gone from the visible face entirely (still present in the data model — a round-
+ *     trip through save/load still carries whatever value they hold).
+ *   - `ax`/`ay` are a REAL mode split on `relToRow` (the `dynamic` driver): `panelTypes.js`'s own declared
+ *     `anchor.kind==='point'` branch reads `relToRow` FIRST and, if it resolves, `continue`s WITHOUT EVER
+ *     TOUCHING `ax`/`ay` — they are genuinely inert, not merely redundant, the instant `relToRow` is set. So
+ *     `fieldsFor` shows ax/ay ONLY while `relToRow` is empty; `relToRow` itself always stays visible (it is
+ *     the mode SWITCH — hiding it would remove the only way to turn relative-anchoring on).
+ * `labels` (t2385, face-only — storage keys unchanged) use the owner's own SETTLED read/write vocabulary
+ * (amendment to t2681, mid-turn — the words a person sees ARE how they learn the model, so the SAME pair
+ * every future value-following field should reuse, never a third synonym): `fx`/`fy` → "writes x"/"writes y"
+ * (the two params dragging WRITES), `ax`/`ay` → "reads x"/"reads y" (the searchable field READS its value
+ * from wherever it's pointed — a literal, a form param, or a marker), `relToRow` → "relative to", `label` →
+ * "name".
  */
 export const pointHandleBlock = {
     type: 'point_handle', label: 'point handle', category: 'Wizard Layout', kind: 'point_handle',
     help: 'A draggable 2D POINT handle on the feature canvas, at a fixed anchor (ax, ay) — type a number for a literal, or search for an existing form param/marker to follow its live value — or, with `relToRow` set, anchor the WHOLE handle to an EXISTING declared sim-start row\'s own LIVE position instead. `fx`/`fy` must each name an EXISTING "Op Param" form field elsewhere in the stack — dragging writes them for real (it reaches the emitted G-code).',
+    dynamic: ['relToRow'],
     defaults: { fx: 'px', fy: 'py', x: '40', y: '60', ax: 0, ay: 0, relToRow: '', label: 'pos' },
-    fields: ['fx', 'fy', 'x', 'y', 'ax', 'ay', 'relToRow', 'label'],
+    allFields: ['fx', 'fy', 'x', 'y', 'ax', 'ay', 'relToRow', 'label'],
+    labels: { fx: 'writes x', fy: 'writes y', ax: 'reads x', ay: 'reads y', relToRow: 'relative to', label: 'name' },
+    fieldsFor(p) {
+        const f = ['fx', 'fy'];
+        if (!((p && p.relToRow) || '')) f.push('ax', 'ay');   // inert once relToRow resolves (panelTypes.js never reads them) — hide
+        f.push('relToRow', 'label');
+        return f;
+    },
     emit: () => [],   // metadata only — the BLOCK produces no G-code itself; the params it names (once resolved) do, via the merged real bindings
 };

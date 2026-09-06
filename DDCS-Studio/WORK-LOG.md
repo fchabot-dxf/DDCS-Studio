@@ -78299,3 +78299,112 @@ files (`bridge.js`, `userOps.js`, `anchorSources.js`, `panelTypes.js`, `placemen
 `progressReporter.mjs`, their own separate commit) — `verification/*.png` churn from running other suites
 this session left unstaged, per the standing screenshot-discipline rule.
 
+## t2681 — MAKE THE HANDLE FACES READABLE: the formField.js `dynamic`/`fieldsFor`/`enablers`/`labels`
+precedent, applied to point_handle/rect_handle
+
+The owner reviewed t2679's three screenshots: **search dropdown APPROVED** ("Origin X · form" / "Origin X ·
+marker", flat with a tie-break hint — exactly right, ship it). **The block FACES themselves were NOT** —
+"'rect handle field fieldH value valueH ax ay sx sy minw maxw minh maxh valueField cornerParam label' is a
+wall of engineer names a person can't read." ⛔ Still no op migrates — still faces-only, still ends in a
+screenshot review.
+
+**Essential-vs-plumbing split, checked against the real code, not guessed** (`handleBindingsFromStack`,
+`panelTypes.js`'s own render branches — the ONLY two places that actually READ these fields):
+- **`point_handle`'s `x`/`y`** and **`rect_handle`'s `value`/`valueH`**: `handleBindingsFromStack` never reads
+  `p.x`/`p.y` or `p.value`/`p.valueH` at all — confirmed by direct reading, not inference. They exist SOLELY
+  as a display snapshot `handleBindingsToBlocks`'s own REVERSE direction writes when regenerating a block
+  from live bindings (mirrors `length_handle`'s own `value` field). Editing them is a silent no-op. Per the
+  dispatch's own "never authored, drop from the face" rule: gone from the visible face, ALWAYS hidden, no
+  reveal path — still present in the data model (`allFields`), so a round-trip still carries whatever they hold.
+- **`point_handle`'s `ax`/`ay`**: a REAL mode split on `relToRow`, not an arbitrary one — `panelTypes.js`'s
+  own declared `anchor.kind==='point'` branch reads `relToRow` FIRST and, if it resolves, `continue`s WITHOUT
+  EVER TOUCHING `ax`/`ay` — they are genuinely inert the instant `relToRow` is set, not merely redundant. So
+  `fieldsFor` (driven by `dynamic: ['relToRow']`) shows ax/ay ONLY while `relToRow` is empty; `relToRow`
+  itself stays ALWAYS visible (it's the mode SWITCH — hiding it would remove the only way to turn relative-
+  anchoring on in the first place).
+- **`rect_handle`'s `sx`/`sy`/`valueField`**: the owner's own explicit "never see" list. Confirmed each
+  defaults to a genuinely NON-EMPTY value ('1'/'1'/'field') — `enablers`' own "hidden while empty" mechanism
+  structurally can't apply the way it does below, so these are kept OUT of `enablers` on purpose (permanent
+  hide, no reveal path) rather than force-fit into a mechanism whose own semantics don't match.
+- **`rect_handle`'s `minw`/`maxw`/`minh`/`maxh`**: DEFAULT TO THE EMPTY STRING already (t2489's own symmetric
+  clamp pair) — a genuine fit for `enablers` (hidden while empty, revealed once set OR via "Block options…",
+  `formField.js`'s own help/limits/units precedent, same mechanism). `cornerParam`: also empty by default,
+  and unlike the clamps it's a real FEATURE a person may deliberately reach for — same enabler treatment.
+- **Always shown**: `fx`/`fy` (point) and `field`/`fieldH` (rect) — the writes targets; `ax`/`ay` (rect,
+  primary regardless of `cornerParam`); `label` (both).
+
+**Labels** (`def.labels`, t2385 — face text only, storage keys byte-identical): first drafted with `ax`/`ay` →
+"anchor x"/"anchor y", then a mid-turn amendment SETTLED the vocabulary for the whole board, not just this
+turn — "a value is WRITTEN (set) and READ (used)… prefer read/write/anchor/writes over fx/fy/ax/ay/valueField
+… don't introduce a THIRD synonym for a thing." Final: `fx`/`fy`/`field`/`fieldH` → "writes x"/"writes
+y"/"writes w"/"writes h" (dragging WRITES these), `ax`/`ay` → "reads x"/"reads y" (the searchable field READS
+its value from wherever it's pointed — a literal, a form param, or a marker), `relToRow` → "relative to",
+`cornerParam` → "corner from", `minw`/`maxw`/`minh`/`maxh` → "min/max width/height", `label` → "name". Every
+new consumer of this same mechanism should reuse this exact read/write pair, per the owner's own ruling.
+
+**Non-vacuity, the whole mechanism**: reverted both blocks to their pre-turn committed state (`git show HEAD:
+... > file`, safe since both were already committed — no scratch-copy step needed this time), re-ran
+`handle-face-readable-2681.spec.js` — **all 3 failed correctly**: the visibility assertions read the OLD
+always-shown state, and the labels test's own `toContain('anchor x')` failed against the raw, unlabeled face
+text (`"point handle fx px fy py x 40 y 60 ax 0 ay 0 relToRow (pick…) label pos"`). Restored, re-confirmed
+3/3 green.
+
+**A genuinely non-obvious timing finding, caught building the round-trip test, not shipped as a bug report**:
+querying a hidden field's `isVisible()` IMMEDIATELY after `stackToWorkspace` reads the PRE-LOAD default
+state — Blockly's own `dynamic`/`enablers` mechanism (`registerDynExtension`, bridge.js) re-syncs via a
+CHANGE-EVENT listener (`addOnChange`), and those events batch to the next animation frame rather than firing
+synchronously during a bulk JSON load. A block changing ONE watched field settled in one frame; a block
+changing FIVE (rect_handle's own `cornerParam` + the four clamp fields set together) needed measurably more
+than one. **Not a product defect** — `blocksApp.js`'s own render pipeline already waits for a paint cycle
+before a person ever sees the canvas, so nobody observes the transient state — but a test reading visibility
+right after a bulk load must wait a tick too, same as `blocks-render.spec.js`'s own pre-existing "render
+queue + RAF" note already flags for a DIFFERENT reason. Fixed with a flat 300ms wait (measured sufficient,
+matching this codebase's own existing timeout convention elsewhere) rather than a fragile single-RAF chain.
+
+**Shape change, verified not silently updated**: `rect-handle-block.spec.js`'s own "DRIVE THE APP" test tried
+to set `VALUEFIELD` via a real UI dropdown click — now permanently hidden, so the click timed out (`0`
+matches for `.blocklyMenuItem` filtered to "field (W)"). Fixed by removing that UI step; the test's own
+existing assertion (`expect(fieldsSet.valueField).toBe('field')`) already checked the untouched DEFAULT,
+which needed no change — the field simply stops being author-set via the canvas, matching the new design
+exactly.
+
+**Four screenshots** (`t2681-handle-faces-readable.spec.js`, new — `t2679-anchor-vocabulary-faces.spec.js`
+re-run unchanged, confirming its own point_handle/rect_handle shots came out readable automatically since it
+drives the SAME live mechanism), for the owner's own review bar ("both handle faces where a machinist can
+read them"):
+- `verification/t2681-point-handle-face-default.png` — literal anchor state: "writes x [px] writes y [py]
+  reads x [40] reads y [60] relative to [(pick…)] name [pos]".
+- `verification/t2681-point-handle-face-relto.png` — `relToRow` set: ax/ay GONE, not just relabeled —
+  "writes x [px] writes y [py] relative to [wall1] name [pos]".
+- `verification/t2681-rect-handle-face-default.png` — the owner's own named example, now FIVE words: "writes
+  w [boxw] writes h [boxh] reads x [0] reads y [0] name [W×H]" (was 15 raw field names).
+- `verification/t2681-rect-handle-face-corner-revealed.png` — `cornerParam` set: the SAME five plus "corner
+  from [stockAttach]" — proving the enabler reveals on demand, not permanently gone.
+
+⛔ No op migrates onto either block's own field shape this turn. `t2679-anchor-vocabulary-faces.spec.js`'s
+own search-dropdown mechanism (owner-approved) is UNCHANGED — this turn only touched visibility/labels.
+
+### VERIFY
+
+Ran the full suite TWICE — once before the read/write label amendment landed, once after (the committed
+labels are the SECOND run's own labels; both runs are recorded since the first caught a real, if unrelated,
+finding worth keeping).
+
+**First run**: test:e2e `test-results/summary.json` — `expected:3213, unexpected:1, flaky:8, skipped:28`. One
+failed title, named: `probe-port-gate-1880.spec.js › every one of the 6 probe ops gates its own Port field
+under V4.1 — not just Corner`. NOT re-argued as a flake — RE-RUN standalone: **3/3 passed cleanly**
+(`probe-port-gate-1880.spec.js` in full, including the one that failed in the big run). This turn's own diff
+touches exactly two files (`pointHandle.js`, `rectHandle.js`) — neither `postGating.js` (what this test
+actually exercises) nor `bridge.js` (unchanged this turn; its `dynamic`/`fieldsFor`/`enablers` machinery
+already existed, built for `formField.js` at t2385-t2407) — the same contention-class flake
+`playwright.config.js`'s own `workers:4` comment already documents (a big-run-only failure that disappears
+standalone), not a regression.
+
+**Second run** (after the label amendment, the FINAL committed state), read the same way — `summary.json`
+directly, never the live page (BACKLOG #87 remains unfixed): **`expected:3208, unexpected:0, flaky:14,
+skipped:28`.** test:node 236/236 both runs. Real verdict: **0 regressions from this turn's own changes**,
+confirmed twice. `git status` clean except this entry, the two source files, the new round-trip spec
+(`handle-face-readable-2681.spec.js`), the new screenshot spec (`t2681-handle-faces-readable.spec.js`), the
+one collateral test fix (`rect-handle-block.spec.js`, the now-hidden VALUEFIELD UI step removed), and the
+four new screenshots.
+

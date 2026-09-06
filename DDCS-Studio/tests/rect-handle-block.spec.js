@@ -300,8 +300,10 @@ test('DRIVE THE APP, THE t2525 BAR: two formfields placed FIRST (must-match pick
     await setPickerField(ff2, 'ATOMTYPE', 'progend');
     await setTextField(ff2, 'KEY', 'retractZ');
 
-    // 4) feature_canvas stacked after param_group, then rect_handle into ITS OWN mouth, picking BOTH params +
-    //    the valueField dropdown (the real risk this gesture carries)
+    // 4) feature_canvas stacked after param_group, then rect_handle into ITS OWN mouth, picking BOTH params.
+    //    t2681 -- VALUEFIELD is no longer on the visible face (the owner's own "plumbing, never see" list);
+    //    this test now exercises its UNTOUCHED DEFAULT ('field') rather than driving a UI control that no
+    //    longer exists -- asserted below, same as before.
     const pgBottom = await stackBottomPoint('param_group');
     await searchFor('feature canvas');
     await dragFlyoutBlockTo('feature_canvas', pgBottom);
@@ -313,7 +315,6 @@ test('DRIVE THE APP, THE t2525 BAR: two formfields placed FIRST (must-match pick
     await dragFlyoutBlockTo('rect_handle', fcMouth);
     await setPickerField('rect_handle', 'FIELD', 'boxw');
     await setPickerField('rect_handle', 'FIELDH', 'boxh');
-    await setDropdownField('rect_handle', 'VALUEFIELD', 'field (W)');
 
     const fieldsSet = await page.evaluate(() => {
         const ws = window.__blkws;
