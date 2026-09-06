@@ -1,24 +1,31 @@
-# DDCS suite progress — a tiny standalone Worker so the test suite's live progress is readable
-# from a phone, from anywhere, with ZERO model tokens. Twin of analytics/ in spirit and setup.
+# DDCS suite progress — live suite progress on a phone, zero model tokens, event-driven end to end.
 #
 #   the suite writes DDCS-Studio/test-results/progress.md (its own reporter, t2407)
-#   a local loop on the dev machine POSTs that text here every ~30s   (tools/push-progress.ps1)
-#   GET /      → a phone-friendly page that re-fetches /raw every 20s and re-renders
-#   GET /raw   → the stored text, verbatim
-#   POST /u?k= → store new text (k must match the PUSH_KEY secret)
+#   push-progress.ps1 watches that file (FileSystemWatcher — an EVENT, not a poll) and POSTs on change
+#   a Durable Object holds the latest text + every open phone as a hibernatable WebSocket
+#   a push broadcasts to all sockets instantly → the page updates in ~1–2s
+#
+#   GET /      → the page (WebSocket client; falls back to slow /raw polling if the socket drops)
+#   GET /live  → WebSocket upgrade
+#   GET /raw   → latest text, verbatim (the fallback)
+#   POST /u?k= → store + broadcast (k must match the PUSH_KEY secret)
 #
 # Deploy (from suite-progress-worker/):
-#   npx wrangler kv namespace create PROG        # once — paste the id below
-#   npx wrangler secret put PUSH_KEY             # once — any long random string
+#   npx wrangler secret put PUSH_KEY     # once — any long random string (mirror it in
+#                                        #   ~/.ddcs-bridge/progress-push-key.txt for the pusher)
 #   npx wrangler deploy
 #
-# ⚠ KV edge caching means a reading colo can serve up to ~60s stale — the page computes its age
-# from the heartbeat INSIDE the text and says so, honestly, instead of posing as live.
+# v1 of this worker used KV (namespace 2454af9711064acd87d4cfee82af90bf) — retired: KV's 60s edge
+# cache defeated freshness and its write quota defeated per-test pushes. The DO has neither problem.
 
 name = "ddcs-suite-progress"
 main = "src/index.js"
 compatibility_date = "2024-11-01"
 
-[[kv_namespaces]]
-binding = "PROG"
-id = "2454af9711064acd87d4cfee82af90bf"
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "ProgressRoom"
+
+[[migrations]]
+tag = "v2-do"
+new_sqlite_classes = ["ProgressRoom"]

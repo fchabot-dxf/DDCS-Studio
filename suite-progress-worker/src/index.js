@@ -1,5 +1,7 @@
-// DDCS suite progress worker — store one small text blob, serve a phone-friendly live page.
-// See ../wrangler.toml for the whole story. No analytics, no identity, nothing but the blob.
+// DDCS suite progress — event-driven edition. One Durable Object holds the latest progress text
+// and every open phone as a hibernatable WebSocket; a push broadcasts to all of them instantly.
+// No KV, no cache windows, no polling anywhere in the chain (the page keeps a slow /raw poll only
+// as a fallback while its socket is down). See ../wrangler.toml.
 
 const PAGE = `<!doctype html>
 <html><head>
@@ -23,12 +25,15 @@ const PAGE = `<!doctype html>
   .wrap{width:100%;max-width:560px;display:flex;flex-direction:column;
         gap:12px;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}
   h1{font-size:13px;margin:0;letter-spacing:.1em;text-transform:uppercase;
-     color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+     color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .live{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--skip)}
+  .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
   .pct{font-size:clamp(64px, 22vw, 110px);font-weight:800;line-height:.95;
        font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .state{font-size:15px;color:var(--muted)}
   .bar{height:22px;background:var(--bar-bg);border-radius:11px;overflow:hidden}
-  .fill{height:100%;background:var(--bar-fill);border-radius:11px;transition:width .6s}
+  .fill{height:100%;background:var(--bar-fill);border-radius:11px;transition:width .5s}
   .count{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
   .count small{font-size:15px;color:var(--muted);font-weight:500}
   .rows{background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:4px 16px}
@@ -50,7 +55,8 @@ const PAGE = `<!doctype html>
 </style></head><body>
 <div class="wrap">
   <div class="stale" id="stale">⚠ No fresh data — the run finished, died, or nothing is pushing.</div>
-  <h1><span>Full suite · RenderRanchy</span><span id="age">…</span></h1>
+  <h1><span>Full suite · RenderRanchy</span>
+      <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
   <div>
     <div class="pct" id="pct">—</div>
     <div class="state" id="state">waiting for data…</div>
@@ -66,69 +72,106 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
-  <div class="foot">re-fetches every 20s · fed by the suite's own reporter · no model involved</div>
+  <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved</div>
 </div>
 <script>
-  var hb = 0;
+  var hb = 0, wsOpen = false;
+  function g(id){ return document.getElementById(id); }
   function render(t){
     var m;
-    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) {
-      document.getElementById('pct').textContent = m[1] + '%';
-      document.getElementById('fill').style.width = m[1] + '%';
-    }
-    if ((m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/))) {
-      document.getElementById('done').textContent = m[1];
-      document.getElementById('total').textContent = m[2];
-    }
-    document.getElementById('state').textContent =
-      t.indexOf('running') >= 0 ? 'running' : 'not running — last known state below';
-    if ((m = t.match(/✅\\s*(\\d+)/))) document.getElementById('pass').textContent = m[1];
-    if ((m = t.match(/❌\\s*(\\d+)/))) document.getElementById('fail').textContent = m[1];
-    if ((m = t.match(/⚠\\s*(\\d+)/)))  document.getElementById('flaky').textContent = m[1];
-    if ((m = t.match(/⊘\\s*(\\d+)/)))  document.getElementById('skip').textContent = m[1];
-    if ((m = t.match(/⏱\\s*([\\dhms ]+?)\\s*·/))) document.getElementById('elapsed').textContent = m[1].trim();
-    if ((m = t.match(/ETA\\s*([\\dhms ~]+)/))) document.getElementById('eta').textContent = '~' + m[1].trim().replace(/^~/,'');
-    var lines = t.split('\\n').filter(function(l){ return l.trim(); });
+    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
+    if ((m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/))) { g('done').textContent = m[1]; g('total').textContent = m[2]; }
+    g('state').textContent = t.indexOf('running') >= 0 ? 'running' : 'not running — last known state below';
+    if ((m = t.match(/✅\\s*(\\d+)/))) g('pass').textContent = m[1];
+    if ((m = t.match(/❌\\s*(\\d+)/))) g('fail').textContent = m[1];
+    if ((m = t.match(/⚠\\s*(\\d+)/)))  g('flaky').textContent = m[1];
+    if ((m = t.match(/⊘\\s*(\\d+)/)))  g('skip').textContent = m[1];
+    if ((m = t.match(/⏱\\s*([\\dhms ]+?)\\s*·/))) g('elapsed').textContent = m[1].trim();
+    if ((m = t.match(/ETA\\s*([\\dhms ~]+)/))) g('eta').textContent = '~' + m[1].trim().replace(/^~/,'');
+    var lines = t.split('\\n');
     for (var i = 0; i < lines.length; i++) {
       var l = lines[i].trim();
-      if (l.charAt(0) === '\`' && l.indexOf('.spec.js') > 0) {
-        document.getElementById('spec').textContent = l.replace(/\`/g, '');
-      }
+      if (l.charAt(0) === '\`' && l.indexOf('.spec.js') > 0) g('spec').textContent = l.replace(/\`/g, '');
     }
     if ((m = t.match(/heartbeat (\\S+?)[\\s—]/))) hb = Date.parse(m[1]) || 0;
     tick();
   }
   function tick(){
-    var el = document.getElementById('age'), st = document.getElementById('stale');
-    if (!hb) { el.textContent = ''; return; }
+    if (!hb) return;
     var mm = Math.round((Date.now() - hb) / 60000);
-    el.textContent = mm < 1 ? 'live' : mm + ' min old';
-    st.style.display = mm >= 5 ? 'block' : 'none';
+    g('age').textContent = mm < 1 ? (wsOpen ? 'live' : 'recent') : mm + ' min old';
+    g('stale').style.display = mm >= 5 ? 'block' : 'none';
+  }
+  function connect(){
+    try {
+      var ws = new WebSocket('wss://' + location.host + '/live');
+      ws.onopen = function(){ wsOpen = true; g('dot').className = 'dot on'; };
+      ws.onmessage = function(e){ if (e.data && e.data.length > 10) render(e.data); };
+      ws.onclose = function(){ wsOpen = false; g('dot').className = 'dot';
+        setTimeout(connect, 3000 + Math.random() * 4000); };
+      ws.onerror = function(){ try { ws.close(); } catch(_){} };
+    } catch(_) { setTimeout(connect, 8000); }
   }
   function pull(){
+    if (wsOpen) return;   // socket healthy: no polling at all
     fetch('/raw', { cache: 'no-store' })
       .then(function(r){ return r.text(); })
       .then(function(t){ if (t && t.length > 10) render(t); })
       .catch(function(){});
   }
-  pull(); setInterval(pull, 20000); setInterval(tick, 30000);
+  connect(); pull(); setInterval(pull, 20000); setInterval(tick, 30000);
 </script>
 </body></html>`;
+
+export class ProgressRoom {
+  constructor(state) { this.state = state; }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/live') {
+      if (request.headers.get('Upgrade') !== 'websocket')
+        return new Response('expected websocket', { status: 426 });
+      const pair = new WebSocketPair();
+      this.state.acceptWebSocket(pair[1]);            // hibernatable — an idle phone costs nothing
+      const cur = await this.state.storage.get('p');
+      if (cur) pair[1].send(cur);                     // current state immediately on connect
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/u') {
+      const t = await request.text();
+      if (t.length > 20000) return new Response('too big', { status: 413 });
+      await this.state.storage.put('p', t);
+      for (const ws of this.state.getWebSockets()) { try { ws.send(t); } catch (_) {} }
+      return new Response('ok');
+    }
+
+    if (url.pathname === '/raw') {
+      const t = (await this.state.storage.get('p')) || '';
+      return new Response(t, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+    }
+
+    return new Response('not found', { status: 404 });
+  }
+
+  // Hibernation-API handlers — sockets survive the object sleeping between events.
+  async webSocketMessage(ws) { /* clients never need to send; ignore */ }
+  async webSocketClose(ws) { try { ws.close(); } catch (_) {} }
+  async webSocketError(ws) { try { ws.close(); } catch (_) {} }
+}
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (request.method === 'POST' && url.pathname === '/u') {
+    if (url.pathname === '/') {
+      return new Response(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+    }
+    if (url.pathname === '/u') {
       if (url.searchParams.get('k') !== env.PUSH_KEY) return new Response('no', { status: 403 });
-      const body = await request.text();
-      if (body.length > 20000) return new Response('too big', { status: 413 });
-      await env.PROG.put('p', body);
-      return new Response('ok');
     }
-    if (url.pathname === '/raw') {
-      const t = (await env.PROG.get('p', { cacheTtl: 60 })) || '';
-      return new Response(t, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
-    }
-    return new Response(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+    // /u (key-checked above), /live, /raw — all served by the one room.
+    const room = env.ROOM.get(env.ROOM.idFromName('main'));
+    return room.fetch(request);
   },
 };
