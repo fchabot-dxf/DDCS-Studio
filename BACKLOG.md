@@ -8311,6 +8311,45 @@ order.]**
 ships labelled live-untested (the release note already says so); FAIRY's check upgrades the label, it does not
 gate the deploy. — advisor, per the owner's own "fairy wont be running soon".
 
+### 81. ⭐ THE DESKTOP APP'S GATEWAY PUBLISHES NOTHING OUT OF THE BOX — cloud reachability is silently off for every fresh install
+
+**[OPEN, measured live on the owner's own machine 2026-09-05, owner-confirmed the intent: "so the fix applies
+to all users not only me right?" — this entry IS that fix; the owner's own config was hand-edited as the
+stopgap.]**
+
+**The symptom, exactly as a real user meets it:** phone opens `ddcs-studio.pages.dev`, Gateway tab, same
+Google account, same workspace — and reads `CONNECTION: unreachable · "Studio could not check whether a
+gateway is running (your Drive did not answer)"` — while the desktop app IS running on the shop PC with a
+working controller connection.
+
+**The mechanism, traced live:** `DDCS-Studio.exe`'s bundled gateway starts with `backend: "local"` (config
+ships without the key; `local` is the default) and `machine_name: ""`. On `local` it never writes the Drive
+heartbeat (`bridge.py::_publish_heartbeat` → `backend.put_heartbeat`, ~20s cadence) — so the phone's Drive
+check finds nothing, forever. Switching to `--backend drive` alone then REFUSES by design: *"Drive backend
+needs a machine name to keep each machine's jobs in their own folder."* Two gates, both silently closed on a
+fresh install — even for a user who already signed into Google (credentials ship bundled; the token was
+sitting right there).
+
+**The fix shape (product, all users):**
+1. ⭐ **Default `machine_name` to the PC hostname** when unset — the descriptor already carries
+   `hostname: "RenderRanchy"`, so the refusal's own folder-collision reason evaporates. A name field stays
+   editable in Setup; hostname is the default, not a lock.
+2. **When a Drive token exists and the backend is unset** (not user-chosen `local`), default the backend to
+   `drive` — the user who signed into Google has already said what they want; honour it. A user who never
+   signed in stays `local` and nothing changes.
+3. ⭐ **Say the state either way.** The gateway's own console/Setup should show "publishing to Drive as
+   <name> / local-only" one line, so 'silently off' stops being silent even when someone chooses local.
+⛔ Scope guard: no new UI surface beyond the Setup field that already exists + one status line — this is
+defaults-and-visibility, not a wizard.
+
+⚠ **Two hazards for whoever builds it, both hit during the live verification:**
+- The gateway banner prints em dashes; under a piped cp1252 console the process DIES on its own startup
+  banner ([[unicode-in-python-output-kills-the-thread]] — reproduced tonight, three attempts). Any first-run
+  path that spawns the gateway must set `PYTHONIOENCODING=utf-8` or strip the banner to ASCII.
+- `START_GATEWAY.bat` still passes `--no-slave`, which t2649's beacon removal deleted — the shipped .bat
+  CANNOT START the gateway at all (exit 2, unrecognized argument). Fix it in the same turn; it is one line
+  and it is the double-click path the README points users at.
+
 **t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
