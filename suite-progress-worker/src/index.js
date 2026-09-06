@@ -127,7 +127,8 @@ const PAGE = `<!doctype html>
   function connect(){
     try {
       var ws = new WebSocket('wss://' + location.host + '/live');
-      ws.onopen = function(){ wsOpen = true; g('dot').className = 'dot on'; };
+      ws.onopen = function(){ wsOpen = true; g('dot').className = 'dot on';
+        try { ws.send('hi'); } catch(_){} };   // the DO answers with current state
       ws.onmessage = function(e){ if (e.data && e.data.length > 10) render(e.data); };
       ws.onclose = function(){ wsOpen = false; g('dot').className = 'dot';
         setTimeout(connect, 3000 + Math.random() * 4000); };
@@ -135,7 +136,7 @@ const PAGE = `<!doctype html>
     } catch(_) { setTimeout(connect, 8000); }
   }
   function pull(){
-    if (wsOpen) return;   // socket healthy: no polling at all
+    if (wsOpen && hb) return;   // socket healthy AND we have data: no polling at all
     fetch('/raw', { cache: 'no-store' })
       .then(function(r){ return r.text(); })
       .then(function(t){ if (t && t.length > 10) render(t); })
@@ -178,7 +179,12 @@ export class ProgressRoom {
   }
 
   // Hibernation-API handlers — sockets survive the object sleeping between events.
-  async webSocketMessage(ws) { /* clients never need to send; ignore */ }
+  // A send issued before the 101 handshake returns can be dropped, so the page says "hi"
+  // once connected and the current state is answered HERE — the reliable first delivery.
+  async webSocketMessage(ws) {
+    const cur = await this.state.storage.get('p');
+    if (cur) { try { ws.send(cur); } catch (_) {} }
+  }
   async webSocketClose(ws) { try { ws.close(); } catch (_) {} }
   async webSocketError(ws) { try { ws.close(); } catch (_) {} }
 }
