@@ -127,8 +127,6 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
-  <div class="spec" id="histcard" style="display:none"><span>recent runs</span>
-    <div id="hist" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.9;overflow-wrap:anywhere"></div></div>
   <details class="spec" style="cursor:pointer">
     <summary style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">what this page shows, and how to know it's telling the truth</summary>
     <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px">
@@ -146,7 +144,6 @@ const PAGE = `<!doctype html>
       Delivery: file event → push → Durable Object → WebSocket (green dot = live; grey = polling fallback).
       No model, no tokens, anywhere. Trust but verify:
       <a href="/raw" style="color:var(--muted)">the raw data</a> ·
-      <a href="/runs" style="color:var(--muted)">the run log</a> ·
       <a href="https://github.com/fchabot-dxf/DDCS-Studio/commits/main/suite-progress-worker" style="color:var(--muted)">every change to this page, with its reason</a>
     </div>
   </details>
@@ -337,23 +334,8 @@ const PAGE = `<!doctype html>
       .then(function(t){ if (t && t.length > 10) render(t); })
       .catch(function(){});
   }
-  function loadRuns(){
-    fetch('/runs', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(runs){
-      if (!runs || !runs.length) return;
-      g('histcard').style.display = 'block';
-      g('hist').innerHTML = runs.slice(0, 12).map(function(r){
-        var d = new Date(r.at), ok = (+r.failed || 0) === 0;
-        var when = (d.getMonth()+1) + '/' + d.getDate() + ' ' +
-                   String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-        return '<span style="color:' + (ok ? 'var(--ok)' : 'var(--bad)') + '">' + (ok ? '✔' : '✘') + '</span> ' +
-               when + ' · ' + (r.tier || '?') + ' · ' + r.passed + '/' + r.total +
-               (+r.failed ? ' · <b style="color:var(--bad)">' + r.failed + ' failed</b>' : '') +
-               (+r.flaky ? ' · ' + r.flaky + ' flaky' : '') + ' · ' + r.took;
-      }).join('<br>');
-    }).catch(function(){});
-  }
-  connect(); pull(); loadRuns();
-  setInterval(pull, 12000); setInterval(tick, 30000); setInterval(loadRuns, 120000);
+  connect(); pull();
+  setInterval(pull, 12000); setInterval(tick, 30000);
 </script>
 </body></html>`;
 
