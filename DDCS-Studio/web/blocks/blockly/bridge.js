@@ -110,7 +110,10 @@ const HANDLE_ANCHOR_FIELDS = {
 // and `cross_aim_handle`'s new one (t2583) — both were free text before this turn, meaning `relTo` had NEVER
 // been reachable by a person clicking through the app, only via a literal template (this session's own fourth
 // instance of "a declared seam with no way in" — see simStart.js's own header for the full account).
-const RELTO_TARGET_FIELDS = { formfield: 'relToRow', cross_aim_handle: 'relToRow' };
+// t2677 (Phase 2 board, proposal (c)) — `point_handle` is the THIRD consumer: extending the SAME reference
+// (not a new one) to the plain point-kind handle so its own anchor.kind==='point' render branch can resolve a
+// live sim-start position the same way cross_aim_handle's own anchor.kind==='crossAim' branch already does.
+const RELTO_TARGET_FIELDS = { formfield: 'relToRow', cross_aim_handle: 'relToRow', point_handle: 'relToRow' };
 const SELECTS = {
     corner: ['FL', 'FR', 'BL', 'BR'],
     probeSeq: ['XY', 'YX'],

@@ -69,7 +69,10 @@ test('round-trip: a point_handle nested in feature_canvas MERGES its anchor onto
     // needs live `stock` (unavailable at this static-binding-build layer) so a NEW stock-token string
     // ('stockHalfW', ...) can anchor a point handle at a live stock-relative position -- a plain numeric
     // string still resolves byte-identical at render time, this is a representation change only.
-    expect(r.anchors[0].anchor, 'the anchor is DECLARED {kind:point, ax, ay, label} -- no frame (distinct from layoutwidget)').toEqual({ kind: 'point', ax: '0', ay: '0', label: 'spot' });
+    // t2677 -- relToRow joins ax/ay/label: empty string (the block's own default, unset here) when the
+    // author never named a sim-start row -- byte-identical render (the fixed-literal ax/ay path, unchanged)
+    // until it's actually set, same "declared but inert until used" shape ax/ay/label already had.
+    expect(r.anchors[0].anchor, 'the anchor is DECLARED {kind:point, ax, ay, relToRow, label} -- no frame (distinct from layoutwidget)').toEqual({ kind: 'point', ax: '0', ay: '0', relToRow: '', label: 'spot' });
     expect(r.merged.filter((b) => b.param === 'spotx' || b.param === 'spoty').length, 'exactly one entry per param, no duplicates').toBe(2);
     // reverse round-trip: the two merged bindings still re-nest into a feature_canvas carrying the SAME point_handle
     expect(r.nBack).toBe(1);

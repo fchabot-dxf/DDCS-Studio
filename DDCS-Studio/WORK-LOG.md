@@ -78066,3 +78066,82 @@ Rendered as a `tier: <script>` line in `progress.md` near the heartbeat sub, OMI
 Non-vacuity: ran a real spec through the real `npm run test:e2e` invocation, read `progress.md` back —
 `tier: test:e2e` present exactly where intended; `progress.json` picked it up for free via the shared `d`
 object (not separately wired, not scope creep — the file's own existing one-object/three-renderers shape).
+
+## t2677 — PROPOSAL (c) BUILT AND PROVEN: relToRow on point_handle, corner's own file left untouched
+
+**The mechanism**, mirroring `cross_aim_handle`'s own already-shipped `relToRow` (t2583) exactly:
+`point_handle` (`pointHandle.js`) gains a `relToRow` field (must-match picker, `RELTO_TARGET_FIELDS` in
+`bridge.js` — the same map `formfield` and `cross_aim_handle` already ride). `handleBindingsFromStack`'s own
+point_handle branch (`userOps.js`) carries it onto the built `anchor` object, raw string, same doctrine as
+`ax`/`ay` (t2573) — resolved live, not at this static-binding layer.
+
+**The parity, not a lookalike**: `panelTypes.js`'s role-tagged fallback branch (`byRole.x && byRole.y`) had
+its own ~30-line relTo position/write-back/dog-leg block extracted into ONE new shared function,
+`resolveRelToPoint` — reused by BOTH the fallback branch AND the DECLARED `anchor.kind==='point'` branch
+when `anchor.relToRow` is set. Not a position-only port: the extraction carries the pinned-wall write-back
+(`_writeParam` when the destination wall is datum-pinned) and the dog-leg runtime-end anchor shift
+(`passEnds`/`dest.anchorsAtPrev`) — the two pieces t2675's own finding named as NOT covered by `crossAim`'s
+own precedent. Both are now on BOTH entrances, one implementation.
+
+**Verified against the mechanism's own claim before touching anything live**: ran the FULL corner suite (47
+files, 114 tests) against the refactored `panelTypes.js` BEFORE writing any new test — **114/114 passed,
+every FL/FR/BL/BR × YX/XY × Zon/Zoff combo showing Δ=0.00** — the extraction is byte-identical to corner's
+own live rendering today.
+
+**Proving the mechanism, corner as the ground, NOT migrated** (`corner-relto-declared-parity-2677.spec.js`,
+new): builds a SCRATCH def in-test — corner's real value bindings with `group`/`role` stripped off
+`cross1_x`/`cross1_y`, merged with a `point_handle` block (`relToRow:'wall1'`) via
+`handleBindingsFromStack`/`mergeHandleAnchors`, the SAME mechanism a real migration would eventually use.
+Three tests, comparing the scratch (declared) path against the live `cornerDataDef()` (fallback) path:
+1. **Position**, both corner/probeSeq combos — matched an INDEPENDENT hand-derived truth first (mirrors
+   `corner-data-repos-handle.spec.js`'s own check), then cross-path parity (position, label, colour, manual,
+   emits) — not just "same as each other," both independently correct.
+2. **Dog-leg** (passEnds threaded) — the runtime-end-shifted position identical between paths, AND both
+   independently confirmed relocated away from the static (no-passEnds) position — the regression guard
+   `corner-data-repos-handle.spec.js`'s own second test already established, now proven on both entrances.
+3. **Pinned-wall write-back** — a fake `panelStarts` with the destination pass forced pinned to a DIFFERENT
+   world point (a real delta to write, not a no-op), the resulting world position identical between paths.
+
+**Non-vacuity, the whole mechanism, not just the new test's own shape**: found `h.fx`/`h.ax`/`h.ay` do NOT
+survive into the final `handles` array (`canvasWidgets.js`'s own `place()` consumes them into a combined
+world `x`/`y` and drops the rest) — an assumption my first draft got wrong, caught by the test itself
+failing with `null` rather than a silent pass, fixed by switching the lookup to `h.kind==='move'` and
+reading only `h.x`/`h.y`/`label`/`color`/`manual`/`emits`. Then the REAL non-vacuity proof: reverted all
+four source files to their pre-turn committed state (`git checkout HEAD --`, safe only because scratch
+copies of the fix were saved first — never on uncommitted work without one), re-ran the parity suite: **all
+3 failed correctly** (e.g. `world x identical`: expected −40, received 0 — the declared path silently
+degrading to the fixed-literal `(0,0)` anchor without `relToRow`, exactly the pre-fix defect). Restored
+from the scratch copies (not `HEAD`), re-confirmed 3/3 green.
+
+**⚠ A git-stash mistake, caught and corrected immediately**: reached for `git stash` to do this same
+revert-and-restore, which this repo's own memory explicitly forbids (the stash stack is shared across
+seats — confirmed live, `git stash list` already showed two OTHER seats' own entries before mine). Popped
+it back within the same breath, verified the four files matched the saved scratch copies byte-for-byte
+(one showed a diff on first check — traced to a CRLF/LF line-ending artifact from the stash round-trip, not
+lost content, confirmed via `diff --strip-trailing-cr`). No repeat.
+
+**Collateral, found and fixed**: `point_handle`'s own new `relToRow` field (even empty) widens its declared
+`anchor` object, which broke ONE pre-existing test's own STRICT `toEqual` shape assertion
+(`point-handle-block.spec.js`) — updated the expected object to include `relToRow: ''`, matching the exact
+same "declared but inert until set" precedent `ax`/`ay`/`label` already established. Grepped for every
+OTHER strict `{kind:'point',...}` assertion in the suite (`handle-target-fails-visibly-2525.spec.js`,
+`pointpick-block.spec.js`) — both structurally immune (one only ever asserted `{param,kind}`, the other is
+`layoutwidget`'s own, unrelated anchor shape) — confirmed, not assumed, by running them.
+
+**A NEW, adjacent finding, named not chased**: `pinnedStartsFor` (panelTypes.js) — the function that
+determines WHETHER a wall is pinned in the first place, for a live app render — ALSO reads `b.group`/
+`b.role`/`b.relTo` directly off the value binding, the same dependency corner's own migration will need to
+account for once it actually strips those fields. Out of THIS turn's scope (the scratch test bypasses it
+via direct `panelStarts` injection, proven sufficient for the write-back MATH); named here and in the
+BACKLOG board so a real corner migration doesn't rediscover it from scratch.
+
+Item 5 (small item, separate commit): `BACKLOG.md` #85 — the census table's own (c) row marked built, a
+standing checklist added (check BOTH the anchor-fixedness axis AND the render-path-reachability axis before
+calling any op "ready" — corner passed the first, silently failed the second).
+
+### VERIFY
+
+Full suite (`npm test`): test:node 236/236. test:e2e **3203 passed, 0 failed, 11 flaky, 27 skipped.** Final
+line reads ZERO FAILED. `git status` clean except this entry, the four source files (`panelTypes.js`,
+`pointHandle.js`, `userOps.js`, `bridge.js`), the new parity spec, the one collateral test fix, and
+`BACKLOG.md` (its own separate commit).

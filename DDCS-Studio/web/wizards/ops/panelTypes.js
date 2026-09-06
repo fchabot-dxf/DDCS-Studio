@@ -339,6 +339,43 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // t81 — colour a handle by its pass's reposition SOURCE (auto=cyan / manual=amber), MATCHING the top panel. `sources` is the
     // per-pass array the panel exposes (getPassSources); absent → null → the FeatureCanvas keeps its CSS default (gold).
     const srcCol = (pass) => (!Array.isArray(sources)) ? null : (sources[pass] === 'manual' ? '#ffb300' : '#22d3ee');
+    // t2677 (Phase 2 board, proposal (c)) — THE relTo POSITION + WRITE-BACK + DOG-LEG RESOLVER, extracted so
+    // the role-tagged fallback branch (below, `byRole.x && byRole.y`) and the DECLARED `anchor.kind==='point'`
+    // branch (point_handle's own new `relToRow`) share ONE implementation, not two — the SAME reasoning
+    // `resolveRelToIndex` itself already applies to the fallback branch AND `crossAim`'s own declared branch.
+    // `relTo` is the `{row}` shape both already use; `xB`/`yB` are the x/y-role value bindings (`byRole.x`/
+    // `byRole.y`, or the real bindings `attach()` merged a point_handle's anchor onto — same object shape
+    // either way: `.param` + (for the fallback caller only) `.relTo`, read by the CALLER, not this function).
+    // Returns null when `relTo` is nullish (the caller's own fixed-anchor path is unaffected). Otherwise
+    // returns `{ax, ay, offX, offY, destPass, destEmits, reposManual}` — `ax+offX, ay+offY` is the WORLD
+    // position, `offX/offY` alone is what the handle DECL's own `x`/`y` fields want (display is anchor-
+    // relative). Also performs the pinned-wall write-back and the `repoGroups` capture-stash as SIDE EFFECTS,
+    // matching the fallback branch's own exact behavior — not a position-only subset of it.
+    const resolveRelToPoint = (relTo, xB, yB, gid) => {
+        if (relTo == null) return null;
+        let ax = 0, ay = 0, destX = null, destY = null, destPass = null, destEmits;
+        const ri = resolveRelToIndex(def.opType, params, relTo);
+        if (ri != null) destPass = ri + 1;
+        const src = (Array.isArray(panelStarts) && panelStarts.length) ? panelStarts
+            : ((ri != null) ? (opSimStarts(def.opType, params, s) || []) : []);
+        const a = src[ri], dest = src[ri + 1];
+        if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+        if (dest) destEmits = dest.emits;
+        if (ri != null && dest) { const mw = markerWorldOf(src, passEnds, ri + 1); destX = num(mw.x, 0); destY = num(mw.y, 0); }
+        const end = (Array.isArray(passEnds) && ri != null) ? passEnds[ri] : null;
+        if (end && a && dest && dest.anchorsAtPrev) { ax = num(end.x, 0); ay = num(end.y, 0); }
+        const offX = (destX != null) ? destX - ax : num(params[xB.param]);
+        const offY = (destY != null) ? destY - ay : num(params[yB.param]);
+        const destPinned = destPass != null && Array.isArray(panelStarts) && panelStarts[destPass] && panelStarts[destPass].pinned;
+        if (destPinned) {
+            if (_writable(xB.param) && r3(offX) !== r3(num(params[xB.param]))) _writeParam(xB.param, offX);
+            if (_writable(yB.param) && r3(offY) !== r3(num(params[yB.param]))) _writeParam(yB.param, offY);
+        }
+        const x = ax + offX, y = ay + offY;
+        if (spotStore && xB.param && yB.param) repoGroups.push({ gid, fx: xB.param, fy: yB.param, ax, ay, worldX: x, worldY: y });
+        const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';
+        return { ax, ay, offX, offY, destPass, destEmits, reposManual };
+    };
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     // t1690 DECLARE `_writable`'s STRUCTURAL half — a param is individually settable AT ALL unless it shares a
@@ -472,7 +509,21 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         // plain numeric string is byte-identical to before; a NEW stock-token string ('stockHalfW', …) now
         // anchors a point handle at a live stock-relative position — the SECOND, independent consumer proving
         // t2571's own stock-anchor primitive general, not diag_aim_handle's private helper.
-        if (anchor && anchor.kind === 'point') { pos(resolveAnchorCoord(anchor.ax, stock, 0), resolveAnchorCoord(anchor.ay, stock, 0), anchor.label || 'pos'); continue; }
+        if (anchor && anchor.kind === 'point') {
+            // t2677 (Phase 2 board, proposal (c)) — `relToRow` PARITY: the DECLARED path (point_handle) reaches
+            // the SAME resolveRelToPoint the role-tagged fallback branch (below) and `crossAim` already share —
+            // position, the pinned-wall write-back, the dog-leg anchor shift, AND the pass-number label/colour/
+            // manual decoration all come from the ONE implementation, not a position-only lookalike. Empty
+            // `relToRow` (the default) skips this whole branch — byte-identical to before.
+            if (anchor.relToRow && byRole.x && byRole.y && wr('x') && wr('y')) {
+                const rt = resolveRelToPoint({ row: anchor.relToRow }, byRole.x, byRole.y, gid);
+                const x = rt.ax + rt.offX, y = rt.ay + rt.offY;
+                items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — same convention as the fallback branch's own relTo rendering
+                decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: rt.offX, y: rt.offY, ax: rt.ax, ay: rt.ay, label: rt.destPass != null ? String(rt.destPass) : (anchor.label || 'pos'), color: srcCol(rt.destPass), manual: rt.reposManual, emits: rt.destEmits });
+                continue;
+            }
+            pos(resolveAnchorCoord(anchor.ax, stock, 0), resolveAnchorCoord(anchor.ay, stock, 0), anchor.label || 'pos'); continue;
+        }
         // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
         // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent
         // param. Mirrors the byRole.x/y/len branch further down (same MUTE anchor dot + canvasWidgets `length`
@@ -727,50 +778,18 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             // wall-1→wall-2 reposition, consumed in G91): anchor the point to the op's Nth DECLARED sim-start, so the
             // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
-            let ax = 0, ay = 0, destX = null, destY = null, destPass = null, destEmits;
-            if (byRole.x.relTo != null) {
-                // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in BOTH
-                // probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
-                const ri = resolveRelToIndex(def.opType, params, byRole.x.relTo);
-                if (ri != null) destPass = ri + 1;   // the handle sits on the destination marker (pass ri+1) → colour by that pass's source (t81)
-                // t301 Seam C (ONE declared source) — read the anchor + the DESTINATION wall world from the SHARED per-pass
-                // starts (panelStarts = computePassStarts's output, which the 3D marker ALSO consumes) via the ONE wizard-
-                // agnostic markerWorldOf. So the two panels can't diverge BY CONSTRUCTION: a datum-PINNED wall is absolute in
-                // BOTH; an AUTO reposition relocates to the anchor pass's runtime END in BOTH. NO parallel opSimStarts/cornerXY
-                // POSITION derive here. Fall back to the op's declared sim-starts ONLY when no panel is wired (2d-only mode —
-                // there is no 3D preview to be coincident with, so nothing to diverge from).
-                const src = (Array.isArray(panelStarts) && panelStarts.length) ? panelStarts
-                    : ((ri != null) ? (opSimStarts(def.opType, params, s) || []) : []);
-                const a = src[ri], dest = src[ri + 1];
-                if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
-                if (dest) destEmits = dest.emits;   // t1684 — census finding 2: carry the DECLARED emits flag (undefined = undeclared, unchanged) through to the handle
-                if (ri != null && dest) { const mw = markerWorldOf(src, passEnds, ri + 1); destX = num(mw.x, 0); destY = num(mw.y, 0); }
-                // shift the ANCHOR to the anchor pass's RUNTIME END (passEnds[ri], post probe+retract+lift) when the destination
-                // has a programmed dog-leg — EXACTLY the markerWorldOf gate, so the emitted #23/#24 = wall − runtime-END. MANUAL
-                // travel (anchorsAtPrev false — the operator jogs) keeps the static anchor: the handle can't diverge from the ruby.
-                const end = (Array.isArray(passEnds) && ri != null) ? passEnds[ri] : null;
-                if (end && a && dest && dest.anchorsAtPrev) { ax = num(end.x, 0); ay = num(end.y, 0); }
-            }
-            let offX = (destX != null) ? destX - ax : p('x');
-            let offY = (destY != null) ? destY - ay : p('y');
-            // t301 — the #23/#24 (G91 increment) WRITE-BACK: when this destination wall is datum-PINNED (its world is fixed on
-            // the stock — the `pinned` flag flows from pinnedStartsFor THROUGH computePassStarts, the ONE source), DERIVE the
-            // emitted increment = pinned world − the (current, possibly Start-shifted) anchor and WRITE it to the form field
-            // (guarded — only on a real change, so no re-render loop; the anchor is upstream + never depends on this field).
-            // So dragging the Start (which moves this anchor) keeps the wall put — its increment re-derives. NO cornerXY here.
-            const destPinned = destPass != null && Array.isArray(panelStarts) && panelStarts[destPass] && panelStarts[destPass].pinned;
-            if (destPinned) {
-                if (wr('x') && r3(offX) !== r3(num(params[byRole.x.param]))) _writeParam(byRole.x.param, offX);
-                if (wr('y') && r3(offY) !== r3(num(params[byRole.y.param]))) _writeParam(byRole.y.param, offY);
-            }
+            // t2677 — the position/write-back/dog-leg math itself moved to `resolveRelToPoint` (above), shared with the
+            // DECLARED `anchor.kind==='point'` branch's own new `relToRow` — this call site is now just its caller.
+            const rt = resolveRelToPoint(byRole.x.relTo, byRole.x, byRole.y, gid);
+            const ax = rt ? rt.ax : 0, ay = rt ? rt.ay : 0;
+            const offX = rt ? rt.offX : p('x'), offY = rt ? rt.offY : p('y');
+            const destPass = rt ? rt.destPass : null, destEmits = rt ? rt.destEmits : undefined;
+            const reposManual = rt ? rt.reposManual : false;   // auto → cyan square, manual → amber circle
             const x = ax + offX, y = ay + offY;
-            // stash this relTo emitting group's live world + anchor so a drag on ANY handle can CAPTURE (freeze) the others
-            if (spotStore && byRole.x.param && byRole.y.param) repoGroups.push({ gid, fx: byRole.x.param, fy: byRole.y.param, ax, ay, worldX: x, worldY: y });
             // t297 INVARIANT (handle-owns-number, hole-is-mute): the numeric pass label is a property of exactly ONE marker
             // kind — the emitting `_pos` handle below — and is NEVER duplicated onto this coincident anchor hole (which is a MUTE
             // dot, no n) nor onto the sim-only Start ◇ (which stays 'Start', non-numeric). That is what keeps the two-"1" ghost dead.
             items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the pass number rides the handle label alone
-            const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';   // auto → cyan square, manual → amber circle
             if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual, emits: destEmits });   // label = the destination PASS NUMBER (1,2,…) — the SOLE owner of the number; t1684 — emits (census finding 2): undeclared stays unchanged (solid), declared false renders hollow
         }
     }

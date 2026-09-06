@@ -795,7 +795,12 @@ export function handleBindingsFromStack(children, realBindings) {
                 // diag_aim_handle, its first consumer.
                 const ax = (p.ax === '' || p.ax == null) ? '0' : String(p.ax);
                 const ay = (p.ay === '' || p.ay == null) ? '0' : String(p.ay);
-                const anchor = { kind: 'point', ax, ay, label: p.label || 'pos' };
+                // t2677 (Phase 2 board, proposal (c)) — relToRow, mirroring cross_aim_handle's own identical
+                // field (t2583) exactly: a raw string naming a declared simstart row, empty = no relTo (the
+                // fixed ax/ay literal anchor, unchanged). Resolved live in panelTypes.js's own anchor.kind===
+                // 'point' branch, not here — this layer stays static, same doctrine as ax/ay just above.
+                const relToRow = p.relToRow ? String(p.relToRow) : '';
+                const anchor = { kind: 'point', ax, ay, relToRow, label: p.label || 'pos' };
                 out.push(attach(String(p.fx || 'x'), gid, 'x', anchor));
                 out.push(attach(String(p.fy || 'y'), gid, 'y', anchor));
             } else if (b.type === 'rect_handle') {
