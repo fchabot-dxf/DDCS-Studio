@@ -239,4 +239,141 @@ The Blocks canvas remains the central nervous system (holding 100% of the data),
 The most powerful part of this architecture is that **we do not need to build these visual editors from scratch**. 
 
 The exact same HTML/JS/Vue components that currently render these interactive features in the Wizard tab (e.g., `coordListSvg.js` or `regionEditor.js`) can be entirely reused for the block editors. 
+
+---
+
+## t2675 — THE LIVE-ANCHOR PRIMITIVE: a design memo (DESIGN ONLY, nothing below is built)
+
+⚠ **Everything above this line describes an earlier, speculative vision (Vue components, `draw_rect`,
+`sim_start_anchor`, `structural_guard`) that was never built.** What actually shipped instead
+(BACKLOG #71/#72, t2511 onward) is a DIFFERENT, simpler mechanism: `point_handle`/`rect_handle`/
+`radial_handle`/`length_handle`/… — small GUI blocks nested inside a `feature_canvas` block's own mouth,
+each declaring a FIXED literal anchor (`ax`/`ay`) plus which real form param(s) it drags. `panelTypes.js`'s
+own `layoutSpecFromOp` reads them via a `groups[gid]` loop, switching on `anchor.kind`. This memo is
+grounded in THAT real, shipped mechanism — not the categories above, which this document keeps only as
+history.
+
+### The problem, in one sentence per op (t2665/t2673/t2675's own measurements)
+
+Migrating a built-in-as-data twin's canvas gestures from a JS `previewGeometry` hook (or, for corner, a
+role-tagged fallback with no hook at all) to REAL blocks in the `feature_canvas` mouth requires the
+declared-anchor vocabulary to express three things it currently cannot:
+
+| Gap | Ops blocked | What's missing |
+|---|---|---|
+| **(a) Live, datum-relative anchor** | bore, contour, drill, pocket, surfacing, tap, text (7 ops) | The anchor position depends on ANOTHER field's live value (`originX`) AND a datum-corner selector (`stockAttach`/`pathDatum`) that picks which corner + which sign. `rect_handle`'s `ax`/`ay` are fixed literals baked at authoring time. |
+| **(b) Conditional write target** | surfacing (`sf_pos` specifically) | The SAME visual marker writes `originX`/`originY` in one mode and `jogX`/`jogY` in another, picked by a THIRD field (`zMode`). `point_handle`'s `fx`/`fy` resolve once, at authoring time (must-match pickers). |
+| **(c) Incremental/relTo anchor in the DECLARED path** | corner (`cross1_x/y`, `startX/Y`) | The anchor is a LIVE OFFSET from another declared sim-start pass (`relTo:{row:'wall1'}`), including a pinned-wall write-back and a dog-leg runtime-end shift. The value-binding side already carries `relTo`; the DECLARED `anchor.kind==='point'` render branch does not resolve it at all — only the older role-tagged fallback does. A PARTIAL precedent already ships: `crossAim` (`anchor.relToRow`) resolves the position half via the same `resolveRelToIndex`, but not the write-back/dog-leg half. |
+| **(d) Compound / multi-field anchor** | slot (`sl_anchor`, a `translate` handle moving `ax/ay` AND `bx/by` together) | None of the 10 existing `anchor.kind` values are a compound "move several params by one shared delta" gesture — deliberately unbuilt once already (t716's own header: "Slot has no single position param… this is the anchor the origin-based ops get from their pos handle"), and un-deferring it is the same ruling, not a new one. |
+
+Three declaration shapes below answer (a)/(b)/(c); (d) is named as its own, separate, still-deliberately-
+unbuilt gesture kind (not designed here — a compound handle is a different vocabulary problem, one value
+per FIELD rather than one value per HANDLE, and deserves its own memo when it's actually prioritized).
+
+### Proposal (a) — anchor-by-reference: an anchor that names a datum, not a literal
+
+**The idea:** `rect_handle`'s `ax`/`ay` (and `point_handle`'s, for symmetry) accept EITHER a plain number
+(today's literal, unchanged) OR a declared REFERENCE — the name of another param this stack already
+binds, resolved live at render time. A SECOND, optional field names the datum-corner SELECTOR (which
+param picks px/py/sx/sy the way `stockAttach`/`pathDatum` do for surfacing) so the corner itself can be
+live too, not just the offset.
+
+- **Block face:** `rect_handle`'s `ax`/`ay` fields stay plain text (already true today — no picker, no new
+  field TYPE), but the reference form is recognizable (`@originX` or similar sentinel, matching how
+  `resolveAnchorCoord` already distinguishes a stock-token string from a plain number by trying the token
+  table first). A THIRD, new field — `cornerParam` — optionally names the datum-selector field
+  (`stockAttach`), must-match-picker like `fx`/`fy` already are.
+- **What `deriveBindings`/`handleBindingsFromStack` does:** unchanged at the DERIVE layer — `anchor.ax`/
+  `anchor.ay`/`anchor.cornerParam` stay RAW STRINGS (mirroring `point_handle`'s own `ax`/`ay`, already kept
+  raw for exactly this reason — t2573's own note). Resolution moves entirely into the RENDER layer.
+- **What `panelTypes.js` does:** `resolveAnchorCoord` gains a THIRD tier — after the stock-token table and
+  the plain-number parse, try `params[raw]` (the op's own live value) if `raw` matches a param name AND a
+  `params` argument is threaded through (today it only receives `stock`, not `params` — a real, small
+  signature change, not free). The datum-corner math itself (`px`/`py`/`vx`/`vy`/`sx`/`sy` from
+  `stockAttach`/`pathDatum`) — currently `handleScale()`'s own private logic — becomes its own small,
+  exported, reusable function `cornerAnchorOf(cornerParamValue, w, h)` that BOTH `handleScale` (unchanged
+  call sites) and the new render-time anchor resolver can call, so there is one source for "what does
+  'pp' mean" rather than two.
+- **What the 7 blocked ops' JS would translate to:** `sf_size`'s current `{ax: ox+px, ay: oy+py, sx, sy,
+  ...}` (computed inline in `surfacingPreviewGeometry`) becomes a `rect_handle` block: `{field:'w',
+  fieldH:'h', ax:'originX', ay:'originY', cornerParam:'stockAttach', valueField:'field'}` — the block
+  names WHICH params to track, the render path does the datum-corner math the SAME way `handleScale`
+  already does it, just reading it through the reference instead of a direct function call.
+- **What it CANNOT express:** a REFERENCE anchor whose target is itself computed (not a plain bound param)
+  — e.g. if a future op's "corner" depended on TWO fields combined, not one selector param. Not needed by
+  any of the 7 today (all resolve through one datum-selector field), but worth naming as the boundary.
+
+### Proposal (b) — target-by-condition: a write target that switches on another field
+
+**The idea:** reuse the vocabulary formfield's own `when` gating already established (`whenparam`/
+`whenis`), applied to WHICH PARAM a handle writes rather than whether a FORM ROW shows. A handle
+declares MULTIPLE candidate targets, each with its own `when`; exactly one is active at a time (the SAME
+mutual-exclusion `whenOk` already guarantees for row visibility).
+
+- **Block face:** `point_handle` gains a repeatable "target" sub-structure instead of a single `fx`/`fy`
+  pair — concretely, N target rows, each `{fx, fy, whenParam, whenIs}`, authored as either (i) a small
+  fixed-count set of extra optional fields (`fx2`/`fy2`/`whenParam2`/`whenIs2` — ugly but simple, matches
+  this codebase's own existing "a few numbered slots" precedent e.g. `min`/`max` pairs) or (ii) the handle
+  nests small `handle_target` child blocks in a THIRD mouth, more composable but a new mouth-authoring
+  surface no handle block has needed before. Given only surfacing needs this today (1 op, 2 targets), (i)
+  is the smaller machinery; (ii) only earns its cost if a THIRD op needs 3+ conditional targets later
+  (rule-of-three, this project's own standing discipline for when a slot's machinery is worth building).
+- **What `deriveBindings`/`handleBindingsFromStack` does:** `attach()` is called ONCE PER CANDIDATE TARGET
+  (not once), each producing its own `{group, role, anchor}` entry tagged with that target's own `when` —
+  mirroring EXACTLY how a `when`-gated group ALREADY skips rendering in `layoutSpecFromOp`'s own group loop
+  (`gWhen`/`whenOk`, already live for corner's own `start` group). No new gating primitive — REUSE.
+- **What `panelTypes.js` does:** the `groups[gid]` loop's existing `gWhen` check (skip the WHOLE group if
+  its gate fails) already does 90% of this — the remaining piece is: when a group has MULTIPLE members for
+  the SAME role (x appears twice, once per candidate target, each own `when`), pick the one whose `when`
+  passes instead of the current `byRole[b.role] = b` last-write-wins (which silently picks whichever
+  candidate happens to iterate last — today harmless since no group has this shape yet, but a real bug the
+  moment one does).
+- **What surfacing's own JS would translate to:** `startMarkerTarget(zMode)`'s own `{normal:{x:'originX',
+  y:'originY'}, skim:{x:'jogX',y:'jogY'}}` map becomes two `attach()` calls behind one `point_handle`
+  block: target 1 `fx:'originX', fy:'originY', whenParam:'zMode', whenIs:'normal'`; target 2
+  `fx:'jogX', fy:'jogY', whenParam:'zMode', whenIs:'skim'`.
+- **What it CANNOT express:** a target that depends on TWO conditions at once (an AND of two `when`s) —
+  `whenOk` itself already supports only a single param/value pair per gate; widening THAT is a separate,
+  earlier-layer decision this memo doesn't reopen. Not needed by surfacing (one condition, `zMode`), named
+  as the boundary for whoever hits it next.
+
+### Proposal (c) — relToRow on point_handle: extend the ALREADY-SHIPPED crossAim precedent
+
+**The idea:** the smallest of the three — `point_handle` gains ONE new field, `relToRow`, mirroring both
+`formfield`'s own already-shipped `relToRow` (t2133, for VALUE fields) and `crossAimHandle`'s own already-
+shipped `relToRow` → `anchor.relToRow` (t2583, for a DIFFERENT gesture kind). No new primitive — closing a
+gap in an existing one.
+
+- **Block face:** `point_handle` gains `relToRow` (must-match picker, naming a `simstart` block's own `id`
+  in this stack — same picker convention `formfield`'s own `relToRow` already uses).
+- **What `deriveBindings`/`handleBindingsFromStack` does:** `handleBindingsFromStack`'s own point_handle
+  branch (userOps.js) adds `relToRow: p.relToRow || ''` onto the built `anchor` object (one field, same
+  shape `crossAim`'s branch already carries).
+- **What `panelTypes.js` does:** the `anchor.kind==='point'` branch (line ~475) gains the SAME
+  `resolveRelToIndex`/`panelStarts` resolution `crossAim`'s own branch already has (lines ~658-676) —
+  literally portable, not new logic. What is NOT portable without separate work: the pinned-wall
+  write-back (`_writeParam` on a datum-pinned destination) and the dog-leg runtime-end anchor shift
+  (`passEnds`/`dest.anchorsAtPrev`) — both live ONLY in the older role-tagged fallback branch today, never
+  ported to ANY declared anchor kind, `crossAim` included. Closing (c) for the POSITION half is a genuinely
+  small, low-risk port; closing it for corner's OWN full behavior (write-back + dog-leg) needs that
+  separately verified first — named, not attempted, this turn (see `cornerData.js`'s own t2675 comment).
+- **What corner's own JS would translate to:** `cross1_x`/`cross1_y`'s own spec rows drop `group`/`role`
+  (those come from the handle block instead); a `point_handle` block in `feature_canvas`'s mouth:
+  `{fx:'cross1_x', fy:'cross1_y', relToRow:'wall1'}`. A second, `when`-gated (via the SAME mechanism
+  proposal (b) reuses) `point_handle` for `startX`/`startY`: `{fx:'startX', fy:'startY',
+  relToRow:'zsurf'}` — its own `when` inherited from the value binding it merges onto (unchanged), not
+  declared on the handle itself.
+- **What it CANNOT express (yet):** the write-back/dog-leg behavior above — a real, separate gap even once
+  `relToRow` itself ships.
+
+### Recommended order, if this arc continues
+
+**(c) first** — smallest, has a working precedent (`crossAim`) to copy from, and the position-only half is
+verifiable in isolation before touching corner's own write-back/dog-leg complexity. **(a) second** — the
+highest-leverage (7 ops), self-contained (a resolver + one exported corner-math function), no interaction
+with (b) or (c). **(b) third** — smallest ops-count (1), and the "multiple candidates per role" render-loop
+change is the most invasive of the three (touches the shared group-building loop every op's handles run
+through, so needs the widest regression check). (d) — slot's compound anchor — stays out of scope until a
+second op actually needs a multi-field-single-delta gesture (rule of three), matching its own original
+deferral.
 When you click "Configure UI" on a `coordlist` block, the system simply pops open a modal and mounts the exact same `coordListSvg` component you'd see in the Wizard tab. You interact with it exactly the same way, and when you close the modal, the component serializes its state back into the block. One UI component, two purposes!

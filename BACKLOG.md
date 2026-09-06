@@ -8434,3 +8434,42 @@ entirely — a `feature_canvas` node with empty `params` silently lost the `'com
 registered. Every other migrated op's own `feature_canvas` node already carried this correctly (confirmed by
 grep); comm was the first standalone (no adjacent `preview3d`) one in the whole arc, an isolated authoring
 slip, not a second #77. Fixed, re-verified live. Full account: WORK-LOG t2605.
+
+### 85. ⭐ THE PHASE 2 BOARD — which of the 32 built-in-as-data twins can migrate their canvas gestures to
+### declared handle blocks, and what's blocking the rest
+
+**[OPEN, census built t2673, corner's own gap added + design memo written t2675 — see
+`wizards_as_data_architecture.md`'s own t2675 section for the full, per-shape proposal.]**
+
+Phase 1 of this arc (BACKLOG #71/#72) got every migrated op's FORM onto declared `formfield`/`group_box`
+blocks. Phase 2 is the same move for CANVAS GESTURES (`point_handle`/`rect_handle`/…, nested in
+`feature_canvas`'s own mouth) — currently every gesture-bearing op still drives its canvas from either a JS
+`previewGeometry` hook or (corner only) hand-written `group`/`role`/`relTo` fields baked directly onto the
+value-binding specs, invisible in the Blocks tab either way.
+
+**The census** (grepped `handleScale`/`previewGeometry`/`role:` across every `blocks/dataOps/*Data.js` +
+atom-level hooks — a FLOOR per `VERIFICATION-DISCIPLINE.md` rule 18, not individually confirmed for every
+row):
+
+| Category | Ops | Blocked on |
+|---|---|---|
+| Ready today | — (see below; corner was believed ready, measured NOT to be — t2675) | — |
+| (a) live/datum-relative anchor | bore, contour, drill, pocket, surfacing, tap, text (7) | `rect_handle`'s anchor is a fixed literal; these need it to track a live field + a datum-corner selector |
+| (b) conditional write target | surfacing's `sf_pos` specifically | `point_handle`'s `fx`/`fy` resolve once, at authoring time; this handle's target switches on `zMode` |
+| (c) relToRow in the declared path | corner (`cross1_x/y`, `startX/Y`) | position-half has a working precedent (`crossAim`'s own `anchor.relToRow`); the write-back + dog-leg half does not, for ANY declared anchor kind yet |
+| (d) compound/multi-field anchor | slot (`sl_anchor`) | no existing `anchor.kind` covers "one delta moves several params" — deliberately unbuilt once already, not re-opened here |
+| No interactive canvas handle at all | the remaining 23 (alignment, atc×6, centerDrill, comm, edge, facing, homing, ioStep, middle, faceProbe, odProbe, odTurn, parting, pauseConfirm, polygon, rotaryCenter, rotaryClock, wcs) | N/A — nothing to migrate |
+
+**Corner was the dispatched pilot (t2675) and turned out NOT to be ready** — its own `relTo`-anchored
+handles render through an older role-tagged fallback branch with no declared-anchor equivalent; forcing a
+`point_handle` block would have rendered the handle at the wrong world position (the raw stored delta read
+as an absolute coordinate), not merely lost some metadata. Reported, not shipped broken — full account in
+`cornerData.js`'s own t2675 comment and WORK-LOG t2675.
+
+**The recommended next step** (from the design memo): build (c) first — smallest, has a working precedent
+to copy from (`crossAim`), and the position-only half is independently verifiable before touching corner's
+own write-back/dog-leg complexity. Then (a) — highest leverage (7 ops), self-contained. Then (b) — smallest
+op-count (1), most invasive render-loop change. (d) stays deferred until a second op needs it.
+
+**Nothing here blocks anything else in this file or the arc's own other work** — filed so the count and the
+per-shape reasoning live in the record, not scattered across turn logs.

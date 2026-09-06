@@ -156,6 +156,14 @@ export default class ProgressReporter {
             etaSec: Math.round(etaMs / 1000),
             heartbeatAt: new Date(now).toISOString(),
             staleAfterSec: STALE_AFTER_SEC,
+            // t2675 (amendment) — WHICH TIER is actually running, so the progress page stops hardcoding "full
+            // suite" for a run it has no way to identify. `npm_lifecycle_event` is the invoking npm script name
+            // ('test:e2e', 'test:smoke', 'test:changed', …) — confirmed LIVE (not assumed) that it survives the
+            // nested spawn chain test-all.cjs uses (spawnSync('npm', ['run', 'test:e2e'])) and correctly reads
+            // "test:e2e" from inside the Playwright process either way. `npm_command` ('run') is the documented
+            // fallback for the rare case the lifecycle var is absent (e.g. no npm wrapper at all) — a coarser
+            // signal, but still real, never fabricated.
+            tier: process.env.npm_lifecycle_event || process.env.npm_command || '',
         };
 
         // Each surface writes independently — one failing (a locked file, a full disk) must never take the others down.
@@ -184,7 +192,7 @@ function renderMd(d, pct) {
 ✅ ${d.passed} · ❌ ${d.failed} · ⚠ ${d.flaky} · ⊘ ${d.skipped} · ⏱ ${fmtDuration(d.elapsedSec * 1000)} · ETA ${eta}
 
 \`${d.currentSpec || '—'}\`
-
+${d.tier ? `\ntier: ${d.tier}\n` : ''}
 <sub>heartbeat ${d.heartbeatAt} — if this still says "running" and the heartbeat is over ${d.staleAfterSec}s old, the run died.</sub>
 `;
 }

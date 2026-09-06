@@ -77986,3 +77986,83 @@ datum-corner selector, not a fixed literal) — before ANY of the 7 handleScale-
 translate-anchor gap) can safely migrate. **Corner (category A) is the one genuinely-ready candidate** for a
 LOWER-RISK pilot than surfacing, if the arc continues down this path rather than building the new primitive
 first.
+
+## t2675 — CORNER TURNED OUT NOT TO BE READY EITHER (measured, not assumed); the primitive gets a real memo;
+## the board gets filed
+
+**Item 1 — corner's own migration: attempted, then reported, for a THIRD reason this arc hadn't found yet.**
+t2673's own census correctly measured corner as "role:'x'/'y' bindings, no previewGeometry hook, no dynamic
+anchor" — true, and the reason the dispatch called it the ready candidate. What that census DIDN'T check
+(a genuine gap in my own prior work, not the dispatch's): whether corner's `relTo`-anchored handles
+(`cross1_x/y` relative to sim-start `wall1`; `startX/Y` relative to `zsurf`) are actually REACHABLE through
+the declared `anchor.kind==='point'` render branch `point_handle` blocks produce. Traced the actual code
+before building anything: `panelTypes.js`'s `anchor.kind==='point'` branch (what a point_handle block
+produces) calls `pos(anchor.ax, anchor.ay, label)` with FIXED literals and NO `relTo` resolution at all.
+Corner's real `relTo` behavior — `resolveRelToIndex`/`markerWorldOf` position resolution, a dog-leg
+runtime-end anchor shift, and a pinned-wall write-back that WRITES the form field when the destination wall
+is datum-pinned — lives ENTIRELY in the older role-tagged FALLBACK branch (`byRole.x && byRole.y`, no
+`anchor` object), a code path `point_handle` blocks never reach. **Declaring corner's gestures as
+`point_handle` blocks today would render the handle at the WRONG WORLD POSITION** — the raw stored delta
+value (e.g. the #23 signed offset) read as an absolute world coordinate — not a metadata loss, a visibly
+wrong handle. Confirmed this is not a dead end, though: `crossAim` (`crossAimHandle.js`,
+`anchor.kind==='crossAim'`) ALREADY threads a declared `anchor.relToRow` through the identical
+`resolveRelToIndex` mechanism — a real, working precedent for the POSITION half, just never extended to
+`point_handle`'s own kind, and never covering the write-back/dog-leg half for ANY declared kind yet.
+Documented the finding directly in `cornerData.js` (a new comment above `cross1_x`'s own spec row) rather
+than forcing a migration that would have shipped a visibly-wrong handle on an op this project's own history
+already flags as trip-prone (the dispatch's own words: "corner has tripped an adjacent wire on every prior
+corner turn").
+
+**Item 2 — the primitive design memo, written** (`wizards_as_data_architecture.md`, new section, DESIGN
+ONLY — noted that this file's own earlier "Category A/B/C/D" sections describe a Vue-based vision that was
+never built; the real, shipped mechanism is the `point_handle`/`rect_handle`/`feature_canvas`/`anchor.kind`
+system, and the memo is grounded in THAT). Three proposals, each with block face / deriveBindings behavior /
+render-path behavior / what the blocked ops' JS translates to / explicit limits, per the dispatch's own
+requested structure:
+- **(a) anchor-by-reference** — `rect_handle`'s `ax`/`ay` accept a param NAME (not just a literal), resolved
+  live via a widened `resolveAnchorCoord` (needs a `params` argument it doesn't have today) plus a new,
+  extracted `cornerAnchorOf()` function sharing `handleScale()`'s own datum-corner math (one source, not
+  two). Closes the 7-op `handleScale` gap.
+- **(b) target-by-condition** — a handle declares MULTIPLE candidate write-targets, each gated by the SAME
+  `when` vocabulary formfield rows already use — reusing the EXISTING `whenOk`/group-skip mechanism, not a
+  new gate. Closes surfacing's own `sf_pos` mode-switch.
+- **(c) relToRow on point_handle** — the smallest proposal: ONE new field, extending the ALREADY-SHIPPED
+  `crossAim` precedent to `point_handle`'s own kind. Closes corner's position-only half; the write-back/
+  dog-leg half is named as a SEPARATE gap this proposal does not close.
+Recommended order: (c) first (smallest, has a working precedent, independently verifiable), (a) second
+(highest leverage, self-contained), (b) third (smallest op-count, most invasive render-loop change — touches
+the shared group-building loop every handle-bearing op runs through). Slot's own compound/translate need
+(d) stays deliberately deferred, matching its own original ruling, not re-opened.
+
+**Item 3 — the board filed**: `BACKLOG.md` item 85, the census table (now corrected — corner moved OUT of
+"ready today" into its own row, category (c)) plus the recommended build order and a pointer to the memo.
+
+### VERIFY
+
+No runtime code changed this turn — pure investigation, a code comment, a design memo, and a BACKLOG entry.
+Full suite (`npm test`): test:node 236/236. test:e2e **3202 passed, 0 failed, 9 flaky, 27 skipped.** Final
+line reads ZERO FAILED, matching the prediction (no runtime code changed this turn) and confirming the
+`cornerData.js` comment-only edit didn't perturb anything. `git status` clean except this entry,
+`BACKLOG.md` (item 85), `wizards_as_data_architecture.md` (the memo), and `cornerData.js` (the finding
+comment).
+
+### NEXT
+
+Whoever picks up the arc next has three ordered, scoped, already-designed proposals to build from — (c)
+first per the memo's own reasoning. None of this turn's work is itself blocking; it is groundwork for
+whichever proposal gets built.
+
+### AMENDMENT (close-out): the progress page's own tier label
+
+The owner caught `progress.md`'s consuming page hardcoding "full suite" with no way to actually know which
+tier ran. Fixed at the source rather than guessed: `progressReporter.mjs`'s shared `d` object (feeds all
+three surfaces — .md/.json/.html) gains `tier: process.env.npm_lifecycle_event || process.env.npm_command
+|| ''`. **Checked live, not assumed**, per the amendment's own instruction: confirmed `npm_lifecycle_event`
+survives `test-all.cjs`'s own nested spawn (`spawnSync('npm', ['run', 'test:e2e'])`) and correctly reads
+`"test:e2e"` from inside the Playwright process either way — no fallback needed for the common full-suite
+path; `npm_command` stays as the documented fallback for a bare `playwright test` with no npm wrapper.
+Rendered as a `tier: <script>` line in `progress.md` near the heartbeat sub, OMITTED entirely when empty
+(never a blank placeholder) — matching the amendment's own "displayed only when present, never inferred."
+Non-vacuity: ran a real spec through the real `npm run test:e2e` invocation, read `progress.md` back —
+`tier: test:e2e` present exactly where intended; `progress.json` picked it up for free via the shared `d`
+object (not separately wired, not scope creep — the file's own existing one-object/three-renderers shape).

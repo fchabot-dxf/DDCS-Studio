@@ -104,6 +104,23 @@ export const CORNER_BINDING_SPECS = [
     // ② B4 step 4a — SEMANTIC relTo: anchor the drag to the sim-start row NAMED 'wall1' (not a fragile numeric index).
     // resolveRelToIndex maps 'wall1' → its position among the SURVIVING when-filtered starts, so the handle tracks wall-1
     // in BOTH probeZ states (off: wall1 is filtered-index 0; on: the zsurf row shifts it to 1). Declare-never-infer.
+    //
+    // t2675 (BACKLOG #71/#72, the block-declared-handle migration pilot) — MEASURED, not migrated to a
+    // `point_handle` block: this `relTo`-anchored group renders through panelTypes.js's OLDER role-tagged
+    // FALLBACK branch (`byRole.x && byRole.y`, no `anchor` object at all), which resolves relTo via
+    // `resolveRelToIndex`/`markerWorldOf`, applies the anchor-pass RUNTIME-END shift for a programmed dog-leg,
+    // and WRITES BACK the emitted #23/#24 increment when the destination wall is datum-PINNED. The DECLARED
+    // `anchor.kind==='point'` branch (what a `point_handle` block produces) has NONE of this — it calls
+    // `pos(anchor.ax, anchor.ay, label)` with the RAW STORED PARAM VALUE as an ABSOLUTE world coordinate.
+    // Declaring this group as a `point_handle` today would render the handle at the wrong world position
+    // (the signed delta value read as if it were absolute) — not a metadata loss, a visibly wrong handle.
+    // THE PRECEDENT ALREADY EXISTS, partially: `crossAim` (crossAimHandle.js, `anchor.kind==='crossAim'`
+    // branch here) already threads a declared `anchor.relToRow` through the SAME `resolveRelToIndex` this
+    // group needs — extending `point_handle` with the identical field is the natural next step (see the
+    // t2675 primitive design memo). What that precedent does NOT yet cover: the pinned-wall write-back
+    // (`_writeParam` on a datum-pinned destination, further down this fallback branch) and the dog-leg
+    // runtime-end anchor shift — both unverified for the declared path, not attempted here under time
+    // pressure on an op the project's own history already flags as trip-prone.
     { param: 'cross1_x',   type: 'number', tokenEligible: true, formHidden: true, group: 'reposition', role: 'x', relTo: { row: 'wall1' }, label: 'Wall 2 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#23' }, key: 'value' },
     { param: 'cross1_y',   type: 'number', tokenEligible: true, formHidden: true, group: 'reposition', role: 'y', relTo: { row: 'wall1' }, label: 'Wall 2 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#24' }, key: 'value' },
     // ③ — the Z-first START handle (#21/#22, the zsurf→wall1 traverse): PRUNE-GATED on probeZFirst (only emitted when Z-first),
