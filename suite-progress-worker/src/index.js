@@ -47,6 +47,9 @@ const PAGE = `<!doctype html>
   .live{display:inline-flex;align-items:center;gap:10px}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--skip)}
   .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  .bell{background:none;border:1px solid var(--edge);border-radius:8px;color:var(--muted);
+        font-size:15px;padding:3px 9px;cursor:pointer;line-height:1}
+  .bell.on{color:var(--warn);border-color:var(--warn)}
   .pct{font-size:clamp(64px, 22vw, 110px);font-weight:800;line-height:.95;
        font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .state{font-size:15px;color:var(--muted)}
@@ -77,7 +80,7 @@ const PAGE = `<!doctype html>
 <div class="wrap">
   <div class="banner" id="banner"></div>
   <h1><span id="tier">Suite · RenderRanchy</span>
-      <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
+      <span class="live"><button class="bell on" id="bell" title="bell / silent — rings at 90% and at the finish">🔔</button><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
   <div class="hero">
     <div>
       <div class="pct" id="pct">—</div>
@@ -171,10 +174,23 @@ const PAGE = `<!doctype html>
       g('state').textContent = status === 'running' ? 'running' : 'waiting for data…';
     }
   }
-  // ---- the bell: ring at 90% and at the finish. Browsers unlock audio on the first real
-  // gesture — and a scroll's own touch counts — so there's no toggle: the instinctive
-  // scroll-on-load arms it. A bell firing before any touch queues and rings on the first one.
+  // ---- the bell: ring at 90% and at the finish. The first real gesture arms the audio
+  // (a scroll's own touch counts — phone reality, invisible). The 🔔/🔕 toggle is NOT the
+  // arming mechanism: it is a plain silent/bell preference, bell by default, remembered.
   var rang90 = false, rangDone = false, lastDone = 0, actx = null, pendingSeq = null;
+  var soundOn = true;
+  try { soundOn = localStorage.getItem('bell') !== '0'; } catch(_){}
+  function bellUi(){ var b = g('bell'); if (!b) return;
+    b.textContent = soundOn ? '🔔' : '🔕'; b.className = soundOn ? 'bell on' : 'bell'; }
+  document.addEventListener('DOMContentLoaded', function(){
+    bellUi();
+    g('bell').onclick = function(){
+      soundOn = !soundOn;
+      try { localStorage.setItem('bell', soundOn ? '1' : '0'); } catch(_){}
+      bellUi();
+      if (soundOn) beep([[880, 0, 90]]); else pendingSeq = null;   // going silent drops anything queued
+    };
+  });
   function unlockAudio(){
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
@@ -186,6 +202,7 @@ const PAGE = `<!doctype html>
     document.addEventListener(ev, unlockAudio, { once: true, passive: true });
   });
   function beep(seq){       // seq: [ [freq, startMs, lenMs], ... ]
+    if (!soundOn) return;   // the preference — arming is separate and automatic
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') { actx.resume(); pendingSeq = seq; return; }
