@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * Per-axis HOME DIRECTION: the DECLARED ENVELOPE SIGN is the single source of the home end. Verifies:
@@ -10,6 +10,9 @@ import { test, expect } from '@playwright/test';
  *   3. NATIVE (M98 P501) is byte-UNCHANGED by the override (the controller uses its own config; sim-only there).
  *   4. The dir override round-trips through the op marker codec (it rides the already-declared `config` Struct).
  * The default (Auto / dir unset) stays byte-identical to a config with no `dir` key.
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. No twin-seeding needed — works directly with
+ * `homingStack`/`emitMapped`/`markerLine`/`parseMarker`, never the user-ops registry.
  */
 test('homing dir override: signed-envelope default; a stale dir can NO LONGER flip the seek emit (dropped); native → G31; round-trips', async ({ page }) => {
   await page.goto('http://localhost:3211');

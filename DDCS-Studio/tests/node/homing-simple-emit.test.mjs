@@ -1,9 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t536 HOMING part 2 — the human's exact case: a SAVED method:'native' config. The wizard now IGNORES the saved method
  * and emits a SHORT, READABLE G31 block (no M98, no 7-read "debounce" vote, no GOTO/label soup, no ±10000). Both Z signs
  * seek TOWARD the declared top (backfilled zMaxHome). Verified as the ordered emit lines + a real-app code-preview screenshot.
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. ONLY the first test moved — pure `homingStack`/`emitMapped`,
+ * no DOM. The file's 2nd test ("REAL APP: a saved-native config code preview...screenshot") is the dispatch's own
+ * named split — a genuine real-app render+screenshot dependency. Split into
+ * tests/homing-simple-emit-drive.spec.js, left in the browser tier.
  */
 test('a SAVED method:native + declared zMaxHome → the wizard emits the SHORT G31 block, both signs seek the top', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -40,28 +45,4 @@ test('a SAVED method:native + declared zMaxHome → the wizard emits the SHORT G
     expect(r.nLines, 'the per-axis homing is a SHORT readable block').toBeLessThan(15);
     // (4) BOTH signs seek UP toward the declared top (positive Z seek)
     expect(r.eNeg, 'z=-120 also seeks UP toward the declared top (positive G31 Z)').toMatch(/G31 Z\d+(\.\d+)? F800/);
-});
-
-test.use({ viewport: { width: 1300, height: 950 } });
-test('REAL APP: a saved-native config code preview shows the SHORT G31 block per axis (screenshot)', async ({ page }) => {
-    await page.addInitScript(() => {
-        localStorage.setItem('ddcs_studio_settings', JSON.stringify({
-            machine: { x: 600, y: 600, z: 500, workOrigin: { x: 0, y: 0, z: 0 } },
-            inputs: [{ id: 'probe', type: 'probe', label: '3D Probe', pin: 5, level: 0 }, { id: 'setter', type: 'setter', label: 'Tool Setter', pin: 6, level: 0 }],
-            limits: {},
-            homing: { philosophy: 'sequential', axes: { z: { enable: true, order: 1, method: 'native', seekFeed: 800, slowFeed: 100, backoff: 5 }, x: { enable: true, order: 2, method: 'native' }, y: { enable: true, order: 3, method: 'native' } } },
-        }));
-    });
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
-    await page.evaluate(() => window.openWiz('user_homing_data'));
-    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
-    await page.waitForTimeout(500);
-    const code = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_simple_g31.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
-    console.log('CODE PREVIEW:\n' + code);
-    expect(code, 'the code preview shows G31 (the saved native is ignored — no toggle)').toContain('G31');
-    expect(code, 'NOT M98 P501 in the preview').not.toContain('M98P501');
-    expect(code, 'no GOTO soup in the preview').not.toMatch(/GOTO\d/);
 });

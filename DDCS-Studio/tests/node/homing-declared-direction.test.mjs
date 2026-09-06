@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * HOMING — the DECLARED ENVELOPE SIGN is the SINGLE source of the home direction (t491, the human's principle:
@@ -7,6 +7,11 @@ import { test, expect } from '@playwright/test';
  * sign — it seeked the far/bottom end (-120) instead of the declared home (machine-0/top). FIX: axisHomeMotion derives
  * the home end from the envelope sign (machine-0) so a stale dir can NO LONGER diverge it. Reproduce → fix → confirm:
  * machine.z=-120 homes Z to the TOP (0) REGARDLESS of any dir; a +120 axis homes to its declared 0 end; byte-identical.
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. ONLY tests 1-3 moved — all pure (`axisHomeMotion`,
+ * `GcodeExecutionEngine`, `homingStack`/`emitMapped`, no DOM). The file's 4th test ("DRIVE THE APP...screenshot")
+ * opens a real wizard, plays a real Three.js simulation, and takes a screenshot — a genuine app+DOM+render
+ * dependency. Split into tests/homing-declared-direction-drive.spec.js, left in the browser tier.
  */
 
 test('the DECLARED envelope sign wins: machine.z=-120 homes Z to the TOP (0), NOT -120, regardless of any homing.z.dir', async ({ page }) => {
@@ -67,29 +72,4 @@ test('t536 — a LINEAR axis with a SAVED method:native emits the SIMPLE G31 (th
     expect(r.auto, 'the wizard does NOT emit the native M98 P501 for a linear axis').not.toContain('M98P501');
     // and dir is dropped → the emit is byte-identical regardless of the stale saved dir
     expect(r.minus, 'the wizard homing emit is byte-identical regardless of the (ignored) dir').toBe(r.auto);
-});
-
-test.use({ viewport: { width: 1300, height: 950 } });
-test('DRIVE THE APP: with a STALE dir=-, machine.z=-120 still homes Z UP to the top (not plunged) — screenshot', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
-    await page.evaluate(() => {
-        const s = window.ddcsGetSettings();
-        s.preview = s.preview || {}; s.preview.autoLoop = false;
-        s.machine = { x: 300, y: 200, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
-        // the human's config: machine.z=-120 (home at the TOP) BUT a STALE per-axis dir='-' that used to plunge Z to -120
-        s.homing = { axes: { z: { method: 'native', dir: '-', backoff: 5, enable: true, order: 1 } } };
-    });
-    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
-    await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_homing_data'));
-    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
-    await page.evaluate(() => window.ddcsStudio.wizardManager.update());
-    // t542 — PLAY the REAL emitted homing code (the preview no longer uses a proxy). simSpeed up the slow re-touch so it
-    // settles fast, then assert the PLAYED engine homed Z to the TOP (-5, backed off), NOT the -120 plunge (-115).
-    await page.evaluate(() => { const host = document.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
-    await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 20000 });
-    const endZ = await page.evaluate(() => +window.ddcsStudio.wizardManager._activePanel.engine.pos.z.toFixed(1));
-    expect(endZ, 'even with a stale dir=-, the PLAYED real emit homes Z to the TOP (~-5), not the -120 plunge (-115)').toBeGreaterThan(-8);
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_declared_dir_top.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });

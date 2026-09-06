@@ -1,9 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t540 (0) STALL VERIFY — the NEW simple-G31 homing emit (b0a9791) must PLAY TO COMPLETION (no freeze, the human's line-8
  * stall was the OLD O501 GOTO wall). Trace the emitted macro through the engine, BOTH Z signs, WITH + WITHOUT a stock shown:
  * it completes (finite end pos, no infinite loop → trace returns) and the tool ends near the declared TOP, not overshooting.
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. This file was listed in the dispatch's own SKIP list (grouped
+ * with the genuinely UI-driving preview/marker files by name association) — reading it found it is actually a pure
+ * `homingStack`+`emitMapped`+`GcodeExecutionEngine` trace test, no DOM at all. A misclassification the shape-gate
+ * caught, corrected here (the opposite direction from this batch's other correction, `homing-derived-home-end`/
+ * `homing-refusal-reaches-twin-1898`/`homing-pin-audit`, which the dispatch listed as MOVE candidates but are 100%
+ * real-app UI).
  */
 test('(0) the simple-G31 homing emit traces to completion (no freeze), both signs, stock shown + hidden; tool ends at the top', async ({ page }) => {
     await page.goto('http://localhost:3211');

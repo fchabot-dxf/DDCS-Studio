@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * HOMING WIZARD OUTPUT = explicit G31 seek (t499). The human's want: "the wizard is for g31", "i dont like that the
@@ -7,8 +7,14 @@ import { test, expect } from '@playwright/test';
  * G-code — and the seek runs TOWARD the home switch (machine-0), not the far end. `native` (M98 P501) stays a SEPARATE
  * setup option. Grounded vs O501 (slib-g.nc): seek dir/dist #[2+N]=20000*#[612+N]-10000 (line 184); the seek G31 P-word
  * = the limit port #[1045+N*3], L = active level #[1047+N*3] (line 190). VERIFY IN THE REAL APP (drive the wizard).
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. The dispatch expected only ONE real-app test to stay ("the
+ * rAF frame-sample test"), but reading found TWO ("REAL APP: the homing wizard code panel..." and "REAL APP: with
+ * a STOCK SHOWN...") — both genuinely drive a real wizard + real DOM + (the second) an rAF `viz._animTool`
+ * world-matrix frame-sampling loop. Moved the other two, which are pure: test 1 (`homingStack`/`emitMapped`, no
+ * DOM) and the final clamp test (`GcodeExecutionEngine` with a stubbed settings function, no DOM). Both real-app
+ * tests split into tests/homing-g31-output-drive.spec.js, left in the browser tier.
  */
-test.use({ viewport: { width: 1300, height: 950 } });
 
 // ── UNIT: the default output is G31 (not M98), seeking TOWARD home, with the params visible + grounded vs O501. ──
 test('the homing wizard emits G31 by default (params visible), NOT M98 P501; seek is toward machine-0/home', async ({ page }) => {
@@ -38,60 +44,6 @@ test('the homing wizard emits G31 by default (params visible), NOT M98 P501; see
     // the datum + homed flag are set at the resolved literal registers (Z → #882 coord, #1517 flag)
     expect(r.zEmit, 'sets the Z machine-coord datum').toContain('#882=0');
     expect(r.zEmit, 'sets the Z homed flag').toContain('#1517=1');
-});
-
-// Drive the ACTUAL wizard with a STOCK shown: the code panel shows G31 (not M98) AND the rendered tool seeks to the
-// switch/top (worldZ ~-5, where the G31 goes), NOT plunging. Assert both the EMITTED CODE and the RENDERED tool.
-async function driveHomingWizard(page) {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
-    await page.evaluate(() => {
-        const s = window.ddcsGetSettings();
-        s.machine = { x: 600, y: -600, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
-        // method OMITTED per-axis → the wizard's default = seek (G31). This is the human's out-of-the-box scenario.
-        s.homing = { axes: { z: { enable: true, order: 1, backoff: 5 }, x: { enable: true, order: 2 }, y: { enable: true, order: 3 } } };
-        s.stock = { show: true, x: 100, y: 100, z: 25, datum: 'nnp' };   // a workpiece IS shown (the human's scenario)
-        s.preview = s.preview || {}; s.preview.autoLoop = false;
-    });
-    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
-    await page.evaluate(() => window.openWiz('user_homing_data'));
-    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
-    await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
-    await page.evaluate(() => window.updateWiz && window.updateWiz());
-    await page.waitForTimeout(300);
-}
-
-test('REAL APP: the homing wizard code panel shows G31 (not M98), params visible', async ({ page }) => {
-    await driveHomingWizard(page);
-    const code = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
-    expect(code, 'the emitted homing code shown to the user is G31').toContain('G31');
-    expect(code, 'the emitted homing code is NOT M98 P501 (params no longer hidden in the O501 macro)').not.toContain('M98P501');
-    expect(code, 'the seek port param (a limit-port register) is visible in the code panel').toMatch(/P#\d+/);
-});
-
-test('REAL APP: with a STOCK SHOWN, the G31 homing preview tool seeks to the switch/top (~-5), NOT plunging', async ({ page }) => {
-    await driveHomingWizard(page);
-    // t542 — the preview plays the REAL emit (slow F100 re-touches); simSpeed it so the trajectory lands in the sampling window.
-    await page.evaluate(() => { const host = document.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 20; });
-    const out = [];
-    for (let i = 0; i < 22; i++) {
-        out.push(await page.evaluate(() => {
-            const p = window.ddcsStudio.wizardManager._activePanel;
-            const ez = p && p.engine && p.engine.pos ? +p.engine.pos.z.toFixed(1) : null;
-            let w = null; try { if (p && p.viz && p.viz._animTool) { p.viz._animTool.updateWorldMatrix(true, false); w = +p.viz._animTool.getWorldPosition(new (p.viz.THREE.Vector3)()).z.toFixed(1); } } catch (e) { /* */ }
-            return { ez, w };
-        }));
-        await page.waitForTimeout(110);
-    }
-    const w = out.map((s) => s.w).filter((v) => v != null);
-    const ez = out.map((s) => s.ez).filter((v) => v != null);
-    const wMin = Math.min(...w), wMax = Math.max(...w), ezMin = Math.min(...ez);
-    expect(wMax >= -6, `the rendered tool reaches the switch/top (worldZ max=${wMax}), NOT the -100 bottom`).toBe(true);
-    // t540 — the tool now STARTS at the mid-envelope draggable Start and travels UP to the switch, so it legitimately
-    // occupies mid-Z (was pinned near the top). The t497 "no plunge" property is that the RENDERED tool TRACKS engine.pos.z
-    // (machine frame): assert wMin matches the engine's min, so a stock-floor plunge (w≈-100 while engine≈-60..-5) fails.
-    expect(Math.abs(wMin - ezMin) < 3, `the rendered tool TRACKS engine.pos.z (worldZ min=${wMin}, engine min=${ezMin}) — no stock-floor plunge`).toBe(true);
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_g31_tool_at_switch.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 // A PLAYED G31 seek toward home, with NO stock (the homing context), stops AT the home switch = the machine envelope

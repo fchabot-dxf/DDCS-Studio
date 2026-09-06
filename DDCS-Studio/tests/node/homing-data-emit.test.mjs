@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * HOMING E1 (t548) — the user_homing_data TWIN emit. On the E0 superset: deriveGuards (_run ticks) collapses the template to
@@ -6,6 +6,9 @@ import { test, expect } from '@playwright/test';
  * seek dist; declared <edge>Home → direction; unset span → skip) via the ONE shared builder. VERIFY: twin emit == homingStack
  * byte-diff ZERO across the axis-selection × Z-sign × declared-home sweep PLUS run-order permutations; a settings change (Z
  * travel / Home flag) is TRACKED by the NEXT emit (no frozen snapshot). NOT registered/opened in-place yet (E2).
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. No twin-seeding fix needed: every test calls
+ * `registerUserOp(homingDataDef())` explicitly (or none — the last test needs no registry at all).
  */
 function setHomingSettings(page, machine, limits, config) {
     return page.evaluate(({ machine, limits, config }) => {

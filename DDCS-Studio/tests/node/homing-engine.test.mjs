@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // H1 — native homing (M98 P501 X<N>) is run by the execution engine.
 //
@@ -7,7 +7,9 @@ import { test, expect } from '@playwright/test';
 // flag). These tests pin the fix: the engine models the native home (rapid to the declared home end + back-off) and sets
 // the homed flag #[1515+N]. (t542 — the WIZARD PREVIEW now plays the real emitted G31 code, not a proxy; this M98 handler
 // stays for native code played in the editor.)
-test.use({ viewport: { width: 1000, height: 800 } });
+//
+// t2695 — TIER MIGRATION BATCH 5: moved browser→node. No twin-seeding needed at all — every test uses
+// `GcodeExecutionEngine` directly with a stubbed `window.ddcsGetSettings`, never the user-ops registry.
 
 // Deterministic machine/homing config injected so the home-end math is checkable regardless of app defaults.
 const STUB_SETTINGS = `window.ddcsGetSettings = () => ({

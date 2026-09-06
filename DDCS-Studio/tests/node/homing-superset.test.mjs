@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * HOMING E0 (t546) — the data-op twin seam. homingStack(params, {superset:true}) carries EVERY axis's home block GUARDED by
@@ -6,6 +6,9 @@ import { test, expect } from '@playwright/test';
  * → BYTE-IDENTICAL to the concrete build. The emit is SETTINGS-dependent (seek dist = machine span + margin; direction = the
  * declared <edge>Home) — those ride the params here (the twin will bind them from settings via deriveGuards/postInstantiate,
  * E1). NOTE: E0 gates the axis-SELECTION in CANONICAL order; the run-ORDER reorder is the twin's unroll (E1, comm precedent).
+ *
+ * t2695 — TIER MIGRATION BATCH 5: moved browser→node. No twin-seeding needed at all — works directly with
+ * `homingStack`/`pruneGuards`/`emitMapped`, never the user-ops registry.
  */
 test('E0 GATE: prune(homingStack superset) == concrete homingStack, byte-identical across the selection × Z-sign × declared-home sweep', async ({ page }) => {
     await page.goto('http://localhost:3211');

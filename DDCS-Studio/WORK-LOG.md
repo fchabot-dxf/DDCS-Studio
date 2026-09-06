@@ -78870,3 +78870,81 @@ total precisely.
 (`corner-data-start-live-drag.spec.js`), and 11 deleted browser specs (10 whole-file moves + the trimmed-
 then-deleted `corner-data-start-live.spec.js`). Process tree clean (0 flagged) after the mem-server fix.
 
+## t2695 — TIER-MIGRATION BATCH 5: the HOMING emit cluster — a MIXED family, shape-gated hard, with
+misclassifications caught in BOTH directions + a genuine node-tier boundary found
+
+Dispatched as the first explicitly "MIXED" batch (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch5.md`):
+a solid emit/engine core plus a lot of preview/marker/form/in-place UI, told to shape-gate hard. Read all 14
+candidate/uncertain files named in the dispatch (10 "move", 2 "split", 2 "uncertain — read them") plus a
+spot-check of the "expect to skip" list. Result: **5 files moved whole, 6 files split, 3 "move" candidates
+turned out to be 100% real-app UI (corrected to skip), 1 "skip" candidate turned out to be 100% pure
+(corrected to move), and one node conversion FAILED on first run and was moved back out** — every one of these
+was a MEASURED finding, not a guess from the file name.
+
+### THE TWO MISCLASSIFICATIONS — the dispatch's own "confirm by reading" instruction, proven necessary
+
+- **`homing-play-complete`** — listed in the dispatch's SKIP group (bucketed with the genuinely-UI preview/
+  marker files by name association). Reading it found a single, fully pure test: `homingStack`+`emitMapped`+
+  `GcodeExecutionEngine.trace()`, zero DOM. Corrected: MOVED.
+- **`homing-derived-home-end`, `homing-refusal-reaches-twin-1898`, `homing-pin-audit`** — all three were in the
+  dispatch's own MOVE list. All three turned out to be 100% real-app UI on reading: `homing-derived-home-end`
+  drives the real Settings panel (`window.openSettings`, real DOM row queries, an I/O-table checkbox click +
+  `dispatchEvent`, two screenshots); `homing-refusal-reaches-twin-1898`'s all 4 tests call a shared
+  `previewFor()` helper that does `window.openWiz` + `waitForSelector('#wiz_user_code')` + reads its
+  `textContent` (checking what the LIVE PREVIEW shows, not calling `emitMapped` directly); `homing-pin-audit`
+  drives `window.openWiz`, waits for a real `<canvas>`, and reads `_activePanel.getSegments()`. All three left
+  **completely untouched** — no split needed, since none of their content is pure.
+
+### THE SPLITS — 6 files, and the dispatch under-counted the UI tests in one of them
+
+`homing-declared-direction` (3 of 4 moved, DRIVE+screenshot stays), `homing-declared-home` (1 of 3 moved, 2
+REAL-APP sim-and-screenshot tests stay), `homing-sysstart-real` (1 of 2 moved, the Macros-panel DRIVE stays),
+`homing-simple-emit` (1 of 2 moved, exactly as the dispatch itself predicted), `homing-limit-trip` (3 of 5
+moved cleanly — see the node-tier boundary below) — and **`homing-g31-output`**, where the dispatch expected
+ONE test to stay ("the rAF frame-sample test") but reading found **TWO**: "REAL APP: the homing wizard code
+panel shows G31" (a plain DOM read, no rAF) AND "REAL APP: with a STOCK SHOWN, the G31 homing preview tool
+seeks to the switch/top" (the actual rAF/`viz._animTool` world-matrix frame-sampling loop the dispatch named).
+Both stayed; the other 2 (a pure emit test and a pure `GcodeExecutionEngine` clamp test) moved. Each split's
+new browser file is named `<original>-drive.spec.js` (or `-regenerate.spec.js` for the one sysstart case),
+matching batch 2/3/4's own convention.
+
+### A GENUINE NODE-TIER BOUNDARY, FOUND BY RUNNING THE TEST, NOT BY READING
+
+`homing-limit-trip`'s first test ("native homing...TRIPS the home switch...RELEASES on the back-off") LOOKED
+pure on reading (`GcodeExecutionEngine`, `virtualIO`, no DOM) and was moved on that basis — but FAILED on the
+first node run (`r.tripped` came back `false`). Root cause: the test registers a REAL
+`window.addEventListener('io_change', ...)` listener and expects `dispatchEvent` to actually invoke it
+mid-trace, so it can observe the TRIP→RELEASE sequence over time (not just the final state). `register.mjs`'s
+own event-bus stub is **deliberately inert** — its own header names this as the point, not an oversight:
+"nothing in this tier ever fires an event... the emit under test must not depend on having been poked." This
+is not a bug to route around (and NOT a case for editing `register.mjs` — that would silently change the
+contract every OTHER passing node test relies on). Moved this one test back out, into
+`tests/homing-limit-trip-drive.spec.js` alongside the file's own already-planned DRIVE/screenshot test — the
+same "not a candidate for this tier" doctrine as the real-DOM (`corner-data-start-live`, `homing-derived-
+home-end`) and real-render (`lathe-surfaces-1295`) findings in earlier batches, just triggered by a live event
+subscription instead of DOM/Three.js. The other 3 tests in the same file check only FINAL state via
+`getVirtualInput()` after `trace()` returns — no event subscription needed — and moved clean.
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite): all 11 original files run together in the browser (33
+tests: the 24 that moved + the 9 that stayed) = **120.51s summed duration total**. Split by title to isolate
+the fair comparison: the 24 tests that actually moved = **33.34s** browser vs **1.18s** node — **~28x
+aggregate**, the highest of the 4 batches so far (the 9 staying real-app tests carry 87.17s of that 120.51s
+on their own — rAF sampling loops, `waitForTimeout` chains, and full Three.js sim playback are expensive in a
+way the pure emit tests never were, which is exactly why they stayed put).
+
+### VERIFY (LIGHT MODEL — no full suite, per the standing amendment)
+
+`npm run test:node`: 396/396 (372 prior + 24 this batch, exactly).
+
+`npx playwright test --list`: **3093 tests — down from batch 4's 3117 by EXACTLY 24**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 11 new `tests/node/*.test.mjs` files, 6 new split-off browser specs, and
+11 deleted browser specs (5 whole-file moves + 6 fully-split originals). The corrected-to-skip 3 files
+(`homing-derived-home-end`, `homing-refusal-reaches-twin-1898`, `homing-pin-audit`) plus the already-uncertain
+`homing-stock-poisons-1832` (confirmed 100% real-app DOM on reading — drives the Blocks app, `#blk-preview-
+panel`'s own `__panel` instance) and the dispatch's own 12-file skip list are untouched. Process tree clean
+(0 flagged).
+
