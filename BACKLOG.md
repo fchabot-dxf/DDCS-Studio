@@ -8456,7 +8456,7 @@ row):
 | Ready today | — (see below; corner was believed ready, measured NOT to be — t2675) | — |
 | (a) live/datum-relative anchor | bore, contour, drill, pocket, surfacing, tap, text (7) | `rect_handle`'s anchor is a fixed literal; these need it to track a live field + a datum-corner selector |
 | (b) conditional write target | surfacing's `sf_pos` specifically | `point_handle`'s `fx`/`fy` resolve once, at authoring time; this handle's target switches on `zMode` |
-| (c) relToRow in the declared path | corner (`cross1_x/y`, `startX/Y`) | position-half has a working precedent (`crossAim`'s own `anchor.relToRow`); the write-back + dog-leg half does not, for ANY declared anchor kind yet |
+| (c) relToRow in the declared path — ✅ MECHANISM BUILT t2677, corner's own file still unmigrated | corner (`cross1_x/y`, `startX/Y`) | CLOSED: `point_handle` now carries `relToRow`, position + write-back + dog-leg all resolve through the SAME `resolveRelToPoint` the fallback branch uses — proven via a scratch def, not yet applied to `cornerData.js` itself (waits for (a)/(b), see above) |
 | (d) compound/multi-field anchor | slot (`sl_anchor`) | no existing `anchor.kind` covers "one delta moves several params" — deliberately unbuilt once already, not re-opened here |
 | No interactive canvas handle at all | the remaining 23 (alignment, atc×6, centerDrill, comm, edge, facing, homing, ioStep, middle, faceProbe, odProbe, odTurn, parting, pauseConfirm, polygon, rotaryCenter, rotaryClock, wcs) | N/A — nothing to migrate |
 
@@ -8466,10 +8466,29 @@ handles render through an older role-tagged fallback branch with no declared-anc
 as an absolute coordinate), not merely lost some metadata. Reported, not shipped broken — full account in
 `cornerData.js`'s own t2675 comment and WORK-LOG t2675.
 
-**The recommended next step** (from the design memo): build (c) first — smallest, has a working precedent
-to copy from (`crossAim`), and the position-only half is independently verifiable before touching corner's
-own write-back/dog-leg complexity. Then (a) — highest leverage (7 ops), self-contained. Then (b) — smallest
-op-count (1), most invasive render-loop change. (d) stays deferred until a second op needs it.
+⭐ **STANDING CHECKLIST, added after corner's own miss (t2677) — check BOTH axes before marking anything
+"ready" on this board:** (1) is the anchor a fixed literal (no `previewGeometry` hook, no `handleScale`
+dependency)? AND (2) does the render path's actual DECLARED branch (`anchor.kind==='point'`/`'rect'`/…,
+panelTypes.js) reach this op's own real behavior — not just SOME branch that happens to also render a
+point/rect shape? Corner passed axis (1) cleanly (that's what made the census call it ready) and failed
+axis (2) silently (its real behavior lived in the OLDER role-tagged fallback branch, invisible to a census
+built on binding-shape alone). A future "ready" op needs BOTH checked, not inferred from one.
+
+**Proposal (c) — relToRow on point_handle — BUILT and PROVEN (t2677), corner's own dataOps.js UNTOUCHED.**
+`point_handle` gained the `relToRow` field (extending `cross_aim_handle`'s own already-shipped precedent);
+`panelTypes.js`'s declared `anchor.kind==='point'` branch now shares ONE resolver (`resolveRelToPoint`)
+with the role-tagged fallback branch for position + the pinned-wall write-back + the dog-leg anchor shift —
+not a position-only subset. Proven via a SCRATCH def built in a new test
+(`corner-relto-declared-parity-2677.spec.js`) — corner's real value bindings, `group`/`role` stripped, a
+`point_handle` block merged on instead — rendering IDENTICALLY to the live fallback across both
+corner/probeSeq combos, the dog-leg-shifted case, and a direct pinned-destination injection; all 114
+pre-existing corner specs stayed green, unchanged, confirming the shared-resolver extraction didn't perturb
+corner's own live rendering. `cornerData.js` itself was not migrated — that step waits for (a)/(b) so the
+WHOLE gesture set (reposition + start) can move in one turn, per the memo's own scope note.
+
+**The recommended next step** (from the design memo): (a) — highest leverage (7 ops), self-contained. Then
+(b) — smallest op-count (1), most invasive render-loop change. (d) stays deferred until a second op needs
+it.
 
 **Nothing here blocks anything else in this file or the arc's own other work** — filed so the count and the
 per-shape reasoning live in the record, not scattered across turn logs.
