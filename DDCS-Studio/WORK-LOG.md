@@ -76636,3 +76636,62 @@ showed zero divergence from origin (0 ahead, 0 behind) — no rebase needed, no 
 The doc staleness named above (`ARCHITECTURE.md` etc.) is a reasonable follow-up if the advisor wants it — not
 urgent (documentation, not behavior), but real. The dropdown-default census (t2649's separate small item) is
 next in this same turn, its own commit.
+
+## t2649 (SMALL ITEM, separate commit) — the dropdown-default census
+
+Measurement only, per the dispatch's own explicit instruction ("Census only, fix nothing"). t2643 found and
+contained ONE instance of a general defect: Blockly's stock `field_dropdown` has no "initial value" property
+at all (confirmed live at t2643) — `def.defaults[f]` is NEVER consulted for a dropdown-kind field on ANY
+block; only each field's own declared OPTION ORDER decides what a fresh drag gets. t2643 fixed exactly one
+case (`feature_canvas.panel`, via a per-field reorder inside `jsonDef()`) and named the general defect,
+un-measured, for its own turn. This is that turn.
+
+**Method.** A throwaway script (run once via the node tier's own browser-stub preload,
+`node --import ./tests/node/support/register.mjs`, then deleted — not committed, nothing to maintain) walked
+every block in `PALETTE` (`web/wizards/ops/index.js`), used `bridge.js`'s own exported `fieldsOf`/`fieldKind`/
+`fieldOptions` to find every field classified `'dropdown'`, and compared `def.defaults[f]` against
+`options[0]` — the exact comparison `jsonDef()`'s own header comment describes as the defect. Reused the
+registry's OWN declared classification and option list rather than re-deriving either by hand, so the census
+can never disagree with what the block registration itself will do.
+
+**Result: 92 dropdown fields registry-wide; 20 where the declared default is not `options[0]`.** One of the
+20 is `feature_canvas.panel` itself — ALREADY fixed by t2643's own per-field reorder inside `jsonDef()` (the
+census's raw scan reads `optionsFor()`'s UNREORDERED source order, which `jsonDef()`'s special case only
+patches for the actual registered block — confirmed by re-reading that reorder branch, not assumed). So
+**19 blocks are genuinely silently wrong on a fresh drag today**:
+
+| block.field | declared default | options[0] (what a fresh drag actually gets) |
+|---|---|---|
+| `probe.axis` | `Z` | `X` |
+| `machinemove.axis` | `Z` | `X` |
+| `proberead.axis` | `Z` | `X` |
+| `readmachine.axis` | `Z` | `X` |
+| `probestart.axis` | `Z` | `X` |
+| `probecheck.axis` | `Z` | `X` |
+| `contour.side` | `on` | `outside` |
+| `pocketfill.strategy` | `concentric` | `parallel` |
+| `drillcycle.cycle` | `peck` | `drill` |
+| `wcs.wcs` | `G54` | `active` |
+| `ifgoto.op` | `!=` | `<` |
+| `confirm.mode` | `1` (number) | `"1"` (string) — a TYPE mismatch, not just an order one |
+| `corner_config.probeSeq` | `YX` | `XY` |
+| `math.op` | `/` | `+` |
+| `waitinput.mode` | `rise` | `imm` |
+| `grid_container.gap` | `16px` | `8px` |
+| `length_handle.axis` | `Y` | `X` |
+| `sc_travelapproach.value` | `auto` | `manual` |
+| `sc_axisorder.value` | `XY` | `YX` |
+
+Six of the nineteen share one field name (`axis`, on `probe`/`machinemove`/`proberead`/`readmachine`/
+`probestart`/`probecheck`) — all six default to `Z` but the shared `SELECTS` vocabulary (t1520's own "one
+field name, one enum" declaration) lists `X` first, so this is really ONE root cause wearing six faces, not
+six independent mistakes. `confirm.mode` is qualitatively worse than the rest: `1` (number) vs `"1"` (string)
+is a type mismatch on top of the order one — worth flagging separately since a strict-equality fix pass could
+paper over the order bug while leaving the type one live.
+
+**Not fixed, per the dispatch.** 19 (real) is small enough that a one-reorder-pass turn (t2643's own
+`jsonDef()` pattern, repeated 19 times) is plausible, but the shared-root-cause cluster (6 of 19 from one
+`SELECTS` list) argues it might be cheaper to fix `SELECTS.axis`'s own declared order once than to patch six
+call sites — that fork, and whether 19 is small enough to hand-patch at all vs. teaching the bridge a real
+initial-value mechanism, is the advisor's to route with the number in hand, per the dispatch's own framing.
+`git status` clean except this entry, confirmed below.
