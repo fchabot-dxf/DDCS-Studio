@@ -131,7 +131,7 @@ const PAGE = `<!doctype html>
 </div>
 <script>
   var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
-  var elFromData = 0, etaFromData = 0;
+  var elFromData = 0, etaFromData = 0, inconsistent = false;
   function g(id){ return document.getElementById(id); }
   function parseDur(s){
     var m = s.match(/(?:(\\d+)h)?\\s*(?:(\\d+)m)?\\s*(?:(\\d+)s)?/);
@@ -158,12 +158,23 @@ const PAGE = `<!doctype html>
   function render(t){
     var m;
     g('raw').textContent = t;   // the raw view mirrors every delivery, live
+    // ⚠ NEVER pose: if the reporter's own numbers don't add up (completed > total, so
+    // pct > 100 — the multi-project full-suite accumulation bug), the page must SAY the
+    // data is inconsistent, not render a 215% that looks authoritative. MD still shows raw.
+    var doneN = (m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/)) ? +m[1] : 0;
+    var totalN = m ? +m[2] : 0;
+    inconsistent = totalN > 0 && doneN > totalN;
     // The reporter NEVER writes a bare status word — t2409's own owner ruling made the
     // verdict a RATIO ("4/4 passed") so reds can't read as a crash at a glance. So:
     // "running" mid-run; a ratio + "passed" = finished (fail count colors it); else unknown.
     status = /·\\s*running\\b/.test(t) ? 'running'
            : (/\\d+\\s*\\/\\s*\\d+ passed/.test(t) ? 'finished' : '');
-    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) { pctNow = m[1]; g('pct').textContent = m[1] + '%'; g('fill').style.width = m[1] + '%'; }
+    if ((m = t.match(/\\*\\*([\\d.]+)%\\*\\*/))) {
+      pctNow = m[1];
+      var pv = parseFloat(m[1]) || 0;
+      g('pct').textContent = inconsistent ? '⚠' : m[1] + '%';
+      g('fill').style.width = Math.min(100, pv) + '%';   // never a bar past full
+    }
     if ((m = t.match(/\\*\\*(\\d+)\\s*\\/\\s*(\\d+)\\*\\*/))) { g('done').textContent = m[1]; g('total').textContent = m[2]; }
     if ((m = t.match(/✅\\s*(\\d+)/))) g('pass').textContent = m[1];
     if ((m = t.match(/❌\\s*(\\d+)/))) { failsNow = +m[1]; g('fail').textContent = m[1]; }
@@ -189,6 +200,15 @@ const PAGE = `<!doctype html>
     var mm = Math.round(ageMin);
     g('age').textContent = ageMin < 1 ? (wsOpen ? 'live' : 'recent') : mm + ' min old';
     var b = g('banner');
+    // ⚠ Impossible numbers outrank every other state: say the data is inconsistent
+    // rather than dress it as progress. (The reporter's multi-project full-suite counts.)
+    if (inconsistent) {
+      b.className = 'banner finished-bad';
+      b.textContent = "⚠ Reporter numbers don't add up — see MD for the raw file";
+      g('state').textContent = 'inconsistent data';
+      g('eta').textContent = '—';
+      return;
+    }
     // Three distinct states, using the reporter's OWN semantics (a running heartbeat
     // older than 120s means the run died — documented in the reporter itself):
     if (status === 'running' && ageMin * 60 > 120) {
@@ -265,6 +285,7 @@ const PAGE = `<!doctype html>
     if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch(_){} }
   }
   function checkBells(){
+    if (inconsistent) return;   // don't ring on garbage
     var doneN = +g('done').textContent || 0;
     // a NEW run: progress went backwards — re-arm both bells
     if (doneN < lastDone - 50) { rang90 = false; rangDone = false; }
