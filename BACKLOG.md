@@ -8287,6 +8287,30 @@ Constraints, all already on the record:
 - ⭐ Poll cadence: the vendor's own tool polls `10002` continuously; the M3X bridge polls positions at 100 ms.
   Start there, measure, and never let tracking polls starve a position read.
 
+### 80. ⏸ THE FAIRY QUEUE — everything gated on the Expert seat, parked in one place
+
+**[OPEN, owner-stated 2026-09-05: "fairy wont be running soon." So nothing below blocks anything above — the
+RENDERRANCHY loop plans around this list, not on it. When FAIRY next runs, this entry IS its work queue, in
+order.]**
+
+1. ⭐ **Live-check the tracking tab (#79, shipped `V2026.09.05.2` as built + synthetic-proven, LIVE-UNTESTED).**
+   Minutes at the machine: start `V21_dwell.nc`, watch the Gateway tab read RUNNING + Line N, watch both clear
+   on the finish edge. The ask is already written in `context/HANDOFF-TO-FAIRY.md`.
+2. ⭐ **The `16062` unit question — `verify/V23_lineadvance.nc` is ALREADY WRITTEN, never run.** Settles whether
+   the register counts file lines or executable blocks. ⇒ This is the single gate on showing a PERCENT in the
+   tracking view (#79 rules no-percent until it is answered; a Studio spec enforces it).
+3. **`10002` non-zero states** — only `0`/`1` observed; does feed hold or probing report differently? (The
+   vendor treats any non-zero as running; Studio already does the same, so this refines, not blocks.)
+4. **`bench/05` leftovers:** `G10 L20` — the ONLY item there that moves an axis, needs a human at the machine,
+   answers whether the old broken-and-dangerous finding survived the flash (Studio still routes around it).
+5. **`bench/04-modbus-slave-test-plan.md`** — written, never run.
+6. **The five vendor questions** drafted with measurements (`context/CHANNELS.md`, commit `8fb3855b`) — send
+   when the owner wants; the measurements behind them do not go stale.
+
+⚠ **Standing consequence while this list sleeps:** the main-branch deploy does NOT wait on item 1. Tracking
+ships labelled live-untested (the release note already says so); FAIRY's check upgrades the label, it does not
+gate the deploy. — advisor, per the owner's own "fairy wont be running soon".
+
 **t2605 — `commData` (`panel:'commscreen'`), the LAST unverified panel kind, resolved: MIGRATABLE, not
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
