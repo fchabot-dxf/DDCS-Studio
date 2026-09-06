@@ -80,15 +80,28 @@ export default {
         el('div', { class: 'role-headline' }, id.headline),
         id.detail ? el('div', { class: 'role-detail' }, id.detail) : null));
 
-    this.conn.replaceChildren(
-      el('div', { class: 'section-label' }, 'Connection'),
-      el('div', { class: 'row' },
-        el('span', { class: 'dot ' + (s.dot || 'bad') }),
-        el('span', { class: 'job' },
-           // ⚠ 'unreachable' is a verdict about THIS device. When the MACHINE has reported in, say that
-           //    instead - this tab is about the machine, not about the phone looking at it.
-           (!d && this._hb && this._hb.state === 'fresh') ? 'no gateway on this device' : (s.label || 'unreachable')),
-        s.device ? el('span', { class: 'muted' }, '· ' + s.device) : null));
+    // BACKLOG #83 (owner-ruled) — a CLIENT with NO local daemon at all (`!d`) can only ever show a red
+    // "unreachable" dot here (deriveStatus's own `if (!d) return {dot:"bad", label:"unreachable"}` — the ONE
+    // branch with no other possible outcome) — a definitional truth the identity pill already states one line
+    // up. ⚠ NARROWER than `askMachine` alone: a MISMATCH client (this PC runs its OWN real daemon, just wired
+    // to a different controller) has a REAL, varying `d` — deriveStatus resolves it to "live"/"controller
+    // offline"/"sandbox", genuinely live information about THIS PC's own machine that the identity pill (which
+    // only states the mismatch classification) does not — so that case keeps the section, unchanged.
+    if (askMachine && !d) {
+      this.conn.replaceChildren();
+      this.conn.style.display = 'none';
+    } else {
+      this.conn.style.display = '';
+      this.conn.replaceChildren(
+        el('div', { class: 'section-label' }, 'Connection'),
+        el('div', { class: 'row' },
+          el('span', { class: 'dot ' + (s.dot || 'bad') }),
+          el('span', { class: 'job' },
+             // ⚠ 'unreachable' is a verdict about THIS device. When the MACHINE has reported in, say that
+             //    instead - this tab is about the machine, not about the phone looking at it.
+             (!d && this._hb && this._hb.state === 'fresh') ? 'no gateway on this device' : (s.label || 'unreachable')),
+          s.device ? el('span', { class: 'muted' }, '· ' + s.device) : null));
+    }
 
     if (askMachine) await this._refreshHeartbeat();
     const hb = (askMachine && this._hb) || null;

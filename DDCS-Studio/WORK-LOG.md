@@ -76950,3 +76950,32 @@ under load). Zero failures traceable to `user_root`'s reorder, the live-preview 
 `git status` clean except this entry, `wizards/ops/index.js`, `blocks/blocksApp.js`,
 `tests/user-root-flyout-first-2653.spec.js`, and `tests/live-preview-unmatched-binding-2653.spec.js`,
 confirmed below.
+
+## t2653 (SMALL ITEM, separate commit) — BACKLOG #83: hide the Status tab's Connection section on a bare client
+
+Owner-ruled 2026-09-06: on a CLIENT device with no local daemon at all, the Connection section can only ever
+show a red "unreachable" dot — `deriveStatus`'s own `if (!d) return {dot:"bad", label:"unreachable"}` is the
+ONE branch reachable when the device call fails, no other outcome possible — a definitional fact the identity
+pill one line up already states plainly ("This PC is a CLIENT..."). Restating it as a red alarm reads as a
+problem when nothing has failed.
+
+**Narrower than the dispatch's own literal "on a CLIENT device" wording, checked rather than assumed:**
+`askMachine` (the existing `role === 'client'` flag) also covers the MISMATCH case — a client whose OWN local
+daemon is real and running, just wired to a different controller than this workspace. Read `deriveStatus`
+itself before gating on `askMachine` alone: for a mismatch descriptor (`controller_connected: true`, a real
+remote `dest`), it resolves to `{dot:"ok", label:"live"}` — genuinely live, varying information about THIS
+PC's own machine that the identity pill (which only states the mismatch classification) does not carry.
+Gating on `askMachine` alone would have hidden a real, informative green status alongside the truly-empty red
+one. Narrowed to `askMachine && !d` — the one case `deriveStatus` can ONLY ever resolve to the red alarm.
+
+Display-only, `status.js`, the role condition already existed (`askMachine`) — no new derivation, just where
+it's read.
+
+**Verified:** `tests/status-connection-hidden-client-2653.spec.js` — hidden for a bare client (no daemon),
+present and visible for a gateway, present and visible (and genuinely reading "live") for a mismatch client.
+Non-vacuity: reverting `status.js` reproduces `visible: true` for the bare-client case and fails that one
+test; the other two stay green either way (controls). Existing `role-identity-status-2173.spec.js` (14 tests)
+and `status-remote-machine-2112.spec.js` re-run unchanged and green — the identity pill and every other
+Status-tab fact this turn did not touch are unaffected.
+
+`git status` clean except this entry and `status.js`/the one new test file, confirmed below.
