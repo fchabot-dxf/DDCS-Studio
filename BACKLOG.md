@@ -8369,6 +8369,9 @@ config, envelope, offsets, custom wizards, G-code, all still open and editable. 
 device, the next person to pick it up holds the previous user's entire machine.
 
 **The ruling:** sign-out unloads the workspace. Studio returns to its pristine signed-out state.
+⭐ **Amended by the owner, same day: show a "Signed out" notice when it completes** — the act should
+acknowledge itself (the "Publish → Published" copy rule), not leave the user inferring success from an
+emptier screen. One toast/inline line in the app's established notice style; no new surface.
 
 **Design notes for whoever builds it, from the standing principles:**
 - ⚠ Unsaved changes are the one wrinkle: [[persistence-user-owned-file]] — localStorage is TEMPORARY, the
