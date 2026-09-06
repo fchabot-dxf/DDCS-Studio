@@ -79,7 +79,30 @@ const PAGE = `<!doctype html>
 </div>
 <script>
   var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
+  var elFromData = 0, etaFromData = 0;
   function g(id){ return document.getElementById(id); }
+  function parseDur(s){
+    var m = s.match(/(?:(\\d+)h)?\\s*(?:(\\d+)m)?\\s*(?:(\\d+)s)?/);
+    return m ? ((+m[1]||0)*3600 + (+m[2]||0)*60 + (+m[3]||0)) : 0;
+  }
+  function fmtDur(sec){
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec/3600), mn = Math.floor((sec%3600)/60), s = sec%60;
+    return (h ? h + 'h ' : '') + mn + 'm ' + s + 's';
+  }
+  // The clocks: heartbeat minus reported-elapsed anchors the run's start; tick locally
+  // every second while the run is genuinely alive (running + heartbeat fresher than the
+  // reporter's own 120s dead rule). Frozen otherwise — a dead run's clock must not lie.
+  setInterval(function(){
+    if (status !== 'running' || !hb || elFromData <= 0) return;
+    if (Date.now() - hb > 120000) return;                    // dead rule: freeze
+    var runStart = hb - elFromData * 1000;
+    g('elapsed').textContent = fmtDur((Date.now() - runStart) / 1000);
+    if (etaFromData > 0) {
+      var etaEnd = hb + etaFromData * 1000;
+      g('eta').textContent = '~' + fmtDur((etaEnd - Date.now()) / 1000);
+    }
+  }, 1000);
   function render(t){
     var m;
     // the reporter's own status word: running mid-run, passed/failed at onEnd
@@ -90,8 +113,8 @@ const PAGE = `<!doctype html>
     if ((m = t.match(/❌\\s*(\\d+)/))) { failsNow = +m[1]; g('fail').textContent = m[1]; }
     if ((m = t.match(/⚠\\s*(\\d+)/)))  g('flaky').textContent = m[1];
     if ((m = t.match(/⊘\\s*(\\d+)/)))  g('skip').textContent = m[1];
-    if ((m = t.match(/⏱\\s*([\\dhms ]+?)\\s*·/))) g('elapsed').textContent = m[1].trim();
-    if ((m = t.match(/ETA\\s*([\\dhms ~]+)/))) g('eta').textContent = '~' + m[1].trim().replace(/^~/,'');
+    if ((m = t.match(/⏱\\s*([\\dhms ]+?)\\s*·/))) { g('elapsed').textContent = m[1].trim(); elFromData = parseDur(m[1]); }
+    if ((m = t.match(/ETA\\s*([\\dhms ~]+)/))) { var e = m[1].trim().replace(/^~/,''); g('eta').textContent = '~' + e; etaFromData = parseDur(e); }
     var lines = t.split('\\n');
     for (var i = 0; i < lines.length; i++) {
       var l = lines[i].trim();
