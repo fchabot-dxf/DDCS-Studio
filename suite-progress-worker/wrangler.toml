@@ -1,0 +1,24 @@
+# DDCS suite progress — a tiny standalone Worker so the test suite's live progress is readable
+# from a phone, from anywhere, with ZERO model tokens. Twin of analytics/ in spirit and setup.
+#
+#   the suite writes DDCS-Studio/test-results/progress.md (its own reporter, t2407)
+#   a local loop on the dev machine POSTs that text here every ~30s   (tools/push-progress.ps1)
+#   GET /      → a phone-friendly page that re-fetches /raw every 20s and re-renders
+#   GET /raw   → the stored text, verbatim
+#   POST /u?k= → store new text (k must match the PUSH_KEY secret)
+#
+# Deploy (from suite-progress-worker/):
+#   npx wrangler kv namespace create PROG        # once — paste the id below
+#   npx wrangler secret put PUSH_KEY             # once — any long random string
+#   npx wrangler deploy
+#
+# ⚠ KV edge caching means a reading colo can serve up to ~60s stale — the page computes its age
+# from the heartbeat INSIDE the text and says so, honestly, instead of posing as live.
+
+name = "ddcs-suite-progress"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+[[kv_namespaces]]
+binding = "PROG"
+id = "2454af9711064acd87d4cfee82af90bf"
