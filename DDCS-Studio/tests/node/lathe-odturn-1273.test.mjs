@@ -1,8 +1,40 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1273 — OD TURNING, the lathe family's FIRST INHERITOR. Every mechanism here was proven on the facing pilot; what
  * this spec checks is that OD *inherited* them rather than re-invented them, and that its own numbers are right.
+ *
+ * t2687 — MOVED browser→node (tier-migration proof batch), the WHOLE file, all 18 tests. Pure
+ * `odPasses`/`odTurnStack`/emit/`traceToolpath` + declared-data lookups — no canvas, no DOM (even "THE SHOULDER
+ * CORNER" test, which sounds like a canvas drag, is a pure call into `latheProfileCanvas.js`'s own
+ * `odProfileSpec`/`onDrag` functions, never touching a real SVG). The ONLY addition this conversion needed:
+ * several tests look up the REGISTERED `user_lathe_odturn` twin (`uo.listUserOps().find(...)`) — the browser boot
+ * registers every built-in twin as a side effect of loading the app; here `boot()` seeds this ONE twin.
+ *
+ * ⚠ `createUserOp`, NOT `registerUserOp` — caught live, not assumed, and it cost real time to isolate. First
+ * attempt used `registerUserOp` (mirroring `dialect-emit-golden-2072.test.mjs`'s own `_boot()`) and got
+ * `listUserOps().length === 0` right after a "successful" call — confirmed with a standalone probe script, not
+ * guessed. `registerUserOp` only installs a def into the LIVE builder/spec/label registries (`USER_DEFS`, what
+ * `getUserDef`/`builderOf` read — the SAME source `dialect-emit-golden-2072.test.mjs`'s own tests query, which
+ * is why THAT file's identical-looking call is correct for ITS OWN usage); `listUserOps()` (what THIS file's own
+ * tests query throughout) reads a SEPARATE store (`readStore()`, localStorage-backed) that only `createUserOp`
+ * populates. The SAME symptom (`undefined`/`null` reads deep inside `wl.exportWizard`/`defaultParams`) briefly
+ * looked like a missing IndexedDB stub for the two `.wiz`-file tests (`fsHandles.js` does call
+ * `indexedDB.open(...)`, and register.mjs stubs no IndexedDB) — isolating each test standalone (`--test-name-
+ * pattern`) before accepting that theory is what caught it was the registration bug instead: with `createUserOp`,
+ * BOTH `.wiz` tests pass cleanly, no IndexedDB stub needed at all — `.wiz` file content lives entirely in the
+ * mocked `showDirectoryPicker`'s own in-memory `Map`, which `writeLibraryFile`/`listLibrary` reach without ever
+ * touching the handle-persistence layer that owns the IndexedDB call.
+ *
+ * ⚠ CREATED ON EVERY CALL IF MISSING, NOT MEMOIZED — TWO tests in this file (".wiz ROUND TRIP", ".wiz GATE
+ * RULED") call `uo.deleteUserOp(t)`. In the BROWSER each test gets a FRESH page (`page.goto` reloads the whole
+ * app, re-registering every built-in twin from scratch), so a deletion in one test never reaches the next. Here
+ * `page.goto()` is a no-op (harness.mjs's own header explains why) — module state PERSISTS across tests in the
+ * same process, so `boot()` checks for the op and re-creates it if a prior test deleted it (an unconditional
+ * `createUserOp` throws "already exists" for every test that DIDN'T delete it) — reproducing the browser's own
+ * per-test isolation instead of assuming it away.
+ *
+ * Every `expect(...)` carried across byte-for-byte, per the migration's own rule.
  *
  * THE GROUND TRUTH IS HAND-DERIVED. A Ø20 bar turned down to Ø14, 1mm of radius per pass, leaving 0.5 for the
  * finish: roughing stops at radius 7.5 (the finished 7 plus the 0.5 allowance), and stepping out from there in 1mm
@@ -16,6 +48,9 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { odTurnDataDef, OD_DATA_OPTYPE } = await import('/blocks/dataOps/odTurnData.js');
+    if (!uo.listUserOps().some((d) => d.opType === OD_DATA_OPTYPE)) uo.createUserOp(odTurnDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
 };

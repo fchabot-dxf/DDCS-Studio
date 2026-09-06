@@ -1,6 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
+ * t2687 — MOVED browser→node (tier-migration proof batch). Pure `holecycle.js`/`emitProgram`/`traceToolpath` +
+ * `/_test/literalHoleReference.js` (already served-to-tests-only, importable by nothing in the app) — no DOM, no
+ * canvas, no `user_*` twin registration (every lookup here is static module state: `BLOCKS`, `BUILDERS`,
+ * `newBlock`). Converted MECHANICALLY, `page.evaluate` bodies and every `expect(...)` carried byte-for-byte,
+ * `boot()` kept verbatim (harness.mjs's own `waitForFunction` is a no-op regardless of the predicate passed).
+ *
  * t1381 — THE DRILL FAMILY, FOLDED: a PATTERN of holes × a per-hole CYCLE, in ONE parametric body.
  *
  * t1379 landed the peck cycle, measured the family, and found the constraint that decided this turn's shape: a

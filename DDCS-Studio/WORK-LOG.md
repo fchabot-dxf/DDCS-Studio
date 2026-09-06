@@ -78553,3 +78553,86 @@ test:e2e `expected:3219, unexpected:0, flaky:6, skipped:28`. Zero failed titles.
 this entry, the one comment-only doc change (`surfacingData.js`), and the new test file
 (`surfacing-skim-marker-type2-2685.spec.js`) + its one screenshot.
 
+## t2687 — TIER-MIGRATION PROOF BATCH: 2 of 3 giants moved browser→node, 1 kept (measured regression) — the
+delta is the deliverable
+
+Dispatched to move the 3 biggest CONFIRMED browser→node candidates (a 6-agent audit's own top picks) and
+MEASURE the real time reclaim before scaling to the other ~217. Result: **2 moved clean, 1 stays — a real,
+measured regression for the headline file, not a hunch overridden.**
+
+### middle-superset.spec.js — MEASURED SLOWER in node, NOT MOVED
+
+Browser (isolated, 1 worker): 4 shards × ~19-23s + the partition test (3ms) + the dedup test (638ms) ≈
+**81.3s total**. Node (the SAME 14336-combo sweep, unsharded — the shard/retry scaffolding this file's own
+header says exists PURELY to beat Playwright's 60s cap): **~133s, measured TWICE, consistent** (133.1s,
+132.6s — not a fluke, not system-load noise). **Node was 1.6x SLOWER, not faster, for this specific
+14336-iteration compute-bound sweep** (each iteration: a full `JSON.parse(JSON.stringify(...))` clone +
+`pruneGuards` + two `emitMapped` builds). This contradicts the dispatch's own premise for "the headline,
+biggest single lever" — reported rather than forced. The likely reason, NAMED not chased further (out of
+scope for a proof-batch turn): unlike the two files below (~20-30 SMALL tests each, where browser PAGE-BOOT
+overhead genuinely dominates — confirmed separately: trivial-compute browser tests in this suite run
+500-700ms each, almost entirely boot, not compute), middle-superset is the OPPOSITE shape — ONE test,
+14336 iterations, compute-bound — so there is no boot overhead to eliminate, and whatever raw execution
+difference exists between Node's own V8 build/GC tuning and Chromium's, for THIS specific allocation-heavy
+pattern, runs the other way. **Deleted my own node conversion attempt** rather than ship a slower duplicate;
+`middle-superset.spec.js` is untouched, still in the browser tier.
+
+### lathe-odturn-1273.spec.js — MOVED, whole file, 18/18 — browser 12.8s → node ~1.6-1.9s (measured twice)
+
+A genuine, if initially bumpy, win. First conversion attempt failed 6 of 18 tests with `undefined`/`null`
+reads deep inside `wl.exportWizard`/`defaultParams` — traced (NOT assumed) to using `registerUserOp`
+(mirroring `dialect-emit-golden-2072.test.mjs`'s own `_boot()`) where this file's OWN tests query
+`listUserOps()` — a DIFFERENT store `registerUserOp` never populates (`createUserOp` does: it calls
+`registerUserOp` internally AND persists to the `readStore()`/localStorage-backed list `listUserOps()`
+reads). A standalone probe script (`registerUserOp` then `listUserOps().length` — got `0`) confirmed this
+before touching the test file again. The SAME symptom briefly looked like a missing IndexedDB stub for the
+two `.wiz`-file tests (`fsHandles.js` genuinely does call `indexedDB.open(...)`, unstubbed in
+`register.mjs`) — isolating each failing test standalone (`node --test --test-name-pattern=...`) BEFORE
+accepting that theory is what caught the real cause instead: with `createUserOp`, both `.wiz` tests pass
+clean, no IndexedDB stub needed at all (the mocked `showDirectoryPicker`'s own in-memory `Map` is all
+`writeLibraryFile`/`listLibrary` ever touch). `boot()` now creates the twin fresh IF MISSING on every call
+(not memoized) — two of the eighteen tests call `uo.deleteUserOp`, and node's own module state persists
+across tests in one process where the browser's per-test page reload would have silently re-registered
+everything. Result: **18/18 pass, ~1.6-1.9s** (two clean runs) vs the browser's own 12.8s — a ~7-8x reclaim.
+Original `lathe-odturn-1273.spec.js` deleted (whole-file move).
+
+### holecycle-parametric-1381.spec.js — MOVED, whole file, 28/28 — browser 25.7s → node 1.58s (~16x)
+
+The cleanest of the three: no `user_*` twin dependency at all (every lookup is static module state — `BLOCKS`,
+`BUILDERS`, `newBlock`), so a purely mechanical copy (import line + one added header note) worked FIRST try.
+28/28 pass, 1.582s vs the browser's own 25.7s. Original `holecycle-parametric-1381.spec.js` deleted
+(whole-file move).
+
+### THE MEASURED DELTA (the deliverable)
+
+| File | Browser | Node | Delta |
+|---|---|---|---|
+| middle-superset.spec.js | 81.3s | 133s (measured 2x) | **REGRESSION — not moved** |
+| lathe-odturn-1273.spec.js | 12.8s | ~1.6-1.9s | ~7-8x faster |
+| holecycle-parametric-1381.spec.js | 25.7s | 1.58s | ~16x faster |
+
+**For the advisor's own next-scale-up planning**: the two REAL wins share a shape — many (18-28) SMALL,
+independent tests, each paying its own ~500-700ms browser-boot tax the node tier eliminates entirely. The
+one REGRESSION shares the opposite shape — ONE massive, single-test, compute-bound sweep with no boot cost
+to reclaim. **The 40-50% suite-time projection, if it assumed middle-superset-shaped files among the other
+~217 movable candidates, needs re-deriving from ONLY the many-small-tests shape** — a giant compute-bound
+sweep should be sorted OUT of that batch (or measured individually) before being counted toward the
+projection, not assumed to behave like the small-test majority. Flagging this as the turn's own second
+deliverable, alongside the two real conversions.
+
+### VERIFY
+
+`npm run test:node`: 282/282 (236 prior + 18 lathe + 28 holecycle, exactly), 4.84s total. Full browser suite
+`--list` confirmed the count dropped by EXACTLY 46 (3253 → 3207 = 18 + 28) before running it for real.
+
+Full suite (`npm test`), read from `test-results/summary.json`'s own `stats` (BACKLOG #87 still open, live page
+not trusted): `expected:3165, unexpected:2, flaky:12, skipped:28`. **Two failed titles, named, neither
+touched by this turn's own diff** (two new node test files + two deleted browser specs + WORK-LOG — no
+production code, no other test file): `disable-guard-2307.spec.js › a CHILD disabled inside a parametric op
+(drill) is immediately re-enabled, with a toast explaining why` and `probe-port-gate-1880.spec.js › every one
+of the 6 probe ops gates its own Port field under V4.1 — not just Corner` (the SAME title that flaked in
+t2681's own full run — already the established contention-class flake `playwright.config.js`'s own `workers:4`
+comment documents). NOT re-argued — RE-RUN standalone: **6/6 passed cleanly**, both files, including both
+previously-failed titles. Real verdict: **0 regressions from this turn's own changes.** `git status` clean
+except this entry, the two new node test files, and the two deleted browser specs.
+
