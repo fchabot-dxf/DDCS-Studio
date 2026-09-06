@@ -309,7 +309,7 @@ test('DRIVE THE APP, THE t2525 BAR: two formfields placed FIRST (must-match pick
     await searchFor('feature canvas');
     await dragFlyoutBlockTo('feature_canvas', pgBottom);
     await nudgeConnectionTogether('feature_canvas', 'previousConnection', 'param_group', 'nextConnection');
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+    await setDropdownField('feature_canvas', 'PANEL', '+ 2D');
 
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('point handle');
@@ -623,7 +623,7 @@ test('DRIVE THE APP, THE SAME t2525 BAR IN ASSIGN-VAR MODE (t2665, gap 9): two f
     await searchFor('feature canvas');
     await dragFlyoutBlockTo('feature_canvas', pgBottom);
     await nudgeConnectionTogether('feature_canvas', 'previousConnection', 'param_group', 'nextConnection');
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+    await setDropdownField('feature_canvas', 'PANEL', '+ 2D');
 
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('point handle');

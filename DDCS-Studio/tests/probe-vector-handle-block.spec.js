@@ -332,7 +332,7 @@ test('DRIVE THE APP, THE t2517/t2525 BAR: three formfields placed FIRST, then fe
     const pgBottom = await stackBottomPoint('param_group');
     await searchFor('feature canvas');
     await dragFlyoutBlockTo('feature_canvas', pgBottom);
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+    await setDropdownField('feature_canvas', 'PANEL', '+ 2D');
 
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('probe vector handle');

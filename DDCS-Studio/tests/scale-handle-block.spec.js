@@ -286,7 +286,7 @@ test('DRIVE THE APP, THE t2525 BAR: two formfields placed FIRST (must-match pick
     const pgBottom = await stackBottomPoint('param_group');
     await searchFor('feature canvas');
     await dragFlyoutBlockTo('feature_canvas', pgBottom);
-    await setDropdownField('feature_canvas', 'PANEL', 'form2d');
+    await setDropdownField('feature_canvas', 'PANEL', '+ 2D');
 
     const fcMouth = await mouthPoint('feature_canvas', 'DO');
     await searchFor('scale handle');

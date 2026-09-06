@@ -253,7 +253,26 @@ import { handleScale } from '../../wizards/ops/placement.js';
  *  origin) as a path + a size handle (w/h) + the START-POSITION marker (the same `sf_pos`/'pos' handle t716 always
  *  had — ONE widget, not a second one). Mirrors the built-in surfacingView.buildSurfacingSpec; handles write the
  *  TWIN params directly (preview-side → emit unaffected by the drag ITSELF; whether the WRITTEN param reaches the
- *  emit depends entirely on which param `startMarkerTarget` names, per the declared mode-target mapping above). */
+ *  emit depends entirely on which param `startMarkerTarget` names, per the declared mode-target mapping above).
+ *
+ *  t2673 (BACKLOG #71/#72, the block-declared-handle migration pilot) — MEASURED, not built: this function stays
+ *  the source of truth for BOTH of surfacing's handles, rather than moving to `point_handle`/`rect_handle` blocks
+ *  in the `feature_canvas` mouth, because BOTH have a real shape the current declared-anchor vocabulary (10 kinds,
+ *  panelTypes.js) cannot express without new capability:
+ *   - `sf_size` (below, via `hs.size`): `handleScale`'s own anchor is DYNAMIC — `ax = ox + px` where `ox` is the
+ *     LIVE `originX` value and `px`/`vx`/`sx` all depend on the user's OWN `stockAttach`/`pathDatum` datum-corner
+ *     pick (any of the 4 corners, live-editable, not a rare edge case). `rect_handle`'s declared anchor is a FIXED
+ *     literal (`ax`/`ay` baked at authoring time) — it cannot track a co-located point handle's own current
+ *     position, let alone re-derive which corner is even "near" from a separate field's live value. THE SAME GAP
+ *     blocks bore/contour/drill/pocket/tap (all confirmed via `handleScale` too, WORK-LOG t2673's own census).
+ *   - `sf_pos` (below, via `startMarkerTarget`): the handle's own WRITE TARGET switches between originX/originY
+ *     (Normal) and jogX/jogY (Skim) at runtime. `point_handle`'s `fx`/`fy` are resolved ONCE, at authoring time
+ *     (must-match pickers) — there is no declared way today for a handle's own bound param to be conditional on
+ *     another param's live value.
+ *  Forcing either shape into a static block declaration today would mean picking ONE fixed corner/target and
+ *  silently breaking every OTHER state a real, already-shipped, extensively-tested user path exercises
+ *  (`surfacing-start-position-1648.spec.js`, `surfacing-skim-rect-follows-marker-1674.spec.js`) — exactly the
+ *  "identical before and after" bar this migration is held to. Reported, not shipped broken. */
 export function surfacingPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), w = _n(p.w, 100), h = _n(p.h, 80);
     const hs = handleScale(p, '', ox, oy, w, h);

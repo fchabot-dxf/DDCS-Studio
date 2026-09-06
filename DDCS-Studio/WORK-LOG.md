@@ -77888,3 +77888,101 @@ choice. Named candidates on the table (not a recommendation, just what's visible
 (BACKLOG #80 item 2, itself FAIRY-gated), CAM hand-edit, macOS packaging, Blockly drag-feel (gap 5, named
 t2661/t2665 but not sized), controller porting (V4.1-first, per `master-ddcs-file-is-reframed-backup`'s own
 `[[porting-to-other-controllers]]` pointer), or a fresh owner idea.
+
+## t2673 — THE LOOP WAKES: PHASE 2 pilot, MEASURED not built (a real gap found, named); a real fix shipped
+## alongside it; the census
+
+**Item 1 — surfacing's handle-block migration: attempted, then REPORTED rather than shipped broken.** The
+dispatch's own premise ("the mechanism exists... t2663 proved a handle block drives a real rendered handle")
+is true for an AUTHORED wizard's simple, fixed-anchor handle — but surfacing's own two gestures are NOT that
+shape, confirmed by reading the actual math, not assumed from the mechanism working elsewhere:
+- **`sf_size` (the W×H handle)**: `handleScale()` (`wizards/ops/placement.js:143`) computes its anchor as
+  `ax = ox + px` — `ox` is the LIVE `originX` value and `px` (plus `vx`/`sx`, which corner of the rect the
+  handle even resizes FROM) depends on `stockAttach`/`pathDatum` — a real, live-editable form field (t2271's
+  own "dual corner picker," not a rare edge case). `rect_handle`'s own declared anchor
+  (`panelTypes.js` `anchor.kind==='rect'`) is a FIXED LITERAL (`ax`/`ay` baked at block-authoring time) — it
+  cannot track a co-located point handle's live position, let alone re-derive which corner is "near" from a
+  SEPARATE field's own live value. Checked whether `resolveAnchorCoord` (the primitive that already lets
+  `point_handle`'s own ax/ay resolve a NAMED STOCK TOKEN) could be widened to also resolve a PARAM NAME instead
+  of a stock token — it CAN'T reach the op's own `params` at all (its signature is `(raw, stock, fallback)`,
+  no params argument) — so even that widening only solves the "track originX" half, not the datum-corner
+  sx/sy/px/py fork, which is a genuinely different, bigger primitive (a live, declared "corner-relative
+  anchor," not a stock-token lookup).
+- **`sf_pos` (the mode marker)**: its own WRITE TARGET switches between `originX`/`originY` (Normal) and
+  `jogX`/`jogY` (Skim) at runtime (`startMarkerTarget(zMode)`). `point_handle`'s `fx`/`fy` are resolved ONCE,
+  at authoring time (must-match pickers) — there is no declared way today for a handle's bound param to be
+  conditional on another param's live value.
+- **THIS IS NOT SURFACING-SPECIFIC.** Grepped every `blocks/dataOps/*Data.js` + the atom-level hooks
+  (`wizards/ops/*.js`) for `handleScale`: **bore, contour, drill, pocket, surfacing, tap, AND text** (7 of the
+  32 built-in-as-data twins) all drive their own resize/pos handle through the SAME datum-corner-relative
+  math. Every one of them is blocked on the identical missing primitive, not just surfacing's own.
+
+Forcing either shape into a static block declaration today would mean picking ONE fixed corner/target and
+silently breaking an already-shipped, extensively-tested path
+(`surfacing-start-position-1648.spec.js`, `surfacing-skim-rect-follows-marker-1674.spec.js`, both still fully
+green, untouched) — exactly the "identical before and after" bar this migration is held to. **Reported in
+code** (a new header block above `surfacingPreviewGeometry`, `surfacingData.js`) rather than shipped broken,
+per this turn's own precedent for item 3 ("if it needs new machinery, report not build") — the same discipline
+applied one item earlier than the dispatch explicitly named it for.
+
+**Item 2 — the census (gesture mechanism per built-in-as-data twin), a FLOOR not a ceiling** (per
+`VERIFICATION-DISCIPLINE.md` rule 18 — grep narrows and explains, it doesn't prove completeness):
+
+| Category | Ops | Mechanism | Migratable today? |
+|---|---|---|---|
+| A — already block-declarable shape | **corner** | `role:'x'/'y'` bindings, no `previewGeometry` hook, no dynamic anchor | Likely yes — the lowest-risk next candidate, not surfacing |
+| B — blocked on the live/datum-corner anchor gap (item 1's own finding) | **bore, contour, drill, pocket, surfacing, tap, text** | twin- or atom-level `previewGeometry` hook, all reach `handleScale()` | No — needs the new corner-relative anchor primitive first |
+| C — blocked on a DIFFERENT gap (no compound/multi-field anchor kind) | **slot** | `previewGeometry` hook; handles include a `translate` type (moves A+B together) — none of the 10 existing anchor kinds cover it | No — needs its own new anchor kind |
+| E — no interactive canvas handle at all (confirmed for middle/edge/faceProbe/odProbe via direct read — SIM-START markers only, non-interactive; presumed for the rest by absence of any `previewGeometry`/role-binding signal, NOT individually confirmed) | the remaining 23 (alignment, atc×6, centerDrill, comm, edge, facing, homing, ioStep, middle, faceProbe, odProbe, odTurn, parting, pauseConfirm, polygon, rotaryCenter, rotaryClock, wcs) | none | N/A — nothing to migrate |
+
+**The batch order isn't ready to sequence per-op yet — it's blocked at a shared prerequisite.** 8 of 9
+ops with ANY canvas gesture (categories B+C) need new declared-anchor capability before ANY of them can
+migrate without a real behavior regression; only **corner** (category A) looks genuinely ready today, and it
+was not this turn's own dispatched pilot.
+
+**Item 3 — the raw `'form3d+2d'` token: fixed, not just reported (this one WAS cheap).** `def.labels` was the
+wrong tool (it relabels a field's own NAME prefix, never an enum VALUE). Traced the actual mechanism instead
+of guessing: `bridge.js`'s own per-field options dispatcher (`fieldOptionsFor`-shaped function, line ~366)
+ALREADY special-cases `panel`+`feature_canvas`, but returned `Object.keys(PANEL_TYPES)` — bare value strings
+used as their own label, which IS the raw-token bug. Fixed to `Object.values(PANEL_TYPES).map((t) => [t.label, t.id])`
+— sourced from `PANEL_TYPES`'s own already-declared `.label` (panelTypes.js), one source, no new list.
+**Live-caught, not assumed**: my first attempt (adding a competing `selects:` block to `featureCanvasBlock`
+itself) broke 9 existing "DRIVE THE APP" specs — reverted once the FULL suite (well, the targeted spec
+files) proved it, then traced to the real, already-existing special-case and fixed THAT instead. A SECOND
+live surprise: Blockly's own native `FieldDropdown` auto-trims a COMMON PREFIX shared by every option's label
+to shorten the block-face/menu text — since all 5 `PANEL_TYPES` labels start with "Form ", the actual
+rendered/clickable text is `"only"`/`"+ 3D"`/`"+ 2D"`/`"+ 3D + 2D"`/`"+ DDCS screen"`, not the full label.
+Confirmed live via `field.getOptions(false)` before writing a single test fix (not guessed from Blockly
+folklore). Updated the 9 real call sites across 8 spec files (`length/point/proj-length/probe-vector/rect/
+radial/scale/shear-handle-block.spec.js`) from the old raw-token search string `'form2d'` to the new,
+ACTUALLY-RENDERED trimmed text `'+ 2D'` — all 33 tests in that group green. `panel-default-completeness-
+2643.spec.js`'s own comment mentioning `'form2d'` is prose describing a step it deliberately never calls —
+left untouched.
+
+### VERIFY
+
+Item 1: no code shipped, no regression possible — `surfacing-start-position-1648.spec.js` and
+`surfacing-skim-rect-follows-marker-1674.spec.js` untouched, still pass (confirmed in the full run below).
+Item 3: 33/33 handle-block + panel-default specs green, including the 9 corrected search strings, verified
+live (not assumed) at each step — the dropdown's own actual options read via `field.getOptions()` before any
+test edit, the sed replacement's own correctness re-verified by re-running, not by inspection alone.
+
+Full suite (`npm test`): test:node 236/236. test:e2e **3191 passed, 1 failed, 19 flaky, 27 skipped.** The 1
+failure — `lathe-drag-responsive-2505.spec.js` "click-to-edit on polyFlats" (a `.press('Enter')` locator
+timeout) — re-run in isolation: **4/4 clean.** Unrelated to anything this turn touched (a lathe click-to-edit
+input, nothing to do with feature_canvas/PANEL/surfacing); the SAME test also flaked, and was confirmed the
+same way, in t2667's own run — a recurring pattern worth watching (not yet a third-strike "declare it" case
+per VERIFICATION-DISCIPLINE's own rule 19 precedent, but named here so the NEXT recurrence is recognized,
+not re-discovered from scratch). `git status` clean except this entry, the source fix (`bridge.js`), the
+finding comment (`surfacingData.js`), the 8 corrected spec files, and their own regenerated
+`verification/*.png` baselines (side effects of the tests that just ran, same established practice as every
+prior turn).
+
+### NEXT
+
+**The real next step for this whole arc is building the missing primitive** — a declared, live "corner-
+relative anchor" (an anchor whose `ax`/`ay`/`sx`/`sy` resolve from ANOTHER field's current value + a
+datum-corner selector, not a fixed literal) — before ANY of the 7 handleScale-blocked ops (or slot's own
+translate-anchor gap) can safely migrate. **Corner (category A) is the one genuinely-ready candidate** for a
+LOWER-RISK pilot than surfacing, if the arc continues down this path rather than building the new primitive
+first.
