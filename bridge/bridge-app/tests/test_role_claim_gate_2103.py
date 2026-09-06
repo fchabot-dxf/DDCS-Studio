@@ -35,19 +35,11 @@ class _StubTransfer:
         return r"\\stub\cncdisk\%s" % name
 
 
-class _StubBeacons:
-    def reset(self, marker=None):
-        pass
-
-    def latest(self):
-        return None
-
-
 def _make_poller(tmp_root, expert_dest="", role_override=""):
     backend = LocalFolderBackend(tmp_root)
-    cfg = Config(local_root=tmp_root, expert_dest=expert_dest, role_override=role_override, enable_slave=True)
+    cfg = Config(local_root=tmp_root, expert_dest=expert_dest, role_override=role_override)
     transfer = _StubTransfer()
-    return Poller(backend, transfer, _StubBeacons(), cfg, log=lambda *a: None), backend, cfg, transfer
+    return Poller(backend, transfer, cfg, log=lambda *a: None), backend, cfg, transfer
 
 
 def _submit(backend, cfg, name="part.nc", nc="G0 X0\nM30\n"):

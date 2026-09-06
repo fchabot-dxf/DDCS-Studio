@@ -122,7 +122,7 @@ test('RIDER — the standalone safetraverse palette entry is HIDDEN (inert until
 });
 
 test('SEND CONFIRM: a red program asks an explicit confirm before the push (reads the CHECK, not the chip); cancel aborts, green sends', async ({ page }) => {
-    // Mount the gateway Send view with a mock client (no backend); count submitJob calls; beacons off (deliver-only).
+    // Mount the gateway Send view with a mock client (no backend); count submitJob calls.
     await page.evaluate(async () => {
         const mod = await import('/ui/gateway/views/send.js');
         const root = document.createElement('div'); root.id = 'test-send-root';
@@ -134,9 +134,8 @@ test('SEND CONFIRM: a red program asks an explicit confirm before the push (read
         // from a real ctx.client.descriptor() BEFORE calling mount(). Omitting it here (as this test always
         // has) makes applyState(undefined) correctly read as "no gateway" and route through the Drive
         // fallback instead of the mocked client.submitJob — not a bug, just a mock that predates t2080.
-        try { mod.default.mount({ root, desc: { id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }, client: { submitJob: async () => { window.__submitted++; return { jobId: 'J1', tracked: false }; } } }); }
+        try { mod.default.mount({ root, desc: { id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }, client: { submitJob: async () => { window.__submitted++; return { jobId: 'J1' }; } } }); }
         catch (e) { window.__mountErr = String(e && e.message || e); }
-        const cb = root.querySelector('input[type=checkbox]'); if (cb) { cb.checked = false; cb.dispatchEvent(new Event('change', { bubbles: true })); }
     });
     expect(await page.evaluate(() => window.__mountErr), 'the send view mounted').toBeNull();
     const sendRoot = page.locator('#test-send-root');

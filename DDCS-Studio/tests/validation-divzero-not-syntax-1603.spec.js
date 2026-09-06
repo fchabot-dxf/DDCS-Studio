@@ -115,14 +115,20 @@ test('the real Send dialog does NOT falsely refuse the shipped lathe OD-turn pro
     await page.waitForTimeout(700);
     expect(await clickBtn('Use current Studio program'), 'the current program stages').toBe(true);
     await page.waitForTimeout(900);
-    // t2225 — was hardcoded 'Send (tracked)'. This test is about the div-zero VALIDATION gate, orthogonal to
-    // which transport mode is offered — beacons are gated off by default for a V4.1/M350-family descriptor
-    // (ui/gateway/views/send.js's Modbus capability check, t2113), so the real button here reads
-    // "Send (deliver-only)", not "Send (tracked)" (confirmed live: the previous hardcoded string never matched
-    // anything, on either .includes() or .startsWith() — the substring simply isn't present). 'Send (' matches
-    // whichever transport mode actually rendered, the same way send-history-real-path-2065 handles it
-    // explicitly via its own beaconsOn parameter — this test has no such parameter and doesn't need one.
-    expect(await clickBtn('Send ('), 'and the send is attempted').toBe(true);
+    // t2649 (BACKLOG #78) — was 'Send (' (matching whichever "Send (tracked)"/"Send (deliver-only)" transport
+    // label the removed Beacons checkbox produced). That checkbox and its parenthetical are gone — the button
+    // text is now bare "Send", IDENTICAL to the L1 GATEWAY nav tab's own "Send" text, so plain text-matching
+    // can no longer disambiguate them. Target the submit button by its OWN class instead (`button.primary`,
+    // same selector preflight-badge-838's own Send-view test uses), never relying on label text for identity.
+    // the CONNECTION contract only, never the gate under test (same lift clickBtnImpl always applied) —
+    // force-enable the button (no real gateway answers in this test) before clicking it for real.
+    expect(await page.evaluate(() => {
+        const b = document.querySelector('#gateway-app button.primary');
+        if (!b) return false;
+        b.disabled = false;
+        b.click();
+        return true;
+    }), 'and the send is attempted').toBe(true);
     await page.waitForTimeout(12_000);   // the mismatch probe must time out against a dead gateway first
 
     const dlg = await page.evaluate(() => [...document.querySelectorAll('dialog,.dlg,.modal,[role=dialog]')]

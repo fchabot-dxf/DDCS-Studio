@@ -11,16 +11,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /**
  * t2065 — THE REAL PATH, DRIVEN, NOT MOCKED. Every existing spec near this feature mocks
  * `/api/descriptor`/`/api/queue`/`/api/history` with hand-typed JSON that was never produced by the real
- * bridge — exactly the "wired chain, never a working one" shape this arc has already found twice (beacons
- * never worked; "last time" reported a stalled run's own stopwatch). This spec spawns the REAL
- * `fairy.bridge` process (SimBeaconSource stands in for hardware — the only necessarily-fake piece), lets
- * Studio's OWN zero-configuration local-gateway auto-probe (`gateway-local-reach-1325`'s own mechanism —
- * `127.0.0.1:8765` is the first registered port) find it for real, and drives the ACTUAL Send button click
- * and the ACTUAL rendered History DOM — no `page.route` anywhere in this file.
+ * bridge — exactly the "wired chain, never a working one" shape this arc has already found more than once.
+ * This spec spawns the REAL `fairy.bridge` process, lets Studio's OWN zero-configuration local-gateway
+ * auto-probe (`gateway-local-reach-1325`'s own mechanism — `127.0.0.1:8765` is the first registered port)
+ * find it for real, and drives the ACTUAL Send button click and the ACTUAL rendered History DOM — no
+ * `page.route` anywhere in this file.
  *
- * Server-side proof (real HTTP + a real background tick loop + real beacon injection, three tests) lives in
+ * Server-side proof (real HTTP + a real background tick loop, no mocks) lives in
  * `bridge/bridge-app/tests/test_history_real_path_2065.py`. This spec closes the OTHER half: does clicking
  * Send in the real UI actually reach that real server and render back correctly.
+ *
+ * t2649 (BACKLOG #78) — was two tests: a "Beacons off" deliver-only send, and a "Beacons on" tracked send
+ * that (with no real Modbus hardware on this dev machine) genuinely stalled and was proven to render honestly
+ * as such. The beacon mechanism those exercised is REMOVED (owner-directed 2026-09-04, never demonstrably ran
+ * end-to-end) — there is no more Beacons checkbox, no more tracked/stalled state, and the bridge's own
+ * `--stall` CLI flag this spec used to spawn with is gone too. Every send is now what "deliver-only" already
+ * was, so this collapses to the one real-path proof that still applies: a real send reaches the real bridge
+ * and is recorded, for real, as delivered.
  */
 test.use({ viewport: { width: 1300, height: 850 } });
 
@@ -49,9 +56,7 @@ test.beforeAll(async () => {
     // t2227 — a REAL SYSDISK firmware fixture, not a mock: ops.py's detect_controller()/_fingerprint_sysdisk()
     // reads the first *.out file (sorted) under <tmpRoot>/SYSDISK (the sibling _sysdisk_for() derives from
     // `dest`'s own "cncdisk" suffix) and string-scans it for family signals when the filename alone is
-    // ambiguous. Without one, the bridge fingerprints as "unknown" and send.js's Modbus capability gate
-    // force-disables Beacons regardless of this test's own beaconsOn intent — the root cause the t2223/t2225
-    // triage found. `parse.out` from a genuine Expert M350 capture (this repo's own ground truth for this
+    // ambiguous. `parse.out` from a genuine Expert M350 capture (this repo's own ground truth for this
     // controller family, same standing as the M350 dumps elsewhere) — VERIFIED to fingerprint as
     // "expert-m350" by running _fingerprint_sysdisk's own exact scan against it directly (contains "M350" and
     // "Modbus", not "DDCSV4"), not assumed from its name or location.
@@ -64,14 +69,7 @@ test.beforeAll(async () => {
     bridgeProc = spawn(PY, [
         '-m', 'fairy.bridge', 'run',
         '--backend', 'local', '--root', tmpRoot, '--dest', dest,
-        // t2065 — enable_slave stays ON (default), NOT --no-slave: per t2020's own fix, a tracked job on a
-        // bridge with enable_slave=False resolves straight to "delivered" and never enters the watch loop
-        // at all -- correct behaviour, but it means --no-slave can never genuinely STALL, which is exactly
-        // what the second test below needs to prove. No real Modbus hardware exists on this dev machine
-        // either way (the port probe fails cleanly, t2057's own fix) -- the watch loop doesn't care whether
-        // the receiver is healthy, only whether a beacon ever arrives, and none ever will here.
         '--serve', '--host', '127.0.0.1', '--http-port', String(BRIDGE_PORT),
-        '--stall', '3',        // short, real stall — the test genuinely waits this long
         '--poll', '0.3',       // t2065 — the IDLE tick cadence defaults to 5s; a real send otherwise sits in the
                                 // inbox for up to that long before the real background loop even looks at it
     ], {
@@ -84,13 +82,11 @@ test.beforeAll(async () => {
         // ("a self-hoster adds their own Studio origin") — using it here, not bypassing the guard.
         //
         // t2065 — FOUND WHILE BUILDING THIS SPEC, a real isolation gap: Config.from_env() layers
-        // defaults < persisted config.json < explicit CLI, and no CLI flag can force enable_slave BACK ON
-        // over a persisted "false" (--no-slave only ever turns it off). This machine has a REAL persisted
-        // ~/.ddcs-bridge/config.json (the human's own actual prior bridge usage, enable_slave:false in it)
-        // — without isolating HOME/USERPROFILE, this test would have silently read the human's own real
-        // config file. Pointing HOME at the test's own throwaway tmpRoot makes os.path.expanduser("~")
-        // resolve there instead, so default_config_path() finds nothing and falls back to class defaults —
-        // never touches the real file.
+        // defaults < persisted config.json < explicit CLI. This machine has a REAL persisted
+        // ~/.ddcs-bridge/config.json (the human's own actual prior bridge usage) — without isolating
+        // HOME/USERPROFILE, this test would have silently read the human's own real config file. Pointing
+        // HOME at the test's own throwaway tmpRoot makes os.path.expanduser("~") resolve there instead, so
+        // default_config_path() finds nothing and falls back to class defaults — never touches the real file.
         env: { ...process.env, DDCS_TRUSTED_ORIGINS: 'http://localhost:3211', HOME: tmpRoot, USERPROFILE: tmpRoot },
     });
     const up = await waitForBridge();
@@ -112,12 +108,12 @@ test.afterAll(async () => {
     if (tmpRoot) { try { rmSync(tmpRoot, { recursive: true, force: true }); } catch (_) { /* best effort */ } }
 });
 
-const stageAndSend = async (page, { beaconsOn }) => {
+const stageAndSend = async (page) => {
     // Point at the real bridge EXPLICITLY, the same way a real user types a daemon URL in the Console tab
     // (gateway-local-reach-1325's own "typed URL" mechanism) — sidesteps the auto-probe's own backoff
     // timing (gateway-quiet-offline-1307: 5s/10s/20s) so the test doesn't depend on winning that race; the
-    // SEND FLOW itself (instrument -> submitJob -> real HTTP -> real server) is what this spec is proving,
-    // not the auto-discovery mechanism, which has its own dedicated coverage already.
+    // SEND FLOW itself (submitJob -> real HTTP -> real server) is what this spec is proving, not the
+    // auto-discovery mechanism, which has its own dedicated coverage already.
     await page.addInitScript(([base]) => {
         localStorage.setItem('ddcs_api', base);
         localStorage.setItem('ddcs_mode', 'local');
@@ -128,16 +124,6 @@ const stageAndSend = async (page, { beaconsOn }) => {
         window.ddcsLoadBlockStack([
             { id: 'a', type: 'move', params: { mode: 'rapid', x: 10, y: 10, z: -5, feed: 500 } },
             { id: 'b', type: 'move', params: { mode: 'rapid', x: 20, y: 20, z: -5, feed: 500 } },
-            // t2065 — FOUND WHILE BUILDING THIS SPEC, a real reachable edge case: instrument.js only places
-            // beacons on Z-up retract moves or ahead of an M30 (instrument.js:55,59); a program with NEITHER
-            // (this staged stack originally had two flat rapids and no M30) silently instruments to
-            // total_beacons:0, so a REAL tracked send with Beacons checked reaches the server as
-            // tracked:false with no warning surfaced anywhere. Every real wizard-built program always closes
-            // with a progend block (M30 by default, programFraming.js:104) so this can't happen through normal
-            // Studio authoring -- but a raw/hand-typed editor program with no M30 and no retract hits it for
-            // real. Documented in WORK-LOG rather than "fixed" here: this block is the retract a real op
-            // would already emit, restoring the realistic case this spec means to drive.
-            { id: 'c', type: 'move', params: { mode: 'rapid', x: 20, y: 20, z: 5, feed: 500 } },
         ]);
         await new Promise((r) => setTimeout(r, 700));
     });
@@ -152,20 +138,17 @@ const stageAndSend = async (page, { beaconsOn }) => {
     await page.waitForTimeout(700);
     expect(await clickBtn('Use current Studio program'), 'the current program stages').toBe(true);
     await page.waitForTimeout(500);
-    if (!beaconsOn) {
-        await page.evaluate(() => {
-            const cb = [...document.querySelectorAll('input[type=checkbox]')].find((c) =>
-                (c.closest('label')?.textContent || '').includes('Beacons'));
-            if (cb && cb.checked) cb.click();
-        });
-        await page.waitForTimeout(200);
-    }
-    expect(await clickBtn(beaconsOn ? 'Send (tracked)' : 'Send (deliver-only)'), 'the send is attempted').toBe(true);
+    // t2649 (BACKLOG #78) — plain 'Send' text-matching can't tell the submit button from the L1 GATEWAY nav
+    // tab (also literally "Send") now that the removed Beacons checkbox's "Send (tracked)"/"Send
+    // (deliver-only)" parenthetical no longer makes the two texts distinct. Target the submit button by its
+    // OWN class instead (`button.primary`), never relying on label text for identity.
+    expect(await page.locator('#gateway-app button.primary').count(), 'the send button rendered').toBeGreaterThan(0);
+    await page.locator('#gateway-app button.primary').click();
     await page.waitForTimeout(1500);
 };
 
-test('a REAL deliver-only send (Beacons off) reaches the real bridge and renders in the real History tab', async ({ page }) => {
-    await stageAndSend(page, { beaconsOn: false });
+test('a REAL send reaches the real bridge and renders "delivered" in the real History tab', async ({ page }) => {
+    await stageAndSend(page);
     // t2241 — Jobs folded into Send: the merged job list is already ON this tab, no navigation needed. Just
     // let the REAL /api/history poll happen — no mocked route anywhere, and Send stays the active view so its
     // own onPoll (which fetches it) keeps running.
@@ -176,39 +159,5 @@ test('a REAL deliver-only send (Beacons off) reaches the real bridge and renders
         return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
     });
     expect(r.length, 'the real send genuinely produced a real history row').toBeGreaterThan(0);
-    expect(r[0][1], 'a deliver-only send is recorded as delivered, for real').toBe('delivered');
-});
-
-test('a REAL tracked send that is never fed a beacon genuinely stalls, and the real History tab shows it honestly', async ({ page }) => {
-    await stageAndSend(page, { beaconsOn: true });
-    // no beacon ever arrives (no real Modbus hardware on this dev machine, and the port probe fails cleanly
-    // per t2057's own fix) -- wait past the real, short --stall 3 configured above, then read the real
-    // Tracking tab's own state.
-    await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Track');
-        if (t) t.click();
-    });
-    await page.waitForTimeout(4500);   // genuinely wait out the real stall window, not simulated
-    const tracked = await page.evaluate(() => (document.querySelector('#gateway-app .gw-view .bt-state') || {}).textContent);
-    expect(tracked, 'the real tracker shows the real stalled state, not a stuck 0% that never explains itself').toMatch(/STALLED/i);
-
-    // t2241 — Jobs folded into Send: switch back there for the merged job list (was 'Jobs', its own tab)
-    await page.evaluate(() => {
-        const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Send');
-        if (t) t.click();
-    });
-    await page.waitForTimeout(1500);
-    const r = await page.evaluate(() => {
-        const root = document.querySelector('#gateway-app .gw-view');
-        const rows = [...root.querySelectorAll('table tr')].slice(1);
-        return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
-    });
-    // t2095 — this used to check row[1] === 'stalled' exactly. resultLabel() (t2049, now in
-    // ui/gateway/jobHistory.js — was jobs.js, moved when Jobs folded into Send at t2241) deliberately never
-    // renders the bare word 'stalled' — it appends HOW FAR the run
-    // got ('stalled — no signal after delivery' when zero beacons ever arrived, matching this exact scenario,
-    // or 'stalled — signal lost at N/total' otherwise), a real UX improvement this test's exact-match assertion
-    // was never updated to match. Matches the family of stalled labels instead of the retired bare literal.
-    const stalledRow = r.find((row) => /^stalled/.test(row[1] || ''));
-    expect(stalledRow, 'the real stalled job is recorded honestly in real History, not silently dropped').toBeTruthy();
+    expect(r[0][1], 'a real send is recorded as delivered, for real').toBe('delivered');
 });

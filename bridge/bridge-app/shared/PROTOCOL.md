@@ -5,49 +5,25 @@ sides must obey. Change it deliberately — a mismatch silently breaks the bridg
 
 ---
 
-## 1. Beacon frame (controller → Modbus slave) — CONFIRMED LIVE
-The instrumented job sets two vars and pushes them at each safe retract:
-```
-#251 = 111        ; marker, set once near the top
-#250 = <n>        ; beacon number, 1..255
+## 1-2. [REMOVED t2649, BACKLOG #78] The beacon checkpoint mechanism and its per-job map
 
-> ⚠ **BEHAVIOUR lives in [`JOB-RULES.md`](../JOB-RULES.md), not here.** This file describes the *layout and wire shape* — what a job looks like and where it sits. **When** a gateway claims one, what happens when it cannot deliver, what survives a restart, and what the sender is told are settled there, once. Do not restate any of it in this file; reference it.
-MSETDATA[250,1,0,2,16,300]
-```
-`MSETDATA[250,1,0,2,16,300]` = write **2 bytes** from `#250` to **holding register 0** of slave id **1**,
-function 16. Bytes pack little-endian within the register: `reg = (#251 << 8) | #250 = (111 << 8) | n`.
+⛔ **REMOVED entirely, owner-directed 2026-09-04: "beacons dont work remove them."** The instrumenter (`web/`'s
+own JS port + `checkpoint_insert.py`) rewrote the user's `.nc` to insert `#251=111`/`#250=<n>` + `MSETDATA[…]`
+checkpoints at safe retracts; a Modbus SLAVE on the gateway watched for them and decoded a bare beacon number
+into percent/op/line/ETA via a per-job JSON map. **The evidence, preserved here so nobody repeats the
+mistake it recorded:**
 
-⇒ **The slave watches holding register 0. Each beacon arrives as `28416 + n`.**
-- decode: `n = reg & 0xFF` (low byte)
-- validate: `(reg >> 8) & 0xFF == 111` (the marker) — else it isn't a checkpoint frame, ignore it
-- `n` runs `1 .. total_beacons`; the **last** `n` is the forced "complete" beacon (just before `M30`)
+> ⚠⚠ **"Proven on the machine 2026-06-06" was WIRE-FRAME evidence, never FEATURE evidence.** `CHECKPOINT_TEST.nc`
+> proved `MSETDATA[250,1,0,2,16,300]` transports 2 bytes wedge-free — a genuine, real fact about the transport.
+> It was NOT proof the beacon FEATURE worked end to end: instrumenting a real job, watching checkpoints fire,
+> decoding the map, and showing progress was never once exercised, anywhere, by anything (BACKLOG #78's own
+> evidence table — the ONLY beacon test that existed, `test_beacon_health_2057.py`, covered exclusively the
+> SAD path: a bad/busy COM port reporting its own honest failure). The wire worked; the feature never ran.
 
-Proven on the machine 2026-06-06 (`CHECKPOINT_TEST.nc`): `n = 1/2/3` arrived as `28417 / 28418 / 28419`,
-wedge-free. This frame is fixed — do not change `#250/#251/111/[...,0,2,16,300]` without re-proving live.
-
-> ⚠️ **The frame carries NO job id** — only the beacon number. See §4 (single active job).
-
----
-
-## 2. The map (per-job, produced by the instrumenter)
-`web/` (or `checkpoint_insert.py`) emits, alongside the instrumented `.nc`, a JSON map so a bare beacon
-number becomes percent / op / line / ETA:
-```json
-{
-  "source": "bracket_v3.nc",
-  "var": 250, "marker_var": 251, "marker": 111,
-  "msetdata": "MSETDATA[250,1,0,2,16,300]",
-  "total_est_time_s": 512.0,
-  "total_beacons": 7,
-  "beacons": [
-    { "n": 1, "orig_line": 14, "op": "2D Contour1", "cum_time_s": 31.2, "percent": 6.1, "complete": false },
-    { "n": 7, "orig_line": 803, "op": "Finish",     "cum_time_s": 512.0, "percent": 100.0, "complete": true }
-  ]
-}
-```
-- `percent` is **time-weighted** (cum_time / total) — not line-ratio — so the bar tracks wall-clock.
-- Lookup: on beacon `n`, find `beacons[n-1]` → `percent`, `op`, `orig_line`. ETA = `total_est_time_s − cum_time_s`.
-- Schema authority: [`../../controllers/expert-m350/tools/checkpoint_insert.py`](../../controllers/expert-m350/tools/checkpoint_insert.py).
+⇒ **The replacement is BACKLOG #79 — live Modbus position/run-state/line-number polling** (registers
+`10002`/`16062`, confirmed on the owner's own machine, `expert-m350/FINDINGS.md` 2026-09-05). It is
+continuous rather than checkpoint-based, needs no per-job map, and — the real win — **never rewrites the
+user's own `.nc` file at all.** See master.py's `PositionPoller` / `Ops.job_tracking_status()`.
 
 ---
 
@@ -55,52 +31,44 @@ number becomes percent / op / line / ETA:
 | Key | Writer | Reader | Meaning |
 |---|---|---|---|
 | `inbox/<jobId>.nc` | web | fairy | job waiting to be delivered (the **queue**) |
-| `inbox/<jobId>.map.json` | web | fairy | its map — **only for TRACKED jobs** (see job types) |
-| `status/<jobId>.json` | fairy | web | live progress (see §5) |
-| `gateway/heartbeat.json` | fairy | web | gateway liveness + descriptor (`machine_id`, `name`, `last_seen`, `active_job`) — so the cloud console knows if the gateway is awake (CONFIGS §6) |
-| `history/<jobId>.json` | fairy | web | finished-job log: `name`, `final_state`, `duration_s`, `started_at`/`ended_at` — the History view (durable; written on every terminal outcome) |
+| `inbox/<jobId>.map.json` | web | fairy | optional per-job metadata (`content_hash`, `source`, `machine_id`) — never a progress-watch request (t2649) |
+| `status/<jobId>.json` | fairy | web | job state (see §5) |
+| `gateway/heartbeat.json` | fairy | web | gateway liveness + descriptor (`machine_id`, `name`, `last_seen`) — so the cloud console knows if the gateway is awake (CONFIGS §6) |
+| `history/<jobId>.json` | fairy | web | finished-job log: `name`, `final_state`, `delivered_at`, `recorded_at`, `content_hash` — the History view (durable; written on every terminal outcome) |
 
 - **`jobId`** is **lexicographically sortable** = creation order, e.g. `20260606T143207-bracket_v3`.
   The queue is "`LIST inbox/` sorted ascending" → strict FIFO.
 - `web` PUTs to `inbox/`; `fairy` LISTs `inbox/` and takes the **oldest**.
-- **Two job types, keyed off the presence of a map (the "beacons" toggle in web):**
-  - **TRACKED** — has a `.map.json` (e.g. a Fusion cut, instrumented). fairy watches beacons → progress.
-  - **DELIVER-ONLY** — no map (e.g. a DDCS-Studio probe / utility `.nc`). fairy delivers it and marks it
-    `delivered` (terminal); no beacon watch. These never need beacons.
+- **Every job is delivered the same way** (t2649, BACKLOG #78 — was two types, TRACKED/DELIVER-ONLY, split
+  on whether the beacon mechanism should watch it; that split is gone with the mechanism). Deliver, mark
+  `delivered`, done — a `.map.json`'s presence no longer changes what happens to the job.
 - **No bucket retention (decided 2026-06-07).** There is no `archive/`/`kept/`. fairy **deletes
-  `inbox/<jobId>.*` the instant delivery succeeds** — for *both* job types. Rationale: the file now lives on
-  the **controller's CNCDISK**, which is where a same-session re-run comes from anyway (re-select + Start on
-  the panel); days later the operator regenerates. So the controller is the de-facto retention; a bucket copy
-  buys nothing. Deleting on delivery is also the idempotency mechanism (a delivered job is gone from the
-  queue) **and** an operational-safety win: a crashed/restarted fairy can't re-deliver a job mid-cut.
-  Only `status/<jobId>.json` (metadata: percent/op/line — no G-code) persists, as the web tracker's mirror.
+  `inbox/<jobId>.*` the instant delivery succeeds**. Rationale: the file now lives on the **controller's
+  CNCDISK**, which is where a same-session re-run comes from anyway (re-select + Start on the panel); days
+  later the operator regenerates. So the controller is the de-facto retention; a bucket copy buys nothing.
+  Deleting on delivery is also the idempotency mechanism (a delivered job is gone from the queue) **and** an
+  operational-safety win: a crashed/restarted fairy can't re-deliver a job mid-cut.
+  Only `status/<jobId>.json` (metadata — no G-code) persists, as the web tracker's mirror.
 
 ---
 
-## 4. Single active job (forced by §1)
-Because the beacon frame has no job id, **only one job may be "active" (running + tracked) at a time.**
-The bridge serializes:
+## 4. [REMOVED t2649, BACKLOG #78] "Single active job"
+
+⛔ Existed ONLY because the beacon frame carried no job id, so at most one job could be watched at a time.
+With the beacon mechanism removed there is nothing to watch — every claim delivers and reaches a terminal
+state (`delivered`/`failed`) synchronously, within the same tick that claimed it:
+
 ```
 fairy loop:
-  if no active job and inbox not empty:
+  if inbox not empty:
      jobId = oldest in inbox
-     read inbox/<jobId>.nc (+ .map.json if present; hold the map in RAM)
+     read inbox/<jobId>.nc (+ .map.json if present)
      copy the .nc  →  Expert CNCDISK     (deliver)
      DELETE inbox/<jobId>.*              (delivered → controller has it; see §3)
-     if no map (DELIVER-ONLY): status = "delivered" (terminal); done — slot stays free
-     else (TRACKED): reset the slave to this job's marker; mark active; status = "delivered"
-  while active:
-     read holding[0]; if a NEW valid beacon n arrives → status = "running", update from the in-RAM map
-     if n == total_beacons (complete) → status = "done"; active = none
-     if no beacon for STALL_SECONDS after first → status = "stalled" (operator hasn't pressed Start, or it errored)
+     status = "delivered" (terminal)     -- or "failed" on a refusal/delivery error
 ```
-- Delivering one-at-a-time keeps beacon attribution unambiguous and matches the operator running jobs in
-  order. The cloud `inbox/` still holds the whole queue; it just drains as each job is delivered.
-- Tracking after delivery runs entirely off the **in-RAM map + the live beacon stream** — no bucket file
-  is read during a run. (RAM-only is operationally safe: the map has no control authority; losing it to a
-  fairy crash costs only the progress bar for that one in-flight job, never the cut.)
-- **Future** (not v1): to pre-load several jobs on the controller, encode a job tag in a second register
-  (e.g. set `#252` and push 4 bytes). Out of scope until needed.
+
+Multiple jobs can be claimed and delivered across successive ticks with nothing held "active" between them.
 
 ---
 
@@ -109,30 +77,26 @@ fairy loop:
 {
   "jobId": "20260606T143207-bracket_v3",
   "name": "bracket_v3.nc",
-  "state": "running",
-  "last_beacon": 4,
-  "total_beacons": 7,
-  "percent": 61.0,
-  "op": "Drill 6mm",
-  "line": 3000,
-  "eta_s": 198,
+  "state": "delivered",
   "updated_at": "2026-06-06T14:32:07Z",
-  "events": [ "delivered → Expert", "running" ]
+  "events": [ "claimed 20260606T143207-bracket_v3", "writing to controller", "delivered → Expert" ]
 }
 ```
-**States:** `queued` (in inbox, web's view) → `delivered` (on Expert disk) → `running` (beacons arriving)
-→ `done` (complete beacon) · or `stalled` (no beacons after delivery+grace) · `failed` (delivery/IO error).
-For a **deliver-only** job (no map; §3), `delivered` is the **terminal** state — there's no `running`/`done`.
+**States:** `queued` (in inbox, web's view) → `delivering` (the write is in progress — see JOB-RULES.md) →
+`delivered` (terminal, on Expert disk) · or `failed` (identity/delivery/IO refusal, terminal).
 
-`web` polls `status/<jobId>.json` for the tracker; `percent`/`op`/`line`/`eta_s` come straight from the
-map lookup on `last_beacon`. The truly-live view is on fairy (direct from the slave); this is the mirror.
+t2649 (BACKLOG #78) — was also `last_beacon`/`total_beacons`/`percent`/`op`/`line`/`eta_s`, all decoded from
+the beacon mechanism's own per-job map. Removed with it: `delivered` is now always terminal, so there is no
+"live" number left for this object to carry — live job state (BACKLOG #79) is a separate, process-wide
+Modbus poll, not attached to any one job's status object. See `Ops.job_tracking_status()`.
+
+`web` polls `status/<jobId>.json` for the tracker.
 
 ---
 
 ## 6. What is fixed vs free
-- **Fixed (don't change without re-proving on the machine):** the beacon frame (§1).
-- **Free (either app can evolve as long as both agree here):** the map fields beyond `n/percent`, the R2
-  key names, the status fields. Bump a `"protocol": 1` field on objects if we ever break compatibility.
+- **Free (either app can evolve as long as both agree here):** the map fields, the R2 key names, the status
+  fields. Bump a `"protocol": 1` field on objects if we ever break compatibility.
 
 ---
 

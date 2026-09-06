@@ -36,7 +36,7 @@ const boot = async (page, trackingBody) => {
     await page.waitForTimeout(900);
 };
 
-test('tracking not enabled (the common case — beacons, no --position-poll) → the block stays hidden entirely', async ({ page }) => {
+test('tracking not enabled (the common case — no --position-poll) → the block stays hidden entirely', async ({ page }) => {
     await boot(page, { enabled: false });
     const visible = await page.evaluate(() => {
         const el = document.querySelector('.bt-jobtrack');

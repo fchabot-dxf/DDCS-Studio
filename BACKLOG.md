@@ -8200,7 +8200,12 @@ account: WORK-LOG t2601 (diagnosis) + t2603 (fix + all 5 migrations).
 
 ### 78. ⛔ REMOVE THE BEACON PROGRESS MECHANISM ENTIRELY — owner: "beacons dont work remove them"
 
-**[OPEN, owner-directed 2026-09-04. Not a cleanup — ~238 references in `bridge/bridge-app`.]**
+**[DONE t2649. The mechanism, its per-job map, `slave.py`/`telemetry.py`/`checkpoint_insert.py`/the JS
+instrumenter, and every UI surface that rendered its progress (History Duration/Last-time, the queue/tracker
+percent bars, the Beacons checkbox in Send/Submit/Setup) are removed. `PROTOCOL.md` §1-2/§4/§5 mark what was
+WIRE-FRAME evidence vs FEATURE evidence, per the caveat below. Delivery + BACKLOG #79's live tracking proven
+working after the removal (bridge pytest 126/126). Was OPEN, owner-directed 2026-09-04 — not a cleanup, ~238
+references in `bridge/bridge-app`.]**
 
 ⭐ **The owner's statement is the finding.** The beacon tracks job progress by **rewriting the user's `.nc`**:
 the instrumenter inserts `#250 = <n>` + `MSETDATA[250,1,0,2,16,300]` checkpoints, each arriving at the PC

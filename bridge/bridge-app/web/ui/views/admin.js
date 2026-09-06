@@ -1,5 +1,5 @@
-// admin.js — the Setup view. On a LOCAL gateway it's an editable form (machine name, controller disk,
-// beacons) with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
+// admin.js — the Setup view. On a LOCAL gateway it's an editable form (machine name, controller disk)
+// with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
 // into the gateway — configure it on the machine PC). A form view: mounted on tab click, not polled.
 import { el, toast } from "../util.js";
 
@@ -105,8 +105,6 @@ export default {
 
     const name = el("input", { type: "text", value: cfg.machine_name || "", placeholder: "e.g. Ultimate Bee" });
     const destField = el("input", { type: "text", value: dest, placeholder: "\\\\10.0.0.50\\cncdisk", style: "width:100%" });
-    const beacons = el("input", { type: "checkbox" });
-    beacons.checked = !!cfg.enable_slave;
     const PORTS = [8765, 8766, 8767, 8768, 8769];
     const portSel = el("select", {}, PORTS.map((p) => el("option", { value: String(p) }, String(p))));
     portSel.value = String(cfg.port || 8765);
@@ -117,7 +115,7 @@ export default {
       save.disabled = true;
       try {
         const r = await ctx.client.setConfig({
-          machine_name: name.value, dest: destField.value.trim(), enable_slave: beacons.checked,
+          machine_name: name.value, dest: destField.value.trim(),
           port: parseInt(portSel.value, 10),
         });
         if (!r.ok) { toast(r.error || "save failed", true); info.textContent = r.error || ""; }
@@ -140,8 +138,6 @@ export default {
         el("span", { class: "label" }, "Controller disk (network share)"),
         destField,
         el("span", { class: "hint" }, "Must be a network share, e.g. \\\\10.0.0.50\\cncdisk — local folders aren't allowed.")),
-      el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
-        beacons, "Beacons (Modbus progress — Expert only; leave off for V4.1)"),
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
 
       this.profileBlock(prof),

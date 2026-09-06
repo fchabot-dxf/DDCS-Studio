@@ -2,11 +2,15 @@
 POSITION POLLER: OPTION 1 WIRED AS A GENUINE PROGRESS SOURCE (t2063).
 
 t2059 proved the one-shot `ModbusMaster` client against a local synthetic slave. This turn wraps it in a
-continuously-polling `PositionPoller` — the same threading/status() discipline `slave.py`'s
-`ModbusBeaconSource` already carries (t2057) — and proves the CENTRAL claim: a poller whose reads are
-failing must report itself UNHEALTHY, even while its background thread is genuinely alive and looping. A
-thread that "looks fine" while quietly answering nothing is exactly the defect t2057 closed on the receive
-side; this is the same discipline applied to the read side.
+continuously-polling `PositionPoller` — proving the CENTRAL claim: a poller whose reads are failing must
+report itself UNHEALTHY, even while its background thread is genuinely alive and looping. A thread that
+"looks fine" while quietly answering nothing is exactly the defect this discipline exists to catch.
+
+t2649 (BACKLOG #78) — the Modbus SLAVE (the beacon checkpoint receiver, `slave.py`) this poller used to be
+"mutually exclusive with, same serial port" is REMOVED — owner-directed 2026-09-04, never demonstrably ran
+end-to-end. `build()` no longer constructs a beacons object of any kind, so the mutual-exclusivity tests that
+lived here are gone with it; `com_port`/`baud`/`slave_id` are this poller's OWN config now, not shared with
+anything.
 
 Two tiers, same reasoning as test_master_2059.py: logic needing no pymodbus wire I/O runs in the standard
 suite; the real wire round-trip (a genuine in-process synthetic slave) is detected structurally and skips
@@ -24,7 +28,6 @@ sys.path.insert(0, os.path.join(_HERE, ".."))
 from fairy.master import PositionPoller, ModbusMaster, REGISTERS   # noqa: E402
 from fairy.bridge import build   # noqa: E402
 from fairy.config import Config   # noqa: E402
-from fairy.slave import SimBeaconSource, ModbusBeaconSource   # noqa: E402
 
 
 # ── (1) logic that needs no pymodbus wire I/O ───────────────────────────────────────────────────────────────
@@ -109,38 +112,25 @@ def test_position_status_never_leaks_the_internal_ts_key_into_raw():
     assert st["read_at"] == "2024-12-19T00:24:50Z", st
 
 
-# ── bridge.py wiring: mutual exclusivity with the Modbus slave, same serial port ───────────────────────────
+# ── bridge.py wiring: PositionPoller construction from config ───────────────────────────────────────────────
 
 def _cfg(tmp, **overrides):
     dest = os.path.join(tmp, "cncdisk")
     return Config(backend="local", local_root=tmp, expert_dest=dest, com_port="COM_TEST", slave_id=1, **overrides)
 
 
-def test_position_poll_wins_over_the_slave_when_both_are_enabled_same_port_one_mode_at_a_time():
-    """The controller's own P279 can only be Poll (MSETDATA) or Slave (this) at once — never both. build()
-    enforces the SAME exclusivity on the bridge side: position-poll requested -> beacons is SimBeaconSource
-    (a tracked send correctly resolves to "delivered" via the existing t2020 path), never a real
-    ModbusBeaconSource trying to share the port with the poller."""
+def test_position_poller_is_constructed_when_enabled_none_when_not():
     import tempfile
     tmp = tempfile.mkdtemp()
     try:
-        cfg = _cfg(tmp, enable_slave=True, enable_position_poll=True)
-        _, _, beacons, _, pp = build(cfg)
-        assert isinstance(beacons, SimBeaconSource), type(beacons)
+        cfg = _cfg(tmp, enable_position_poll=True)
+        _, _, _, pp = build(cfg)
         assert isinstance(pp, PositionPoller), type(pp)
         assert pp.port == "COM_TEST"
-    finally:
-        import shutil; shutil.rmtree(tmp, ignore_errors=True)
 
-
-def test_normal_slave_path_is_unchanged_when_position_poll_is_off():
-    import tempfile
-    tmp = tempfile.mkdtemp()
-    try:
-        cfg = _cfg(tmp, enable_slave=True, enable_position_poll=False)
-        _, _, beacons, _, pp = build(cfg)
-        assert isinstance(beacons, ModbusBeaconSource), type(beacons)
-        assert pp is None
+        cfg_off = _cfg(tmp, enable_position_poll=False)
+        _, _, _, pp_off = build(cfg_off)
+        assert pp_off is None
     finally:
         import shutil; shutil.rmtree(tmp, ignore_errors=True)
 
@@ -151,7 +141,7 @@ def test_position_registers_override_flows_from_config_through_to_the_poller():
     try:
         custom = {"state": {"addr": 1, "count": 1, "note": "a bench correction"}}
         cfg = _cfg(tmp, enable_position_poll=True, position_registers=custom)
-        _, _, _, _, pp = build(cfg)
+        _, _, _, pp = build(cfg)
         assert pp.registers == custom
     finally:
         import shutil; shutil.rmtree(tmp, ignore_errors=True)

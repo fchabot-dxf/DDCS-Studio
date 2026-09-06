@@ -30,22 +30,14 @@ from fairy.poller import Poller                                 # noqa: E402
 from fairy.transfer import Transfer, controller_disk_reachable   # noqa: E402
 
 
-class _StubBeacons:
-    def reset(self, marker=None):
-        pass
-
-    def latest(self):
-        return None
-
-
 def _make(expert_dest):
     """The REAL Transfer class throughout -- reachability is checked against the REAL filesystem
     (os.path.isdir), not a stubbed answer, so these tests prove the actual mechanism, not a mock of it."""
     tmp = tempfile.mkdtemp()
     backend = LocalFolderBackend(tmp)
-    cfg = Config(local_root=tmp, expert_dest=expert_dest, enable_slave=True)
+    cfg = Config(local_root=tmp, expert_dest=expert_dest)
     transfer = Transfer(cfg)
-    poller = Poller(backend, transfer, _StubBeacons(), cfg, log=lambda *a: None)
+    poller = Poller(backend, transfer, cfg, log=lambda *a: None)
     return poller, backend, cfg, tmp
 
 

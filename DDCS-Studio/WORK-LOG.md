@@ -76535,3 +76535,104 @@ Non-vacuity: three new planted cases (`#[#70]=1`, `#[#70+15]=1`, `#[#151+3]=#883
 equivalents — all pass. Full node tier re-run: 247 passed, 0 failed (unchanged count — this extends an
 existing test file, adds no new one). `git status` clean except this entry and `emitLintRules.js`/
 `emit-lint-2645.test.mjs`, confirmed below.
+
+## t2649 — BACKLOG #78: REMOVE THE BEACONS ENTIRELY
+
+The mechanism the owner ordered gone ("beacons dont work remove them", 2026-09-04) — a path BACKLOG #78's own
+evidence table showed never demonstrably ran end-to-end (only the wire transport and the sad-path failure
+report were ever tested; the feature itself — instrument → checkpoints fire → map decodes → progress shown —
+never once, anywhere). Deletion of dead machinery, not retirement of a working one; no behaviour to preserve.
+
+**Deleted wholesale (zero production consumers once the beacon path is gone):** `fairy/slave.py` (the Modbus
+SLAVE / beacon receiver — `ModbusBeaconSource`/`SimBeaconSource`), `fairy/telemetry.py` (the `--ws` Command
+Center — confirmed zero consumers anywhere, no Studio/console client ever connected), `checkpoint_insert.py`
+(the Python instrumenter), `test_beacon_health_2057.py`, and the whole `web/shared/js/instrument/` directory
+(the JS instrumenter port + its own `gcode-parse.js` dependency + its selftest — confirmed zero production
+consumers via grep before deleting).
+
+**Rewritten (Python, `bridge/bridge-app/fairy/`):** `poller.py`'s two-phase claim→watch state machine
+collapses to claim→deliver→terminal in one tick (every job is now what "deliver-only" already was) — `active`/
+`_watch()`/`_is_complete()`/`on_checkpoint` all removed. `tracker.py`'s `build_status()` drops from
+`(map, last_beacon, state)` to `(job_id, name, state, events)` — pure identity+state, no per-job map decode.
+`bridge.py`'s `build()`/`run_loop()` lose the `SimBeaconSource`/`ModbusBeaconSource` construction branching and
+the `--ws`/`--stall`/`--no-slave` CLI flags; heartbeat's unused `active_job` field removed (confirmed zero
+consumers anywhere). `config.py` drops `enable_slave`/`stall_seconds`/`enable_ws`/`ws_port`/
+`run_poll_interval_s`; `com_port`/`baud`/`slave_id` are KEPT (now solely for t2647's `PositionPoller`).
+`ops.py`'s `submit_job()` drops the `tracked`/`warning` response fields entirely. History/status record shapes
+shrink to what a synchronous-delivery pipeline can honestly know: history is
+`{jobId, name, final_state, delivered_at, recorded_at, content_hash}` (no `duration_s`/`last_beacon`/
+`started_at` — there was never another way to compute them); status is
+`{jobId, name, state, updated_at, events}` (no `percent`/`op`/`line`/`eta_s`/`last_beacon`/`total_beacons`).
+`master.py`'s `PositionPoller` docstring updated (it referenced the now-deleted `ModbusBeaconSource` by name
+for its own P279-mode-exclusivity explanation) — the class itself needed zero behavioural changes; it was
+already architecturally independent, confirmed via its own pre-existing "mutually exclusive on the same
+serial link" docstring.
+
+**Python tests:** `test_history_real_path_2065.py` rewritten (kept its own real-HTTP-plus-real-tick-loop
+discipline, proved against the simplified flow instead of deleted); `test_poller_track_gate.py`,
+`test_position_poller_2063.py`, `test_claim_survives_bad_job_2111.py`, `test_reachability_claim_gate_2105.py`,
+`test_role_claim_gate_2103.py` all had their beacon-shaped stubs/fixtures fixed or their now-obsolete
+tracked-vs-deliver-only tests removed, keeping every test that was about delivery mechanics/identity/
+content-hash linking rather than beacon behavior specifically. Full bridge pytest: **126 passed, 0 failed**,
+re-run repeatedly through the turn.
+
+**Studio UI (`DDCS-Studio/web/`):** `jobHistory.js` drops `lastTimeDuration()` and the stalled-with-progress
+`resultLabel()` branch — `historyToCSV()` shrinks to Job/Result/Finished (Duration/Last-time were beacon-
+derived and would read "—" forever under synchronous delivery; removed rather than left as dead columns).
+`send.js` loses the Beacons checkbox, its settings block, the `instrument()` call, and the `noModbus`
+capability-gate machinery entirely — every send is now unconditionally deliver-only. `tracker.js` and the
+legacy fairy-console's `queue.js` both had their "big tracker" percent-bar/ETA/Operation/Line/Beacon stat
+block simplified to job name + delivery state (the status object no longer carries any of those fields — a
+0%-forever bar would have been actively misleading, not just quietly absent). `admin.js` (both Studio's and
+the legacy console's) loses the Beacons/`enable_slave` checkbox. The legacy console's `submit.js` — which
+imported the now-deleted `/shared/js/instrument/instrument.js` and would have 404'd — rewritten to plain
+deliver-only, matching send.js. The cloud Worker's `POST /jobs` handler (`[[path]].js`) drops the `tracked`
+response field to match `submit_job`'s new shape.
+
+**E2E specs, found broken by actually running the suite, not assumed fine:** deleted
+`send-beacon-warning-2057.spec.js` (tested a `warning` mechanism that no longer exists). Rewrote
+`send-history-real-path-2065.spec.js` (spawned the real bridge with the now-removed `--stall` flag; kept its
+real-process-no-mocking discipline, dropped the stall/tracked test). Rewrote `gateway-jobs-history-view-2026.
+test.mjs`'s sibling spec and the CSV export node test to the new 3-column shape. Fixed a genuine NEW ambiguity
+in `client-send-2080.spec.js`, `send-gate-wiring-1585.spec.js`, and `validation-divzero-not-syntax-1603.
+spec.js`: the removed Beacons checkbox's "Send (tracked)"/"Send (deliver-only)" parenthetical used to be what
+disambiguated the transport button from the identically-labelled "Send" nav tab in plain-text button matching;
+with it gone the submit button's text is bare "Send", byte-identical to the tab — text matching alone can no
+longer tell them apart. Switched those three to `button.primary`/`:not(.settings-main-tab)` class-based
+targeting instead of label text. Removed the now-vacuous "beacons toggle can't clobber the label" test in
+client-send-2080 (the checkbox it clicked no longer exists — the test degenerated to a no-op). Removed the now-
+false "GATEWAY: Beacons toggle present" assertion from `settings-role-gate-2111.spec.js`. Trimmed
+`gcode-parse-oplabel-2061.test.mjs` down to its two REAL drill/pocket-emit regression tests (rewritten to
+assert directly on the header string instead of through the retired `opLabel` utility); dropped its purely-
+synthetic `opLabel`/`stripComment` unit tests, whose only subject was the deleted beacon-instrumenter helper.
+Full node tier: 236 passed, 0 failed. All touched Playwright specs re-run individually against the real dev
+server: 29 + 4 + 3 passed, 0 failed.
+
+**PROTOCOL.md** — §1-2/§4/§5 replaced with `[REMOVED t2649, BACKLOG #78]` sections stating explicitly that
+"Proven on the machine 2026-06-06" was WIRE-FRAME evidence, never FEATURE evidence, per the dispatch's own
+caveat ("mark it on the way out so the next reader does not repeat my mistake").
+
+**Grep count, beacon references (the dispatch's own explicit VERIFY ask):** dispatch's own estimate was
+~238 in `bridge/bridge-app`. After: 87 in `bridge/bridge-app`, 158 in `DDCS-Studio` (131 of which is
+`WORK-LOG.md`'s own append-only historical record of past turns — untouched on principle, git history
+convention). Of the rest: `ARCHITECTURE.md`/`README.md`/`ROADMAP.md`/`CONFIGS.md`/`fairy/README.md`
+(~43 hits combined) describe the beacon mechanism as current architecture and are now stale — **deliberately
+NOT rewritten this turn** (out of the dispatch's named scope, and this turn was already large); flagged here
+as a genuine, reported gap rather than silently left. Everything else remaining is either historical/
+explanatory comment (correctly describing what USED TO be true), `navigator.sendBeacon()` analytics code
+(unrelated browser API), or incidental beacon-shaped test fixture data in `test_drive_backend_2076.py` that
+tests backend-agnostic map round-tripping, not beacon behavior (left as-is, harmless).
+
+**Delivery + BACKLOG #79 tracking proven working after the removal:** bridge pytest 126/126 (including
+`test_job_tracking_2647.py`, the t2647 synthetic-slave round trip, untouched and still green — `master.py`/
+`PositionPoller` were never touched behaviourally). Studio node tier 236/236. All touched Playwright specs
+green against the real dev server.
+
+`git status` clean except this entry and the beacon-removal files, confirmed below. Concurrency: `git fetch`
+showed zero divergence from origin (0 ahead, 0 behind) — no rebase needed, no FAIRY commits to reconcile.
+
+### NEXT
+
+The doc staleness named above (`ARCHITECTURE.md` etc.) is a reasonable follow-up if the advisor wants it — not
+urgent (documentation, not behavior), but real. The dropdown-default census (t2649's separate small item) is
+next in this same turn, its own commit.

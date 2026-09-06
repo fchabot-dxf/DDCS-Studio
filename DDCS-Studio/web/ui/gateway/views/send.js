@@ -1,6 +1,6 @@
 // ui/gateway/views/send.js — send a program to the controller. Ported from the fairy submit view, adapted to
-// Studio: drop a .nc OR pull the current Studio editor program, optionally instrument it with beacons for
-// progress tracking, then submitJob to the gateway queue. A WRITE op — the operator still presses Cycle Start.
+// Studio: drop a .nc OR pull the current Studio editor program, then submitJob to the gateway queue. A WRITE
+// op — the operator still presses Cycle Start.
 //
 // t2241 (BACKLOG amendment 7/14) — Jobs folded in: the tab that CREATES a job (submitJob is the seam) now
 // also shows what it created, ONE merged list (queue + finished history, newest first, state as a column)
@@ -9,9 +9,12 @@
 // jobs.js used to render are gone as distinct views; the events log specifically has NO new home (not
 // reachable from Track — see tracker.js's own header) and is a genuine, reported loss, not a silent one —
 // WORK-LOG t2241 names it for the advisor's own ruling.
-import { el, toast, fmtEta } from '../util.js';
+//
+// t2649 (BACKLOG #78) — the "Beacons (track progress)" checkbox + its settings (count/pacing/var/marker) and
+// the instrument() call they drove are REMOVED — owner-directed 2026-09-04, the beacon mechanism never
+// demonstrably ran end-to-end. Every send is now what "deliver-only" already was.
+import { el, toast } from '../util.js';
 import { contractFor, isUnreachable } from '../state.js';   // t1327 — the declared connection-state contract
-import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
 import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
 import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
@@ -22,19 +25,12 @@ import { submitJobToDrive, canSendViaDrive, readGatewayHeartbeat } from '../../c
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
 import { sfx } from '../../sound.js';   // t2125 — job.sent marks the moment a job LEAVES this browser (client-only; arrived/delivered/failed are the gateway's own)
 import { UIUtils } from '../../uiUtils.js';   // t2024 — CSV export reuses the SAME download primitive backup.js/varListPanel.js already use, not a new one
-import { lastTimeDuration, resultLabel, historyToCSV, fmtWhen } from '../jobHistory.js';   // t2241 — pure, kept OUT of this file: importing them from here broke the node-tier test (this file pulls in a browser-only chain)
+import { resultLabel, historyToCSV, fmtWhen } from '../jobHistory.js';   // t2241 — pure, kept OUT of this file: importing them from here broke the node-tier test (this file pulls in a browser-only chain)
 
-const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
-const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
-const clampInt = (v, lo, hi, d) => Math.min(hi, Math.max(lo, int(v, d)));
-
-// t2020 — JOB IDENTITY: a SHA-256 of the NORMALISED (pre-instrumentation) G-code, so History can link two
-// sends of the identical program regardless of whether Beacons was ticked or how many beacon points were
-// configured (both would change the WIRE bytes without changing the logical job). Deliberately hashes the
-// ORIGINAL text the operator is sending, not the instrumented `nc` that later gets written to the controller.
-// What this gets right: a re-export with a changed comment/header/line-ending links (the normaliser strips
-// exactly that noise). What this gets wrong, on purpose: the same geometry at a different feed does NOT link
-// — a real cut-time difference is a genuinely different job, and normalisation was never meant to erase that.
+// t2020 — JOB IDENTITY: a SHA-256 of the NORMALISED G-code, so History can link two sends of the identical
+// program regardless of comment/header/line-ending noise (the normaliser strips exactly that). What this
+// gets wrong, on purpose: the same geometry at a different feed does NOT link — a real cut-time difference
+// is a genuinely different job, and normalisation was never meant to erase that.
 async function contentHashOf(text) {
   const bytes = new TextEncoder().encode(normaliseGcode(text));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -58,24 +54,7 @@ export default {
     const useStudio = el('button', { class: 'op-btn' }, '⬆ Use current Studio program');
     const nameField = el('input', { type: 'text', placeholder: 'job name (e.g. bracket_v3.nc)', style: 'flex:1' });
 
-    const beacons = el('input', { type: 'checkbox', checked: '' });
-    // t2113 - why beacons are unavailable, stated where the control is. Empty on a capable controller.
-    const beaconNote = el('div', { class: 'hint', style: 'margin-top:4px' });
-    const count = el('input', { type: 'number', value: String(DEFAULTS.max), min: '1', max: '255', style: 'width:90px' });
-    const pacing = el('select', {},
-      el('option', { value: 'time' }, 'by time (wall-clock)'),
-      el('option', { value: 'line' }, 'by line count'));
-    const varN = el('input', { type: 'number', value: String(DEFAULTS.varNum), style: 'width:70px' });
-    const markerV = el('input', { type: 'number', value: String(DEFAULTS.markerVar), style: 'width:70px' });
-    const markerN = el('input', { type: 'number', value: String(DEFAULTS.marker), style: 'width:70px' });
-
-    const settings = el('div', { class: 'block' },
-      el('div', { class: 'grid-2' }, field('Beacon count (1–255)', count), field('Pacing', pacing)),
-      el('details', {},
-        el('summary', { class: 'muted', style: 'cursor:pointer;margin:8px 0' }, 'advanced — var / marker (rarely changed; the frame is proven)'),
-        el('div', { class: 'grid-3' }, field('counter var', varN), field('marker var', markerV), field('marker value', markerN))));
-
-    const btn = el('button', { class: 'primary', disabled: '' }, 'Send (tracked)');
+    const btn = el('button', { class: 'primary', disabled: '' }, 'Send');
     const info = el('div', { class: 'hint' });
     const previewContainer = el('div', { style: 'flex: 1; min-height: 300px; margin-top: 15px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column;' });
 
@@ -96,10 +75,8 @@ export default {
       }
     };
     const sync = () => {
-      settings.classList.toggle('hidden', !beacons.checked);
-      btn.textContent = this._sendLabel ? this._sendLabel() : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)');
+      btn.textContent = this._sendLabel ? this._sendLabel() : 'Send';
     };
-    beacons.onchange = sync;
 
     const load = (f) => { const r = new FileReader(); r.onload = () => accept(f.name, String(r.result)); r.readAsText(f); };
     drop.onclick = () => input.click();
@@ -287,50 +264,26 @@ export default {
           }
         } catch (_) { /* advisory — never block the send on a checker error */ }
 
-        let nc = file.text, map;
-        if (beacons.checked) {
-          const res = instrument(file.text, {
-            max: clampInt(count.value, 1, 255, DEFAULTS.max),
-            pacing: pacing.value,
-            varNum: int(varN.value, DEFAULTS.varNum),
-            markerVar: int(markerV.value, DEFAULTS.markerVar),
-            marker: int(markerN.value, DEFAULTS.marker),
-            source: name,
-          });
-          nc = res.nc; map = res.map;
-        }
-        // t2020 — hashed from file.text (the ORIGINAL, pre-instrumentation program), so tracked and
-        // deliver-only sends of the same logical job hash the same regardless of the beacon settings above.
         const contentHash = await contentHashOf(file.text);
         // t2080 — NO GATEWAY? SEND THROUGH DRIVE. A CLIENT (a phone, or a PC not wired to the controller)
         // has no gateway of its own to POST to, so it writes the job straight into the same Drive inbox the
         // gateway already polls — the gateway then claims and delivers it exactly as if a local gateway had
         // queued it. Preferring the gateway when one IS reachable is deliberate: it is instant and offline,
         // whereas Drive costs a poll interval (~15s) and an internet round trip. Drive is the FALLBACK, not
-        // the default. ⚠ A Drive send is DELIVER-ONLY by construction — beacons are a Modbus link between the
-        // controller and ITS gateway, so a client has nothing to instrument for.
+        // the default.
         let r;
         if (this._gatewayReachable) {
-          r = await ctx.client.submitJob(name, nc, map, contentHash);
+          r = await ctx.client.submitJob(name, file.text, undefined, contentHash);
         } else {
           if (!canSendViaDrive()) throw new Error('No gateway on this PC, and no Google account connected — sign in (top right) to send through your Drive.');
-          r = await submitJobToDrive(name, file.text, contentHash, fileSavedStem());   // the ORIGINAL program: no beacons on this path
+          r = await submitJobToDrive(name, file.text, contentHash, fileSavedStem());
         }
         toast('Queued ' + r.jobId);
         sfx('job.sent');
         // t2105 - a time promise is only honest when a gateway is polling AND the mill can take it.
         info.textContent = r.via === 'drive'
-          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`
-          : `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
-        // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
-        // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
-        // in 3.2s like any other, so ALSO append to the durable `info` line the operator already reads —
-        // that one survives even if they glance away right after clicking Send, rather than silently
-        // un-ticking tracking for them.
-        if (r.warning) {
-          toast(r.warning, true);
-          info.textContent += ` — ⚠ ${r.warning}`;
-        }
+          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s.`
+          : `Queued ${r.jobId}`;
       } catch (e) {
         toast('Send failed: ' + e.message, true);
       } finally {
@@ -348,10 +301,9 @@ export default {
     // The state contract ALREADY computes reachability for the banner, so record it here rather than
     // inventing a second, driftable source.
     this._gatewayReachable = true;
-    // ONE rule for the button's label, because TWO were setting it: sync() (on the beacons checkbox) and
-    // applyState() (on every gateway-status tick). Whichever ran last won, so "Send via Drive" was being
-    // clobbered back to "Send (deliver-only)" the moment anything re-synced — the label would flicker or
-    // silently lie about which transport a click uses.
+    // ONE rule for the button's label, because TWO were setting it: sync() and applyState() (on every
+    // gateway-status tick). Whichever ran last won, so "Send via Drive" was being clobbered back to "Send"
+    // the moment anything re-synced — the label would flicker or silently lie about which transport a click uses.
     this._viaDrive = false;
     // t2105 - THE GREY. 'Is a gateway running' is AMBIENT state, knowable before the click, so it belongs
     // in the same family as 'no Google account' (which t1327 already greys) rather than with the
@@ -385,8 +337,7 @@ export default {
         })
         .catch(() => { this._hbState = 'unreadable'; this._millOff = false; });   // ignorance, not absence
     };
-    this._sendLabel = () => (this._viaDrive ? 'Send via Drive'
-                                            : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)'));
+    this._sendLabel = () => (this._viaDrive ? 'Send via Drive' : 'Send');
     this.applyState = (desc) => {
       this._lastDesc = desc;
       const c = contractFor('send');
@@ -409,20 +360,6 @@ export default {
       // ⚠ ONLY when a gateway actually ANSWERED (!out). No descriptor means no knowledge, and refusing on
       //    ignorance is the habit we keep removing - `undefined` must never read as 'the mill is off'.
       const millOffLocal = !out && !!desc && desc.controller_connected === false;
-      // t2113 - BEACONS NEED MODBUS RTU, AND THE V4.1 HAS NONE. The label has said "Expert only; leave off
-      // for V4.1" all along - but a parenthetical is advice, not a gate, and the line below this used to
-      // re-enable the checkbox unconditionally on every state update. Meanwhile the app KNOWS: the descriptor
-      // carries controller_family.
-      // ⚠ THE COST OF GETTING IT WRONG IS NOT ZERO, which is why advice was never enough: instrument() injects
-      //    `#var = n` + MSETDATA at every Z-up, and with no Modbus slave to answer, EACH ONE BLOCKS ON A
-      //    TIMEOUT. The human measured 1-2 SECONDS PER BEACON on a V4.1 - pure cost, and zero progress data,
-      //    because nothing can receive it. Up to 255 of those in one program.
-      // ⭐ Capability gates the control, the way the controller's own capabilities gate fields elsewhere.
-      // ⚠ POSITIVE CAPABILITY, NOT A BLACKLIST. My first version tested `family === 'v4.1'`, which would let a
-      //    V3 straight through into the same timeouts - bridge/controllers/dm500/FINDINGS.md: grepping the
-      //    whole 311-param DM500 eng for modbus|master|slave|serial.*mode gives ZERO HITS. Modbus RTU is an
-      //    EXPERT feature; everything else lacks it, including anything added later. Name what HAS it.
-      const noModbus = !!desc && !!desc.controller_family && desc.controller_family !== 'expert-m350';
       banner.style.display = (out || millOffLocal) ? '' : 'none';
       banner.setAttribute('data-gw-state', out ? 'unreachable' : millOffLocal ? 'controller-offline' : 'connected');
       // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",
@@ -468,16 +405,7 @@ export default {
                            : (out ? c.reason : '');
       btn.textContent = this._sendLabel();
       // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job
-      // the offline half stays live on purpose - dropping a file, using the Studio program, naming the job
-      for (const elm of [drop, useStudio, nameField, count, pacing, varN, markerV, markerN]) elm.disabled = false;
-      // ⛔ beacons is NOT in that list any more: a blanket re-enable would undo the capability gate on every
-      //    tick. It is set explicitly, and forced OFF so a checkbox ticked before the controller was known
-      //    cannot silently instrument a program that can never report.
-      beacons.disabled = noModbus;
-      if (noModbus && beacons.checked) { beacons.checked = false; beacons.dispatchEvent(new Event('change', { bubbles: true })); }
-      if (beaconNote) beaconNote.textContent = noModbus
-        ? 'Progress beacons need Modbus, which the V4.1 does not have — a tracked send would pause 1-2s at every retract and report nothing.'
-        : '';
+      for (const elm of [drop, useStudio, nameField]) elm.disabled = false;
       this._renderHeartbeatStatus();
     };
 
@@ -523,15 +451,10 @@ export default {
       hbBox,
       drop, input,
       el('div', { class: 'row', style: 'margin-top:10px' }, useStudio),
-      el('div', { class: 'row', style: 'margin-top:12px' },
-        el('label', { class: 'row', style: 'gap:6px;cursor:pointer' }, beacons, 'Beacons (track progress)')),
-      beaconNote,
-      settings,
       el('div', { class: 'row', style: 'margin-top:12px' }, nameField, btn),
       info,
       el('div', { class: 'wiz-usage' },
-        'Beacons ON instruments the job for progress tracking; OFF = deliver-only (probe / util macros). '
-        + 'The operator presses Cycle Start at the machine.'));
+        'The job is delivered to the controller; the operator presses Cycle Start at the machine.'));
     // t2241 — FORM ABOVE LIST, on purpose (the human's own reasoning: the row appearing under the button you
     // just pressed is the entire point of the merge). `flex-shrink: 0` so the list takes only its own height
     // and never squeezes; the preview panel (a secondary, review-before-sending tool) keeps the remaining
@@ -551,8 +474,8 @@ export default {
 
   // t2241 — ONE list, two sources merged by jobId (lexicographically sortable = creation order, ops.py's own
   // make_job_id contract), newest first, STATE AS A COLUMN rather than a second view: a job appears the
-  // instant it is queued (state: queued/delivering/running/stalled) and stays the SAME row once it finishes
-  // (state becomes the final result) — no jump from one list to another to see what happened to it.
+  // instant it is queued (state: queued/delivering) and stays the SAME row once it finishes (state becomes
+  // delivered/failed) — no jump from one list to another to see what happened to it.
   // t1327 — clears to empty on a failed poll (jobs.js's own contract, preserved): a stale listing describing
   // a machine that is not there is exactly the phantom-data shape this whole contract exists to prevent.
   async _pollJobs(ctx) {
@@ -567,24 +490,20 @@ export default {
   renderJobList(items, rows) {
     const c = this.jobList;
     const label = el('div', { class: 'section-label' }, 'Jobs');
-    const live = (items || []).map((j) => ({ jobId: j.jobId, name: j.name || j.jobId, stateText: j.state || 'queued', pillClass: j.state || 'queued', duration: '—', last: '—', finished: '—' }));
-    const done = (rows || []).map((r, i) => ({
+    const live = (items || []).map((j) => ({ jobId: j.jobId, name: j.name || j.jobId, stateText: j.state || 'queued', pillClass: j.state || 'queued', finished: '—' }));
+    const done = (rows || []).map((r) => ({
       jobId: r.jobId, name: r.name || r.jobId, stateText: resultLabel(r), pillClass: r.final_state || '',
-      duration: r.duration_s == null ? '—' : fmtEta(r.duration_s),
-      last: (() => { const l = lastTimeDuration(rows, i); return l == null ? '—' : fmtEta(l); })(),
-      finished: fmtWhen(r.ended_at),
+      finished: fmtWhen(r.delivered_at || r.recorded_at),
     }));
     const merged = [...live, ...done].sort((a, b) => (a.jobId < b.jobId ? 1 : -1));
     if (!merged.length) { c.replaceChildren(label, el('div', { class: 'muted' }, 'no jobs sent yet this session')); return; }
     const exportBtn = el('button', { class: 'op-btn', onclick: () => this.exportHistoryCSV() }, 'Export CSV');
     const tbl = el('table', {}, el('tr', {},
-      el('th', {}, 'job'), el('th', {}, 'state'), el('th', {}, 'duration'), el('th', {}, 'last time'), el('th', {}, 'finished')));
+      el('th', {}, 'job'), el('th', {}, 'state'), el('th', {}, 'finished')));
     for (const m of merged) {
       tbl.append(el('tr', {},
         el('td', { class: 'mono' }, m.name),
         el('td', {}, el('span', { class: 'pill ' + m.pillClass }, m.stateText)),
-        el('td', { class: 'mono' }, m.duration),
-        el('td', { class: 'mono' }, m.last),
         el('td', { class: 'mono' }, m.finished)));
     }
     c.replaceChildren(el('div', { class: 'row' }, label, exportBtn), tbl);

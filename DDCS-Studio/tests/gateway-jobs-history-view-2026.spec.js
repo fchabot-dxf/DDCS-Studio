@@ -2,15 +2,21 @@ import { test, expect } from '@playwright/test';
 
 /**
  * gateway-jobs-history-view-2026 — t2026: THE VIEW A HUMAN ACTUALLY REACHES, not just the pure
- * `historyToCSV()`/`lastTimeDuration()` functions node-tested in t2024. `jobs.js` changed by +65 lines across
- * two turns (t2020's "last time" column, t2024's Export CSV button) with no Playwright spec ever RENDERING
- * it — the green-tests-over-a-dead-ui-path shape this session has hit before: the logic is tested, the
- * surface a person actually clicks is not.
+ * `historyToCSV()` function node-tested in t2024. `jobs.js` changed by +65 lines across two turns (t2020's
+ * "last time" column, t2024's Export CSV button) with no Playwright spec ever RENDERING it — the
+ * green-tests-over-a-dead-ui-path shape this session has hit before: the logic is tested, the surface a
+ * person actually clicks is not.
  *
  * t2241 — jobs.js is gone; Jobs folded into Send (a merged queue+history list living under the send form,
- * BACKLOG amendment 7/14). Same table, same columns (job/state/duration/last time/finished — "state" reads
- * the SAME resultLabel() a finished row always did), now reached via the Send tab instead of a Jobs tab —
- * this file's own assertions are unchanged, only the tab clicked to reach them.
+ * BACKLOG amendment 7/14). Same table, now reached via the Send tab instead of a Jobs tab.
+ *
+ * t2649 (BACKLOG #78) — the table used to also carry Duration/Last-time columns, and a stalled-run test
+ * proving "last time" skipped a stalled row's own truncated duration and linked to the real completion
+ * instead. Both were derived from the removed beacon mechanism's own per-job progress signal
+ * (`duration_s`/`last_beacon`/`total_beacons`) — delivery is now synchronous, so there is no "how long did
+ * the cut take" signal this process can observe, and those columns/that test are removed with it (they would
+ * read "—" forever if kept). The table is now job/state/finished; `resultLabel` is a bare `final_state`
+ * pass-through.
  *
  * Bridges to the gateway suite's OWN established fake/offline techniques rather than inventing a third way to
  * stand a gateway up: `page.route` response mocking (gateway-quiet-offline-1307) + the navigate/click-the-tab
@@ -21,15 +27,14 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
-// Newest-first, matching what backend.list_history() really returns (poller.py sorts recorded_at DESC) — two
-// runs of the SAME program (shared content_hash), so the "last time" link has something real to show.
+// Newest-first, matching what backend.list_history() really returns (poller.py sorts recorded_at DESC).
 const HISTORY_ROWS = [
-    { jobId: 'J2', name: 'bracket.nc', final_state: 'done', duration_s: 90, ended_at: '2026-08-16T10:00:00', content_hash: 'HASH-A' },
-    { jobId: 'J1', name: 'bracket.nc', final_state: 'done', duration_s: 120, ended_at: '2026-08-15T10:00:00', content_hash: 'HASH-A' },
+    { jobId: 'J2', name: 'bracket.nc', final_state: 'delivered', delivered_at: '2026-08-16T10:00:00Z', content_hash: 'HASH-A' },
+    { jobId: 'J1', name: 'bracket.nc', final_state: 'delivered', delivered_at: '2026-08-15T10:00:00Z', content_hash: 'HASH-A' },
 ];
 
 const boot = async (page, { historyRows = HISTORY_ROWS } = {}) => {
-    // Mocked, not a real gateway — but the SAME three calls jobs.js's own onPoll makes, so what renders is
+    // Mocked, not a real gateway — but the SAME three calls send.js's own onPoll makes, so what renders is
     // exactly what a connected bridge answering this data would produce.
     await page.route('**/api/descriptor', (route) => route.fulfill({
         status: 200, contentType: 'application/json',
@@ -50,7 +55,7 @@ const boot = async (page, { historyRows = HISTORY_ROWS } = {}) => {
     await page.waitForTimeout(900);
 };
 
-test('a human reaching History sees the finished jobs, the linked repeat, and a live Export CSV control', async ({ page }) => {
+test('a human reaching History sees the finished jobs and a live Export CSV control', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
@@ -65,38 +70,10 @@ test('a human reaching History sees the finished jobs, the linked repeat, and a 
     });
     expect(r.rowTexts, 'both finished jobs render as rows a person can read').toHaveLength(2);
     expect(r.rowTexts[0][0], 'the program name').toBe('bracket.nc');
-    expect(r.rowTexts[0][1], 'the outcome').toBe('done');
-    expect(r.rowTexts[0][2], 'this run\'s own duration').toBe('1m30s');
-    // THE REPEAT, VISIBLE ON SCREEN: the newer row's "last time" column carries the OLDER run's real
-    // duration, not a placeholder — this is the whole point of t2020's content-hash identity work, rendered.
-    expect(r.rowTexts[0][3], 'the repeat links to the prior run\'s real duration').toBe('2m00s');
-    expect(r.rowTexts[1][3], 'the first-ever run has nothing earlier to link to').toBe('—');
+    expect(r.rowTexts[0][1], 'the outcome').toBe('delivered');
+    expect(r.rowTexts[0][2], 'when it finished').toBe('2026-08-16 10:00:00');
     expect(r.exportPresent, 'the Export CSV control exists on screen').toBe(true);
     expect(r.exportDisabled, 'and it is clickable, not greyed out').toBeFalsy();
-});
-
-test('t2049: a stalled run does not poison "last time" on the REAL rendered view — the estimate skips it', async ({ page }) => {
-    // Same shape as the CSV/last-time node test (job-history-csv-export-2024.test.mjs), rendered through the
-    // actual view: J2 stalled 45s into the same program after J1's genuine 600s completion; J3 is the newest
-    // send, no result yet. Before the fix, J3's (and J2's own) "last time" column showed "45s" — the stalled
-    // run's own truncated duration — instead of the real 600s completion.
-    const STALL_ROWS = [
-        { jobId: 'J3', name: 'bracket.nc', final_state: 'delivered', duration_s: 0, ended_at: '2026-08-17T12:00:00', content_hash: 'HASH-A' },
-        { jobId: 'J2', name: 'bracket.nc', final_state: 'stalled', duration_s: 45, last_beacon: 6, total_beacons: 40, ended_at: '2026-08-17T11:00:00', content_hash: 'HASH-A' },
-        { jobId: 'J1', name: 'bracket.nc', final_state: 'done', duration_s: 600, ended_at: '2026-08-17T10:00:00', content_hash: 'HASH-A' },
-    ];
-    await boot(page, { historyRows: STALL_ROWS });
-    const r = await page.evaluate(() => {
-        const root = document.querySelector('#gateway-app .gw-view');
-        const rows = [...root.querySelectorAll('table tr')].slice(1);
-        return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
-    });
-    expect(r[0][1], 'the newest row is the un-finished delivery').toBe('delivered');
-    expect(r[0][3], 'skips the stalled row, links to the real 10-minute completion').toBe('10m00s');
-    // t2073 — no cause is claimed (operator-abort/lost-link/hang stay indistinguishable), but the label is now
-    // PRECISE about how far the run got, using data the poller already records and the view previously discarded.
-    expect(r[1][1], 'the middle row is the stall itself, honest about extent not cause').toBe('stalled — signal lost at 6/40');
-    expect(r[1][3], 'the stalled row also looks past itself to the real completion, not its own truncated 45s').toBe('10m00s');
 });
 
 test('with NO jobs at all (queue or history), the list says so plainly and offers no Export control to click', async ({ page }) => {
@@ -136,10 +113,10 @@ test('the Export CSV button is WIRED — clicking it actually triggers a file do
     for await (const chunk of stream) chunks.push(chunk);
     const csv = Buffer.concat(chunks).toString('utf-8');
     // THE ACTUAL BYTES THAT LEFT THE BROWSER, not the pure-function unit test's return value — the two rows
-    // this test staged are really in the downloaded file, repeat visible via the "Last time" column.
+    // this test staged are really in the downloaded file.
     const lines = csv.split('\r\n');
-    expect(lines[0]).toBe('"Job","Result","Duration","Last time","Finished"');
+    expect(lines[0]).toBe('"Job","Result","Finished"');
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toBe('"bracket.nc","done","1m30s","2m00s","2026-08-16 10:00:00"');
-    expect(lines[2]).toBe('"bracket.nc","done","2m00s","","2026-08-15 10:00:00"');
+    expect(lines[1]).toBe('"bracket.nc","delivered","2026-08-16 10:00:00"');
+    expect(lines[2]).toBe('"bracket.nc","delivered","2026-08-15 10:00:00"');
 });

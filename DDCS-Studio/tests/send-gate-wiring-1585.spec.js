@@ -56,18 +56,22 @@ test('the real Send button raises the real gate dialog, naming the line', async 
     await page.waitForTimeout(700);
     expect(await clickBtn('Use current Studio program'), 'the current program stages').toBe(true);
     await page.waitForTimeout(900);
-    // t2113 - MATCH THE SEND BUTTON, NOT ONE OF ITS LABELS. This asked for the exact text 'Send (tracked)',
-    // which silently assumed the beacons checkbox defaults to ON - and that now depends on the CONTROLLER:
-    // a V4.1 has no Modbus, so beacons are gated off and the button reads 'Send (deliver-only)'. The test
-    // began failing on a dev machine with a real V4.1 attached, because the app auto-adopts a local gateway
-    // and the descriptor is real. ⭐ This test is about the GATE DIALOG, not about which transport label the
-    // button happens to carry, so it should never have pinned the label.
-    // t2225 — a SECOND, previously-masked bug found once the earlier 'Use current Studio program' step
-    // started succeeding: plain 'Send' also matches the L1 GATEWAY nav tab (button "Send", 4 chars) — shorter
-    // than "Send (deliver-only)" (19 chars) — so the shortest-match sort picked the TAB (a no-op re-click,
-    // already active) instead of the transport button, and the gate dialog never fired. 'Send (' requires the
-    // parenthetical only the transport buttons carry, same fix as validation-divzero-not-syntax-1603.
-    expect(await clickBtn('Send ('), 'and the send is attempted').toBe(true);
+    // t2113/t2225 — plain 'Send' text-matching can't tell the transport button from the L1 GATEWAY nav tab
+    // (also literally "Send") — used to be disambiguated by a "Send (tracked)"/"Send (deliver-only)"
+    // parenthetical only the transport button carried. t2649 (BACKLOG #78) removed the Beacons checkbox that
+    // parenthetical named, so the button text is now bare "Send" too — IDENTICAL to the nav tab's text, a
+    // text-only match can no longer disambiguate them at all. Target the submit button by its OWN class
+    // instead (`button.primary`, the same selector preflight-badge-838's own Send-view test already uses),
+    // never relying on label text for identity.
+    // the CONNECTION contract only, never the gate under test (same lift clickBtnImpl always applied) —
+    // force-enable the button (no real gateway answers in this test) before clicking it for real.
+    expect(await page.evaluate(() => {
+        const b = document.querySelector('#gateway-app button.primary');
+        if (!b) return false;
+        b.disabled = false;
+        b.click();
+        return true;
+    }), 'and the send is attempted').toBe(true);
     await page.waitForTimeout(12_000);   // the mismatch probe must time out against a dead gateway first
 
     const dlg = await page.evaluate(() => [...document.querySelectorAll('dialog,.dlg,.modal,[role=dialog]')]

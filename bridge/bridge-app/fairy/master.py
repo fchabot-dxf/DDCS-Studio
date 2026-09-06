@@ -158,26 +158,24 @@ class ModbusMaster:
 
 class PositionPoller:
     """t2063 — Option 1's READ-side progress source: continuously polls the controller's own Modbus
-    Slave-mode registers (P279=Slave) for live position/state, in a background daemon thread — the SAME
-    threading shape as `slave.py`'s `ModbusBeaconSource`, and the SAME honest `status()` contract from
-    t2057: a dead poller REPORTS dead, it never looks healthy by omission. `status()` reflects the LAST
-    poll CYCLE's real outcome, not merely "is the thread alive" — a thread that keeps looping while every
-    single read fails must still report unhealthy; that was exactly the gap t2057 closed on the receive
-    side, and this is the same discipline applied to the read side.
+    Slave-mode registers (P279=Slave) for live position/state, in a background daemon thread, with the SAME
+    honest `status()` contract from t2057: a dead poller REPORTS dead, it never looks healthy by omission.
+    `status()` reflects the LAST poll CYCLE's real outcome, not merely "is the thread alive" — a thread that
+    keeps looping while every single read fails must still report unhealthy; that was exactly the gap t2057
+    closed on the receive side, and this is the same discipline applied to the read side.
 
-    DELIBERATELY NOT A BeaconSource, and NOT wired into `Poller`/job-tracking this turn. Position/state is
-    not a beacon ordinal — there is no cursor yet to translate "where the tool physically is" into "which
-    operation, how much time left" (`JOB-PROGRESS-PLAN.md`'s own cursor-advance design, named as load-bearing
-    and explicitly NOT built at t2059/t2061). This class only proves the one thing this turn asks for: that
-    the PC can read live position/state from the controller, standing alone, observable, honestly reported.
+    Position/state is not a beacon ordinal — there is no cursor yet to translate "where the tool physically
+    is" into "which operation, how much time left" (`JOB-PROGRESS-PLAN.md`'s own cursor-advance design, named
+    as load-bearing and explicitly NOT built at t2059/t2061). This class only proves the one thing t2063 asked
+    for: that the PC can read live position/state from the controller, standing alone, observable, honestly
+    reported. BACKLOG #79 (t2647) later built the job-tracking consumer on top of it.
 
-    MUTUALLY EXCLUSIVE with `ModbusBeaconSource` on the SAME physical serial link — not just a software
-    conflict (both would try to exclusively open the same COM port), a CONTROLLER-side one: the OEM's own
-    firmware release notes document `P279` as a three-way mode select (`NO` / `Poll` / `Slave`), with `Poll`
-    explicitly labelled "the renamed master mode" — the one MSETDATA/MGETDATA need. The controller can only
-    be in ONE of these at a time, so a controller set to `P279=Slave` (what this class needs) will NOT be
-    pushing MSETDATA checkpoint frames at the same time, regardless of what the bridge's own config says.
-    `bridge.py`'s wiring keeps these as alternatives, never both active at once, for exactly this reason.
+    t2649 (BACKLOG #78) — this docstring used to explain why this class was MUTUALLY EXCLUSIVE with
+    `slave.py`'s `ModbusBeaconSource` on the SAME physical serial link (a controller-side fact: `P279` is a
+    three-way mode select — `NO`/`Poll`/`Slave` — and MSETDATA's master-mode push needs `Poll` while this
+    class needs `Slave`, so a controller can only serve one of them at a time). `slave.py` and the beacon
+    mechanism it served are REMOVED (owner-directed 2026-09-04) — there is nothing left to be exclusive
+    with — kept here as a historical note in case a future master-mode consumer is ever added again.
     """
 
     def __init__(self, port, baud, device_id, interval_s=2.0, registers=None, timeout=1.0):

@@ -6,21 +6,11 @@ mechanism never worked despite every unit test passing, and "last time" reported
 truncated stopwatch despite the UI test passing. Both bugs lived in the gap between "a test constructs the
 state a real user's action would have produced" and "a real user's action actually produces that state."
 
-Every EXISTING test in this area falls into exactly that gap on the server side too, once looked at closely:
-`test_poller_track_gate.py`/`test_beacon_health_2057.py` call `ops.submit_job(...)` as a direct Python
-function call, never over real HTTP; the JS-side `gateway-jobs-history-view-2026.spec.js` mocks
-`/api/history`'s RESPONSE with hand-typed row dicts that were never produced by `poller.py`'s own
-`_record_history`. Nothing has ever driven: a real HTTP POST to a real running `/api/jobs` -> the real
-poller's own background tick loop (not a manually-called `.tick()`) advancing a real job through real beacon
-arrivals or a real wall-clock stall -> a real HTTP GET to `/api/history` reading back what that pipeline
-genuinely wrote to disk.
-
-This file closes that gap: a real `fairy.bridge`-built server (SimBeaconSource stands in for hardware --
-the only necessarily-fake piece, since no real Modbus link exists here), a background thread running the
-SAME tick loop shape `run_loop()` uses, and a plain `urllib` HTTP client sending the exact requests
-`send.js`/`client.js` would send. If the values coming back don't match what the JS layer (`lastTimeDuration`,
-`jobs.js`'s render) already assumes, that mismatch is the actual defect -- found here, at the source, not
-inferred from a passing UI test that never touched the source at all.
+t2649 (BACKLOG #78) — the beacon mechanism this file used as its own proving ground is REMOVED (owner-
+directed 2026-09-04, never demonstrably ran end-to-end). The DISCIPLINE this file exists for still applies —
+a real HTTP POST to a real running `/api/jobs`, the real poller's own background tick loop (not a manually-
+called `.tick()`), a real HTTP GET to `/api/history` reading back what that pipeline genuinely wrote to disk —
+just against the simplified delivery-only flow every job now uses.
 
 Run standalone:  python bridge/bridge-app/tests/test_history_real_path_2065.py
 """
@@ -39,7 +29,6 @@ from fairy.bridge import build   # noqa: E402
 from fairy.config import Config   # noqa: E402
 from fairy.ops import Ops   # noqa: E402
 from fairy.server import start_server   # noqa: E402
-from fairy.slave import SimBeaconSource   # noqa: E402
 
 
 def _post(base, path, body):
@@ -57,26 +46,26 @@ def _get(base, path):
         return json.loads(r.read())
 
 
-def _run_real_pipeline(fn):
+def _run_real_pipeline(fn, machine_id="", wrong_identity=False):
     """Stand up a REAL bridge (real HTTP server + real backend + real Poller) and run its tick loop in a
     background thread -- the SAME shape run_loop() uses, not a test harness that calls .tick() by hand on a
-    fake clock. `fn(base_url, beacons)` runs with it live; teardown always happens, even on failure."""
+    fake clock. `fn(base_url)` runs with it live; teardown always happens, even on failure."""
     tmp = tempfile.mkdtemp(prefix="fairy_realpath_")
     dest = os.path.join(tmp, "cncdisk")   # transfer.py: "for a no-hardware test, point dest at an ordinary folder"
+    os.makedirs(dest, exist_ok=True)
+    if wrong_identity:
+        # identity.verify() reads <dest>/<identity_filename> and compares its own "id" against cfg.machine_id
+        # (poller.py's _do_claim) -- writing a DIFFERENT id here is what makes every claim on this pipeline
+        # a genuine identity mismatch, over real HTTP, not a mocked refusal.
+        with open(os.path.join(dest, ".bridge-machine.json"), "w", encoding="utf-8") as f:
+            json.dump({"id": "SOME-OTHER-MACHINE", "name": "Wrong machine"}, f)
     cfg = Config(
-        # enable_slave=True is REQUIRED even with a SimBeaconSource stand-in: poller.py's own t2020 fix
-        # checks this flag directly, independent of whether a usable beacons object was actually supplied —
-        # False resolves every tracked job straight to "delivered", correctly, per that fix (confirmed by
-        # hitting it while writing this test: with enable_slave=False the job never entered the watch loop
-        # at all, exactly as designed — a real config mistake here, not a bug in the code under test).
-        backend="local", local_root=tmp, expert_dest=dest, enable_slave=True,
-        stall_seconds=2.0,           # short but real -- the test genuinely waits this long, wall-clock
-        run_poll_interval_s=0.1, poll_interval_s=0.1,
-        serve=True, host="127.0.0.1", port=18765, machine_id="",
+        backend="local", local_root=tmp, expert_dest=dest,
+        poll_interval_s=0.1,
+        serve=True, host="127.0.0.1", port=18765, machine_id=machine_id,
     )
-    beacons = SimBeaconSource()
-    backend, transfer, beacons, poller, _ = build(cfg, beacons=beacons)
-    httpd = start_server(cfg, Ops(backend, cfg, beacons))
+    backend, transfer, poller, _ = build(cfg)
+    httpd = start_server(cfg, Ops(backend, cfg))
 
     stop = threading.Event()
 
@@ -98,7 +87,7 @@ def _run_real_pipeline(fn):
                 time.sleep(0.1)
         else:
             raise RuntimeError("real bridge server never came up")
-        fn(base, beacons)
+        fn(base)
     finally:
         stop.set()
         t.join(timeout=2)
@@ -107,19 +96,13 @@ def _run_real_pipeline(fn):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_a_tracked_job_fed_to_completion_produces_a_real_positive_duration_over_real_http():
-    def run(base, beacons):
-        mapping = {"total_beacons": 3, "beacons": [
-            {"n": 1, "orig_line": 5, "op": "Op1", "cum_time_s": 1.0, "percent": 33.0, "complete": False},
-            {"n": 2, "orig_line": 10, "op": "Op2", "cum_time_s": 2.0, "percent": 66.0, "complete": False},
-            {"n": 3, "orig_line": 15, "op": "Op3", "cum_time_s": 3.0, "percent": 100.0, "complete": True},
-        ], "total_est_time_s": 3.0}
+def test_a_job_posted_over_real_http_is_claimed_delivered_and_recorded_by_the_real_tick_loop():
+    def run(base):
         r = _post(base, "/api/jobs", {"name": "real_path.nc", "nc": "(real path job)\nM30\n",
-                                       "map": mapping, "contentHash": "REALHASH1"})
-        assert r["tracked"] is True, r
+                                       "contentHash": "REALHASH1"})
         job_id = r["jobId"]
 
-        # wait for the real background tick loop to CLAIM it (delivered) -- real timing, not forced
+        # wait for the real background tick loop to CLAIM + deliver it -- real timing, not forced
         for _ in range(50):
             q = _get(base, "/api/queue")
             if any(i.get("jobId") == job_id and i.get("state") == "delivered" for i in q):
@@ -128,117 +111,77 @@ def test_a_tracked_job_fed_to_completion_produces_a_real_positive_duration_over_
         else:
             raise AssertionError("real tick loop never claimed/delivered the job")
 
-        # duration_s = round(ended - started_at), and started_at is set on the FIRST beacon (not delivery) --
-        # so the gap that must be real and unambiguous after rounding is between beacon 1 and the final one.
-        beacons.feed(1)
-        time.sleep(0.8)
-        beacons.feed(2)
-        time.sleep(0.8)
-        beacons.feed(3)   # the forced "complete" beacon
-
         for _ in range(50):
             hist = _get(base, "/api/history")
             rec = next((h for h in hist if h["jobId"] == job_id), None)
-            if rec and rec["final_state"] == "done":
+            if rec is not None:
                 break
             time.sleep(0.1)
         else:
-            raise AssertionError("job never reached 'done' in real history via the real tick loop")
+            raise AssertionError("job was delivered but never recorded in real history via the real tick loop")
 
-        assert rec["final_state"] == "done", rec
+        assert rec["final_state"] == "delivered", rec
         assert rec["content_hash"] == "REALHASH1", rec
-        assert rec["total_beacons"] == 3 and rec["last_beacon"] == 3, rec
-        # THE ACTUAL CHECK: duration_s is a REAL wall-clock measurement, not a synthetic number -- must be a
-        # genuinely positive float roughly matching the real ~0.7s the test spent between start and completion,
-        # not None (would mean started_at never got set) and not a hand-typed constant.
-        assert isinstance(rec["duration_s"], (int, float)) and rec["duration_s"] > 0, rec
+        assert rec["name"] == "real_path.nc", rec
     _run_real_pipeline(run)
 
 
-def test_a_job_that_gets_one_beacon_then_genuinely_stalls_records_honestly_over_real_http():
-    """THE t2049 CASE, produced for real: a job that made SOME progress then never finished -- exactly the
-    shape that used to poison "last time" before t2049's own fix. Waits out the REAL stall_seconds, not a
-    fast-forwarded clock."""
-    def run(base, beacons):
-        mapping = {"total_beacons": 5, "beacons": [
-            {"n": 1, "orig_line": 5, "op": "Op1", "cum_time_s": 1.0, "percent": 20.0, "complete": False},
-        ], "total_est_time_s": 5.0}
-        r = _post(base, "/api/jobs", {"name": "real_path.nc", "nc": "(real path job 2)\nM30\n",
-                                       "map": mapping, "contentHash": "REALHASH1"})
-        job_id = r["jobId"]
-        for _ in range(50):
-            q = _get(base, "/api/queue")
-            if any(i.get("jobId") == job_id and i.get("state") == "delivered" for i in q):
-                break
-            time.sleep(0.1)
-        beacons.feed(1)   # one real checkpoint -- then nothing else ever arrives
-        time.sleep(3.5)   # past the real stall_seconds=2.0 configured above -- genuinely waited out, not simulated
-
-        hist = _get(base, "/api/history")
-        rec = next((h for h in hist if h["jobId"] == job_id), None)
-        assert rec is not None, "the stalled job must still be recorded -- honestly, not silently dropped"
-        assert rec["final_state"] == "stalled", rec
-        assert rec["content_hash"] == "REALHASH1", rec
-        # a real, positive, but SHORT duration -- the watchdog's own elapsed time, not a fabricated number
-        assert isinstance(rec["duration_s"], (int, float)) and 0 < rec["duration_s"] < 5, rec
-    _run_real_pipeline(run)
-
-
-def test_last_time_over_real_data_skips_the_real_stalled_run_and_finds_the_real_completion():
-    """BOTH jobs above, back to back, same content_hash, through the SAME real pipeline -- then the exact
-    lastTimeDuration() logic (t2049) applied to what the server genuinely produced, not a synthetic
-    replacement. Newest-first (the real sort order backend.list_history() uses) means the stalled one is
-    rows[0] and the done one is rows[1] -- lastTimeDuration(rows, 0) must skip past the stall to the real
-    completion, exactly the bug t2049 fixed, now proven against genuinely-produced data."""
-    def run(base, beacons):
-        # job 1: completes for real
-        m1 = {"total_beacons": 2, "beacons": [
-            {"n": 1, "orig_line": 5, "op": "Op1", "cum_time_s": 1.0, "percent": 50.0, "complete": False},
-            {"n": 2, "orig_line": 10, "op": "Op2", "cum_time_s": 2.0, "percent": 100.0, "complete": True},
-        ], "total_est_time_s": 2.0}
-        r1 = _post(base, "/api/jobs", {"name": "lt.nc", "nc": "(lt job1)\nM30\n", "map": m1, "contentHash": "LTHASH"})
-        for _ in range(50):
-            q = _get(base, "/api/queue")
-            if any(i.get("jobId") == r1["jobId"] and i.get("state") == "delivered" for i in q):
-                break
-            time.sleep(0.1)
-        beacons.feed(1); time.sleep(0.8); beacons.feed(2)   # a real, unambiguous-after-rounding gap between beacons
+def test_two_jobs_same_content_hash_both_land_in_history_newest_first():
+    """The real sort order backend.list_history() uses (recorded_at DESC) -- the FOUNDATION
+    lastTimeDuration()/jobHistory.js's own history-linking logic (t2020) builds on, proven against
+    genuinely-produced data rather than hand-typed rows."""
+    def run(base):
+        r1 = _post(base, "/api/jobs", {"name": "lt.nc", "nc": "(lt job1)\nM30\n", "contentHash": "LTHASH"})
         for _ in range(50):
             hist = _get(base, "/api/history")
-            if any(h["jobId"] == r1["jobId"] and h["final_state"] == "done" for h in hist):
+            if any(h["jobId"] == r1["jobId"] for h in hist):
                 break
             time.sleep(0.1)
 
-        # job 2: same program (same content_hash), stalls for real, after the done one
-        m2 = {"total_beacons": 3, "beacons": [{"n": 1, "orig_line": 5, "op": "Op1", "cum_time_s": 1.0, "percent": 33.0, "complete": False}], "total_est_time_s": 3.0}
-        r2 = _post(base, "/api/jobs", {"name": "lt.nc", "nc": "(lt job2)\nM30\n", "map": m2, "contentHash": "LTHASH"})
+        r2 = _post(base, "/api/jobs", {"name": "lt.nc", "nc": "(lt job2)\nM30\n", "contentHash": "LTHASH"})
         for _ in range(50):
-            q = _get(base, "/api/queue")
-            if any(i.get("jobId") == r2["jobId"] and i.get("state") == "delivered" for i in q):
+            hist = _get(base, "/api/history")
+            if any(h["jobId"] == r2["jobId"] for h in hist):
                 break
             time.sleep(0.1)
-        beacons.feed(1)
-        time.sleep(3.5)
+        else:
+            raise AssertionError("second job never reached real history via the real tick loop")
 
         hist = _get(base, "/api/history")
         rows = sorted(hist, key=lambda h: h.get("recorded_at", ""), reverse=True)   # matches backend.list_history()'s own real sort
-        assert rows[0]["jobId"] == r2["jobId"] and rows[0]["final_state"] == "stalled", rows[0]
-        assert rows[1]["jobId"] == r1["jobId"] and rows[1]["final_state"] == "done", rows[1]
-
-        # THE ACTUAL lastTimeDuration LOGIC (t2049's fix), against this REAL data:
-        def last_time_duration(rows, i):
-            r = rows[i]
-            if not r.get("content_hash"):
-                return None
-            for p in rows[i + 1:]:
-                if p.get("content_hash") == r["content_hash"] and p.get("final_state") == "done":
-                    return p.get("duration_s")
-            return None
-
-        lt = last_time_duration(rows, 0)
-        assert lt == rows[1]["duration_s"], (lt, rows[1]["duration_s"])
-        assert lt is not None and lt > 0
+        assert rows[0]["jobId"] == r2["jobId"] and rows[0]["final_state"] == "delivered", rows[0]
+        assert rows[1]["jobId"] == r1["jobId"] and rows[1]["final_state"] == "delivered", rows[1]
+        assert rows[0]["content_hash"] == rows[1]["content_hash"] == "LTHASH", rows
     _run_real_pipeline(run)
+
+
+def test_an_identity_refusal_over_real_http_is_recorded_honestly_not_silently_dropped():
+    """A job aimed at the wrong machine (CONFIGS §7's own identity check) must be REFUSED loudly by the
+    real tick loop, not silently vanish -- over the same real HTTP pipeline the happy path above uses."""
+    def run(base):
+        r = _post(base, "/api/jobs", {"name": "wrong_machine.nc", "nc": "(x)\nM30\n", "contentHash": "IDHASH"})
+        job_id = r["jobId"]
+        for _ in range(50):
+            q = _get(base, "/api/queue")
+            item = next((i for i in q if i.get("jobId") == job_id), None)
+            if item is not None and item.get("state") == "failed":
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("the real tick loop never refused the identity-mismatched job")
+        # a SECOND job, posted AFTER the refusal, must still be claimable -- the real proof the FIFO wasn't
+        # wedged behind the refused one (list_queue() itself keeps showing terminal statuses on purpose, so
+        # checking THAT for absence would assert on the wrong thing).
+        r2 = _post(base, "/api/jobs", {"name": "second.nc", "nc": "(y)\nM30\n", "contentHash": "IDHASH2"})
+        for _ in range(50):
+            q = _get(base, "/api/queue")
+            item2 = next((i for i in q if i.get("jobId") == r2["jobId"]), None)
+            if item2 is not None and item2.get("state") == "failed":
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("a job posted after the refusal never got its own turn -- the FIFO wedged")
+    _run_real_pipeline(run, machine_id="EXPECTED-ID", wrong_identity=True)
 
 
 if __name__ == "__main__":

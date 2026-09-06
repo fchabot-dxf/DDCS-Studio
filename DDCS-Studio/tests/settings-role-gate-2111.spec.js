@@ -4,8 +4,8 @@ import { test, expect } from '@playwright/test';
  * t2111 (S1, ROLES-PLAN.md) — THE SETUP FORM IS GATED BY ROLE.
  *
  * The human's own definition of the feature: *"the client is really hiding the settings that help connect
- * the gateway to the controller"*. A client is a PC with no controller wired to it, so the controller disk,
- * the Modbus beacons and the controller-profile card are settings for hardware it does not have.
+ * the gateway to the controller"*. A client is a PC with no controller wired to it, so the controller disk
+ * and the controller-profile card are settings for hardware it does not have.
  *
  * ⭐ ROLES-PLAN's gate, quoted, is what these tests encode: *"the client Setup renders with no
  * controller-wiring field PRESENT (not merely disabled); the gateway Setup is byte-for-byte what it is
@@ -54,7 +54,6 @@ const CLIENT = { role: 'client', role_conflict: false, dest: '', backend: 'local
 const CONFLICT = { role: 'client', role_conflict: true, dest: '\\\\10.0.0.50\\cncdisk', backend: 'local', version: '1', controller_connected: false };
 
 const wiring = (page) => page.locator('#test-admin-root').getByText('Controller disk (network share)');
-const beaconsRow = (page) => page.locator('#test-admin-root').getByText(/Beacons \(Modbus progress/);
 const profileCard = (page) => page.locator('#test-admin-root').getByText('Controller profile');
 const cloudSection = (page) => page.locator('#test-admin-root').getByText('Cloud storage (send from anywhere)');
 
@@ -63,7 +62,6 @@ test('GATEWAY: the controller-wiring settings are all there — unchanged from b
     await mountAdmin(page, GATEWAY);
     expect(await page.evaluate(() => window.__adminErr), 'the admin view rendered').toBeNull();
     await expect(wiring(page), 'the controller disk field').toHaveCount(1);
-    await expect(beaconsRow(page), 'the Modbus beacons toggle').toHaveCount(1);
     await expect(profileCard(page), 'the controller-profile card').toHaveCount(1);
 });
 
@@ -73,7 +71,6 @@ test('CLIENT: the controller-wiring settings are ABSENT, not disabled', async ({
     expect(await page.evaluate(() => window.__adminErr)).toBeNull();
     // ROLES-PLAN: "no controller-wiring field PRESENT (not merely disabled)"
     await expect(wiring(page), 'no controller disk field on a client').toHaveCount(0);
-    await expect(beaconsRow(page), 'no Modbus beacons toggle on a client').toHaveCount(0);
     await expect(profileCard(page), 'no controller-profile card on a client').toHaveCount(0);
 });
 

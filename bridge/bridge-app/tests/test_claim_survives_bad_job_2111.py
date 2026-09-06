@@ -34,22 +34,14 @@ from fairy.poller import Poller                                 # noqa: E402
 from fairy.transfer import Transfer                              # noqa: E402
 
 
-class _StubBeacons:
-    def reset(self, marker=None):
-        pass
-
-    def latest(self):
-        return None
-
-
 def _make():
     tmp = tempfile.mkdtemp()
     dest = os.path.join(tmp, "cncdisk")
     os.makedirs(dest)
     backend = LocalFolderBackend(tmp)
-    cfg = Config(local_root=tmp, expert_dest=dest, enable_slave=True)
+    cfg = Config(local_root=tmp, expert_dest=dest)
     transfer = Transfer(cfg)
-    poller = Poller(backend, transfer, _StubBeacons(), cfg, log=lambda *a: None)
+    poller = Poller(backend, transfer, cfg, log=lambda *a: None)
     return poller, backend, cfg, tmp
 
 
@@ -62,7 +54,7 @@ def test_a_corrupt_map_json_does_not_crash_the_tick():
     try:
         poller, backend, cfg, root = _make()
         try:
-            backend.put_job("job1", b"G0 X0\nM30\n", mapping={"total_beacons": 3, "marker": 111})
+            backend.put_job("job1", b"G0 X0\nM30\n", mapping={"source": "job1.nc"})
             map_path = os.path.join(backend.inbox, "job1.map.json")
             with open(map_path, "w", encoding="utf-8") as f:
                 f.write("{not valid json at all")   # the corruption
@@ -82,7 +74,7 @@ def test_the_bad_job_is_failed_honestly_not_left_wedging_the_fifo():
     try:
         poller, backend, cfg, root = _make()
         try:
-            backend.put_job("job1", b"G0 X0\nM30\n", mapping={"total_beacons": 3, "marker": 111})
+            backend.put_job("job1", b"G0 X0\nM30\n", mapping={"source": "job1.nc"})
             map_path = os.path.join(backend.inbox, "job1.map.json")
             with open(map_path, "w", encoding="utf-8") as f:
                 f.write("{not valid json at all")
@@ -107,7 +99,7 @@ def test_the_poller_keeps_claiming_after_a_bad_job_not_just_surviving_one_tick()
     try:
         poller, backend, cfg, root = _make()
         try:
-            backend.put_job("job1-bad", b"G0 X0\nM30\n", mapping={"total_beacons": 3, "marker": 111})
+            backend.put_job("job1-bad", b"G0 X0\nM30\n", mapping={"source": "job1.nc"})
             with open(os.path.join(backend.inbox, "job1-bad.map.json"), "w", encoding="utf-8") as f:
                 f.write("{not valid json at all")
 

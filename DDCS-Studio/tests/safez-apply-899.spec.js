@@ -39,7 +39,7 @@ test('Apply-Now submits the confirmed one-liner #520=<margin> / M30 (deliver-onl
   await expect.poll(() => posts.length, { timeout: 4000 }).toBe(1);
   expect(posts[0].name, 'the job has a distinct name so it is identifiable in Gateway > Jobs history').toBe('set-safez-520.nc');
   expect(posts[0].nc, 'the program writes #520 to the NEGATIVE machine Z and ends with M30').toBe('#520=-7\nM30\n');
-  expect(posts[0].map, 'deliver-only — no beacon tracking map').toBeFalsy();
+  expect(posts[0].map, 'no per-job map is submitted').toBeFalsy();
 });
 
 test('Apply-Now is gated by the confirm: Cancel submits NOTHING', async ({ page }) => {

@@ -1,7 +1,7 @@
 // tracker.js — the big shop-floor Tracker: ONE job, readable from across the room.
 // Giant percent + bar + stats, scaled with the viewport (clamp). Queue/history live in send.js (t2241 —
 // were jobs.js, folded in when Jobs merged into Send).
-import { el, fmtEta } from "../util.js";
+import { el } from "../util.js";
 import { stateNote } from "../state.js";   // t1327 — the declared connection-state contract
 
 const stat = (k, v) => el("div", { class: "bt-stat" },
@@ -10,9 +10,10 @@ const stat = (k, v) => el("div", { class: "bt-stat" },
 export default {
   id: "tracker",
   // t2113 (human: "the tracking tab should be gated") - LIVE TRACKING NEEDS MODBUS RTU AND THE V4.1 HAS NONE.
-  // Every number this tab can show arrives via beacons over Modbus, so on a V4.1 it can only ever render an
-  // empty frame - or worse, a STALE one: the human found it displaying a job at 63% from a status record two
-  // months old. A tab that cannot answer should say so, not present blank furniture.
+  // t2649 (BACKLOG #78) — the reason updated: the live numbers this tab shows (renderPosition/renderJobTracking,
+  // BACKLOG #79) arrive via a Modbus position poll, not the removed beacon mechanism. On a V4.1 (no Modbus)
+  // it can only ever render an empty frame - or worse, a STALE one: the human found it displaying a job at
+  // 63% from a status record two months old. A tab that cannot answer should say so, not present blank furniture.
   // ⛔ DECLARED, not hand-rolled into the panel: the view states its own requirement and gatewayPanel reads it,
   //    so a second capability-gated view adds a line here rather than a branch there.
   requiresModbus: true,
@@ -40,7 +41,7 @@ export default {
     try { items = await ctx.client.listQueue(); }
     catch { this.renderUnreachable(); return; }
     const active = items
-      .filter((i) => ["delivering", "running", "delivered", "stalled"].includes(i.state))
+      .filter((i) => ["delivering", "delivered"].includes(i.state))
       .sort((a, b) => (a.jobId < b.jobId ? 1 : -1))[0];
     this.render(active);
     this.renderPosition(ctx);      // t2073 — independent of job state (Poll-mode position isn't wired to job tracking)
@@ -51,7 +52,7 @@ export default {
   // number, both float32 CDAB and CONFIRMED on the owner's own M350 (expert-m350/FINDINGS.md, 2026-09-05),
   // unlike work_position/machine_position which stay raw because their byte order is still unattested. Silent
   // (block stays hidden) for every gateway that hasn't enabled --position-poll, same convention as
-  // renderPosition — this must never appear as a broken feature for the majority who use beacons instead.
+  // renderPosition — this must never appear as a broken feature for a gateway that hasn't turned it on.
   // ⛔ NO PERCENT — BACKLOG #79's own explicit constraint: whether register 16062 counts physical file lines
   // or executable blocks is UNTESTED (a hardware question, FAIRY's to resolve, not ours) — showing "line N"
   // sidesteps it entirely rather than drawing a percentage off an unconfirmed denominator.
@@ -83,8 +84,8 @@ export default {
   // the bridge measures — RAW, UNDECODED registers — and nothing more; decoding a register pair into a
   // float32 X/Y/Z would be a second unverified guess on top of an already-unattested register map (see
   // Ops.position_status's own docstring). Silent (block stays hidden) for every gateway that hasn't
-  // enabled --position-poll — this must never appear as a broken/empty tracking feature for the majority
-  // who use beacons instead.
+  // enabled --position-poll — this must never appear as a broken/empty tracking feature for a gateway
+  // that hasn't turned it on.
   async renderPosition(ctx) {
     let pos;
     try { pos = await ctx.client.getPosition(); } catch { return; }   // gateway-unreachable is already shown by render() above; don't double-report
@@ -105,6 +106,13 @@ export default {
       el("div", { class: "muted", style: "text-align:center" }, "No gateway answering — Studio cannot see whether a job is running."));
   },
 
+  // t2649 (BACKLOG #78) — was ALSO a percent bar + ETA/Operation/Line/Beacon stats, all decoded from the
+  // beacon mechanism's own per-job map (tracker.py's old beacon_for()). The beacon mechanism is REMOVED
+  // (owner-directed 2026-09-04, never demonstrably ran end-to-end) — a job's status object now carries only
+  // {jobId, name, state, updated_at, events} (PROTOCOL §5), and delivery is synchronous, so there is no
+  // multi-tick progress left to bar-chart. Live run-state/executing-line (BACKLOG #79) is a separate,
+  // process-wide concern rendered by renderJobTracking below, not attached to this job. Simplified to what
+  // the status object can actually say: which job, and its delivery state.
   render(j) {
     const c = this.wrap;
     if (!j) {
@@ -114,20 +122,10 @@ export default {
           "No active job — it appears here on delivery."));
       return;
     }
-    const pct = Math.round(j.percent ?? 0);
-    const fill = el("div", { class: "bt-fill" });
-    fill.style.width = pct + "%";
     c.replaceChildren(
       el("div", { class: "bt-top" },
         el("span", { class: "bt-job" }, j.name || j.jobId),
         el("span", { class: "bt-state s-" + j.state }, (j.state || "").toUpperCase())),
-      el("div", { class: "bt-pct" }, pct + "%"),
-      el("div", { class: "bt-bar" }, fill),
-      el("div", { class: "bt-stats" },
-        stat("ETA", fmtEta(j.eta_s)),
-        stat("Operation", j.op || "—"),
-        stat("Line", j.line != null ? String(j.line) : "—"),
-        stat("Beacon", j.last_beacon ? `${j.last_beacon}/${j.total_beacons ?? "?"}` : "—")),
     );
   },
 };

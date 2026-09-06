@@ -36,26 +36,20 @@ class Config:
     # local folders so the connection is always a real controller (no confusing local "sandbox").
     expert_dest: str = ""
 
-    # --- Modbus slave (slave.py) ------------------------------------------
+    # --- Modbus MASTER position poll (master.py) — t2063/t2647 (BACKLOG #79) -----------------------------
+    # Opt-in, OFF by default. Live position/run-state/executing-line reads, needs controller param
+    # P279=Slave. com_port/baud/slave_id are this feature's OWN wire config now — t2649 (BACKLOG #78)
+    # removed the Modbus SLAVE (the beacon checkpoint receiver, slave.py) these fields used to be shared
+    # with; PositionPoller (master.py) is the only consumer left.
     com_port: str = "COM6"                  # SABRENT FTDI on CNC-FAIRY
     baud: int = 115200
     slave_id: int = 1
-    enable_slave: bool = True               # False (--no-slave): skip the Modbus slave (UI/SMB-only; no serial/pymodbus)
-
-    # --- Modbus MASTER position poll (master.py, Option 1) — t2063 --------
-    # Opt-in, OFF by default: unproven on real hardware beyond a local synthetic slave (t2059/t2063).
-    # MUTUALLY EXCLUSIVE with enable_slave/the Modbus slave above — same serial port (com_port/baud/
-    # slave_id, reused as-is: it's the SAME wire), and the controller's own P279 parameter is a one-at-a-
-    # time mode select (NO/Poll/Slave) — Poll is what MSETDATA needs, Slave is what this needs. See
-    # master.py's own PositionPoller docstring.
     enable_position_poll: bool = False      # --position-poll
     position_poll_interval_s: float = 2.0   # seconds between read cycles
     position_registers: dict = None         # override any/all of master.py's default REGISTERS block(s); None = use the defaults as-is
 
     # --- loop / timing ----------------------------------------------------
-    poll_interval_s: float = 5.0            # while idle (no active job)
-    run_poll_interval_s: float = 1.0        # while a job is active (faster progress)
-    stall_seconds: float = 120.0            # no new beacon this long -> "stalled"
+    poll_interval_s: float = 5.0            # how often the poller checks the inbox
 
     cncdisk_refresh_s: float = 15.0         # how often to republish the CNCDISK file listing
     heartbeat_s: float = 20.0               # how often to publish the gateway heartbeat
@@ -81,10 +75,6 @@ class Config:
     shared_dir: str = ""                    # monorepo shared/ dir, mounted at /shared/ (empty = no mount)
     open_browser: bool = False              # --open: pop the console in the default browser on start
     config_path: str = ""                   # where Setup persists config (empty -> ~/.ddcs-bridge/config.json)
-
-    # --- WebSocket telemetry (Command Center broadcast; telemetry.py) --------------
-    enable_ws: bool = False                 # --ws: start the WebSocket telemetry server
-    ws_port: int = 8766                     # WebSocket bind port (separate from the HTTP port 8765)
 
     # --- audio feedback (chime.py; t2125, SOUND-PLAN.md) ---------------------------------------------
     # ⛔ NO CLI FLAG HERE ON PURPOSE. SOUND-PLAN.md's ruling is "exactly ONE toggle anywhere in the
@@ -113,7 +103,7 @@ class Config:
     # config.json key (what the Setup UI / set_config writes) -> Config attribute it restores.
     _PERSIST_KEYS = {
         "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
-        "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
+        "com_port": "com_port", "backend": "backend",
         "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
         "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
         "sound_enabled": "sound_enabled",   # t2125 — the master toggle, live from whatever Studio last pushed

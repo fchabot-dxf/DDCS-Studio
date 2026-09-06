@@ -8,9 +8,11 @@ No bucket retention. Every job's inbox/<jobId>.* is DELETED on delivery — the 
 the controller's CNCDISK (which is where a same-session re-run comes from anyway; days later the
 operator regenerates). Only status/<jobId>.json (metadata, no G-code) remains, for the tracker.
 
-Two job types, keyed off the map (PROTOCOL §3/§4) — the only difference is whether fairy watches beacons:
-  * TRACKED (has a .map.json, e.g. a Fusion cut): deliver -> watch beacons -> progress.
-  * DELIVER-ONLY (no map, e.g. a probe / utility .nc): deliver -> "delivered" (terminal), no watch.
+t2649 (BACKLOG #78) — every job now delivers and reaches a terminal state (delivered/failed) synchronously
+within the tick that claimed it: deliver -> "delivered" (terminal). There is no more TRACKED/DELIVER-ONLY
+distinction (the beacon mechanism that split them is REMOVED — owner-directed 2026-09-04, never demonstrably
+ran end-to-end); a job's own `.map.json`, when present, carries only `content_hash` and similar per-job
+metadata now, never a progress-watch request.
 """
 from abc import ABC, abstractmethod
 

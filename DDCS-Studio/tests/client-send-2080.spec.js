@@ -30,9 +30,13 @@ const openSend = async (page, { signedIn }) => {
 };
 
 // the SEND CONTROL, not the tab of the same name
+// t2649 (BACKLOG #78) — the label used to also be 'Send (tracked)'/'Send (deliver-only)' (the removed
+// Beacons checkbox); every send is now just 'Send' or 'Send via Drive' — IDENTICAL, for the bare case, to
+// the L1 GATEWAY nav tab's own "Send" text (`.settings-main-tab`). Excluding that class is now required,
+// where the old parenthetical used to make the two texts naturally distinct.
 const sendBtn = (page) => page.evaluate(() => {
-  const b = [...document.querySelectorAll('#gateway-app button')]
-    .find((x) => /^Send (via Drive|\(tracked\)|\(deliver-only\))/.test(x.textContent.trim()));
+  const b = [...document.querySelectorAll('#gateway-app button:not(.settings-main-tab)')]
+    .find((x) => /^Send( via Drive)?$/.test(x.textContent.trim()));
   return b ? { text: b.textContent.trim(), disabled: b.disabled, title: b.title } : null;
 });
 
@@ -52,15 +56,14 @@ test('no gateway AND no account: the old contract stands — disarmed, with its 
   expect(b.disabled, 'nothing can carry the job, so Send stays disarmed').toBe(true);
 });
 
-test('the label has ONE source — a beacons toggle cannot clobber the Drive label', async ({ page }) => {
-  // sync() (beacons checkbox) and applyState() (every status tick) both set this label; whichever ran last
-  // won, so the button could silently claim a transport it was not going to use.
+test('the label has ONE source — a re-sync cannot clobber the Drive label', async ({ page }) => {
+  // t2080b — sync() (mount-time) and applyState() (every status tick) both used to set this label from
+  // DIFFERENT branches; whichever ran last won, so the button could silently claim a transport it was not
+  // going to use. t2649 (BACKLOG #78) removed the Beacons checkbox that used to be this test's own trigger
+  // for a re-sync (`sync()` is now static — nothing left in the form to toggle); a poll tick is the one
+  // remaining real trigger, so this waits one out instead.
   await openSend(page, { signedIn: true });
-  await page.evaluate(() => {
-    const cb = [...document.querySelectorAll('#gateway-app input[type=checkbox]')][0];
-    if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
-  });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(1500);   // let a real status-poll tick call applyState() again
   const b = await sendBtn(page);
   expect(b.text, 'still the Drive route after a re-sync').toBe('Send via Drive');
 });

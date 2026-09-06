@@ -1,5 +1,5 @@
-// admin.js — the Setup view. On a LOCAL gateway it's an editable form (machine name, controller disk,
-// beacons) with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
+// admin.js — the Setup view. On a LOCAL gateway it's an editable form (machine name, controller disk)
+// with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
 // into the gateway — configure it on the machine PC). A form view: mounted on tab click, not polled.
 import { el, toast } from "../util.js";
 import { getService, setService, GATEWAY_PORTS, DEFAULT_LOCAL_BASE } from "../service.js";
@@ -177,7 +177,7 @@ export default {
   renderSetup(ctx, d, cfg, prof) {
     // t2111 (S1, ROLES-PLAN) - GATE THE CONTROLLER-WIRING FIELDS BY ROLE. The human's own definition of the
     // feature: 'the client is really hiding the settings that help connect the gateway to the controller'.
-    // A client is a PC with no controller wired to it, so the disk path, the Modbus beacons and the
+    // A client is a PC with no controller wired to it, so the disk path and the
     // controller-profile card are settings for hardware it does not have.
     // ⛔ ROLE GATES ONLY THIS GROUP. The cloud/account settings below are NOT gated and must never be: a
     //    client's ONLY transport is Drive, so hiding them would remove the one thing it needs, and a
@@ -210,8 +210,6 @@ export default {
 
     const name = el("input", { type: "text", value: cfg.machine_name || "", placeholder: "e.g. Ultimate Bee" });
     const destField = el("input", { type: "text", value: dest, placeholder: "\\\\10.0.0.50\\cncdisk", style: "width:100%" });
-    const beacons = el("input", { type: "checkbox" });
-    beacons.checked = !!cfg.enable_slave;
     // LAN serving ("personal cloud", COMBINED-APP-PLAN Step 3): off = 127.0.0.1 (this PC only),
     // on = 0.0.0.0 (any device on the user's wifi opens Studio in a browser — no install).
     const lan = el("input", { type: "checkbox" });
@@ -265,7 +263,7 @@ export default {
       save.disabled = true;
       try {
         const r = await ctx.client.setConfig({
-          machine_name: name.value, dest: destField.value.trim(), enable_slave: beacons.checked,
+          machine_name: name.value, dest: destField.value.trim(),
           host: lan.checked ? "0.0.0.0" : "127.0.0.1", port: parseInt(portSel.value, 10),
           backend: useDrive.checked ? "drive" : "local",
         });
@@ -273,7 +271,7 @@ export default {
         else {
           toast("Saved");
           info.textContent = r.restart_needed
-            ? "Saved. Restart the gateway to apply (beacons / network binding)." : "Saved + applied.";
+            ? "Saved. Restart the gateway to apply (network binding)." : "Saved + applied.";
           await this.render(ctx);
         }
       } catch (e) { toast("save failed: " + e.message, true); }
@@ -302,8 +300,6 @@ export default {
         el("span", { class: "label" }, "Controller disk (network share)"),
         destField,
         el("span", { class: "hint" }, "Must be a network share, e.g. \\\\10.0.0.50\\cncdisk — local folders aren't allowed.")),
-      el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
-        beacons, "Beacons (Modbus progress — Expert only; leave off for V4.1)"),
       ]),
       el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
         lan, "Allow other devices on my network (serve Studio on the LAN)"),

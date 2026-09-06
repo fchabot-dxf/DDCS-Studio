@@ -132,7 +132,7 @@ def test_sound_hook_calls_chime_play_only_when_allowed():
 
 class _OpsShim:
     """Exercises get_config/set_config as real bound methods against a real Config(), without booting a
-    whole Ops (which needs a live backend/transfer/beacons) -- only what those two methods actually reach
+    whole Ops (which needs a live backend/transfer) -- only what those two methods actually reach
     on self beyond .cfg is stubbed; _config_file/_lan_ip are the real Ops implementations."""
     def __init__(self, cfg):
         self.cfg = cfg

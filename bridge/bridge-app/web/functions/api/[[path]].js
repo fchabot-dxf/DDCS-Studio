@@ -104,7 +104,7 @@ export async function onRequest(context) {
       const id = jobId(b.name);
       await bucket.put(`inbox/${id}.nc`, b.nc, { httpMetadata: { contentType: "text/plain" } });
       if (b.map) await bucket.put(`inbox/${id}.map.json`, JSON.stringify(b.map), { httpMetadata: { contentType: "application/json" } });
-      return json({ jobId: id, name: b.name, tracked: !!(b.map && b.map.total_beacons) });
+      return json({ jobId: id, name: b.name });
     }
     if (m === "POST" && path === "/files/delete") {
       const b = await request.json().catch(() => ({}));

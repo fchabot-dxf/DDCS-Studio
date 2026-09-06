@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * "the tool is at these numbers" into "this job is N% done" — that cursor stays gated on a real bench
  * session (JOB-PROGRESS-PLAN.md). So the Tracking tab gets a SEPARATE, small block showing exactly what
  * the bridge measures (raw, undecoded registers) and nothing more — never claiming job progress, and
- * silent (hidden) for the majority of gateways that use beacons instead and never enabled --position-poll.
+ * silent (hidden) for a gateway that never enabled --position-poll.
  *
  * Same mock-the-three-endpoints technique as gateway-jobs-history-view-2026 — deterministic, no real bridge.
  */
@@ -39,7 +39,7 @@ const boot = async (page, positionBody) => {
     await page.waitForTimeout(900);
 };
 
-test('position not enabled (the common case — beacons, not Poll mode) → the stub stays hidden entirely', async ({ page }) => {
+test('position not enabled (the common case — not Poll mode) → the stub stays hidden entirely', async ({ page }) => {
     await boot(page, { enabled: false });
     const visible = await page.evaluate(() => {
         const el = document.querySelector('.bt-position');

@@ -36,14 +36,12 @@ def make_job_id(name, now=None):
 
 
 class Ops:
-    def __init__(self, backend, config, beacons=None, position_poller=None):
+    def __init__(self, backend, config, position_poller=None):
         self.backend = backend
         self.cfg = config
-        self.beacons = beacons     # t2057 — optional: the live BeaconSource, so submit_job can cross-check
-                                    # a tracked request against the receiver's REAL state, not just enable_slave's
-                                    # configured intent. None in tests/self-test that don't exercise this.
-        self.position_poller = position_poller   # t2073 — optional: the live PositionPoller (t2059/2063),
-                                    # so position_status() can surface it. None when --position-poll is off.
+        self.position_poller = position_poller   # t2073/t2647 — optional: the live PositionPoller (t2059/
+                                    # 2063/2647), so position_status()/job_tracking_status() can surface it.
+                                    # None when --position-poll is off.
         self._detect_cache = None  # (dest, result): the fingerprint is stable per connected controller
 
     # Per-controller baseline profiles (the shared shape Studio consumes). detect_controller() picks
@@ -65,14 +63,18 @@ class Ops:
 
     # --- jobs ---------------------------------------------------------------
     def submit_job(self, name, nc, mapping=None, content_hash=None):
-        """Queue a job. nc = G-code (str or bytes). mapping present => tracked; absent => deliver-only.
+        """Queue a job. nc = G-code (str or bytes).
+
+        t2649 (BACKLOG #78) — was "mapping present => tracked; absent => deliver-only," with a `tracked`/
+        `warning` pair in the response cross-checking a beacon request against the receiver's real state.
+        The beacon mechanism is REMOVED (owner-directed 2026-09-04, never demonstrably ran end-to-end) — every
+        job now delivers the same way; `mapping` survives only as a place for `content_hash` (below) and any
+        future per-job metadata to ride, never a tracking request.
 
         t2020 — content_hash (a SHA-256 of the client's NORMALISED G-code — see send.js's own contentHashOf,
         reusing portingArc.js's normaliseGcode rather than a second normaliser) rides in the SAME mapping dict
-        so it survives for a deliver-only job too (mapping would otherwise be None/absent): it is what lets
-        two sends of the identical program LINK in the History view, independent of tracked vs deliver-only
-        and independent of jobId, which stays a fresh timestamp per send on purpose (never collapses two
-        sends into one record).
+        so two sends of the identical program LINK in the History view — job identity (jobId) stays a fresh
+        timestamp per send on purpose (never collapses two sends into one record).
 
         t2107 — THE LOCAL HALF of the no-send policy (the human's own ruling: "if gateway is on but cnc off
         then it should be a no send policy" — the heartbeat is twofold, gateway running AND controller
@@ -98,25 +100,7 @@ class Ops:
             mapping = {**(mapping or {}), "content_hash": content_hash}
         job_id = make_job_id(name)
         self.backend.put_job(job_id, nc, mapping)
-        tracked = bool(mapping and mapping.get("total_beacons"))
-
-        # t2057 — SAY SO AT THE MOMENT OF SENDING, not twenty minutes into watching a bar that will never
-        # move: a job can ask to be tracked (its map has total_beacons) while the bridge's own Modbus
-        # receiver is off or dead — two independently-set toggles (this send's own request vs. the bridge's
-        # `enable_slave`/hardware state) that nothing else compares. `poller.py`'s claim-time check still
-        # degrades this correctly to "delivered" server-side (t2020) — this is a SEPARATE, EARLIER honesty
-        # signal, surfaced in the submit response itself so the operator can act before the job even runs,
-        # not silently un-ticked for them.
-        warning = None
-        if tracked:
-            if not self.cfg.enable_slave:
-                warning = "Beacons were requested but this bridge has Modbus disabled (Setup -> Beacons is off) — this job will deliver but will NOT show live progress."
-            elif self.beacons is not None:
-                st = self.beacons.status()
-                if not st.get("ok"):
-                    warning = f"Beacons were requested but the bridge's Modbus receiver is not running ({st.get('error') or 'unknown reason'}) — this job will deliver but will NOT show live progress."
-
-        return {"jobId": job_id, "name": name, "tracked": tracked, "warning": warning}
+        return {"jobId": job_id, "name": name}
 
     def list_queue(self):
         """The queue/tracker view: every status object, plus inbox jobs not yet given a status."""
@@ -1185,7 +1169,7 @@ class Ops:
         return {
             "machine_name": c.machine_name, "machine_id": c.machine_id,
             "dest": c.expert_dest, "com_port": c.com_port,
-            "backend": c.backend, "enable_slave": c.enable_slave,
+            "backend": c.backend,
             "sound_enabled": c.sound_enabled, "sound_off": c.sound_off,   # t2125 — master + per-sound toggles; both live, no restart
             "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
@@ -1200,7 +1184,7 @@ class Ops:
 
     def set_config(self, updates):
         """Apply + persist gateway setup. dest must be a network share (no local folders). Fields the
-        gateway reads live (name/id/dest/com) take effect now; backend/beacons need a restart."""
+        gateway reads live (name/id/dest/com) take effect now; backend needs a restart."""
         c = self.cfg
         if "dest" in updates:
             d = (updates.get("dest") or "").strip()
@@ -1236,7 +1220,7 @@ class Ops:
             # t2103 (S0) — live, no restart: effective_role()/the claim gate both read c.role_override
             # fresh on every call, so a Setup change is authoritative the very next poll tick.
             c.role_override = updates["role_override"]
-        for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
+        for k in ("backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True
         if "port" in updates and updates["port"] is not None:   # serve port: only our registered ports (keeps OAuth JS origins valid)
