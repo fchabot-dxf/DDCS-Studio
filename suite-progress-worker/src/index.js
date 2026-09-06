@@ -24,6 +24,24 @@ const PAGE = `<!doctype html>
        margin:0;display:flex;justify-content:center}
   .wrap{width:100%;max-width:560px;display:flex;flex-direction:column;
         gap:12px;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}
+  .hero{display:flex;flex-direction:column;gap:12px}
+  /* Wide screens (tablet / desktop / landscape phone): two columns — the hero breathes on
+     the left, the stat rows sit beside it, the running spec spans. Portrait keeps the ruled
+     rows-only layout untouched. */
+  @media (min-width: 700px){
+    .wrap{max-width:980px;display:grid;grid-template-columns:1.1fr 1fr;
+          grid-template-areas:"banner banner" "head head" "hero rows" "spec spec" "foot foot";
+          gap:16px;align-content:start}
+    .banner{grid-area:banner} h1{grid-area:head} .hero{grid-area:hero;justify-content:center}
+    .rows{grid-area:rows} .spec{grid-area:spec} .foot{grid-area:foot}
+    .pct{font-size:clamp(90px, 11vw, 150px)}
+    .r{padding:14px 0} .r b{font-size:30px} .r.time b{font-size:22px}
+  }
+  /* Short landscape (a phone on its side): shrink the hero so everything fits one screen. */
+  @media (min-width: 700px) and (max-height: 480px){
+    .pct{font-size:56px} .bar{height:14px} .r{padding:7px 0} .r b{font-size:20px}
+    .wrap{gap:8px;padding:10px 16px}
+  }
   h1{font-size:13px;margin:0;letter-spacing:.1em;text-transform:uppercase;
      color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center}
   .live{display:inline-flex;align-items:center;gap:6px}
@@ -60,12 +78,14 @@ const PAGE = `<!doctype html>
   <div class="banner" id="banner"></div>
   <h1><span id="tier">Suite · RenderRanchy</span>
       <span class="live"><span class="dot" id="dot"></span><span id="age">…</span></span></h1>
-  <div>
-    <div class="pct" id="pct">—</div>
-    <div class="state" id="state">waiting for data…</div>
+  <div class="hero">
+    <div>
+      <div class="pct" id="pct">—</div>
+      <div class="state" id="state">waiting for data…</div>
+    </div>
+    <div class="bar"><div class="fill" id="fill" style="width:0%"></div></div>
+    <div class="count"><span id="done">0</span> <small>/ <span id="total">0</span> tests</small></div>
   </div>
-  <div class="bar"><div class="fill" id="fill" style="width:0%"></div></div>
-  <div class="count"><span id="done">0</span> <small>/ <span id="total">0</span> tests</small></div>
   <div class="rows">
     <div class="r ok"><span>passed</span><b id="pass">–</b></div>
     <div class="r bad"><span>failed</span><b id="fail">–</b></div>
