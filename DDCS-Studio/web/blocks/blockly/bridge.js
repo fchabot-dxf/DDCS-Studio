@@ -23,6 +23,7 @@ import { installCoordListField } from './coordListField.js';
 import { installPickerField } from './pickerField.js';   // t2389 (BACKLOG #42 piece 6) — exact-name references (matchvar/atomType/whenparam)
 import { installOptionsEditorField } from './optionsEditorField.js';   // t2389 (BACKLOG #42 piece 2) — the options DSL's editor
 import { installComboField } from './comboField.js';   // t2389 (BACKLOG #42 piece 7) — section/units suggestion combo
+import { installAnchorValueField } from './anchorValueField.js';   // t2679 — point_handle/rect_handle's own searchable ax/ay: number literal, or a must-match search over this def's own form params + preview markers
 import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
 import { LAYOUT_TYPES, PANEL_TYPES } from '../../wizards/ops/panelTypes.js';   // t2393 (BACKLOG #48 item 2) — the ONE declared source for layout.kind/panel.panel's dropdowns (below), not a hand-copied subset
 import { opLabelOf } from '../opBuilders.js';   // t1071 — the opunit chip's friendly per-instance label (opType → the twin's registered label)
@@ -79,20 +80,19 @@ const IO_TARGET_FIELDS = { outpin: { field: 'pin', kind: 'output' }, waitinput: 
 // "worst failure mode" (the flip silently never applies, wrong side gets cut) — closing the picker removes
 // that whole class rather than merely warning about it.
 const SETUP_TARGET_FIELDS = { flip: 'setup' };
-// t2525 (BACKLOG #71) — the HANDLE blocks' own PARAM-NAMING fields: which EXISTING formfield/param_field param
-// each handle drives (userOps.js's own `handleBindingsFromStack`/`attach()` looks it up and merges the
-// handle's anchor onto that REAL binding — the fix for the central t2523 finding, a handle that dragged but
-// never reached emit). CLOSED, same rung as `flip.setup` above and for the identical reason: a handle pointing
-// at a param that doesn't exist is a plain authoring defect, never legitimate forward-authoring the way a
+// t2525 (BACKLOG #71) — WHICH EXISTING formfield/param_field param a block NAMES via a must-match picker over
+// the SAME candidate pool: handle blocks (`handleBindingsFromStack`/`attach()`, userOps.js, looks it up and
+// merges the handle's anchor onto that REAL binding — the fix for the central t2523 finding, a handle that
+// dragged but never reached emit). CLOSED, same rung as `flip.setup` above and for the identical reason:
+// naming a param that doesn't exist is a plain authoring defect, never legitimate forward-authoring the way a
 // goto/tool/pin reference can be — so no `allowNew`, reusing pickKind 'whenparam' as-is (pickerField.js's own
-// candidate set is ALREADY "every formfield/param_field's own PARAM in this stack", exactly what a handle
-// needs; the `b.id !== blk.id` self-exclusion it applies is a harmless no-op here since a handle is never
-// itself a formfield/param_field). One block type may name more than one field (point_handle: fx+fy;
-// rect_handle: field+fieldH) — an array, unlike the other TARGET_FIELDS maps above which only ever needed one.
+// candidate set is ALREADY "every formfield/param_field's own PARAM in this stack").
+// One block type may name more than one field (point_handle: fx+fy; rect_handle: field+fieldH) — an array,
+// unlike the other TARGET_FIELDS maps above which only ever needed one.
 const HANDLE_ANCHOR_FIELDS = {
     length_handle: ['field'],
     point_handle: ['fx', 'fy'],
-    rect_handle: ['field', 'fieldH'],
+    rect_handle: ['field', 'fieldH', 'cornerParam'],   // t2679 — cornerParam is read-only (never merged onto), same doctrine as scale_handle's baseField: names an EXISTING param whose live value is a datum-corner code
     radial_handle: ['field'],
     scale_handle: ['field', 'baseField'],   // t2533 — baseField is read-only (never merged onto), but still a must-match picker
     shear_handle: ['field', 'hField'],   // t2533 — hField is read-only (never merged onto), but still a must-match picker
@@ -101,6 +101,10 @@ const HANDLE_ANCHOR_FIELDS = {
     diag_aim_handle: ['fieldTravel', 'fieldPrimary', 'axisField', 'signField'],   // t2573 — fieldTravel/fieldPrimary are written; axisField/signField are read-only companions (never merged onto), same doctrine as scale_handle's baseField
     cross_aim_handle: ['field', 'axisField', 'signField'],   // t2583 — field is written; axisField/signField are read-only companions (never merged onto), same doctrine as diag_aim_handle's own; relToRow is a DIFFERENT picker kind (RELTO_TARGET_FIELDS below), a sim-start row id, not a param
 };
+// t2679 (amendment 3) — `point_handle`/`rect_handle`'s own `ax`/`ay`: a DIFFERENT field kind from
+// HANDLE_ANCHOR_FIELDS above (`field_anchor_value`, not `field_picker` — a plain number commits directly,
+// unlike every must-match picker here), so its own map, checked separately in `fieldKind`/`jsonDef` below.
+const ANCHOR_VALUE_FIELDS = { point_handle: ['ax', 'ay'], rect_handle: ['ax', 'ay'] };
 // t2585 (BACKLOG #61 follow-up) — `relToRow`: the `relTo` REFERENCE field, naming an EXISTING `simstart` block's
 // own `id` (must already exist, the SAME closed doctrine HANDLE_ANCHOR_FIELDS established — a relTo pointing at
 // a row that was never declared anywhere is a plain authoring defect, not legitimate forward-authoring; a row
@@ -413,6 +417,7 @@ export function fieldKind(def, field) {
     if (IO_TARGET_FIELDS[def.type] && IO_TARGET_FIELDS[def.type].field === field) return 'picker';   // t2453 (BACKLOG #47 tier 2) — I/O pin numbers, see IO_TARGET_FIELDS' own header
     if (SETUP_TARGET_FIELDS[def.type] === field) return 'picker';   // t2453 (BACKLOG #47 tier 3) — flip.setup, CLOSED (no allowNew) — see SETUP_TARGET_FIELDS' own header
     if (HANDLE_ANCHOR_FIELDS[def.type] && HANDLE_ANCHOR_FIELDS[def.type].includes(field)) return 'picker';   // t2525 (BACKLOG #71) — see HANDLE_ANCHOR_FIELDS' own header
+    if (ANCHOR_VALUE_FIELDS[def.type] && ANCHOR_VALUE_FIELDS[def.type].includes(field)) return 'anchorvalue';   // t2679 — see ANCHOR_VALUE_FIELDS' own header; checked BEFORE the numeric-default fallback below, since ax/ay's own default is now a NUMBER (which that fallback would otherwise claim as a plain 'value' socket)
     if (RELTO_TARGET_FIELDS[def.type] === field) return 'picker';   // t2585 — relTo's own reachability fix, see RELTO_TARGET_FIELDS' own header
     // t2393 (BACKLOG #48 item 3) — the magic scope names: a `z`/`by` field whose OWN DEFAULT equals its OWN
     // NAME (`z: 'z'`, `by: 'by'`) is self-describing as "an expression read against Step Down's own published
@@ -543,6 +548,12 @@ function jsonDef(def) {
         // PARAM. See RELTO_TARGET_FIELDS' own header.
         else if (k === 'picker' && RELTO_TARGET_FIELDS[def.type] === f) args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: 'relTo', tooltip: desc });
         else if (k === 'picker') args0.push({ type: 'field_picker', name: FN(f), value: String(def.defaults[f] ?? ''), pickKind: f.toLowerCase(), tooltip: desc });
+        // t2679 (amendment 3) — point_handle/rect_handle's own ax/ay: `value` carries the RAW default (a
+        // number, unlike every other field's own `String(...)` coercion above) — `field_anchor_value`'s own
+        // `fromJson`/`doClassValidation_` normalize it either way, but passing the real type through means a
+        // fresh flyout block's own shadow-equivalent default reads as a plain number immediately, not a
+        // stringified '0' that happens to normalize back.
+        else if (k === 'anchorvalue') args0.push({ type: 'field_anchor_value', name: FN(f), value: def.defaults[f], tooltip: desc });
         else if (k === 'combo') args0.push({ type: 'field_combo', name: FN(f), text: String(def.defaults[f] ?? ''), comboKind: f, tooltip: desc });
         // t2643 (BACKLOG #71/#72) — GENERAL DEFECT: Blockly's own built-in `field_dropdown` ALWAYS selects
         // `options[0]` for a freshly-created block — its `fromJson` has no "initial value" property at all
@@ -935,6 +946,7 @@ export function installBlockly(Blockly) {
     installPickerField(Blockly);       // t2389 — register field_picker (BACKLOG #42 piece 6)
     installOptionsEditorField(Blockly);   // t2389 — register field_optionseditor (BACKLOG #42 piece 2)
     installComboField(Blockly);        // t2389 — register field_combo (BACKLOG #42 piece 7)
+    installAnchorValueField(Blockly);  // t2679 — register field_anchor_value (point_handle/rect_handle's own ax/ay)
     registerDynExtension(Blockly);
     registerSecColorExtension(Blockly);
     registerOpunitExtension(Blockly);   // t1071 — the opunit chip's friendly label + read-only routing key

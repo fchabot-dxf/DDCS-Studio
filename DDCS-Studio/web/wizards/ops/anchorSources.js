@@ -19,12 +19,27 @@ const STOCK_TOKENS = {
     stockHalfH: (stock) => stock.h / 2,
 };
 
-/** `raw`: a literal numeric string (e.g. '40') OR one of STOCK_TOKENS' own keys. `stock`: {w,h}. `fallback`:
- *  used when `raw` is empty/unrecognised/non-numeric. Backward-compatible by construction: every anchor literal
- *  authored before this turn is a plain numeric string, which still resolves via `Number()`, byte-identical —
- *  only a NEW token string activates the stock lookup. */
-export function resolveAnchorCoord(raw, stock, fallback = 0) {
+/** `raw`: a NUMBER (t2679 amendment 3 — `point_handle`/`rect_handle`'s own `ax`/`ay` is a SEARCHABLE VALUE
+ *  FIELD, `anchorValueField.js`: type a number, it commits AS a number), OR a STRING naming either (a) an
+ *  EXISTING bound form param of THIS def — the field's own primary offer, checked against live `params` — or
+ *  (b) one of STOCK_TOKENS' own keys (legacy, `diag_aim_handle`'s t2573 authored strings; the searchable
+ *  field no longer OFFERS these — amendment 3 dropped the stock/setup worlds from the search entirely — but
+ *  still resolves one if hand-authored/inherited), or (c) a plain numeric STRING (the pre-redesign field
+ *  shape, still supported byte-identical). ⛔ A MARKER id is deliberately NOT resolved here — that tier needs
+ *  `def.opType`/live sim-starts, context this function doesn't carry; see `panelTypes.js`'s own
+ *  `markerAnchorCoord` (right before both call sites), which is tried FIRST and falls through to this
+ *  function unchanged. `stock`: {w,h}. `params`: the op's own LIVE resolved params (only the form-param tier
+ *  reads it). `fallback`: used when `raw` is empty/an unrecognised name. Backward-compatible by construction:
+ *  every anchor literal authored before t2679 is a plain numeric STRING, which still resolves via `Number()`
+ *  at the bottom, byte-identical — only a recognised NAME (a live param, or a stock token) activates the
+ *  tiers above it. */
+export function resolveAnchorCoord(raw, stock, fallback = 0, params) {
     if (raw == null || raw === '') return fallback;
+    if (typeof raw === 'number') return raw;
+    if (params && Object.prototype.hasOwnProperty.call(params, raw)) {
+        const v = Number(params[raw]);
+        if (Number.isFinite(v)) return v;
+    }
     const tok = STOCK_TOKENS[raw];
     if (tok) return tok(stock || { w: 0, h: 0 });
     const n = Number(raw);

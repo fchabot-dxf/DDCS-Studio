@@ -8458,7 +8458,8 @@ row):
 | (b) conditional write target | surfacing's `sf_pos` specifically | `point_handle`'s `fx`/`fy` resolve once, at authoring time; this handle's target switches on `zMode` |
 | (c) relToRow in the declared path — ✅ MECHANISM BUILT t2677, corner's own file still unmigrated | corner (`cross1_x/y`, `startX/Y`) | CLOSED: `point_handle` now carries `relToRow`, position + write-back + dog-leg all resolve through the SAME `resolveRelToPoint` the fallback branch uses — proven via a scratch def, not yet applied to `cornerData.js` itself (waits for (a)/(b), see above) |
 | (d) compound/multi-field anchor | slot (`sl_anchor`) | no existing `anchor.kind` covers "one delta moves several params" — deliberately unbuilt once already, not re-opened here |
-| No interactive canvas handle at all | the remaining 23 (alignment, atc×6, centerDrill, comm, edge, facing, homing, ioStep, middle, faceProbe, odProbe, odTurn, parting, pauseConfirm, polygon, rotaryCenter, rotaryClock, wcs) | N/A — nothing to migrate |
+| No interactive canvas handle at all | the remaining 22 (alignment, atc×6, centerDrill, comm, edge, facing, homing, ioStep, faceProbe, odProbe, odTurn, parting, pauseConfirm, polygon, rotaryCenter, rotaryClock, wcs) | N/A — nothing to migrate |
+| ⚠ `middle` — CENSUS CORRECTION (t2679): this row's own "23, no handle" count was a grep FLOOR, never confirmed op-by-op (`VERIFICATION-DISCIPLINE.md` rule 18); `middle` was measured (t2679, amendment 4's own verification ask) and DOES have two real, hand-rolled `crossAim`-kind handles (`panelTypes.js:847-887`, ids `crossAimP`/`crossAimS`) reading a marker-derived live wall-face position and writing a probe-travel form param. It fits `cross_aim_handle`'s own already-declared vocabulary (t2583) exactly — this is a "not yet migrated off hand-rolled JS" gap like the rest of this board, not a new anchor-source. Filed here so a future census sweep starts from this corrected count. edge/alignment/faceProbe/odProbe/rotaryCenter were checked the same way and confirmed genuinely handle-less.
 
 **Corner was the dispatched pilot (t2675) and turned out NOT to be ready** — its own `relTo`-anchored
 handles render through an older role-tagged fallback branch with no declared-anchor equivalent; forcing a
@@ -8486,6 +8487,26 @@ pre-existing corner specs stayed green, unchanged, confirming the shared-resolve
 corner's own live rendering. `cornerData.js` itself was not migrated — that step waits for (a)/(b) so the
 WHOLE gesture set (reposition + start) can move in one turn, per the memo's own scope note.
 
+**Proposal (a) — a live-field-following anchor on `point_handle`/`rect_handle` — BUILT and PROVEN (t2679),
+NO op migrated (owner review pending).** `ax`/`ay` gained a SEARCHABLE VALUE FIELD (`field_anchor_value`,
+`web/blocks/blockly/anchorValueField.js`) — the owner's own live redesign of the memo's original @-sentinel-
+string idea, arrived as four sequential amendments mid-build (full account: WORK-LOG t2679). Type a number,
+it commits as a literal; type letters, it searches a CLOSED list — this def's own bound form params (own
+FORM LABEL shown) plus this def's own preview markers (`simstart` ids) — and commits ONLY from that list,
+flat and ranked, a per-row source tag only on a genuine label tie. No stock/setup world, no controller `#N`
+var — excluded by construction. `rect_handle` also gained `cornerParam` (a plain must-match picker, unrelated
+to the searchable field), naming a param whose live value is a datum-corner code; when set,
+`cornerAnchorOf` (`placement.js`, EXTRACTED from `handleScale`'s own private math, byte-identical — 113/113
+pocket+surfacing specs unchanged) overrides ax/ay/sx/sy with the corner's own live position each render.
+Proven two ways (`anchor-searchable-field-2679.spec.js`): a REAL Blockly workspace round-trip (twice, the
+save→reload shape) and a scratch build proving BOTH the named-param tier and the marker tier re-resolve
+against live params, not a value frozen at merge time. **Verified to span both op families** (amendment 4's
+own ask): none of the 7 blocked (a)-ops or the 5 genuinely handle-less probing ops checked need anything
+this primitive doesn't already offer; `middle`'s own pre-existing handle (see the census correction row
+above) already fits `cross_aim_handle`'s separate vocabulary. No op migrates onto ax/ay's new field this
+turn — three real screenshots (the search dropdown open, flat, with a tie-break hint) went to the owner for
+review first, per the standing cadence.
+
 **The recommended next step** (from the design memo): (a) — highest leverage (7 ops), self-contained. Then
 (b) — smallest op-count (1), most invasive render-loop change. (d) stays deferred until a second op needs
 it.
@@ -8508,3 +8529,61 @@ the one part of drag feel that COULD be fixed locally.
 **What re-opens it:** the owner caring enough to fund a Blockly-core deep-dive turn, OR the hands-on repro
 proving the t2581 dead-gesture state hits real humans (which would promote that pair from parked to urgent
 and this entry would ride along).
+
+### 87. ⚠ LIVE PROGRESS PAGE: `completed` CAN EXCEED `total` on a full-suite run — CONFIRMED symptom, mechanism UNCONFIRMED
+
+**[OPEN, symptom observed t2679 (RENDERRANCHY's own live dashboard, owner screenshot mid-turn) — full account:
+WORK-LOG t2679, amendment 5.]**
+
+Ranchy's own progress page showed `completed: 6997 > total: 3244` (✅314 ❌815 ⚠1 ⊘5867) mid-run, tagged
+`tier: full suite` — an impossible ratio for one consistent run; the page itself now guards it with an
+"inconsistent data" banner rather than showing a nonsense 215%. The `tier` field reading correctly confirms
+t2679's own `DDCS_TIER` small item (WORK-LOG t2679) reached that page — that item is NOT the cause (its own
+diff never touches `total`/`completed`, confirmed by re-reading it).
+
+**What's actually confirmed, vs what isn't:** `playwright.config.js` in THIS repo declares **no `projects`
+array** (read in full) — a single implicit default project. The advisor's own working theory ("`total`
+counts one project while `completed` accumulates across all of them") does not apply to an ordinary `npm
+test` of THIS config as committed. Two live possibilities, neither checked yet: (1) Ranchy invokes Playwright
+differently than this config implies (a shard flag, a second config, `--repeat-each`) — needs checking
+Ranchy's own invocation directly; (2) the DASHBOARD itself (a separate Cloudflare Worker, not
+`progressReporter.mjs`) sums/merges multiple heartbeat snapshots instead of showing only the latest one —
+needs reading that Worker's own source, which this session has not seen.
+
+**Do not certify a full-suite run off the live page's own percentage** until this is closed — read
+`test-results/summary.json`'s own `stats` object directly instead (the same convention
+`scripts/test-all.cjs`'s own flaky-count line already uses). Whoever picks this up next: confirm which of
+the two mechanisms above is real (or find a third) before attempting a fix — `progressReporter.mjs`'s own
+per-run accounting (the `isFinal` gate in `onTestEnd`) was re-read this session and looks internally
+consistent for a SINGLE Playwright process; the anomaly, if it's really in the reporter and not the
+dashboard, would have to come from something invoking/aggregating multiple such processes.
+
+### 88. The marker/form-field TWIN — declare the shape now, build the flip engine when real cases earn it
+
+**[DESIGN DIRECTION, owner-ruled 2026-09-07 while designing Phase 2's follow-a-value primitive.]**
+
+The owner refined the family model: the real split is NOT milling-vs-probing, it's **absolute positioning →
+follow a FORM FIELD (the typed number is truth); relative positioning → follow a MARKER (the derived point is
+truth)** — and it runs THROUGH ops (surfacing straddles both: normal=absolute, skim/G91=relative), so one
+wizard can need both. The deeper shape: a point has two FACES — a field twin (absolute number) and a marker
+twin (relative point) — and the mode picks which is authoritative.
+
+⭐ **THE RULING — two layers, do not conflate them:**
+- ⛔ **DECLARE NOW, it's cheap substrate that compounds** (north star rule 5 — declare-over-handroll:
+  declarations are cheap and compound; YAGNI applies to ENGINES you build, not INTENT you record; this is a
+  PLATFORM, unknown users build unknown wizards, not a fixed 32): the follow-a-value search offers BOTH
+  markers and form fields from one field (already decided, t2679); the anchor data model holds a field-ref OR
+  a marker-ref as equal citizens; the concept "a field and a marker can be two faces of one point" is a
+  stated, first-class expectation a future builder can rely on. Declaring this does NOT wait for a 3rd case —
+  it solidifies what a user can EXPECT to build, which is the point of a platform.
+- ⛔ **BUILD LATER, this is the engine YAGNI actually guards**: the AUTOMATIC mode-driven flip of which face
+  is authoritative (G90→field, G91→marker, switching itself). One real op straddles frames today (surfacing,
+  clumsily, via jogX/jogY form fields). Build the auto-flip mechanism when a real 2nd and 3rd wizard need
+  it — not before. Recording the intent (this entry) is the declaration; the switching machinery is the
+  engine.
+
+**BUILT vs not, so nothing reads as shipped**: read-marker (`relToRow`, t2677) + write-field already coexist
+as a handle's two wires. Proposal (b) (conditional target by `zMode`) is designed-not-built. The
+twin-with-authority-flip is this entry — the SHAPE is declared as Phase 2's primitive lands (t2679); the
+auto-flip ENGINE is deferred. Today's surfacing skim uses form fields, so "relative→marker" is a design
+IMPROVEMENT over what ships, not current behavior.

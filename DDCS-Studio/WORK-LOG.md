@@ -78145,3 +78145,157 @@ Full suite (`npm test`): test:node 236/236. test:e2e **3203 passed, 0 failed, 11
 line reads ZERO FAILED. `git status` clean except this entry, the four source files (`panelTypes.js`,
 `pointHandle.js`, `userOps.js`, `bridge.js`), the new parity spec, the one collateral test fix, and
 `BACKLOG.md` (its own separate commit).
+
+## t2679 — PROPOSAL (a) BUILT, THEN REDESIGNED MID-TURN by the owner (amendments 1-5): a SEARCHABLE VALUE
+FIELD, not a socket+reporter — THE FACES go to the owner, no op migrates this turn
+
+**THE PIVOT, for the record**: the dispatch's own first design — `ax`/`ay` as Blockly value SOCKETS + a new
+`form_variable` reporter block to plug into them — was BUILT AND WORKING (real Blockly round-trip proven,
+scratch-def live-follow proven, 3 screenshots taken) when the owner redesigned the authoring face live,
+across FOUR sequential amendments while the build was in flight. The owner's own words (amendment 1): "authoring
+should be as natural as possible — not literal world names, a SEARCH BOX for allowed values in the input
+itself." The reporter-socket work was REVERTED (deleted `formVariable.js`, its palette registration, its
+`HANDLE_ANCHOR_FIELDS` entry, its tests, its screenshots) and rebuilt to the FINAL scope, amendment 3:
+
+- `ax`/`ay` STAY PLAIN FIELDS (not sockets) — a NEW field class, `field_anchor_value`
+  (`web/blocks/blockly/anchorValueField.js`, built on `pickerField.js`'s must-match popup mechanics +
+  `comboField.js`'s filter-as-you-type shell, the owner's own framing of "promoted spelling aid"). Type a
+  NUMBER → commits as a number (unchanged shape from before this whole arc). Type LETTERS → searches a
+  CLOSED candidate list and commits ONLY from it — the search IS the gate.
+- ⭐ **THE ALLOWED LIST IS THE WHOLE DESIGN** (amendment 3, superseding amendments 1-2's own multi-world/
+  grouped-header ideas): ONE world — the def's own authorable surface. Candidates are ONLY this def's own
+  bound FORM PARAMS (shown by their own FORM LABEL, e.g. "Origin X", not the raw param name) plus this def's
+  own preview MARKERS (`simstart` rows' own declared `id`, t2585 — `relToRow`'s identical candidate pool).
+  ⛔ Nothing else — no stock tokens, no setup values, and NEVER a controller `#N` var (excluded BY
+  CONSTRUCTION: that world simply isn't in the source list, not filtered out by a rule that could be wrong).
+- Results are FLAT, ranked, NO group headers (amendment 2, refining amendment 1's own first draft — the
+  owner: grouping was "the advisor's own namespace instinct leaking onto the authoring face," a machinist
+  searches for the VALUE not its category). A per-row SOURCE HINT ("· form" / "· marker") appears ONLY when
+  two candidates share the same LABEL — a genuine tie a person needs to break; a lone result carries no tag.
+- `cornerParam` (rect_handle's own datum-corner picker) is UNCHANGED across every amendment — still a plain
+  must-match `field_picker`, never folded into the new searchable field.
+
+**Mechanism ("raw at derive, resolution in the render layer" — unchanged doctrine, simpler shape)**:
+`userOps.js`'s `handleBindingsFromStack` keeps ax/ay RAW (a number, or a string naming a param/marker) —
+survived the redesign essentially untouched, since the raw-preservation fix (no more `Number(p.ax)||0`
+coercion) was already correct for a name-string just as much as for a reporter object; only its own comments
+needed correcting. `anchorSources.js`'s `resolveAnchorCoord` DROPPED its object tier, gained a simpler one:
+a string that's a live key in `params` resolves against it BEFORE the legacy `STOCK_TOKENS`/numeric-string
+tiers (unchanged, still serves `diag_aim_handle`'s own t2573 authored strings). MARKERS are resolved
+SEPARATELY — a new `markerAnchorCoord(raw, axis)` in `panelTypes.js` itself (needs `def.opType`/live
+sim-starts, context `resolveAnchorCoord` doesn't carry), tried FIRST at both the point and rect branches,
+falling through to `resolveAnchorCoord` when `raw` isn't a marker id. Deliberately a LIGHTER function than
+`resolveRelToPoint` (relToRow's own richer write-back/dog-leg resolver, unchanged) — a bare scalar read of
+one marker's own `x` or `y`, no write-back: relToRow stays the right tool when a WHOLE handle needs to
+anchor+reposition against a marker; ax/ay borrowing one scalar is a lighter ask.
+`bridge.js` gained `ANCHOR_VALUE_FIELDS` (a DIFFERENT map from `HANDLE_ANCHOR_FIELDS` — a different field
+kind, `'anchorvalue'`, checked in `fieldKind` BEFORE the numeric-default fallback ax/ay's own new number
+defaults would otherwise hit) + the `field_anchor_value` registration. `stackBridge.js` needed **NO changes
+at all** — ax/ay's own generic FIELD round-trip (not a socket) already flows through `toRecord`'s/
+`recToJson`'s existing plain-field branches; confirmed by direct reading before touching anything.
+
+**The mechanism proven two ways** (`anchor-searchable-field-2679.spec.js`, replacing the deleted reporter-era
+spec), matching the dispatch's own VERIFY checklist:
+1. **A REAL Blockly workspace round-trip** (`value-fidelity-1520.spec.js`'s own `stackToWorkspace`/
+   `workspaceToStack` pattern): a `rect_handle` whose AX names an existing formfield's own param commits the
+   RAW param name, shows the param's own FORM LABEL on the block face (not the raw name), round-trips through
+   save AND a second reload identically. A `point_handle` whose AX names an existing `simstart` marker's own
+   id round-trips the same way (markers show their own id — they carry no separate "form label"). An
+   unplugged/plain-literal AY stays a plain number throughout, on both blocks.
+2. **A SCRATCH BUILD** (mirrors `corner-relto-declared-parity-2677.spec.js`'s own method): `layoutSpecFromOp`
+   re-resolves a NAMED ax against WHATEVER live params it's called with — the rendered handle's `x` moved by
+   exactly the live param delta (69, matching a bound `boxh` 30→99 change) across two calls on the SAME
+   merged def; a plain literal ax stayed unaffected, composed the same way the pre-existing t2525 test already
+   pins (`handle.x = ax + ex·sx`). A SECOND scratch test proves the MARKER tier independently: ax/ay BOTH
+   naming corner's own already-registered `wall1` marker resolve to the SAME world position an independent
+   direct `opSimStarts`/`resolveRelToIndex` query finds — isolated from `cross1_x`/`cross1_y`'s own non-zero
+   defaults by binding the handle to fresh, zero-defaulted `markx`/`marky` params instead (so `handle.x/y ===
+   ax/ay`'s own resolved value exactly, no composition to strip when checking the match).
+
+**A test-authoring bug, found and fixed, twice**: the marker scratch test's first draft forgot to strip
+corner's own pre-existing `group`/`role` off `cross1_x`/`cross1_y` (t2677's own established precaution) —
+BOTH the old role-tagged fallback's own handle AND the new point_handle's own handle rendered, and
+`.find(kind==='move')` silently grabbed the WRONG one (the fallback's, id `reposition_pos`, not the scratch
+point_handle's) — caught because the resulting numbers matched neither expected marker position (a genuinely
+confusing false lead before the cause was traced). Separately, the SAME test's real independent-truth
+comparison needed `U.defaultParams(scratchDef)` merged into its own params object — omitted at first, which
+left the isolation params (`markx`/`marky`) undefined rather than their own declared default (0).
+
+**Non-vacuity, the whole mechanism**: reverted `resolveAnchorCoord`'s own params-key tier AND
+`markerAnchorCoord` (returns `undefined` unconditionally) to their pre-turn shape (scratch copies saved
+first), re-ran both SCRATCH BUILD tests — **both failed correctly** (the named-param case: expected 70/139,
+received 40 both times — the anchor silently collapsing to its own literal-0 default; the marker case:
+expected ~7, received 0 — same collapse). Restored from the scratch copies, re-confirmed 4/4 green.
+
+**Amendment 4 — verifying the primitive spans BOTH milling AND probing, not just milling** (the owner's own
+named risk: the census's "23 ops, no interactive handle" row is a grep-derived FLOOR, not confirmed op-by-op,
+and several of those 23 are PROBING ops). Measured directly (`layoutSpecFromOp` called on each op's own real
+def, not inferred): **edge, alignment, faceProbe, odProbe, rotaryCenter — genuinely handle-less**, confirmed
+(0 handles, 0 anchored bindings, each). **middle is NOT handle-less** — it renders TWO real, hand-rolled
+`crossAim`-kind handles (`panelTypes.js:847-887`, ids `crossAimP`/`crossAimS`, pre-dating this whole arc —
+`cross_aim_handle`'s own header already names this exact spot as "middle's OWN hardcoded crossAim
+decl-building… untouched"). Traced what they read/write: a LIVE wall-face position (`lineAt`, marker-derived,
+the SAME kind of value `cross_aim_handle`'s own declared block already formalizes for OTHER ops) → a
+probe-travel form param (`pField`/`sField`). **This does NOT need a third anchor source** — it already fits
+`cross_aim_handle`'s own EXISTING, separate vocabulary (role `'cross'` + marker resolution, t2583); middle is
+simply not yet MIGRATED off its own old hand-rolled JS onto that block — the exact class of defect BACKLOG
+#71/#72 as a whole already targets, not a gap in ax/ay's own new primitive. **Verdict**: the census's 23-op
+floor undercounts by (at least) 1 (middle); every OTHER checked op is genuinely clean; no new vocabulary
+decision forced. Filed as its own BACKLOG note (below) so a future census sweep doesn't have to rediscover
+this by hand.
+
+**RENDERRANCHY's own live progress page flagged a data-consistency bug mid-turn** (amendment 5, the owner's
+own screenshot: completed 6997 > total 3244, an impossible ratio for one consistent run, tier correctly read
+"full suite" — confirming THIS turn's own `DDCS_TIER` small item reached that page). ⚠ UNCONFIRMED MECHANISM
+— I cannot inspect Ranchy's own filesystem from here; what follows is OBSERVED (the screenshot) plus one
+CONCRETE fact checked against THIS repo's own config, not a diagnosis of Ranchy's own run. The advisor's own
+working theory (amendment 5): `total` reflects ONE Playwright project while `completed` accumulates across
+ALL projects a multi-project invocation runs. **Checked directly**: `playwright.config.js` in THIS repo
+declares **no `projects` array at all** (confirmed by reading the file in full) — a single implicit default
+project, so the literal "total counts one project" mechanism does not apply to an ordinary `npm test` run of
+THIS config as it stands today. Either Ranchy is invoking Playwright differently (a shard flag, a second
+config, a repeat-each — unconfirmed), or the live PAGE itself (a separate Cloudflare Worker, not
+`progressReporter.mjs`) is aggregating/summing multiple heartbeat snapshots instead of showing only the
+latest one (also unconfirmed — I have not seen that Worker's own source). Per the owner's own explicit
+instruction: **THIS TURN'S OWN VERIFY (below) does NOT trust the live progress.md's percentage** — it reads
+`test-results/summary.json`'s own `stats` object directly, the same convention `test-all.cjs`'s own flaky-
+count line already established. Filed as its own BACKLOG item, marked UNCONFIRMED mechanism / CONFIRMED
+symptom, for whoever can inspect Ranchy's own invocation or the dashboard Worker directly.
+
+Small item (i), separate commit (unaffected by the mid-turn redesign — built and verified BEFORE the
+amendments landed, untouched since) — the two gaps the owner personally caught in the live progress page:
+1. **A minutes-stale "FINISHED" template at launch / an unlabeled boundary**: `test-all.cjs`'s own
+   `writePhaseMarker` gained a real `phase` parameter (was hardcoded `'node'` for BOTH its calls) and a NEW
+   second boundary — `'e2e-collecting'`, written right before the e2e child spawns, naming the several-second
+   gap where Playwright is still COLLECTING ~2900 test files before `progressReporter.mjs`'s own `onBegin()`
+   fires and starts writing real percentages.
+2. **`TEST:E2E` was ambiguous** (a standalone e2e run vs. the e2e portion of a full-suite run):
+   `test-all.cjs` now passes `DDCS_TIER='full suite'` into the e2e child's own env; `progressReporter.mjs`'s
+   own `tier` field prefers `process.env.DDCS_TIER` over `npm_lifecycle_event`/`npm_command`, falling through
+   unchanged for a standalone `npm run test:e2e` (which never sets it). Proven LIVE: `DDCS_TIER="full suite"
+   npm run test:e2e -- <spec> -g <title>` → `progress.json`'s own `tier` read `"full suite"`; the SAME
+   command WITHOUT the env var → `"test:e2e"`. The two new phase-marker boundaries verified standalone too (a
+   copy of `writePhaseMarker`'s own body run directly, both calls producing the correctly phase-tagged JSON).
+   ⚠ This is the SAME mechanism amendment 5's screenshot confirms reached Ranchy — its own `tier: full suite`
+   reading is this small item working correctly; the completed>total bug is a SEPARATE, pre-existing defect
+   in whatever aggregates the numbers, not something this small item introduced (its own change never touches
+   `total`/`completed` at all — confirmed by re-reading `writePhaseMarker`'s and this item's own diff, neither
+   sets those fields).
+
+### VERIFY
+
+Full suite (`npm test`): test:node 236/236. test:e2e **3205 passed, 0 failed, 13 flaky, 28 skipped** (3246
+total). Read from `test-results/summary.json`'s own `stats` object directly (`expected:3205, unexpected:0,
+flaky:13, skipped:28`), per amendment 5's own explicit instruction — NOT the live progress page. This run's
+own numbers are internally consistent (`passed+flaky+skipped = 3205+13+28 = 3246 = total`, exactly) — no
+completed>total artifact on THIS machine's own single-project `npm test` invocation, consistent with BACKLOG
+#87's own finding that `playwright.config.js` here declares no `projects` array. Flaky count (13) re-checked
+against the live log tail rather than argued: all 13 eventually PASSED on retry (the JSON reporter's own
+`unexpected:0` is the authority — a flaky test is not a failed one). `git status` clean except this entry,
+BACKLOG.md (#85 correction + new #87, its own separate commit per the standing convention), the 9 source
+files (`bridge.js`, `userOps.js`, `anchorSources.js`, `panelTypes.js`, `placement.js`, `pointHandle.js`,
+`rectHandle.js`, the new `anchorValueField.js`), the two new mechanism specs + one collateral test-shape fix
+(`rect-handle-block.spec.js`), the three new screenshots, and the two small-item files (`test-all.cjs`,
+`progressReporter.mjs`, their own separate commit) — `verification/*.png` churn from running other suites
+this session left unstaged, per the standing screenshot-discipline rule.
+

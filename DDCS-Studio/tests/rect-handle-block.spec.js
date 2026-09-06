@@ -63,12 +63,17 @@ test('round-trip: a rect_handle nested in feature_canvas MERGES its anchor onto 
     expect(r.anchors.map((b) => b.param)).toEqual(['boxw', 'boxh']);
     expect(r.anchors.map((b) => b.key), 't2525 -- MERGED from the real bindings, not socket-less').toEqual(['clearance', 'retractZ']);
     expect(r.anchors.map((b) => b.default)).toEqual([40, 30]);
-    expect(r.anchors[0].anchor, 'the anchor carries ax/ay/sx/sy/clamps/valueField/label').toEqual({ kind: 'rect', ax: 0, ay: 0, sx: 1, sy: 1, minw: 5, maxw: null, minh: 5, maxh: null, valueField: 'field', label: 'W×H' });
+    // t2679 -- ax/ay are now VALUE SOCKETS: raw at derive, no longer eagerly Number()'d (the old
+    // `Number(p.ax)||0` would have mangled a plugged `form_variable` reporter record into NaN->0). This test
+    // still authors ax/ay as the RAW STRING '0' (the pre-socket shape, still legacy-supported by
+    // resolveAnchorCoord) -- so the anchor now carries it THROUGH UNCHANGED, string '0', not force-coerced to
+    // the number 0 the old hard-coercion produced. cornerParam joins the anchor (t2679, empty here = unset).
+    expect(r.anchors[0].anchor, 'the anchor carries ax/ay/sx/sy/clamps/valueField/cornerParam/label').toEqual({ kind: 'rect', ax: '0', ay: '0', sx: 1, sy: 1, minw: 5, maxw: null, minh: 5, maxh: null, valueField: 'field', cornerParam: '', label: 'W×H' });
     expect(r.merged.filter((b) => b.param === 'boxw' || b.param === 'boxh').length, 'exactly one entry per param, no duplicates').toBe(2);
     // reverse round-trip: the two merged bindings still re-nest into a feature_canvas carrying the SAME rect_handle
     expect(r.nBack).toBe(1);
     expect(r.back0.type).toBe('feature_canvas');
-    expect(r.back0.children).toEqual([{ type: 'rect_handle', params: { field: 'boxw', fieldH: 'boxh', value: '40', valueH: '30', ax: '0', ay: '0', sx: '1', sy: '1', minw: '5', maxw: '', minh: '5', maxh: '', valueField: 'field', label: 'W×H' } }]);
+    expect(r.back0.children).toEqual([{ type: 'rect_handle', params: { field: 'boxw', fieldH: 'boxh', value: '40', valueH: '30', ax: '0', ay: '0', sx: '1', sy: '1', minw: '5', maxw: '', minh: '5', maxh: '', valueField: 'field', cornerParam: '', label: 'W×H' } }]);
     // FAIL VISIBLY: no matching real bindings -> both anchorUnresolved
     expect(r.unresolvedAnchors.length).toBe(2);
     expect(r.unresolvedAnchors.every((b) => b.anchorUnresolved)).toBe(true);

@@ -137,11 +137,16 @@ export function placeShiftFromParams(p = {}, liveBbox = null) {
     );
 }
 
-/** Helper to compute relative UI handles (pos and size) based on the datum corner.
- *  Returns parameters to spread into `rect`, `point`, or `radial` canvasWidget descriptors, ensuring
- *  the pos handle is at the datum, the size handle is opposite, and dragging updates originX/Y to keep the datum fixed. */
-export function handleScale(params, prefix, ox, oy, w, h) {
-    const pc = (params.pathDatum || params.stockAttach || params.stockDatum || 'nn').replace(/[^ncp]/g, '').padEnd(2, 'n');
+/** t2679 (Phase 2 board, proposal (a)) — the datum-CORNER-CODE math, EXTRACTED from this file's own
+ *  `handleScale` (below, its sole caller until now) so a SECOND caller — `panelTypes.js`'s own render-time
+ *  `rect_handle` resolver, for a handle declaring a `cornerParam` field — can share the identical "what does
+ *  'pp'/'nc'/etc MEAN" derivation, one source, not two. `code` is the raw pathDatum/stockAttach/stockDatum-
+ *  shaped string (2 chars from {n,c,p} per axis, default 'nn' — UNCHANGED parsing, byte-identical to the
+ *  inline version this replaces); `w`/`h` the extent this corner is relative to. Returns the single-axis
+ *  codes (`x`/`y`) alongside the derived geometry so `handleScale` can still build its own `labelDir`/`fx`/
+ *  `fy` from them without re-parsing `code` a second time. */
+export function cornerAnchorOf(code, w, h) {
+    const pc = (code || 'nn').replace(/[^ncp]/g, '').padEnd(2, 'n');
     const x = pc[0], y = pc[1];
     const px = x === 'p' ? w : (x === 'c' ? w / 2 : 0);
     const py = y === 'p' ? h : (y === 'c' ? h / 2 : 0);
@@ -149,6 +154,15 @@ export function handleScale(params, prefix, ox, oy, w, h) {
     if (x === 'p') ra = Math.PI;
     else if (x === 'c' && y === 'p') ra = -Math.PI / 2;
     else if (x === 'c' && y === 'n') ra = Math.PI / 2;
+    return { x, y, px, py, ra, vx: x === 'p' ? -1 : 1, vy: y === 'p' ? -1 : 1, sx: x === 'c' ? 0.5 : 1, sy: y === 'c' ? 0.5 : 1 };
+}
+
+/** Helper to compute relative UI handles (pos and size) based on the datum corner.
+ *  Returns parameters to spread into `rect`, `point`, or `radial` canvasWidget descriptors, ensuring
+ *  the pos handle is at the datum, the size handle is opposite, and dragging updates originX/Y to keep the datum fixed. */
+export function handleScale(params, prefix, ox, oy, w, h) {
+    const code = params.pathDatum || params.stockAttach || params.stockDatum || 'nn';
+    const { x, y, px, py, ra, vx, vy, sx, sy } = cornerAnchorOf(code, w, h);
     // Label direction (SVG screen space): offset AWAY from the shape interior so the glyph
     // doesn't overlap the feature.  Center axes keep the current default (upper-right).
     // lx: -1 = label LEFT (text-anchor:end), 1 = label RIGHT (text-anchor:start)
@@ -161,8 +175,7 @@ export function handleScale(params, prefix, ox, oy, w, h) {
             ax: ox + px, ay: oy + py,
             ex: x === 'c' ? w / 2 : w,
             ey: y === 'c' ? h / 2 : h,
-            vx: x === 'p' ? -1 : 1, vy: y === 'p' ? -1 : 1,
-            sx: x === 'c' ? 0.5 : 1, sy: y === 'c' ? 0.5 : 1,
+            vx, vy, sx, sy,
             fx: x === 'n' ? null : prefix + 'originX',
             fy: y === 'n' ? null : prefix + 'originY',
             a: ra,

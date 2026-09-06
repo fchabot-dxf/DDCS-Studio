@@ -26,6 +26,7 @@ import { placeShiftOfStack } from '../../blocks/blockEmitter.js';
 import { latheLayoutSpec } from '../../viz/latheProfileCanvas.js';   // t1273 — a LATHE op draws its half-profile here; the mill XY-stock layout has nothing to say about a bar on centres   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
 import { MULTI_WIDGETS } from '../../ui/formWidgets.js';   // t1690 — the ONE declared "this widget owns several params as a single control" registry (renderOpForm's own renderUnit reads it); _writable derives from the SAME set instead of a DOM query
 import { resolveAnchorCoord, resolveEnumSign } from './anchorSources.js';   // t2573 — the stock-anchor + enum-sign primitives diag_aim_handle needs (t2571's own assessment); resolveAnchorCoord also retrofit onto point_handle's own ax/ay below, proving it general
+import { cornerAnchorOf } from './placement.js';   // t2679 — the datum-corner-code math handleScale already used, shared here for rect_handle's own optional live `cornerParam`
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -376,6 +377,23 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';
         return { ax, ay, offX, offY, destPass, destEmits, reposManual };
     };
+    // t2679 (amendment 3) — the OTHER tier `point_handle`/`rect_handle`'s own searchable ax/ay field can name:
+    // one of THIS def's own preview markers (a `simstart` row's declared `id`, t2585 — the SAME candidate the
+    // field's own search box offers alongside live form params). A READ-ONLY position lookup, deliberately NOT
+    // `resolveRelToPoint` above: that function's write-back + dog-leg/pinned-pass relocation is `relToRow`'s
+    // own richer, whole-handle-anchors-to-a-marker contract (t2677) — ax/ay borrowing a marker's single scalar
+    // coordinate is a lighter ask, so it stays a lighter function. Returns `undefined` (not 0) when `raw`
+    // isn't a marker id at all, so the caller can fall through to `resolveAnchorCoord`'s own tiers instead of
+    // masking a real form-param/literal value with a false marker miss.
+    const markerAnchorCoord = (raw, axis) => {
+        if (typeof raw !== 'string' || raw === '') return undefined;
+        if (params && Object.prototype.hasOwnProperty.call(params, raw)) return undefined;   // a form param wins first — resolveAnchorCoord's own job
+        const idx = resolveRelToIndex(def.opType, params, { row: raw });
+        if (idx == null) return undefined;
+        const marks = opSimStarts(def.opType, params, s) || [];
+        const m = marks[idx];
+        return m ? num(axis === 'x' ? m.x : m.y, undefined) : undefined;
+    };
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     // t1690 DECLARE `_writable`'s STRUCTURAL half — a param is individually settable AT ALL unless it shares a
@@ -522,7 +540,14 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: rt.offX, y: rt.offY, ax: rt.ax, ay: rt.ay, label: rt.destPass != null ? String(rt.destPass) : (anchor.label || 'pos'), color: srcCol(rt.destPass), manual: rt.reposManual, emits: rt.destEmits });
                 continue;
             }
-            pos(resolveAnchorCoord(anchor.ax, stock, 0), resolveAnchorCoord(anchor.ay, stock, 0), anchor.label || 'pos'); continue;
+            // t2679 (amendment 3) — ax/ay are now a SEARCHABLE VALUE FIELD (anchorValueField.js): a plain
+            // literal number, OR a STRING naming either this def's own live form param (resolveAnchorCoord's
+            // own tier) or one of its own preview markers (`markerAnchorCoord`, tried FIRST — a marker id and
+            // a param name are drawn from disjoint pools by construction, but the marker check is cheap and
+            // deliberately ordered first so a future name collision fails toward the more specific match).
+            const ax2 = markerAnchorCoord(anchor.ax, 'x'); const px = ax2 !== undefined ? ax2 : resolveAnchorCoord(anchor.ax, stock, 0, params);
+            const ay2 = markerAnchorCoord(anchor.ay, 'y'); const py = ay2 !== undefined ? ay2 : resolveAnchorCoord(anchor.ay, stock, 0, params);
+            pos(px, py, anchor.label || 'pos'); continue;
         }
         // t2517 (BACKLOG #71 pilot) — `length_handle` declares kind 'length': a FIXED literal anchor (ax/ay,
         // never itself bound/draggable — unlike the point anchor above, which is always {0,0}) + one 1D-extent
@@ -550,13 +575,31 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             const hB = groups[gid].find((b) => b.role === 'h');
             const ex = wB ? num(params[wB.param]) : 0;
             const ey = hB ? num(params[hB.param]) : 0;
-            items.push({ kind: 'hole', x: anchor.ax, y: anchor.ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed, not draggable
+            // t2679 (amendment 3) — ax/ay are the SAME searchable-value-field shape point_handle's own ax/ay
+            // just above use (a literal number, a live form-param name, or a preview-marker id — tried in
+            // that order via `markerAnchorCoord` then `resolveAnchorCoord`). `cornerParam` (a picker FIELD,
+            // not this searchable field — per the owner's own explicit ruling this turn, unchanged across
+            // every amendment) OPTIONALLY names a param whose LIVE value is a datum-corner code ('nn'/'pp'/…
+            // — the SAME vocabulary stockAttach/pathDatum already use) — when set, `cornerAnchorOf`
+            // (placement.js, the SAME math handleScale-driven ops already run) overrides the static
+            // ax/ay/sx/sy with the corner's own live position, so a migrated op's handle could track a moving
+            // datum corner the way surfacing/pocket/etc already do internally — the render-time half of the
+            // mechanism, authorable now, not yet exercised by any op.
+            const axM = markerAnchorCoord(anchor.ax, 'x'), ayM = markerAnchorCoord(anchor.ay, 'y');
+            let ax = axM !== undefined ? axM : resolveAnchorCoord(anchor.ax, stock, 0, params);
+            let ay = ayM !== undefined ? ayM : resolveAnchorCoord(anchor.ay, stock, 0, params);
+            let liveSx = anchor.sx, liveSy = anchor.sy;
+            if (anchor.cornerParam) {
+                const code = params[anchor.cornerParam];
+                if (code != null) { const c = cornerAnchorOf(code, ex, ey); ax = c.px; ay = c.py; liveSx = c.sx; liveSy = c.sy; }
+            }
+            items.push({ kind: 'hole', x: ax, y: ay, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the anchor itself is fixed (or corner-tracking), not draggable
             const wOk = wB && _writable(wB.param), hOk = hB && _writable(hB.param);
             if (wOk || hOk) {
                 const value = anchor.valueField === 'fieldH' ? ey : ex;   // t2495's own routing — which axis the displayed number reflects
                 decls.push({
-                    type: 'rect', id: gid + '_size', ax: anchor.ax, ay: anchor.ay, ex, ey,
-                    sx: wOk ? anchor.sx : 0, sy: hOk ? anchor.sy : 0,
+                    type: 'rect', id: gid + '_size', ax, ay, ex, ey,
+                    sx: wOk ? liveSx : 0, sy: hOk ? liveSy : 0,
                     field: wOk ? wB.param : undefined, fieldH: hOk ? hB.param : undefined,
                     minw: anchor.minw, maxw: anchor.maxw, minh: anchor.minh, maxh: anchor.maxh,
                     valueField: anchor.valueField, value, label: anchor.label || 'W×H',

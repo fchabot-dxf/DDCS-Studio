@@ -787,14 +787,18 @@ export function handleBindingsFromStack(children, realBindings) {
                 out.push(attach(String(p.field || 'len'), gid, 'len', anchor));
             } else if (b.type === 'point_handle') {
                 const gid = 'ph' + (++n);
-                // t2573 — ax/ay kept as the RAW authored string (not eagerly Number()'d): panelTypes.js's own
-                // `anchor.kind==='point'` branch now resolves each through `resolveAnchorCoord` (anchorSources.js,
-                // t2571's stock-anchor primitive), which needs live `stock` — unavailable at this static-binding-
-                // build layer. A plain numeric string ('0', '40', …) still resolves byte-identical; only a NEW
-                // stock-token string ('stockHalfW', …) activates the lookup, proving the primitive general beyond
-                // diag_aim_handle, its first consumer.
-                const ax = (p.ax === '' || p.ax == null) ? '0' : String(p.ax);
-                const ay = (p.ay === '' || p.ay == null) ? '0' : String(p.ay);
+                // t2573 — ax/ay kept RAW (not eagerly Number()'d/String()'d): panelTypes.js's own
+                // `anchor.kind==='point'` branch resolves each through `resolveAnchorCoord` (anchorSources.js,
+                // t2571's stock-anchor primitive), which needs live `stock`/`params` — unavailable at this
+                // static-binding-build layer. A plain numeric string ('0', '40', …) still resolves byte-
+                // identical; a stock-token string ('stockHalfW', …) activates the stock lookup (t2573).
+                // t2679 (amendment 3) — ax/ay's own field (`field_anchor_value`, anchorValueField.js) commits
+                // EITHER a plain NUMBER (a typed literal) or a STRING naming an existing form param/marker —
+                // never pre-reduced, resolved only at render time (`panelTypes.js`'s `markerAnchorCoord`/
+                // `resolveAnchorCoord`). Pass either through UNCHANGED; only an EMPTY field gets the numeric
+                // default (0, matching the block's own default shape — was the string '0' before this turn).
+                const ax = (p.ax === '' || p.ax == null) ? 0 : p.ax;
+                const ay = (p.ay === '' || p.ay == null) ? 0 : p.ay;
                 // t2677 (Phase 2 board, proposal (c)) — relToRow, mirroring cross_aim_handle's own identical
                 // field (t2583) exactly: a raw string naming a declared simstart row, empty = no relTo (the
                 // fixed ax/ay literal anchor, unchanged). Resolved live in panelTypes.js's own anchor.kind===
@@ -805,12 +809,23 @@ export function handleBindingsFromStack(children, realBindings) {
                 out.push(attach(String(p.fy || 'y'), gid, 'y', anchor));
             } else if (b.type === 'rect_handle') {
                 const gid = 'rh' + (++n);
-                const ax = Number(p.ax) || 0, ay = Number(p.ay) || 0;
+                // t2679 (amendment 3) — ax/ay: the SAME raw-passthrough doctrine as point_handle's own ax/ay
+                // just above (a plain number, or a string naming a form param/marker) — was a hard
+                // `Number(p.ax)||0` coercion before this turn, which would have mangled a name string into
+                // NaN→0, silently discarding it.
+                const ax = (p.ax === '' || p.ax == null) ? 0 : p.ax;
+                const ay = (p.ay === '' || p.ay == null) ? 0 : p.ay;
                 const sx = p.sx === '' || p.sx == null ? 1 : Number(p.sx);
                 const sy = p.sy === '' || p.sy == null ? 1 : Number(p.sy);
                 const numOrNull = (v) => (v === '' || v == null) ? null : Number(v);
+                // t2679 (Phase 2 board, proposal (a)) — `cornerParam`: a picker FIELD (not a socket, this
+                // turn — the memo's own §3), naming a param whose LIVE value is a datum-corner code
+                // ('nn'/'pp'/… — the SAME vocabulary stockAttach/pathDatum already use). Empty = no live
+                // corner-tracking, the static ax/ay/sx/sy above are what render. Resolved live in
+                // panelTypes.js's own anchor.kind==='rect' branch (cornerAnchorOf), not here.
+                const cornerParam = p.cornerParam ? String(p.cornerParam) : '';
                 const anchor = {
-                    kind: 'rect', ax, ay, sx, sy,
+                    kind: 'rect', ax, ay, sx, sy, cornerParam,
                     minw: numOrNull(p.minw), maxw: numOrNull(p.maxw), minh: numOrNull(p.minh), maxh: numOrNull(p.maxh),
                     valueField: p.valueField === 'fieldH' ? 'fieldH' : 'field', label: p.label || 'W×H',
                 };
@@ -939,9 +954,13 @@ export function handleBindingsToBlocks(bindings) {
     for (const g in byGroup) {
         const x = byGroup[g].x, y = byGroup[g].y;
         if (!x || !y) continue;
+        // t2679 (amendment 3) — ax/ay preserved RAW (a number, or a string naming a form param/marker), same
+        // doctrine as `handleBindingsFromStack`'s own forward direction: `String(...)` on a NUMBER here would
+        // silently downgrade it to a text-field-shaped value; a name string passes through unchanged either way.
         ptKids.push({ type: 'point_handle', params: {
             fx: x.param, fy: y.param, x: x.default != null ? String(x.default) : '', y: y.default != null ? String(y.default) : '',
-            ax: String(x.anchor.ax || 0), ay: String(x.anchor.ay || 0), label: x.anchor.label || 'pos',
+            ax: (x.anchor.ax === '' || x.anchor.ax == null) ? 0 : x.anchor.ax,
+            ay: (x.anchor.ay === '' || x.anchor.ay == null) ? 0 : x.anchor.ay, label: x.anchor.label || 'pos',
         } });
     }
     // rect_handle: pair each group's own w/h bindings that carry a {kind:'rect'} anchor.
@@ -952,12 +971,15 @@ export function handleBindingsToBlocks(bindings) {
         const w = byGroupR[g].w, h = byGroupR[g].h;
         if (!w || !h) continue;
         const a = w.anchor;
+        // t2679 (amendment 3) — ax/ay preserved RAW, same doctrine as point_handle's own just above;
+        // cornerParam carried through too (a plain picker string, unaffected either way).
         rectKids.push({ type: 'rect_handle', params: {
             field: w.param, fieldH: h.param, value: w.default != null ? String(w.default) : '', valueH: h.default != null ? String(h.default) : '',
-            ax: String(a.ax || 0), ay: String(a.ay || 0), sx: String(a.sx != null ? a.sx : 1), sy: String(a.sy != null ? a.sy : 1),
+            ax: (a.ax === '' || a.ax == null) ? 0 : a.ax, ay: (a.ay === '' || a.ay == null) ? 0 : a.ay,
+            sx: String(a.sx != null ? a.sx : 1), sy: String(a.sy != null ? a.sy : 1),
             minw: a.minw != null ? String(a.minw) : '', maxw: a.maxw != null ? String(a.maxw) : '',
             minh: a.minh != null ? String(a.minh) : '', maxh: a.maxh != null ? String(a.maxh) : '',
-            valueField: a.valueField === 'fieldH' ? 'fieldH' : 'field', label: a.label || 'W×H',
+            valueField: a.valueField === 'fieldH' ? 'fieldH' : 'field', cornerParam: a.cornerParam || '', label: a.label || 'W×H',
         } });
     }
     // radial_handle: one binding per handle (role 'r'), like length_handle.
