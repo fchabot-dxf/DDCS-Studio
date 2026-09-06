@@ -76979,3 +76979,79 @@ and `status-remote-machine-2112.spec.js` re-run unchanged and green — the iden
 Status-tab fact this turn did not touch are unaffected.
 
 `git status` clean except this entry and `status.js`/the one new test file, confirmed below.
+
+## t2655 — LAYOUT-2D: corner's last empty mouth, separated from 3D-SIM into its own real section
+
+Dispatch: t1724 established corner draws no static 2D shape — the sim-start markers plus the toolpath trace ARE
+its 2D vocabulary; t2631 filled PROJECTED-GCODE with a real code_preview but left LAYOUT-2D collapsed-empty;
+t2635 measured the cost of splitting the combined 3D+2D box across two sections and deferred it. THIS TURN:
+LAYOUT-2D holds the real 2D canvas (`feature_canvas`, live) as its own section, 3D-SIM holds `preview3d`, and
+the adjacency-merge that welds them into one combined box when adjacent must render them SEPARATED when they
+sit in different sections — without breaking the 31 other ops whose merge stays welded.
+
+### THE CHANGE
+
+`cornerData.js`'s `RIGHT` array: `feature_canvas` moved OUT of the `3D-SIM` section (where it sat alongside
+`preview3d`, welded by `formWidgets.js`'s adjacency-merge into one combined box) and INTO `LAYOUT-2D`, now its
+own section holding real content instead of `[]`. `3D-SIM` keeps only `preview3d` + the sim-start markers.
+
+### THREE LAYERED BUGS, ALL FOUND LIVE — none reachable before this turn, because no shipped op ever had
+`preview3d` and `feature_canvas` BOTH render standalone (not merged) on the same page until this split
+
+1. **ID COLLISION.** `preview3d`'s own standalone branch and `feature_canvas`'s own standalone branch both
+   reused `userVizBox_tree`/`userVizContainer_tree` — an established convention for "genuinely no 2D pane
+   anywhere" (ATC-style ops). Corner's split makes BOTH render standalone at once for the first time — two DOM
+   elements sharing one id, `getElementById`/`elNS` silently resolving to the first, corrupting one mount.
+   **Fix:** `treeHasFeatureCanvasSomewhere` (a one-time recursive scan of the whole `uiTree`, added beside the
+   existing `__consumed` set) distinguishes "no 2D anywhere" (ATC — unchanged, `sep3d=false`) from "2D exists,
+   just not adjacent" (corner's new case). `buildVizBox(container, has2d, sep3d=false)` gained the `sep3d` param:
+   when true, `preview3d`'s standalone render uses the genuinely-3D-specific ids
+   (`userViz3dBox_tree`/`userViz3dContainer_tree`) instead of colliding with `feature_canvas`'s own ids.
+   `userOpView.js`'s `pt.mode==='3d2d'` reader already looks these ids up globally (not scoped to a shared
+   parent box), confirmed by reading it directly — it does not care whether the two panes share one
+   `.wiz-visual` or live in two, as long as each id exists exactly once.
+2. **MISSING `makePanesCollapsible()`.** `feature_canvas`'s own standalone branch builds `pnlBox` by hand and
+   never called `paneAccordion.js`'s `makePanesCollapsible()`, unlike every other viz-box branch. Without it,
+   the CSS rule `.wiz-visual [data-viz-pane] { flex-direction: row; ... }` applied to the RAW, un-wrapped
+   `.viz-status`+`.viz-canvas` children instead of the `.wiz-pane-bar`/`.wiz-pane-body` shape `enhancePane()` is
+   supposed to build first — `.viz-status`'s own `width:100%` (no flex properties, so `flex-basis:auto` claims
+   its full width) squeezed `.viz-canvas` to computed width:0 in the row-flex parent. Confirmed live via DOM/CSS
+   inspection (a throwaway instrumented Playwright probe, deleted after use) — never triggered before because,
+   per t2603's own comment, "a migrated op replaces this whole 'sim' node with preview3d+feature_canvas" before
+   any shipped op reached a genuinely-standalone `feature_canvas`. **Fix:** call `makePanesCollapsible(pnlBox)`
+   after appending it, matching every other branch.
+3. **THE RATIO-SPLITTER HAZARD, MEASURED NOT ASSUMED — turned out to be a non-issue.** t2635's own research
+   named the combined box's ratio splitter as the main open question for a genuine separation. Checked live:
+   `paneAccordion.js`'s `addPaneSplitter(split)` opens with `if (panes.length !== 2) return;` — a graceful no-op
+   for a single-pane `.viz-split`. Each separated box IS single-pane, and single-pane (splitter-free) boxes were
+   ALREADY the supported, shipped shape every ATC-style op uses — separation invents no new case here.
+
+### THE MERGE MECHANISM ITSELF IS UNTOUCHED
+
+The merge branch (`if (nextIsPanel || prevIsPanel) { buildVizBox(container, true); ... }`) is byte-identical to
+before. All three fixes above live strictly in the ELSE/non-merge branches — reachable only from the new
+standalone-with-feature_canvas-elsewhere case. The 31 other ops (`grep -rl "type: 'preview3d'" dataOps/*.js`,
+excluding corner) never reach that branch; confirmed both by tracing the code paths and by running their own
+established regression suites (drill, centerdrill, edge, faceProbe, facing, homing, middle) — all green.
+
+### VERIFY
+
+`corner-*.spec.js` (114 tests, including the t2531 canaries and `corner-redivide.spec.js`) — 114/114 green.
+`corner-data-drag.spec.js` hardened: `.fc-stock`'s `boundingBox()` read had no `waitFor` guarding it (unlike
+`.fc-handle-move`, which the same test does wait for) — caught as a real, if rare, load-dependent flake under
+full-suite contention (3/3 clean in isolation beforehand). Added the same `waitFor({state:'visible'})` t2635
+Part 4 already established for this class of settling lag.
+
+Screenshot baselines `modal-corner-win32.png`/`pane-corner-win32.png` regenerated — corner's form is
+legitimately taller now (LAYOUT-2D holds real expanded content instead of collapsed-empty), matching t2635's own
+precedent exactly. Viewed the actual new screenshots before regenerating: both show clean, separated
+LAYOUT-2D/3D-SIM sections, no overlap, no breakage. Re-ran after regenerating — stable (2/2 pass).
+
+**Full suite (`npm test`):** node 236/236. e2e **3182 passed, 3 failed, 16 flaky, 27 skipped**. All 3 failures
+re-run clean in isolation, none naming corner/formWidgets/cornerData: `pane-header-1768.spec.js` ("the view
+toggle choice persists across a reload") — 3/3 clean in isolation, a load-dependent flake.
+`preview-mutation-manifest-2463.spec.js` (`sf-pos-snapback`) — 9/9 clean in isolation (the full manifest file),
+a load-dependent flake. `trig-lift-plan-1466.spec.js` LOCK 5 — the SAME pre-existing, out-of-scope verify-macro
+lint failure named in t2641's and t2643's own entries (file untouched since commit `880ef211`, well before this
+turn — confirmed via `git log`).
+

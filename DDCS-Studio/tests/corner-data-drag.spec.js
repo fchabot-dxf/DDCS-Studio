@@ -60,6 +60,13 @@ test('Corner (data): dragging the reposition handle writes the CORRECT increment
 
   // drag the reposition handle to the STOCK CENTRE — a KNOWN world point W = (stock.x/2, stock.y/2). The move handle snaps
   // to stock anchors, so the centre lands the handle at exactly the world centre; the expected DELTA = W − wall1.
+  // t2655 — the standalone feature_canvas render path now runs a genuinely-new async settle
+  // (formWidgets.js's own makePanesCollapsible call, previously never exercised by any shipped op — see
+  // WORK-LOG t2655) — an explicit wait here, matching the SAME settling-lag precedent t2635 Part 4 already
+  // established for other corner tests, rather than relying on `.fc-handle-move`'s own wait above to also
+  // cover a DIFFERENT element (`.fc-stock` had no wait of its own before; caught as a real, if rare, flake
+  // under full-suite contention — 3/3 clean in isolation, but the class of race is real).
+  await page.locator('#userVizContainer_tree .fc-stock').first().waitFor({ state: 'visible' });
   const stockBox = await page.locator('#userVizContainer_tree .fc-stock').first().boundingBox();
   const W = { x: stock.x / 2, y: stock.y / 2 };
   const expectDx = +(W.x - wall1.x).toFixed(2);

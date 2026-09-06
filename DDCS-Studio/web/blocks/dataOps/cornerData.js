@@ -270,24 +270,19 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // OWN proof that it broke (this exact structure re-run live: canvas-mount 1/1, form-reproduction 2/2,
     // corner-redivide (3)+(4) both green — see WORK-LOG t2635 for the full account).
     //
-    // FORM wraps the field groups (unchanged content, now titled+coloured). 3D-SIM keeps preview3d+
-    // feature_canvas ADJACENT (the merge's own requirement — they stay true array siblings, just one level
-    // deeper under this section, which the generalized adjacency-check now sees through) alongside the
-    // sim-start markers, reproducing the WORKING combined box byte-identical to before this act (t2511's own
-    // guarantee, unbroken). PROJECTED-GCODE gets its own section (moved out of FORM, not duplicated).
+    // FORM wraps the field groups (unchanged content, now titled+coloured). PROJECTED-GCODE gets its own
+    // section (moved out of FORM, not duplicated).
     //
-    // ⚠ LAYOUT-2D IS STILL EMPTY — A NAMED, NOT SILENT, GAP. Splitting preview3d/feature_canvas into TWO
-    // separately-labelled sections (so LAYOUT-2D could host the 2D pane on its own, standalone) was
-    // investigated and found technically POSSIBLE but genuinely costly: the 3D/2D boxes' own mounting is
-    // id-local and safe to relocate, but paneAccordion.js's ratio-splitter (`addPaneSplitter`) requires
-    // BOTH panes as `:scope > [data-viz-pane]` siblings of ONE `.viz-split` — splitting them loses the
-    // drag-resize splitter outright, needs a CSS parent-chain audit (styles.css:2590/2608's own DIRECT-CHILD
-    // chains, the exact t2357 bug class if the new parent isn't `.wiz-2pane`/`.ui-split-pane`), a narrow-width
-    // height-rule fix, and touches 6 existing test files (pane-ratio-slam-2357, pane-ratchet-2353,
-    // pane-container-2355, polish-batch-1239, render-equivalence-1796, screenshot-baselines-1792) — a properly
-    // scoped, separately-verified turn, not a fold-in. Kept `children: []` (t1724's own original, honest
-    // shape) rather than force either a risky DOM split or an unrelated field un-shuffled from FORM just to
-    // avoid an empty box. Flagged, not silently left — see WORK-LOG t2635 and the pass-back note.
+    // t2655 — LAYOUT-2D and 3D-SIM SEPARATED: `feature_canvas` now lives alone in LAYOUT-2D's own children,
+    // `preview3d` alone in 3D-SIM's — the deferred half of t2635's own composition work, costed there and
+    // picked up here now that the cost was actually measured live rather than assumed. Each renders its own
+    // established STANDALONE single-pane shape (byte-identical to any other op's lone preview3d/feature_canvas
+    // — e.g. ATC's own 3D-only box), not the combined 2-pane box: formWidgets.js's adjacency-merge only checks
+    // siblings WITHIN the array `traverse()` is currently iterating, and these two now live in two separate
+    // section children-arrays, each its own recursive call — the merge has no path to reach across that
+    // boundary, verified live (see WORK-LOG t2655), not merely inferred from reading the code. The 31 other
+    // ops that keep `preview3d`+`feature_canvas` genuinely adjacent (inside ONE shared section, or with no
+    // section at all) are untouched — same array, same merge, byte-identical.
     const uiChildren = [{
         type: 'split_horizontal', params: { ratio: '360px:*' },
         children: {
@@ -307,19 +302,32 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
                 sec('PROJECTED-GCODE', '#0ea5e9', [{ type: 'code_preview', params: { tag: '(DDCS M350 COMPLIANT)' } }]),
             ],
             RIGHT: [
-                // t2635 — collapsedDefault:true: an EMPTY section's own expanded body reserves real vertical
-                // height it never uses, measurably shrinking the working 3D-SIM visualization beside it
-                // (874×323 → 874×154, measured live before this fix) — see formWidgets.js's own 'section'
-                // branch for the general mechanism this uses (any section can opt in, not corner-specific).
-                { ...sec('LAYOUT-2D', '#3b82f6', []), params: { title: 'LAYOUT-2D', color: '#3b82f6', collapsedDefault: true } },
+                // t2655 (BACKLOG "the deferred REDIVIDE split") — LAYOUT-2D now hosts the REAL 2D canvas,
+                // standalone, moved out of 3D-SIM's own children (t2635's own deferred item, costed there and
+                // picked up here). `feature_canvas` sitting ALONE in this section's own children array means
+                // formWidgets.js's adjacency-merge (which only ever checks `nodes[i±1]` WITHIN the array
+                // `traverse()` is CURRENTLY iterating — see that file's own preview3d/feature_canvas branches)
+                // has no `preview3d` sibling to find here: LAYOUT-2D.children and 3D-SIM.children are two
+                // SEPARATE arrays, each reached through its own section's own recursive `traverse()` call, so
+                // the merge check literally cannot see across that boundary — verified live, not assumed (see
+                // WORK-LOG t2655). No longer collapsed-by-default: it now holds real, live content.
+                sec('LAYOUT-2D', '#3b82f6', [
+                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
+                ]),
                 // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock);
                 // machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain
                 // forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent =
                 // no forceMachine. The per-pass sim-start markers (cornerSimStartsProvider) are the SHARED
                 // anchor source for both panes below — ONE source, never re-declared per view.
+                // t2655 — `feature_canvas` moved OUT to LAYOUT-2D above; 3D-SIM now holds `preview3d` alone
+                // (+ the sim-start markers, unmoved — they are inert for the live form either way, present
+                // only for Blockly round-trip). `preview3d` standalone renders its own established single-pane
+                // shape (byte-identical to e.g. ATC's own 3D-only box) — no merge, no ratio-splitter needed
+                // (`paneAccordion.js`'s own `addPaneSplitter`: `if (panes.length !== 2) return` — a genuinely
+                // single-pane `.viz-split` was ALREADY its own supported, splitter-free shape before this
+                // turn, not a new case this turn invents).
                 sec('3D-SIM', '#6366f1', [
                     { type: 'preview3d', params: { rotary: false, machine: false, magazine: false, probeWcs: true } },
-                    { type: 'feature_canvas', params: { panel: 'form3d+2d' } },
                     ...simstarts,
                 ]),
             ],

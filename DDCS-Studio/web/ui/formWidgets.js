@@ -1492,7 +1492,17 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
     // visible, no 2D pane at all — the ATC-style 3D-only shape). This is NOT called for a standalone `panel`
     // with no adjacent `preview3d` — that keeps its own pre-existing "FEATURE CANVAS" single-pane shape,
     // untouched by this turn.
-    const buildVizBox = (container, has2d) => {
+    // t2655 — `sep3d` (third mode, additive): a `preview3d` rendered standalone (no ADJACENT feature_canvas to
+    // merge with) but where a feature_canvas genuinely EXISTS elsewhere in the tree, just in a separately-
+    // labelled section (corner's own REDIVIDE split, LAYOUT-2D vs 3D-SIM). This is NOT the `has2d:false` case
+    // below (genuinely no 2D pane anywhere, e.g. ATC) — `userOpView.js`'s own `pt.mode==='3d2d'` reader (the
+    // mode a `panel:'form3d+2d'` feature_canvas selects) looks up `userViz3dBox_tree`/`userViz3dContainer_tree`
+    // for its 3D pane UNCONDITIONALLY, regardless of whether the 2D pane lives in the SAME box or a separate
+    // one — those ids are read directly (`elNS`/`id`), never scoped to a particular parent box. Reusing the
+    // `has2d:false` branch's "2D" ids here would collide with feature_canvas's own standalone box (which
+    // ALREADY correctly claims those same ids, below) — confirmed live: this exact collision (two DOM elements
+    // sharing one id; `getElementById` silently returns only the first) broke 33 corner tests before this fix.
+    const buildVizBox = (container, has2d, sep3d = false) => {
         const box = document.createElement('div');
         box.className = 'wiz-visual';
         box.style.cssText = 'width:100%; display:flex; flex-direction:column; position:relative; flex: 0 1 auto;';
@@ -1506,6 +1516,13 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
             <div class="viz-container" data-viz-pane="layout2d">
                 <div id="${nsId('userVizStatus_tree')}" class="viz-status"></div>
                 <div id="${nsId('userVizContainer_tree')}" class="viz-canvas"></div>
+            </div>
+        </div>` : sep3d ? `
+        <span class="section-label">VISUALIZATION</span>
+        <div class="viz-split">
+            <div class="viz-container" id="${nsId('userViz3dBox_tree')}" data-viz-pane="preview3d">
+                <div id="${nsId('userViz3dStatus_tree')}" class="viz-status"></div>
+                <div id="${nsId('userViz3dContainer_tree')}" class="viz-canvas"></div>
             </div>
         </div>` : (
         // t2603 (BACKLOG #77) — the 3D-only (no 2D pane) box is named `userVizBox`/`userVizContainer`
@@ -1537,6 +1554,24 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
     // levels deep inside a DIFFERENT array (e.g. a `section`'s own children) than the array the merge was
     // detected FROM. A fresh `Set` per `renderUiTree` call (not module-level) — never stale across renders.
     const __consumed = new Set();
+    // t2655 — computed ONCE, over the WHOLE tree (not per-array, like the adjacency check below): does a
+    // `feature_canvas` exist ANYWHERE in this op's presentation tree, adjacent or not? A standalone
+    // `preview3d` (no adjacent feature_canvas found by the merge check below) uses this to tell "genuinely no
+    // 2D pane anywhere" (ATC-style — reuse the "2D" ids, today's behaviour) apart from "has a 2D pane, it's
+    // just declared in a separate, non-adjacent section" (corner's own REDIVIDE split) — see `buildVizBox`'s
+    // own `sep3d` parameter, just below, for why the id choice differs between the two.
+    const treeHasFeatureCanvasSomewhere = (() => {
+        const scan = (nodes) => {
+            for (const n of childrenOf(nodes)) {
+                if (!n) continue;
+                if (n.type === 'feature_canvas') return true;
+                if (n.children && scan(n.children)) return true;
+                if (n.uiChildren && scan(n.uiChildren)) return true;
+            }
+            return false;
+        };
+        return scan(uiTree);
+    })();
     // t2635 — the preview3d/feature_canvas adjacency-merge (below) used to check `nodes[i±1].type` directly,
     // which only ever matched when the two were LITERAL array siblings. `corner-redivide.spec.js`'s own
     // REDIVIDE structure (t130) wraps EACH of a section's own content in a `section` node for Blockly's
@@ -1663,7 +1698,11 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     if (panelNode.uiChildren) traverse(childrenOf(panelNode.uiChildren), container);
                     if (panelNode.children) traverse(childrenOf(panelNode.children), container);
                 } else {
-                    buildVizBox(container, false);
+                    // t2655 — NOT adjacent to a feature_canvas, but one may still exist ELSEWHERE in the tree
+                    // (a separately-sectioned REDIVIDE split, corner's own new shape) — see
+                    // `treeHasFeatureCanvasSomewhere`'s own header comment for why that case needs the
+                    // 3D-specific ids (`sep3d`), never the reused "2D" ids `has2d:false` alone would pick.
+                    buildVizBox(container, false, treeHasFeatureCanvasSomewhere);
                 }
             } else if (node.type === 'sim') {
                 const simBox = document.createElement('div');
@@ -1781,6 +1820,17 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}, codeElId = nu
                     </div>
                 </div>`;
                 container.appendChild(pnlBox);
+                // t2655 — GENUINE PRE-EXISTING GAP, found live: this standalone branch (a feature_canvas with
+                // no adjacent preview3d anywhere) never called `makePanesCollapsible`, unlike buildVizBox's own
+                // two callers and the 'sim' node branch above, which all remember it. Never caught before
+                // because nothing shipped ever exercised a genuinely-standalone feature_canvas — every existing
+                // consumer either merges with an adjacent preview3d (buildVizBox handles that) or predates this
+                // node type. Without it, `[data-viz-pane]`'s own CSS (`.wiz-visual [data-viz-pane] {
+                // flex-direction: row; ... }`, styles.css) never gets un-done by the wrap enhancePane() performs
+                // (raw .viz-status/.viz-canvas children instead of the expected .wiz-pane-bar+.wiz-pane-body) —
+                // confirmed live: the canvas rendered at width:0, off in the row layout the un-enhanced CSS
+                // produces, breaking 21+ corner tests before this fix.
+                import('./paneAccordion.js').then((m) => m.makePanesCollapsible(pnlBox)).catch(() => {});
                 if (node.uiChildren) traverse(childrenOf(node.uiChildren), container);
                 if (node.children) traverse(childrenOf(node.children), container);
             } else if (node.type === 'code_preview') {
