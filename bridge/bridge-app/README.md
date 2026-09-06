@@ -1,75 +1,75 @@
 # bridge-app — DDCS Expert job bridge
 
-⚠ **STALE, t2651: this file's own "beacons"/"Instrument" mentions below describe the progress-tracking
-mechanism REMOVED by BACKLOG #78 (t2649, owner-directed 2026-09-04 — never demonstrably ran end-to-end).**
-Every job now delivers synchronously — no "tracked vs deliver-only" split, no map, no watch phase. The
-replacement is BACKLOG #79's live Modbus position/run-state polling. Current contract:
-[`shared/PROTOCOL.md`](shared/PROTOCOL.md).
+Push a CNC job from anywhere, watch it run on the **DDCS Expert (M350)** — without exposing the machine to
+the internet. This is the application the rest of the repo's findings were building toward.
 
-Push a CNC job from anywhere, watch it run on the **DDCS Expert (M350)** — without exposing the
-machine to the internet. This is the application the rest of the repo's findings were building toward.
+> Targets the **Expert** specifically for its live Modbus position/tracking poll (needs controller param
+> `P279=Slave`, firmware ≥2025-12-11). SMB job delivery works on any controller sharing CNCDISK; the **V4.1
+> bench has no Modbus at all**, so it gets delivery without the live-tracking half. See
+> [`../controllers/expert-m350/FINDINGS.md`](../controllers/expert-m350/FINDINGS.md).
 
-> Targets the **Expert** specifically (uses Expert-only Modbus `MSETDATA` + the confirmed SMB write to
-> CNCDISK). Not for the V4.1 bench. See [`../controllers/expert-m350/FINDINGS.md`](../controllers/expert-m350/FINDINGS.md).
+> **Job lifecycle — one source, not repeated here:** [`JOB-RULES.md`](JOB-RULES.md). Every job delivers the
+> same way today (claim → write to the controller → `delivered`/`failed`) — no per-job map, no watch phase.
+> **No bucket/store retention either way:** the `.nc` is removed from the rendezvous the instant it's
+> delivered — it then lives on the **controller's own CNCDISK**, which is where a same-session re-run comes
+> from (re-select + Start); regenerate for anything later. Only the tiny `status/<jobId>.json` persists.
 
-> **Scope (t2649, BACKLOG #78, 2026-09-04):** every job delivers the same way — claim, write to the
-> controller, mark `delivered`/`failed`. No per-job map, no watch phase (the beacon mechanism this "two job
-> types" scope note used to describe — tracked-via-beacons vs. deliver-only — is REMOVED; see
-> [`shared/PROTOCOL.md`](shared/PROTOCOL.md) §1-2/§4).
->
-> **No bucket retention either way:** the `.nc` is deleted from the bucket the instant it's delivered — the
-> file then lives on the **controller's CNCDISK**, which is where same-session re-runs come from (re-select +
-> Start); days later you regenerate. Only the tiny `status/<jobId>.json` (no G-code) persists.
-
-## Two parallel apps, one bucket
-The system is **two independent programs** that never talk directly — they rendezvous through a cloud
-bucket (Cloudflare **R2**). That decoupling is what gives us a queue and "submit while CNC-FAIRY is
-asleep, it auto-completes on wake."
+## Two parallel apps, one rendezvous
+The system is **two independent programs** that never talk directly — they meet through a **rendezvous
+store**, which can be any of three things depending on setup (see below). That decoupling is what gives us a
+queue and "submit while the gateway is asleep, it delivers on wake."
 
 ```
-   web/  ──writes jobs / reads status──▶  R2  ◀──reads jobs / writes status──  fairy/
-   (Cloudflare app, the UI)            (bucket)                         (CNC-FAIRY, the hardware)
+   Console (web/)  ──writes jobs / reads status──▶  rendezvous  ◀──reads jobs / writes status──  fairy/
+   (the operator's UI, several ways to serve it)   (local / R2 / Drive)      (the gateway PC, cabled to the mill)
 ```
 
-- **`web/`** — the centralized web app (Cloudflare Pages + Worker). Everything the operator touches:
-  **send code · queue · live tracker.** Open from the ASUS, a phone, anywhere.
-- **`fairy/`** — the headless bridge on CNC-FAIRY (the only PC cabled to the Expert). No UI. A loop:
-  **poll R2 → write `.nc` to the Expert (SMB) → mark delivered.** Optionally also polls the controller's own
-  Modbus registers for live position/run-state (BACKLOG #79). Outbound-only, never internet-reachable.
-- **`shared/`** — [`PROTOCOL.md`](shared/PROTOCOL.md): the contract both apps obey (R2 bucket layout, status
-  object, job lifecycle). Read this first — it's the seam.
+- **`web/`** — the Console. Submit · Queue · Files · History · Admin. Served either by the gateway itself
+  (the desktop exe's actual shape — reachable from a phone on the same LAN) or, for a fully cloud config, by
+  a Cloudflare Pages Function `[TO TEST]`. Open from wherever the operator is.
+- **`fairy/`** — the gateway daemon on the PC cabled to the Expert. No separate UI of its own anymore (it
+  serves the Console — see above). A loop: **poll the rendezvous → write the `.nc` to the Expert (SMB) →
+  mark delivered.** Optionally also polls the controller's own Modbus registers for live position/run-state.
+  Outbound-only, never internet-reachable.
+- **`shared/`** — [`PROTOCOL.md`](shared/PROTOCOL.md): the rendezvous contract both sides obey (store layout,
+  status object, job lifecycle pointer). Read this first — it's the seam.
 
-**Design docs:** [`CONFIGS.md`](CONFIGS.md) (vocabulary · deployment configs · shells · distribution · future
-seams) · [`ROADMAP.md`](ROADMAP.md) (build phases) · [`ARCHITECTURE.md`](ARCHITECTURE.md) (module map).
-Vocabulary: **Console** (web app) ↔ **Gateway** (fairy) ↔ **Rendezvous** (R2); the Worker is the **API**.
+**The rendezvous is one of three backends** (`config.backend`): `local` (single-PC testing), `r2` (the
+developer's own Cloudflare bucket — written, **[TO TEST]** live, and structurally excluded from the shipped
+exe), or `drive` (the operator's **own** Google Drive — stdlib-only, ships in the exe, and is the real cloud
+path every user actually gets; auto-selected once they sign in and never explicitly choose otherwise).
+
+**Design docs:** [`ARCHITECTURE.md`](ARCHITECTURE.md) (full module map, with confidence tags) ·
+[`CONFIGS.md`](CONFIGS.md) (vocabulary · deployment configs · distribution) · [`ROADMAP.md`](ROADMAP.md)
+(build phases) · [`JOB-RULES.md`](JOB-RULES.md) (job lifecycle — the one source).
+Vocabulary: **Console** (`web/`) ↔ **Gateway** (`fairy/`) ↔ **Rendezvous** (local/R2/Drive).
 
 ## Why this shape (decisions on record)
-- Transport = **cloud-poll via R2**, chosen over an exposed token endpoint to keep the CNC machine
-  un-exposed. Full argument: [`../TRANSPORT_DECISION.md`](../archive/TRANSPORT_DECISION.md).
-- The **transfer to the Expert is a plain SMB file copy** to `\\192.168.0.99\CNCDISK` (confirmed R/W
-  2026-06-06). The cloud hop only gets bytes *to* CNC-FAIRY across the isolating guest WiFi.
-- **[REMOVED t2649] Beacons** used to be `MSETDATA` progress pushes decoded into `%`/op/line/ETA — the
-  transport was proven wedge-free, but the feature itself never demonstrably ran end-to-end (BACKLOG #78's
-  own evidence table). Replaced by BACKLOG #79's live Modbus position/run-state polling — continuous, no
-  file instrumentation.
+- Transport = **cloud-poll**, chosen over an exposed token endpoint to keep the CNC machine un-exposed. Full
+  argument: [`../TRANSPORT_DECISION.md`](../archive/TRANSPORT_DECISION.md).
+- The **transfer to the Expert is a plain SMB file copy** to the controller's own CNCDISK share (confirmed
+  R/W 2026-06-06). The cloud hop only gets bytes *to* the gateway across an isolating network.
+- **[REMOVED, BACKLOG #78, t2649] Beacons** — `MSETDATA` progress pushes decoded into `%`/op/line/ETA. The
+  transport itself was proven wedge-free, but the feature never demonstrably ran end-to-end. Replaced by
+  **live Modbus position/run-state polling** (BACKLOG #79) — continuous, no file instrumentation, Expert
+  M350 only. Full account: [`ARCHITECTURE.md`](ARCHITECTURE.md) §8.
+- **A user's own cloud, not the developer's** (BACKLOG #76) — the shipped exe's cloud path is the operator's
+  own Google Drive (`drive.file` scope: this app sees only files it created), not a bucket the developer
+  pays for. Auth is a desktop loopback OAuth flow (`fairy/oauth.py`) — consent in the system browser, since
+  Google blocks its own sign-in popup inside an embedded webview.
 
 ## Safety (non-negotiable)
 - **Delivery is automatic; running is not.** The file lands on the controller hands-free, but the
-  **operator presses Cycle Start** at the machine. Remote auto-start is not confirmed — and is the gate.
+  **operator presses Cycle Start** at the machine.
 - **No jog / no live motion control** here. That's a future, *separate*, local low-latency module with a
   hardware E-stop + watchdog (see [`../controllers/shared/ARCHITECTURE.md`](../controllers/shared/ARCHITECTURE.md)). This app is deliver + observe only.
+- The Modbus poll is **read-only and PC-initiated** — the opposite relationship from the removed beacon
+  mechanism, and the reason it cannot wedge the controller. Full argument: `fairy/master.py`'s own header.
 - The controller stays **isolated** on its private cable; its wide-open `guest=root` SMB never touches a
   shared/public network.
 
-## Status
-- [x] Beacon instrumenter (Python reference, `checkpoint_insert.py`) — built, tested.
-- [x] UI mockup ([`../controllers/expert-m350/tools/bridge_ui_mock.html`](../controllers/expert-m350/tools/bridge_ui_mock.html)) — open in a browser.
-- [ ] `shared/PROTOCOL.md` — the contract (this scaffold).
-- [x] `fairy/` — bridge loop on the **LocalFolder** backend (Poller/Transfer/Tracker/Slave seam); `--self-test` + `--demo` pass end-to-end, no hardware/cloud. R2 backend written ([TO TEST] live).
-- [ ] `web/` — submit + beacon (browser) + queue + tracker, on R2.
-
-## Build order
-1. Lock `shared/PROTOCOL.md` (the seam).
-2. `fairy/` against a **LocalFolder** backend → run instrument → "upload" → relay → tracker end-to-end here, no cloud account needed.
-3. Swap in the **R2** backend.
-4. `web/` (Pages + Worker), reusing the mockup as the frontend.
+## Status — see [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 for the full, tagged build order
+- **[SHIPPED]** `fairy/` daemon: delivery, CNCDISK explorer, `local`/`drive` backends, desktop OAuth,
+  live Modbus position/tracking poll (Expert only), the gateway serving the Console itself.
+- **[TO TEST]** The `r2` backend live against a real bucket; the Cloudflare Pages cloud config end-to-end.
+- **[ ]** A `CloudClient`/`DirectClient` for a phone reaching a LAN gateway that isn't same-origin.

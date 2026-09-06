@@ -77781,3 +77781,58 @@ Full suite (`npm test`), run THREE times this turn, each read honestly rather th
 `git status` clean except this entry, `BACKLOG.md` (item 7), the three test-support fixes
 (`trig-lift-plan-1466.spec.js`, `tests/support/dragRenderTruth.js`,
 `tests/preview-mutation-manifest-2463.spec.js`), and the 20 refreshed `verification/*.png` baselines.
+
+## t2669 — THE BEACON-ERA DOC REWRITE: bridge-app's ARCHITECTURE.md + README.md, grounded in the code as it
+## stands today
+
+**Verified first, not assumed:** `JOB-RULES.md` carries ZERO "beacon" mentions (grepped) — it was written
+entirely post-removal and needs no marking. `shared/PROTOCOL.md`'s own beacon sections are already correctly
+tagged `[REMOVED t2649, BACKLOG #78]`, preserved as evidence per its own stated intent. Both already had
+t2649's own markings; nothing to fix there — the correct outcome of "verify" is sometimes a null diff.
+
+**The rewrite itself, grounded module-by-module against the actual code** (not memory of past turns): listed
+`fairy/*.py` and `web/ui/*` directly rather than trusting the old module map, and found it had drifted far
+past just the beacon mechanism — `slave.py`/`telemetry.py`/`localui/`/`web/instrument/`/`web/worker/` are
+gone; `master.py` (Modbus position/tracking poll), `chime.py`, `oauth.py`, `selfupdate.py`,
+`webview_storage.py`, and a THIRD backend (`drive.py`) exist and the old doc never mentioned any of them.
+Grounded every specific claim against source before writing it:
+- **The backend picture had inverted.** `r2.py`'s own docstring: `[TO TEST]` live, and structurally EXCLUDED
+  from the shipped exe (`build_fairy.ps1 --exclude-module boto3`). `drive.py`'s own docstring: stdlib-only,
+  ships in the exe, `drive.file` scope — this is the REAL cloud path every user gets, and `config.py`
+  confirms it now auto-defaults once the user signs in (BACKLOG #81, t2659). The old doc described R2 as
+  simply "the rendezvous"; that's no longer the accurate default story.
+- **The M350-only/V4.1-SMB-only capability boundary** — checked, not assumed from the dispatch's own
+  wording: `master.py`'s docstring names `P279=Slave`; `expert-m350/FINDINGS.md:994` confirms firmware
+  `≥2025-12-11` for that mode; `controllers/ENVIRONMENTS.md:29` states "no Modbus on V4.1" directly. The
+  10002/16062 float32 CDAB decode is tagged `[CONFIRMED on machine 2026-09-05]` in FINDINGS.md itself — used
+  that exact date, not a guessed one.
+- **The Console is now gateway-served by default** (`server.py`'s own docstring: "the one-app face"), with
+  the Cloudflare Pages path (`web/functions/api/[[path]].js`) as a second, `[TO TEST]` config rather than the
+  only one the old doc described.
+- **`ops.py` has grown a second capability group** beyond job/CNCDISK ops — controller-profile detection/
+  parsing/mapping (SMB scan, `.eng`/`coord1`/`camsetting` parsing) feeding DDCS Studio's own controller-import
+  flow. Described at module-map depth (what it does, where), not exhaustively enumerated (~30 methods) —
+  deferred to that feature's own docs for per-field confidence, avoiding a second, driftable copy of the
+  same facts.
+Every claim in both files now carries a `[SHIPPED]`/`[TO TEST]`/`[REMOVED]` tag per this turn's own explicit
+confidence-key convention (stated once at the top of `ARCHITECTURE.md`, applied throughout both files).
+Cross-linked `JOB-RULES.md` and `shared/PROTOCOL.md` from the rewritten map's own opening section instead of
+restating their rules — job lifecycle and the R2/status contract each stay a ONE-source fact.
+
+### VERIFY
+
+TIER (docs-only, per this turn's own dispatch): bridge-app's pytest suite as the smoke check that nothing
+executable moved — 138 tests. First run: 1 failed (`test_csrf_guard.py::test_open_external_is_guarded_and_
+scheme_limited`, a `ConnectionAbortedError` [WinError 10053] — a Windows socket-level artifact, structurally
+unrelated to a pure-markdown change). Re-ran isolated: 10/10 clean. Re-ran the FULL pytest suite: **138/138
+passed** — confirmed a flake, not a regression (an actually-green run, not an argued one). No e2e run, per
+TIER. Every relative link in both rewritten files checked to actually resolve (10/10). `git status` clean
+except this entry and the two rewritten files (`bridge/bridge-app/ARCHITECTURE.md`, `bridge/bridge-app/README.md`).
+
+### NEXT
+
+Out of this turn's own explicit scope, named rather than silently fixed: `CONFIGS.md`'s own "Rendezvous:
+R2 (cloud)" vocabulary line is now incomplete (Drive exists and is the real default path) and `ROADMAP.md`
+still carries a beacon mention in its own opening paragraph — neither was in this turn's dispatch (only
+ARCHITECTURE.md/README.md + the JOB-RULES.md/PROTOCOL.md verify), so left untouched rather than scope-creeping
+into two more files on the strength of the same investigation.
