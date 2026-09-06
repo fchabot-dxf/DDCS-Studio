@@ -1,13 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t778 Phase 2b — THE TAPPING DATA-TWIN. tapData.js emits byte-equal to tapStack; the pitch-locked feed is shown
  * read-only (statusHint, live); the RIGID toggle grey-gates on a declared encoder/servo spindle (spindle.tapCapable) AND
  * the Expert post; a non-reversible spindle warns; the emit honestly degrades rigid → floating off-Expert. The twin
  * round-trips (params via the op marker) and inherits the tool picker (toolBindingsFor).
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: only the first test calls
+ * `registerUserOp(tapDataDef())`, and it runs before any test that would need the registry (node:test runs this
+ * file's tests in declaration order); every other test uses tapDataDef()/tapStack directly, never the registry.
  */
-test.use({ viewport: { width: 1200, height: 860 } });
-
 test('the tap twin builds + emits BYTE-EQUAL to tapStack across a sweep; pitch is a threadpick + tool picker inherited', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);

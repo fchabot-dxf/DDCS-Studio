@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1385 STEP 1 — THE DRILL/BORE TWINS BIND BY IDENTITY, AND NOTHING MOVED.
@@ -21,9 +21,11 @@ import { test, expect } from '@playwright/test';
  * introduced here — it is EXACTLY what `surfacingData`'s identical rpm row has shipped since t1349, and the second test
  * asserts that against surfacing itself rather than arguing it. The field still means blank-is-the-Head-default, because
  * that comes from `socketHeld` plus `spindleHeadPatch`, neither of which this touches.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding needed at all: every test here works with
+ * `drillDataDef()`/`boreDataDef()`'s own returned `.template`/`.bindings` as plain data, or calls `instantiate()`/
+ * `deriveBindingsFor()` directly — never `listUserOps()`/`getUserDef()`/`builderOf()`, so there is no registry to seed.
  */
-test.use({ viewport: { width: 1400, height: 950 } });
-
 const boot = async (page) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });

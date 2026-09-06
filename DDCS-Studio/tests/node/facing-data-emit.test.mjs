@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t2469 (BACKLOG #60, part 2) — FACING as a data-op twin, proven byte-identical to the hand-coded
@@ -22,10 +22,22 @@ import { test, expect } from '@playwright/test';
  * live `allowance`, mirroring `centerDrillData.js`'s own `applyStraightPeck` shape. A real, buildable fix —
  * but a CODE change, out of scope for this turn's own "write the test" ask. Reported, not built, matching
  * this session's own standing rule against forcing a test to claim more than what was actually proven.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. The original never called registerUserOp — it relies on
+ * facingDataDef being pre-seeded (SEED_BUILDERS, run at real app boot by seedDefaultPortedUserOps()). The node
+ * harness's page.goto() only imports settingsPanel.js, so added an explicit `registerUserOp(facingDataDef())`
+ * (plain, not createUserOp: this file never calls listUserOps()).
  */
-test('facing-data-emit: the data def emits byte-identical G-code to facingStack across doc/feed', async ({ page }) => {
+const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { facingDataDef } = await import('/blocks/dataOps/facingData.js');
+    uo.registerUserOp(facingDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+};
+
+test('facing-data-emit: the data def emits byte-identical G-code to facingStack across doc/feed', async ({ page }) => {
+    await boot(page);
 
     const r = await page.evaluate(async () => {
         const { facingStack, FACING_DEFAULTS } = await import('/wizards/lathe/facing.js');
@@ -86,8 +98,7 @@ test('facing-data-emit: the data def emits byte-identical G-code to facingStack 
 });
 
 test('facing-data-emit: cross-dialect -- byte-identical to facingStack for EVERY registered dialect (doc/feed only)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await boot(page);
 
     const r = await page.evaluate(async () => {
         const { facingStack, FACING_DEFAULTS } = await import('/wizards/lathe/facing.js');

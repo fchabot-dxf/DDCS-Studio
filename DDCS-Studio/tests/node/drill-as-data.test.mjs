@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — Stage 4 (ROADMAP STRATEGIC #2). The DRILL built-in, expressed as a pure DATA definition
@@ -19,6 +19,10 @@ import { test, expect } from '@playwright/test';
  * ramp) completely, on its own separately-baked twin. Binding method HERE would add a capability the shipped
  * wizard never had — this divergence assertion stays correct, but for the real reason, see drillData.js's
  * own header.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(drillDataDef())` explicitly in-test (it never queries listUserOps(), only builderOf), which
+ * is a mechanically correct pattern already.
  */
 test('drill-as-data: the data def emits byte-identical G-code to drillStack across a param sweep', async ({ page }) => {
   await page.goto('http://localhost:3211');

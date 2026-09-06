@@ -78723,3 +78723,76 @@ contention-class flake in t2687's own entry, in a file this turn's diff never to
 moves). The 4 skipped files (`lathe-tool-table-1325`, `lathe-overlay-1283`, `lathe-surfaces-1295`,
 `lathe-preview-1297`) are untouched.
 
+## t2691 — TIER-MIGRATION BATCH 3: the milling `*-as-data`/`*-data-emit` twins — 11 of 11 moved, zero splits,
+and the AGGREGATE delta is the real signal for small files
+
+Dispatched to scale the proven shape across the milling twin-equivalence cluster
+(`DDCS-Studio/scratchpad/dispatch-tier-migration-batch3.md`): `drill-as-data`, `bore-as-data`, `slot-as-data`,
+`text-as-data`, `pocket-data-emit`, `facing-data-emit`, `centerdrill-data-emit`, `contour-data-emit`,
+`tap-twin-778`, `drill-bindings-identity-1385`, `parting-cross-dialect-1900` — 11 files, 26 tests total.
+Shape-gated every one first (batches 1–2's own lesson): none drove the booted app, a real DOM, canvas, or
+Three.js, and none hid a giant combinatorial sweep (the largest, `pocket-data-emit`'s 4-shape × 2-strategy ×
+3-size × 6-scalar loop, is 144 `emitMapped` calls — cheap per-call, nothing like middle-superset's 14336-combo
+regression). **All 11 moved clean, whole-file, no stray render/DRIVE test to split this time.**
+
+### A DIFFERENT SEEDING GAP THAN BATCHES 1–2 — same fix, new trigger
+
+Batches 1–2's bug was `registerUserOp` vs `listUserOps()` (two different stores). This batch surfaced a
+THIRD, related gap: **4 of the 11 files** (`pocket-data-emit`, `facing-data-emit`, `centerdrill-data-emit`,
+`parting-cross-dialect-1900`) never call `registerUserOp` OR `createUserOp` at all — they call `builderOf(type)`
+directly and simply ASSUME the twin is already registered, because in the browser it genuinely is:
+`pocketDataDef`/`facingDataDef`/`centerDrillDataDef`/`partingDataDef` are all in `web/app.js`'s own
+`SEED_BUILDERS` array, seeded by `seedDefaultPortedUserOps()` at real app boot (`DDCSStudio.init()`). The node
+harness's `page.goto()` only imports `settingsPanel.js`, so that seeding never runs — `builderOf(type)` would
+silently return `undefined`. Fixed by adding one explicit `registerUserOp(xxxDataDef())` call to each of these
+4 files' `boot()` (plain `registerUserOp`, not `createUserOp` — none of the 4 ever call `listUserOps()`, so the
+simpler call is correct and matches `contour-data-emit`'s own pre-existing in-file convention, which already
+called `registerUserOp` explicitly). `registerUserOp` is idempotent on re-registration, so re-registering
+`user_lathe_parting`/`user_lathe_facing`/`user_lathe_centerdrill` (already created via `createUserOp` by
+batch 2's `lathe-matrix.test.mjs`/`lathe-pilot-1271.test.mjs` in the SAME node process) causes no conflict.
+The other 7 files needed no fix — 6 already call `registerUserOp` explicitly in-test (the correct, pre-existing
+pattern), and `drill-bindings-identity-1385` needs no registration at all (every test works with a def's own
+returned `.template`/`.bindings` as plain data, or calls `instantiate()`/`deriveBindingsFor()` directly).
+
+### THE AGGREGATE DELTA (the batch's own named refinement)
+
+Per-file multiples for files this small are misleading on their own — each pays node's own ~200-400ms
+process/module-load floor once, so a 1-2-test file's "multiple" undersells the real reclaim. Measured both
+ways: all 11 browser specs run together (`npx playwright test <the 11>`), summed per-test durations from the
+JSON report (fair, not confounded by parallel-worker wall-clock) = **20.2s**. All 26 equivalent node tests run
+together in ONE node process = **1.52s**. **Aggregate: ~13.3x** — this is the number that matters for
+projecting the ~217-file backlog, not any single file's own ratio. (Wall-clock for the browser run, with 4
+parallel workers, was 7s — noted for context only; the summed-duration comparison is the fair one since node
+ran single-process.)
+
+Per-file (browser sum → node, informational only): drill-as-data 1.66s→(shares the 1.52s pool), bore-as-data
+0.84s, slot-as-data 2.29s, text-as-data 1.52s, pocket-data-emit 1.95s, facing-data-emit 1.54s,
+centerdrill-data-emit 1.61s, contour-data-emit 0.84s, tap-twin-778 3.95s (6 tests — most tests in the batch),
+drill-bindings-identity-1385 3.24s, parting-cross-dialect-1900 0.76s. tap-twin-778 and
+drill-bindings-identity-1385 (6 and 4 tests respectively) show the shape best: more tests per file dilutes the
+node floor fastest, same lesson as batch 2's own finding stated the other way round.
+
+### VERIFY — under the RELAXED per-batch model (mid-turn amendment, user-approved)
+
+An amendment landed mid-turn: per-batch verify is now (1) `test:node` green + up by exactly the moved total,
+and (2) `playwright test --list` down by exactly the moved total — sufficient on its own, since a test-only
+diff (delete a spec, add its node equivalent) cannot break an unrelated spec (batches 1–2 already confirmed
+this: only the known contention-flake class ever showed up). The full browser suite is now MILESTONE-ONLY
+(every ~4–5 batches, or at the end) rather than every batch. A full suite run for THIS batch was already
+in flight when the amendment landed (`npm test`, backgrounded) — stopped it rather than let it run needlessly
+long, per the amendment's own "if you already started/ran it, fine, don't re-run" (stopping early is the same
+spirit: no full-suite result was needed once the model changed). Process tree confirmed clean after the stop
+(no lingering playwright/node children).
+
+`npm run test:node`: 352/352 (326 prior + 26 this batch, exactly).
+
+`npx playwright test --list`: **3137 tests — down from batch 2's 3163 by EXACTLY 26**, matching the moved
+total precisely.
+
+Cluster aggregate (the amendment's own still-required piece, done as a small TARGETED run, not the full
+suite): the 11 moved specs run together in the browser = 20.2s summed per-test duration; the 26 equivalent
+node tests run together in one process = 1.52s. **~13.3x aggregate.**
+
+`git status` clean except this entry and the 22 files (11 new `tests/node/*.test.mjs`, 11 deleted
+`tests/*.spec.js`, whole-file moves, no splits this batch).
+

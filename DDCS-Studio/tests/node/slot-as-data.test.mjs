@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — Stage 5, port #4: SLOT. Its { template, bindings } def (blocks/dataOps/slotData.js) emits
@@ -24,6 +24,9 @@ import { test, expect } from '@playwright/test';
  *     can't do). This def is the SINGLE-slot template; pattern stays 'single'. (Array-slot = a future port.)
  * `clearance` IS NO LONGER A FRONTIER — see the CLOSED-FRONTIER test at the bottom, which asserts it positively
  * rather than deleting the old expectation quietly.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(slotDataDef())` explicitly in each test.
  */
 test('slot-as-data: byte-identical G-code to slotStack across a param sweep + binding-wiring', async ({ page }) => {
   await page.goto('http://localhost:3211');

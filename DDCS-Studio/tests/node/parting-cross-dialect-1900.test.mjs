@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1900 — CROSS-DIALECT for `user_lathe_parting` (safe-by-absence-today, t1896's own flag: `parting.js` has no
@@ -7,10 +7,24 @@ import { test, expect } from '@playwright/test';
  * No PRE-EXISTING byte-identical spec covered this op at all; this is the minimal one, mirroring the same
  * cheap pattern (`emitMapped`'s own `{dialect}` option — no setActivePostId/reload needed for a SAFE,
  * emit-time-only op) already applied to pocket/rotaryCenter/rotaryClock/slot this same turn.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. The original never called registerUserOp — it relies on
+ * partingDataDef being pre-seeded (SEED_BUILDERS, run at real app boot by seedDefaultPortedUserOps()). The node
+ * harness's page.goto() only imports settingsPanel.js, so added an explicit
+ * `registerUserOp(partingDataDef())` (plain, not createUserOp: this file never calls listUserOps() — and
+ * lathe-matrix.test.mjs, batch 2, already registers the SAME twin via createUserOp in this same node process;
+ * registerUserOp is idempotent on re-registration, so no conflict).
  */
-test('CROSS-DIALECT: user_lathe_parting == partingStack for EVERY registered dialect, both kinds (t1900)', async ({ page }) => {
+const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { partingDataDef } = await import('/blocks/dataOps/partingData.js');
+    uo.registerUserOp(partingDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+};
+
+test('CROSS-DIALECT: user_lathe_parting == partingStack for EVERY registered dialect, both kinds (t1900)', async ({ page }) => {
+    await boot(page);
     const r = await page.evaluate(async () => {
         const { partingStack, PART_DEFAULTS } = await import('/wizards/lathe/parting.js');
         const { PART_DATA_OPTYPE } = await import('/blocks/dataOps/partingData.js');

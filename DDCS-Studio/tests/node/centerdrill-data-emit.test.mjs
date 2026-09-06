@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t2469 (BACKLOG #60, part 2) — CENTRE DRILL as a data-op twin, proven FUNCTIONALLY equivalent to the
@@ -15,10 +15,22 @@ import { test, expect } from '@playwright/test';
  * specific `( straight — one plunge, so there is no step )` note. Both correctly write `#162=0` — the SAME
  * machine behavior — only the human-readable annotation differs. `stripAnnotations` (equivalence.js) drops
  * every parenthetical before comparing, exactly the tool this frontier exists for.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. The original never called registerUserOp — it relies on
+ * centerDrillDataDef being pre-seeded (SEED_BUILDERS, run at real app boot by seedDefaultPortedUserOps()). The
+ * node harness's page.goto() only imports settingsPanel.js, so added an explicit
+ * `registerUserOp(centerDrillDataDef())` (plain, not createUserOp: this file never calls listUserOps()).
  */
-test('centerdrill-data-emit: the data def is FUNCTIONALLY byte-identical to centerDrillStack across a param sweep', async ({ page }) => {
+const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { centerDrillDataDef } = await import('/blocks/dataOps/centerDrillData.js');
+    uo.registerUserOp(centerDrillDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+};
+
+test('centerdrill-data-emit: the data def is FUNCTIONALLY byte-identical to centerDrillStack across a param sweep', async ({ page }) => {
+    await boot(page);
 
     const r = await page.evaluate(async () => {
         const { centerDrillStack, CDRILL_DEFAULTS } = await import('/wizards/lathe/centerDrill.js');
@@ -79,8 +91,7 @@ test('centerdrill-data-emit: the data def is FUNCTIONALLY byte-identical to cent
 // BACKLOG #30 -- same cross-dialect discipline as drill-as-data.spec.js/parting-cross-dialect-1900.spec.js:
 // a dialect-only branch would pass the EXPERT-only sweep above and still be wrong on V4.1/DM500.
 test('centerdrill-data-emit: cross-dialect -- functionally byte-identical to centerDrillStack for EVERY registered dialect', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await boot(page);
 
     const r = await page.evaluate(async () => {
         const { centerDrillStack, CDRILL_DEFAULTS } = await import('/wizards/lathe/centerDrill.js');

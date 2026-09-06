@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * BORE PORT — the data-op twin's emit is BYTE-IDENTICAL to the built-in bore (drillStack with method='helical'). INDEPENDENT
  * TRUTH: drillStack is a separate path. Bore is the Drill wizard's helical variant → a `bore` leaf (holeDia/toolDia/pitch/ramp),
  * NOT the peck `drill` leaf, so it needs its OWN twin. VERIFY byte-diff ZERO across pattern × ramp (step/helix — incl. the
  * linearized-helix hazard) × cut × placement × wcs, on the default (Expert) dialect + a cross-dialect spot-check.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(boreDataDef())` explicitly in-test.
  */
 test('byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ramp × cut × placement × wcs', async ({ page }) => {
     await page.goto('http://localhost:3211');

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — Stage 5, port #5: TEXT (engraving). Its { template, bindings } def (blocks/dataOps/textData.js)
@@ -7,6 +7,9 @@ import { test, expect } from '@playwright/test';
  * (fillText was already flat). `font` is a bound socket (the FONT SEAM — strokeFont FONTS registry), so a text-as-data op
  * is forkable by font. Frontiers held UNBOUND (divergence tripwires): `clearance` (fan-out → progstart + leaf); rpm/dir
  * are frozen at the progstart default. (Text has NO wcs block.)
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(textDataDef())` explicitly in each test.
  */
 test('text-as-data: byte-identical G-code to textStack across a param sweep + binding-wiring', async ({ page }) => {
   await page.goto('http://localhost:3211');

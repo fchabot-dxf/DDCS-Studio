@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * CONTOUR PORT E1 — the data-op twin's emit is BYTE-IDENTICAL to the built-in contourStack (the region-pill→flat reframe
  * + positional bindings). INDEPENDENT TRUTH: the built-in contourStack is a separate path. VERIFY byte-diff ZERO across
  * side (outside/inside/on) × the 4 shapes × a scalar/placement/wcs sweep, on the default (Expert) dialect + a cross-dialect
  * spot-check. (clearance is intentionally UNBOUND — the surfacing/drill frontier — so the sweep does not vary it.)
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(contourDataDef())` explicitly in-test.
  */
 test('E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shapes × a scalar/placement/wcs sweep', async ({ page }) => {
     await page.goto('http://localhost:3211');

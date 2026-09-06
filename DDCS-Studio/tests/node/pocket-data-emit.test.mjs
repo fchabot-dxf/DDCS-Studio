@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * POCKET E1 EMIT — the user_pocket_data twin emits BYTE-IDENTICAL to the built-in pocketStack across the FULL sweep:
@@ -6,10 +6,25 @@ import { test, expect } from '@playwright/test';
  * × 4 shapes × scalar. The twin is a SUPERSET (guards) + the derive-guards hook injects `_tooSmall` (geometry-derived) so
  * the tooSmall guard prunes to the right arm; postInstantiate rewrites the drill centre. INDEPENDENT truth = pocketStack
  * (a separate code path). Also asserts the tooSmall derive SELECTS the right arm + cross-dialect byte-identity.
+ *
+ * t2691 — TIER MIGRATION BATCH 3: moved browser→node. The original never called registerUserOp — it relies on
+ * pocketDataDef being pre-seeded (it's in web/app.js's own SEED_BUILDERS, run by seedDefaultPortedUserOps() at
+ * real app boot). The node harness's page.goto() only imports settingsPanel.js, so that seeding never runs here —
+ * added an explicit `registerUserOp(pocketDataDef())` (plain, not createUserOp: this file never calls
+ * listUserOps(), only builderOf, so the simpler call is correct and matches contour-data-emit's own in-file
+ * convention). registerUserOp is idempotent on re-registration, so this is safe even though other node test
+ * files may register the same twin in the same process.
  */
-test('user_pocket_data == built-in pocketStack, byte-identical across strategy × tooSmall × 4 shapes × scalar', async ({ page }) => {
+const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { pocketDataDef } = await import('/blocks/dataOps/pocketData.js');
+    uo.registerUserOp(pocketDataDef());
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
+};
+
+test('user_pocket_data == built-in pocketStack, byte-identical across strategy × tooSmall × 4 shapes × scalar', async ({ page }) => {
+    await boot(page);
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
@@ -68,8 +83,7 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
 });
 
 test('cross-dialect: user_pocket_data == pocketStack for EVERY registered dialect (t1900, was grbl + rs274ngc only)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio);
+    await boot(page);
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
