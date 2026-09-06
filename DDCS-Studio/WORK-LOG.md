@@ -77603,3 +77603,115 @@ Findings 9 and 10 are the two worth acting on: point_handle's own guard (or the 
 "Op Param only" somewhere a person can see it BEFORE save, and/or `assign`'s own `value` field could become a
 genuine Op Param target (the more natural fit for exactly this wizard shape). The blank-LABEL loose end wants
 a quick live check before it is trusted either way.
+
+## t2665 — GAP 9 (root-caused, fixed), GAP 10 (intent: deliberate), THE BLANK LABEL (closed: not a bug)
+
+**Correcting my own t2663 framing first.** t2663 named gap 9 as "point_handle's guard only accepts Op Param —
+Assign Var mode is invisible to it." Measured this turn: that is not what's wrong. A `page.evaluate` probe
+against `userOps.js` directly (two Assign-mode formfields, matchvar correctly naming two real `assign`
+blocks) showed `handleTargetReport` reporting **2/2 matched** — Assign mode was never excluded. The actual
+defect, found by then deliberately breaking ONE sibling's matchvar (left at the field's own default `#1`
+instead of retargeted): `handleTargetReport` matched **0/2**, blaming BOTH handles even though `px`'s own
+formfield was completely correct.
+
+**Root cause, in `deriveBindings` (dataOps/deriveBindings.js) + `formfieldBindings` (userOps.js):**
+`deriveBindings(flatStack, specs)` throws on the FIRST spec in the array that fails to match exactly one
+block — a genuine authoring-error signal, correct on its own. But `formfieldBindings` called it ONCE over the
+WHOLE spec array inside a single try/catch: `try { return deriveBindings(flat, specs) } catch(_) { return []
+}`. One bad spec anywhere in the array discarded every OTHER spec's already-valid binding too, not just its
+own — the exact "one dangling spec hides the rest" failure `formfieldMatchReport` (t1636) was ALREADY built
+to avoid for its own report (its own header comment names this precisely: "deriveBindings aborts on the FIRST
+mismatch it finds"). `handleTargetReport` inherited the fragile sibling (`formfieldBindings`), not the fixed
+one. **Not bind-mode-specific at all** — an Op Param formfield with a bad `atomType`/`key` hits the identical
+collapse; it read as "Assign mode is refused" purely because the live t2663 session's own Op Param build
+happened to get both specs right on the first try, and its one Assign-mode attempt (briefly tried, then
+abandoned for Op Param) evidently didn't.
+
+**Fix (fork (a) — a contained wiring change, exactly as hoped): `formfieldBindings` now derives ONE spec at a
+time**, isolating a bad spec's failure to itself:
+```js
+for (const s of specs) { try { out.push(...deriveBindings(flat, [s])); } catch (_) { /* skip only this one */ } }
+```
+Same function, same two call sites (`handleTargetReport`'s `valueBindings`, and `authoredExtraBindings`'s live
+preview) — both get accurate results now, for free, since neither special-cased bind mode to begin with.
+
+**⛔ "Silent-until-save" — checked, and it was already less true than the dispatch assumed.** `handleBindingsFromStack`'s
+own header comment (userOps.js:752-756) says an unresolved handle "comes back `anchorUnresolved: true`...
+which panelTypes.js renders as an obviously-broken red marker" — LIVE, on the canvas, during authoring, not
+gated behind Save at all (`handle-target-fails-visibly-2525.spec.js`'s second test already covers this; not
+new this turn). The save-time `alert` in `prepareCandidate` (devMode.js) is a SECOND, blocking backstop on
+top of that live marker, not the only signal. What WAS actually silent/misleading pre-fix: the live red marker
+and the save alert both blamed the WRONG handle (both, when only one was broken) — now fixed by the same
+per-spec isolation above. Whichever the dispatch's fork, the outcome is identical: a broken target is loud,
+live, and now also ACCURATE about which one.
+
+**Non-vacuity, both levels:**
+- Unit level: a new regression test (`handle-target-fails-visibly-2525.spec.js`, "t2665 (gap 9)") reproduces
+  the exact sibling-blanking shape (one valid Assign-mode formfield `px`, one with a dangling matchvar `py`).
+  Reverted `formfieldBindings` to its pre-fix body and re-ran: fails with `matched: 0` (expected `1`) — the
+  precise wrong number the live session hit. Restored the fix from a scratch copy, re-ran the whole file: 4/4
+  green.
+- Full-UI level: a new "DRIVE THE APP" test (`point-handle-block.spec.js`, sibling to t2525's own Op-Param
+  version) builds "Probe Single Point" end to end in ASSIGN-VAR mode — two `assign` blocks in EXECUTION, two
+  formfields bound via `matchvar` (not `atomType`/`key`), `point_handle` naming both — real save, a real
+  reload, a real mouse drag on the rendered SVG handle, emit before/after compared. **Passed live, first try**
+  (screenshot: `verification/t2665-assign-mode-point-handle-emit-wired.png`): Assign-Var mode now reaches the
+  exact same completeness bar Op Param mode already had — form renders, canvas renders a real (non-broken)
+  handle, the drag changes both fields, and emit changes to match.
+
+**GAP 10 — established: DELIBERATE, not incomplete.** `assign` sits in `pickerField.js`'s own `META_TYPES`
+(excluded from the Op Param `atomtype` picker's candidates) — checked its own git history: present from the
+very first commit that introduced `META_TYPES` (t2389), never added or removed since. The structural reason
+holds up: `assign` already has its OWN purpose-built reference path (`matchvar`, disambiguating by the
+block's own `var` VALUE), which Op Param's `atomtype` match cannot replace — `deriveBindings.matches({type})`
+alone requires the picked type be the SOLE block of that type in the stack, correct for `progstart`/`progend`
+(typically singletons) but immediately ambiguous for `assign`, which routinely appears 2+ times in any wizard
+writing more than one variable. Offering `assign` through `atomtype` too would be a second, WORSE (ambiguity-
+prone) path to the identical target, not a missing one. Documented directly at the `META_TYPES` declaration
+(pickerField.js) so the next reader finds the reasoning in the source, not just this entry.
+
+**THE BLANK LABEL — closed: not a bug, product behaves exactly as designed.** `formWidgets.js`'s `labelFor`/
+`isDerivedLabel` (t2541) already document the split precisely: a blank LABEL field is an HONEST signal on the
+block face ("the author never typed one," never silently overwritten), while the RENDERED FORM always falls
+back through `SHARED_LABELS` → `anchor.label` → `deriveLabelFromParam(param)` — never blank to a real user.
+Measured directly (`FW.labelFor({param:'px', label:''})` → `"Px"`, `FW.isDerivedLabel(...)` → `true`; with
+`label:'X'` set → `"X"`, `isDerivedLabel` → `false`). So even in the worst case (t2663's own LABEL edit never
+actually committed, plausibly the self-diagnosed Escape-key field corruption from that same turn's account) a
+real person opening that wizard would have seen "Px"/"Py," never blank — the screenshot showed the BLOCK
+face's honest emptiness, not a data-loss path, and not what the rendered form itself shows.
+
+### VERIFY
+
+Full suite (`npm test`, both `test:node` and `test:e2e`, per this turn's TIER): **test:node 236/236 passed, 0
+failed.** **test:e2e: 3197 passed, 2 failed, 12 flaky, 27 skipped** (38m27s). Both failures re-run individually
+to separate flake from regression, per the loop's own "an argued red is still a red" rule:
+- `preview-mutation-manifest-2463.spec.js` (`sf-pos-snapback`, a drag-distance mutation check) — re-run: **9/9
+  passed clean.** A genuine, load-dependent flake (the same test's own failure text shows a real-time drag
+  distance a few px short of the mutation's threshold — timing, not logic), not a regression from this turn's
+  three-file diff (nothing here touches surfacing/drag distance math).
+- `trig-lift-plan-1466.spec.js` LOCK 5 (verify-macro comment-bracket lint) — re-run: **fails deterministically,
+  3/3.** Confirmed via `git log` to be the SAME pre-existing, out-of-scope failure this WORK-LOG has already
+  named across multiple prior turns (t2649/t2651/t2655/t2657/…): a bracket inside a comment in
+  `bridge/controllers/expert-m350/verify/V20_read_2500.nc`, landed in commit `258806ef` (a controller-verify-
+  macro turn, unrelated to Blocks/authoring), before this session started. Not touched, not fixed here — same
+  established call as every prior turn that hit it: out of scope, name it, move on.
+- The other 12 flaky: counts only — the custom progress reporter logs running totals, not individual flaky
+  identities, and the two targeted re-runs above (needed to separate the real failures) overwrote the run's own
+  JSON summary before I could extract them. Not re-running the full 38-minute suite a second time solely to
+  recover 12 names neither failure implicates. Consistent in scale and shape with every prior turn's own flaky
+  count on this suite (typically 10-14, spread across unrelated domains) — no reason to suspect a regression,
+  but naming this gap plainly rather than inventing the list.
+
+`git status`: clean except this entry, the two touched test files (`point-handle-block.spec.js`,
+`handle-target-fails-visibly-2525.spec.js`), and the three source fixes (`userOps.js`, `pickerField.js`,
+`devMode.js`) — confirmed below, plus one deliberate new screenshot
+(`verification/t2665-assign-mode-point-handle-emit-wired.png`). The pile of OTHER already/separately-dirty
+`verification/*.png` files (side effects of running the suite, pre-dating this turn) left untouched, per
+established practice.
+
+### NEXT
+
+While closing this out, found the save-time `alert` text in `prepareCandidate` (devMode.js:893) still said
+"an 'Op Param' formfield" — stale wording from before this turn's fix, actively misleading about which bind
+modes a handle can target. Fixed in the same commit (now names both modes). Nothing else queued from this
+turn; gaps 9/10/label are all closed.

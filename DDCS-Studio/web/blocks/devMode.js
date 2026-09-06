@@ -890,8 +890,9 @@ function prepareCandidate(a, framing) {
         const list = handleReport.unresolved.map((u) => `${u.param} (${u.kind})`).join(', ');
         return {
             ok: false, error: `${handleReport.total} handle field${handleReport.total === 1 ? '' : 's'} declared, ${handleReport.matched} matched: ${list} `
-                + `— a handle's own field must name a param an "Op Param" formfield in THIS stack actually declares. `
-                + `Add that formfield, or point the handle at an existing one, then save again.`,
+                + `— a handle's own field must name a param a formfield in THIS stack actually declares and resolves `
+                + `(Assign Var or Op Param, either works). Add that formfield, fix its own binding, or point the handle `
+                + `at an existing one, then save again.`,
         };
     }
 

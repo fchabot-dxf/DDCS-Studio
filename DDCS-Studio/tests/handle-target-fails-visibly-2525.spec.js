@@ -122,3 +122,34 @@ test('devMode save gate: a stack with a dangling handle target is REFUSED, mirro
     expect(r.unresolved.length, 'the report itself flags the dangling target -- what devMode.js checks to refuse the save').toBeGreaterThan(0);
     expect(r.unresolved[0].param).toBe('ghost');
 });
+
+test('t2665 (gap 9): ONE formfield with a dangling Assign-Var matchvar must not blank the OTHER, perfectly valid formfield\'s handle target', async ({ page }) => {
+    // Root cause: deriveBindings (dataOps/deriveBindings.js) throws on the FIRST spec in a batch that fails to
+    // match exactly one block. The old formfieldBindings (userOps.js) wrapped the WHOLE batch in one try/catch,
+    // so that single throw discarded every OTHER spec's already-valid binding too -- not bind-mode-specific (an
+    // Op Param spec with a bad atomType/key hits the same collapse), but it FIRST surfaced live via an
+    // Assign-Var formfield whose matchvar was left at its own field default ('#1') instead of being retargeted.
+    // A handle naming the STILL-VALID sibling param must resolve; only the one naming the actually-broken param
+    // should come back unresolved -- the "2 handle fields declared, 0 matched" blanket refusal is the regression.
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => true);
+    const r = await page.evaluate(async () => {
+        const U = await import('/blocks/userOps.js');
+        const children = [
+            { type: 'assign', params: { var: '#101', value: '0', note: '' } },
+            { type: 'param_group', params: { group: 'g1' }, children: [
+                { type: 'formfield', params: { param: 'px', type: 'number', bindMode: 'assign', matchvar: '#101', key: 'value', label: 'X' } },
+                // py's matchvar never retargeted off the block's own default -- no assign block anywhere declares '#1'.
+                { type: 'formfield', params: { param: 'py', type: 'number', bindMode: 'assign', matchvar: '#1', key: 'value', label: 'Y' } },
+            ] },
+            { type: 'feature_canvas', params: { panel: 'form2d' }, children: [
+                { type: 'point_handle', params: { fx: 'px', fy: 'py', ax: '0', ay: '0', label: 'pos' } },
+            ] },
+        ];
+        return { report: U.handleTargetReport(children), pxBindings: U.formfieldBindings(children) };
+    });
+    expect(r.report.total, 'two handle-declared targets (fx=px, fy=py)').toBe(2);
+    expect(r.report.matched, 'px is fully valid and must resolve despite py\'s dangling sibling spec').toBe(1);
+    expect(r.report.unresolved).toEqual([{ param: 'py', kind: 'point' }]);
+    expect(r.pxBindings.map((b) => b.param)).toEqual(['px']);
+});

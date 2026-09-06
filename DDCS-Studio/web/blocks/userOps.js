@@ -1067,12 +1067,20 @@ function resolveBindingsMeta(def) {
 }
 
 /** The FORM bindings a stack's `formfield` blocks declare (specs → deriveBindings over the stack). For the LIVE Blocks
- *  form (devMode.deriveAuthoredDef): a formfield-authored field shows in the form AS YOU AUTHOR IT. Safe — returns [] on
- *  an unmatched var (an in-progress edit) instead of throwing. */
+ *  form (devMode.deriveAuthoredDef) AND handleTargetReport below: a formfield-authored field shows in the form AS YOU
+ *  AUTHOR IT. Safe PER SPEC — an unmatched/in-progress-edit spec is skipped, not thrown. t2665 (gap 9) — deriveBindings
+ *  throws on the FIRST bad spec it hits in a batch, which used to abort the WHOLE array (one dangling formfield blanked
+ *  every OTHER formfield's binding too, and by extension every handle target's match — the exact "0 matched" refusal
+ *  the live authoring session hit with a mistyped Assign-Var matchvar on one sibling field, while the OTHER field's
+ *  binding was perfectly fine). Deriving one spec at a time isolates the failure to the spec that actually owns it,
+ *  the same one-bad-spec-doesn't-hide-the-rest principle formfieldMatchReport already established for its own report.*/
 export function formfieldBindings(children) {
     const specs = bindingsFromStack(children);
     if (!specs.length) return [];
-    try { return deriveBindings(flattenBlocks(children), specs); } catch (_) { return []; }
+    const flat = flattenBlocks(children);
+    const out = [];
+    for (const s of specs) { try { out.push(...deriveBindings(flat, [s])); } catch (_) { /* this spec's own dangling/in-progress match -- skip it alone */ } }
+    return out;
 }
 
 /** t1636 — WHICH declared `formfield` specs a stack's blocks actually satisfy, and which do not. Never throws

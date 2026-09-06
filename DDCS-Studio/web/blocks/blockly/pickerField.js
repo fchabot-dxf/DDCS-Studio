@@ -34,6 +34,15 @@ const META_TYPES = new Set([
     'formfield', 'param_field', 'cam_field', 'cam_table', 'section', 'param_group',
     'feature_canvas', 'layout', 'sim', 'preview3d', 'simstart', 'user_root', 'op', 'assign',
 ]);   // t2511 — preview3d: the 3D-only half of the sim/panel split; t2515 — 'panel' renamed 'feature_canvas'
+// t2665 (gap 10) — WHY 'assign' sits in this list even though it (unlike every other entry) emits real G-code:
+// it already has its OWN purpose-built reference path ('matchvar' above, a few lines up), which disambiguates by
+// the block's own VAR VALUE. Op Param's atomtype match is coarser -- deriveBindings.matches({type}) alone
+// requires the picked type be the SOLE block of that type in the stack, throwing on ambiguity else. That holds
+// fine for progstart/progend/most real op atoms (typically singletons per stack) but breaks immediately for
+// assign, which routinely appears 2+ times in any wizard writing more than one variable -- offering it through
+// atomtype too would be a second, WORSE path to the same target (ambiguity-prone) rather than a missing one.
+// DELIBERATE, confirmed against this list's own origin (t2389, the commit that introduced pickerField.js/
+// META_TYPES) -- 'assign' was present from the very first version, never added or removed since.
 const isRealAtomType = (t) => typeof t === 'string' && !META_TYPES.has(t) && !t.startsWith('user_') && !t.endsWith('_op');
 
 export function installPickerField(Blockly) {
