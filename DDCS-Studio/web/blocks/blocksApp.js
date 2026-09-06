@@ -23,7 +23,7 @@ import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curat
 import { findStrayTopBlockIds } from './programShape.js';   // t2281 — a block dragged from the toolbox and left disconnected: greyed here, excluded from the model in stackBridge.js's own workspaceToStack
 import { sfx } from '../ui/sound.js';   // t2229 (BACKLOG F3a) — block.snap, the human's own named exception to the visible-state-sound removal
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
-import { getUserDef, flattenBlocks, childrenOf, usesTreeOnlyLayout } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2641 — usesTreeOnlyLayout: the ONE tree-vs-flat predicate, shared with userOpView.js
+import { getUserDef, flattenBlocks, childrenOf, usesTreeOnlyLayout, formfieldMatchReport } from './userOps.js';   // t2317 — childrenOf: the ONE children/uiChildren shape normalization (t2315); t2641 — usesTreeOnlyLayout: the ONE tree-vs-flat predicate, shared with userOpView.js; t2653 — formfieldMatchReport: the same unmatched-binding detector the save-time guard already uses, now also read live
 import { findGuardWhenForBlockType } from './whenGuard.js';   // t2415 (BACKLOG #23) — shared with disableGuard.js: does a declared guard wrap this block type?
 import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
@@ -1065,9 +1065,29 @@ async function buildWorkspace() {
       const hasPresentation = Array.isArray(root.uiChildren) && root.uiChildren.length > 0;
       formHost.__sig = null;
       blkLastOpType = null;   // t1746 — a later return to the flat branch counts as fresh, not a same-op re-render
-      formHost.innerHTML = hasPresentation
-        ? '<div class="blk-form-empty">This wizard has no fields yet — add a <b>Form field</b> block, or a <b>Parameter Group</b>, to the Presentation mouth.</div>'
-        : '<div class="blk-form-empty">This wizard is empty — drop a <b>Panel</b> and a <b>Form field</b> block into its <b>Presentation (UI &amp; Sim)</b> mouth to give it a form.</div>';
+      // t2653 (BACKLOG "the authoring doorway pair") — t2639's own "the preview does not refresh while building"
+      // finding, root-caused: the reactive pipeline (reproject → renderLiveForm → deriveAuthoredDef, all
+      // synchronous, all fresh off the live workspace every edit) already works — proven live, not reasoned,
+      // by replaying the exact build sequence with `def.bindings` inspected at each step (a COMPLETE binding
+      // appears in the form the instant it resolves, no save needed). The actual gap: a `formfield` whose bind
+      // spec never MATCHES anything on the canvas (the DEFAULT 'assign' mode needs a separate "Set Variable #1"
+      // block elsewhere; 'Op Param' mode needs an atom of the chosen type) correctly produces zero bindings —
+      // deriveBindings' own documented behaviour, "returns [] on an unmatched var... instead of throwing" — but
+      // the message shown was IDENTICAL to "you haven't added a Form field at all," so a formfield that is 90%
+      // configured and a blank Presentation mouth looked the same to the person building it. `formfieldMatchReport`
+      // already exists and answers exactly this (the SAME detector the save-time guard uses) — read it live too.
+      const report = hasPresentation ? formfieldMatchReport((def && def.children) || []) : null;
+      const dangling = report ? report.unmatched.filter((u) => u.hits === 0) : [];
+      const ambiguous = report ? report.unmatched.filter((u) => u.hits > 1) : [];
+      if (dangling.length || ambiguous.length) {
+        const rows = [...dangling.map((u) => `<li><b>${u.param}</b> — nothing on the canvas matches its ${u.target} yet.</li>`),
+          ...ambiguous.map((u) => `<li><b>${u.param}</b> — ${u.hits} blocks match its ${u.target}; it needs exactly one.</li>`)];
+        formHost.innerHTML = `<div class="blk-form-empty">This wizard's Form field${rows.length > 1 ? 's are' : ' is'} not bound to anything yet:<ul>${rows.join('')}</ul></div>`;
+      } else {
+        formHost.innerHTML = hasPresentation
+          ? '<div class="blk-form-empty">This wizard has no fields yet — add a <b>Form field</b> block, or a <b>Parameter Group</b>, to the Presentation mouth.</div>'
+          : '<div class="blk-form-empty">This wizard is empty — drop a <b>Panel</b> and a <b>Form field</b> block into its <b>Presentation (UI &amp; Sim)</b> mouth to give it a form.</div>';
+      }
       return;
     }
 

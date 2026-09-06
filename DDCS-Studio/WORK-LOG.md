@@ -76853,3 +76853,100 @@ runs, before and after the two fixes above:**
 
 `git status` clean except this entry, `bridge.js`, `tests/dropdown-default-mechanism-2651.spec.js`,
 `tests/length-handle-block.spec.js`, and `tests/riders-848.spec.js`, confirmed below.
+
+## t2653 — THE AUTHORING DOORWAY PAIR: user_root discoverability + the live-preview root-cause
+
+Owner-approved sequence, released V2026.09.05.4 on the t2651 dropdown-defaults mechanism. Two parts of the
+same dispatch, one commit (both touch the authoring surface the dispatch itself treats as one concern);
+BACKLOG #83 is the separate small item, its own commit below.
+
+### Part 1 — user_root ("Define Custom Wizard") now leads its own category
+
+t2637 found it sitting second-to-last in a 28-entry Wizard Layout flyout, under ten handle types — the block
+every authored wizard STARTS from, found only because the block registry was read directly, not through the
+palette a real author sees. `buildToolbox()`'s per-category bucket (`web/blocks/blockly/bridge.js:945`)
+preserves `PALETTE`'s own array order — array position IS flyout position, one and the same fact, no separate
+ordering mechanism to touch. Moved `userRootBlock` in `wizards/ops/index.js`'s own PALETTE array to sort
+before EVERY other Wizard-Layout-categorized entry — including `usageTextBlock`, which sat before it and
+would otherwise have stayed first (checked by actually building the toolbox, not assumed from source order:
+the first attempt moved it only past `layoutBlock`, the next FILE-adjacent Wizard Layout member, and missed
+this one). Category assignment untouched; no new category, no toolbox chrome — a pure reorder, as scoped.
+
+Verified live, not reasoned: a real click on the actual `.blocklyToolboxCategory` DOM row (not a JS
+toolbox-API shortcut) confirms `user_root` is `getTopBlocks()[0]` in the real, rendered Wizard Layout flyout.
+New standing test (`tests/user-root-flyout-first-2653.spec.js`) — non-vacuity checked: reverting the PALETTE
+edit reproduces the pre-fix order (`usage_text` first) and fails the test.
+
+### Part 2 — the live preview: ROOT-CAUSED, not assumed. The wiring was fine; the feedback wasn't.
+
+The dispatch's own hypothesis ("the preview renders once from the saved def, nothing wires Blockly change
+events to a re-render") was tested to destruction, not built around: every link in the chain — Blockly change
+→ `reproject()` → `renderViewsPrompt()` → `renderLiveForm()` → `deriveLiveWizard()` → `deriveAuthoredDef()` →
+`collectAuthoring()` → `authoringBody()` → `workspaceToStack(ws)` — is SYNCHRONOUS and re-derives fresh off
+the live workspace on every single edit. No cache, no snapshot, confirmed by reading every function in the
+path, not by trusting the names.
+
+**Proven live by replaying t2639's own build sequence, instrumented step by step** (a throwaway probe,
+temporary `window.__DEBUG_LIVEFORM` logging in `renderLiveForm`, both removed before commit): dropping a
+`formfield` into a `param_group`'s DO mouth and completing its BindMode/AtomType/Key chain made
+`def.bindings` populate correctly and the form render the real field — the SAME session, no reload, no Save
+click — the instant the binding resolved. The FIRST reproduction attempt (a simpler flyout-drag helper without
+the connection-offset correction `length-handle-block.spec.js`'s own working test already uses) actually
+KNOCKED THE BLOCKS LOOSE from the canvas root entirely — a genuine test-tooling trap, not a product bug, named
+here so the next probe doesn't repeat it: an imprecise nested-mouth drop can silently orphan the whole
+subtree, and the failure LOOKS exactly like a stale-preview bug (blank/wrong form) if you don't check the
+actual serialized stack.
+
+**THE REAL GAP, found by replaying the DEFAULT path** (bindMode left at its own default, `'assign'`, matching
+`matchvar: '#1'`, with no "Set Variable #1" block anywhere on the canvas — the more likely first-attempt path
+for someone who has not yet learned "Op Param" mode exists): `def.bindings` correctly stays `[]` forever
+(`deriveBindings`'s own documented behaviour — "returns [] on an unmatched var... instead of throwing," never
+a bug) — but the message shown was BYTE-IDENTICAL to "you have not added a Form field at all." A 90%-configured
+field and a genuinely blank Presentation mouth read as the SAME thing to the person building it, which is
+indistinguishable from "the preview never updates" without actually diffing the underlying state, exactly what
+this turn did that t2639's own live session could not.
+
+**The fix** (`web/blocks/blocksApp.js`'s mid-edit empty-message branch): read `formfieldMatchReport` —
+already exported by `userOps.js`, already used by the SAVE-time guard to report exactly this same
+condition, just never surfaced DURING authoring — and when it names a dangling (0 hits) or ambiguous (>1
+hits) spec, say so by name instead of falling to the generic message. `def.children` (already computed by
+`deriveAuthoredDef`, the SAME top-level array `flattenBlocks` needs to see both the `uiChildren`-nested
+`formfield` and the `children`-nested target atom together) is the exact input the report needs — no new
+derivation, no second read of the workspace.
+
+**Verified, not assumed:**
+- LIVE, no save: an unmatched default-bind formfield now says "This wizard's Form field is not bound to
+  anything yet: **reach** — nothing on the canvas matches its Match Var #1 yet" the instant PARAM is typed —
+  confirmed via a fresh `page.evaluate` DOM read, no reload anywhere in the test.
+- The SAME session, once BindMode/AtomType/Key are completed, renders the real field instantly (no save) —
+  confirmed the resolved form face (`#blk_wiz_user`) actually contains "reach."
+- A genuinely empty Presentation mouth (no formfield at all — the OTHER empty branch, no
+  `formfieldMatchReport` call) still shows its own original message and throws nothing — `page.on('pageerror')`
+  asserted empty across the whole test.
+- Non-vacuity: reverting `blocksApp.js` reproduces the generic message for both of the first two cases (2 of
+  3 new tests correctly go red); the third (genuinely-empty case) stays green either way, a control.
+- Cost, per the dispatch's own explicit ask: this branch is reachable ONLY while a wizard has ZERO resolved
+  bindings — a mature op like `pocket` (89 fields) already has real bindings, so it never reaches this code
+  at all. Confirmed by RUNNING (not reasoning about) `tests/blocks-edit-lag-788.spec.js` — the project's own
+  existing pocket-edit-cost benchmark — unchanged and green (`modelMs` still <100ms) with this fix in place.
+
+New standing test: `tests/live-preview-unmatched-binding-2653.spec.js` (3 cases above). `tests/
+length-handle-block.spec.js` (t2651's own build-sequence test, same shape) re-run and still green — confirms
+the fix does not disturb the already-working resolved-binding path.
+
+### NOT DONE, named rather than silently skipped
+
+Two lower-severity findings from the SAME t2639 entry (mouth-drop-target precision on `user_root`'s adjacent
+Presentation/Execution mouths; the corner-specific `sc_*` blocks cluttering the generic Wizard Inputs
+category) are untouched — outside this dispatch's own named pair, not forgotten.
+
+Full suite (`npm test`): node 236/236; e2e **3187 passed, 2 failed**, 12 flaky, 27 skipped. Both failures
+confirmed unrelated, same identities as t2649/t2651's own runs: `trig-lift-plan-1466.spec.js` LOCK 5 (the
+same pre-existing verify-macro lint failure, unchanged for three consecutive turns' worth of full runs) and
+`preview-mutation-manifest-2463.spec.js`'s `[sf-pos-snapback]` entry (a surfacing point/move-handle mutation
+test, nothing to do with dropdowns/palette/preview/status — re-run in isolation TWICE across this turn and
+t2651, passes clean both times; its own comment already names itself as potentially "scheduling-sensitive"
+under load). Zero failures traceable to `user_root`'s reorder, the live-preview messaging fix, or BACKLOG #83.
+`git status` clean except this entry, `wizards/ops/index.js`, `blocks/blocksApp.js`,
+`tests/user-root-flyout-first-2653.spec.js`, and `tests/live-preview-unmatched-binding-2653.spec.js`,
+confirmed below.
