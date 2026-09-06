@@ -574,7 +574,17 @@ function jsonDef(def) {
         if (sub) { block['message' + row] = sub + ' %1'; block['args' + row] = [{ type: 'input_dummy' }]; row++; }
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
-    if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
+    if (def.kind === 'user_root') {
+        addMouth('PRESENTATION', 'Presentation (UI & Sim)');
+        // t2661 (closing t2639's gap 4, MEASURED not assumed) — the two mouths sat 47.7px apart at the
+        // app's own default zoom (0.9) against Blockly's own 28px snapRadius (25.2px effective at that
+        // scale): a real, if narrow (~2.7px), band where a drop lands ambiguously close to BOTH. A blank
+        // spacer row — Blockly's OWN input_dummy mechanism, the SAME one every mouth's own sub-label row
+        // above already uses, no Blockly-core change — pushes the gap comfortably past 2x the snap
+        // radius. Scoped to user_root only (the one block this gap named), not the whole registry.
+        block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_dummy' }]; row++;
+        addMouth('EXECUTION', 'Execution (G-code)');
+    }
     else for (const m of mouthsOf(def)) addMouth(m.name, m.label);
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)

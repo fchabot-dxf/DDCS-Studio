@@ -1126,6 +1126,16 @@ function saveAsCustomOp() {
             if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
             _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
             alert(update ? `Updated “${dlgMeta.name}”.` : `Saved “${dlgMeta.name}” as a new wizard — it's a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
+            // t2661 (BACKLOG, closing t2639's gap 7) — the owner's own copy rule: the act acknowledges itself
+            // (Publish -> Published, sign-out -> Signed out, t2657's own notice machinery). Save NEVER clears
+            // the canvas above (confirmed by reading this whole function — no removeBlock/clear call anywhere
+            // on _ws after authorFork), so whatever blocks were just used to author "${dlgMeta.name}" stay
+            // exactly where they were, on the SAME workspace the currently open program is built from — a
+            // first-time author saving a DEFINITION would not expect that to also be true of their program,
+            // and nothing said so before this. ⛔ The dispatch is explicit: do NOT change the insert itself
+            // (whether it SHOULD happen is a product question nobody has asked the owner) — only stop it
+            // being silent.
+            toast(`“${dlgMeta.name}”'s blocks are still on the canvas — they stay part of the program that's open, not removed by saving.`);
         });
     };
     startFor(candidates[0].id, null);

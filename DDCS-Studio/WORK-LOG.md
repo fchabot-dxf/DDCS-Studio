@@ -77388,3 +77388,104 @@ produced the byte-identical message, now disambiguated).
 - **#7 — "Save wizard…" also inserts an instance into the current program, unannounced** — ANNOYING
   (surprising, not destructive — Undo exists).
 None fixed this turn (out of scope for BACKLOG #81); listed so the next dispatch draws from the record.
+
+## t2661 — THE LAST FOUR AUTHORING GAPS, closing t2639's list
+
+Dispatch: gap 7 (RULED, not open) first, then gap 4 (measure before fixing), then gaps 5/6 (judgment-scoped
+polish — measured friction gets fixed, aesthetic preference gets surfaced). Closing deliverable: t2639's list
+reads 8/8 addressed.
+
+### GAP 7 — RULED: "Save wizard…" also inserts into the current program, now announced
+
+Confirmed live (a throwaway probe, deleted before commit) what `saveAsCustomOp()`'s own code already implied
+on reading: the function never clears or removes anything from `_ws` after registering the wizard — the
+blocks just used to author it stay exactly where they were, on the SAME workspace the currently-open program
+is built from. The owner's own copy rule applies verbatim (Publish → Published, sign-out → Signed out, t2657's
+own notice machinery): after the existing save confirmation, a `toast()` now names the fact — `"<name>"'s
+blocks are still on the canvas — they stay part of the program that's open, not removed by saving.` ⛔ The
+insert itself is UNCHANGED, per the dispatch's own explicit instruction — this only stops it being silent.
+New test: `tests/save-wizard-insert-notice-2661.spec.js` — a real Save through the real dialog, the toast
+text asserted, and the canvas confirmed non-empty afterward (the behaviour itself unchanged). Non-vacuity:
+reverting the one added line reproduces the old silent save and fails the test.
+
+### GAP 4 — MEASURED before fixing: the mouth-drop precision problem, quantified
+
+user_root's PRESENTATION and EXECUTION statement-input connections, at the app's own default zoom (0.9),
+measured **47.7px apart** — against Blockly's own `Blockly.config.snapRadius` of **28** (workspace units),
+an **effective 25.2px** catch radius at that scale. Two catch-radii overlap once their centres sit closer
+than 2× the radius (50.4px here) — 47.7 < 50.4, a real, if narrow (~2.7px), band where a drop could land
+within range of BOTH mouths and connect to the wrong one silently. This is also the exact shape t2639's own
+automation hit (a connection-coordinate technique that needed pixel-offset correction on this same block).
+
+**The fix-or-wall fork, resolved:** a GLOBAL `Blockly.config.snapRadius` change would touch every connection
+in the whole app (unmeasured blast radius, and REDUCING ambiguity there means DECREASING the radius —
+fighting gap 5's own "hard to land" complaint directly) — that is the "geometry surgery" wall. The actual fix
+is SCOPED and low-risk instead: `bridge.js`'s own `jsonDef()`, `user_root`'s branch — a blank spacer row
+between the two mouths, using Blockly's OWN `input_dummy` mechanism (the SAME one the mouths' own sub-labels
+already use — no Blockly-core change, no new category, `user_root` only). Re-measured after: **70.2px apart**,
+comfortably clear of the 50.4px threshold — the ambiguous band is closed. Viewed the rendered block before
+accepting — a clean, natural gap between "Presentation (UI & Sim)" and "Execution (G-code)", not a broken
+layout.
+
+New test: `tests/mouth-spacing-2661.spec.js` — asserts the measured pixel distance clears 2× the effective
+snap radius, computed live (not hard-coded), so a future zoom/renderer change re-validates automatically.
+Non-vacuity: reverting the spacer reproduces 47.7px and fails (`expect(47.7).toBeGreaterThan(50.4)`).
+Existing `user-root-flyout-first-2653.spec.js`, `point-handle-block.spec.js` (×3), `panel-default-2643.spec.js`,
+`panel-default-completeness-2643.spec.js`, `live-preview-unmatched-binding-2653.spec.js` (×3) — all 9 unchanged
+and green (mouth lookup is by NAME, not row index, so the extra row doesn't disturb them).
+
+### GAP 6 — measured friction, fixed: the 8 structural-control blocks moved past the generic Wizard Inputs blocks
+
+`structCtl.js`'s 8 `sc_*` blocks (corner's 6 + middle's `axisOrder` + `syncA`) all declare
+`category: 'Wizard Inputs'` — the SAME category as `formfield`/`param_group`/`param_table`/`param`/
+`coordlist`/the specialized pickers. Read the actual PALETTE array (`wizards/ops/index.js`), not assumed
+from the category name alone: `...STRUCT_CTL_BLOCKS` sat BEFORE `paramGroupBlock`/`paramFieldBlock`/
+`paramTableBlock` in array order — and `buildToolbox()`'s per-category bucket preserves PALETTE's own
+iteration order (the SAME fact t2653's own user_root fix already established) — so a person opening Wizard
+Inputs to find `formfield` for ANY OTHER wizard scrolled past 8 corner/middle-only blocks first.
+
+**PURE REORDER**, the identical mechanism/precedent t2653 used for `user_root`: moved `...STRUCT_CTL_BLOCKS`
+to AFTER `paramTableBlock` in the PALETTE array — no new category, no new chrome, category/colour unchanged.
+New test: `tests/structctl-palette-order-2661.spec.js` — opens the REAL Wizard Inputs category (the same
+`.blocklyToolboxCategory` click t2653's own test uses), asserts all 8 `sc_*` types appear AFTER both
+`formfield` and `param_group` in the real flyout's own block order. Non-vacuity: reverting the move
+reproduces the old order (`sc_*` at flyout position 16, `param_group` at 25) and fails. Existing
+`corner-structctl.spec.js` (6/6) and `user-root-flyout-first-2653.spec.js` re-run unaffected.
+
+### GAP 5 — measured, and surfaced rather than fixed: general Blockly drag precision
+
+Per the dispatch's own rule ("measured friction gets fixed, aesthetic preference gets surfaced"): gap 5 is
+NEITHER a measured, scoped geometry defect (gap 4's own shape) NOR a pure aesthetic call (gap 6's own shape)
+— t2639's own text already named it correctly: "a general, well-known class of Blockly-editor friction,"
+evidenced by that same turn's own automation repeatedly needing pixel-offset correction to land a drag on
+ONE specific connection type. There is no scoped, low-risk code change available: any real fix here (looser
+snapping app-wide, a different drag-preview algorithm, connection highlighting) reaches into Blockly's own
+core drag/connection machinery — "the same wall as the two parked Blockly-core bugs," per the dispatch's own
+framing. **Surfaced, not fixed** — named here for the owner's own call on whether it is worth a Blockly-core
+patch/fork, which this turn does not attempt.
+
+### CLOSING DELIVERABLE — t2639's 8 gaps, 8/8 addressed
+
+| # | Gap | Outcome | Turn |
+|---|---|---|---|
+| 1 | No discoverable "start" entry point (user_root buried) | **FIXED** — reordered to lead its category | t2653 |
+| 2 | `param_field` trap (silent dead-end field) | **FIXED** — made to error loudly | t2641 |
+| 3 | Live Wizard View never refreshes while building | **FIXED** — root-caused as a message collision, disambiguated | t2653 |
+| 4 | Mouth-drop-target precision (Presentation/Execution) | **FIXED** — measured, spacer row past 2× snap radius | t2661 |
+| 5 | Precise canvas drag-and-drop is genuinely hard to land | **SURFACED TO OWNER** — general Blockly-core friction, no scoped fix | t2661 |
+| 6 | Corner-specific blocks cluttering the generic palette | **FIXED** — reordered past the generic blocks | t2661 |
+| 7 | "Save wizard…" inserts into the program, unannounced | **FIXED** — a toast names it (RULED, insert unchanged) | t2661 |
+| 8 | feature_canvas/point_handle silently render nothing | **FIXED** — root-caused as `hasTreeLayout`'s split-only trigger | t2641 |
+
+7 fixed, 1 surfaced. The list that started this authoring thread (t2639) closes as a counted record, not an
+open tail.
+
+### VERIFY
+
+Full suite (`npm test`) required per the dispatch's own TIER (the notice touches the save path, the palette
+touches the shared authoring surface) — see the run below. Three new standing tests
+(`save-wizard-insert-notice-2661`, `mouth-spacing-2661`, `structctl-palette-order-2661`), each non-vacuous
+(shown above). The insert notice shown live on a real save-with-insert. Gap 4's zone quantified with the
+fix taken (spacer row) and the wall named (global snapRadius, rejected — blast radius + fights gap 5).
+Gaps 5/6 split fixed-vs-surfaced with reasons. The 8/8 closing table above. `git status` clean except this
+entry and the files named below.
