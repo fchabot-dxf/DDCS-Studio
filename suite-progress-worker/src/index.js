@@ -127,6 +127,8 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
+  <div class="spec" id="histcard" style="display:none"><span>recent runs</span>
+    <div id="hist" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.9;overflow-wrap:anywhere"></div></div>
   <div class="foot">live over WebSocket · falls back to polling if the socket drops · no model involved</div>
 </div>
 <script>
@@ -314,7 +316,23 @@ const PAGE = `<!doctype html>
       .then(function(t){ if (t && t.length > 10) render(t); })
       .catch(function(){});
   }
-  connect(); pull(); setInterval(pull, 12000); setInterval(tick, 30000);
+  function loadRuns(){
+    fetch('/runs', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(runs){
+      if (!runs || !runs.length) return;
+      g('histcard').style.display = 'block';
+      g('hist').innerHTML = runs.slice(0, 12).map(function(r){
+        var d = new Date(r.at), ok = (+r.failed || 0) === 0;
+        var when = (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+                   String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        return '<span style="color:' + (ok ? 'var(--ok)' : 'var(--bad)') + '">' + (ok ? '✔' : '✘') + '</span> ' +
+               when + ' · ' + (r.tier || '?') + ' · ' + r.passed + '/' + r.total +
+               (+r.failed ? ' · <b style="color:var(--bad)">' + r.failed + ' failed</b>' : '') +
+               (+r.flaky ? ' · ' + r.flaky + ' flaky' : '') + ' · ' + r.took;
+      }).join('<br>');
+    }).catch(function(){});
+  }
+  connect(); pull(); loadRuns();
+  setInterval(pull, 12000); setInterval(tick, 30000); setInterval(loadRuns, 120000);
 </script>
 </body></html>`;
 
@@ -337,9 +355,34 @@ export class ProgressRoom {
     if (request.method === 'POST' && url.pathname === '/u') {
       const t = await request.text();
       if (t.length > 20000) return new Response('too big', { status: 413 });
+      // THE RUN LOG: when a run transitions running → finished, snapshot one compact line.
+      // (Same format detection the page uses: the t2409 ratio, never a bare status word.)
+      const prev = (await this.state.storage.get('p')) || '';
+      const fin = /\d+\s*\/\s*\d+ passed/.test(t) && !/·\s*running\b/.test(t);
+      const wasRunning = /·\s*running\b/.test(prev);
+      if (fin && wasRunning) {
+        const g = (re) => { const m = t.match(re); return m ? m[1] : ''; };
+        const entry = {
+          at: Date.now(),
+          tier: g(/tier:\s*([\w:.-]+)/),
+          total: g(/\*\*\d+\s*\/\s*(\d+)\*\*/),
+          passed: g(/✅\s*(\d+)/), failed: g(/❌\s*(\d+)/),
+          flaky: g(/⚠\s*(\d+)/), skipped: g(/⊘\s*(\d+)/),
+          took: g(/⏱\s*([\dhms ]+?)\s*·/).trim(),
+        };
+        const runs = (await this.state.storage.get('runs')) || [];
+        runs.unshift(entry);
+        if (runs.length > 60) runs.length = 60;
+        await this.state.storage.put('runs', runs);
+      }
       await this.state.storage.put('p', t);
       for (const ws of this.state.getWebSockets()) { try { ws.send(t); } catch (_) {} }
       return new Response('ok');
+    }
+
+    if (url.pathname === '/runs') {
+      const runs = (await this.state.storage.get('runs')) || [];
+      return new Response(JSON.stringify(runs), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
     }
 
     if (url.pathname === '/raw') {
