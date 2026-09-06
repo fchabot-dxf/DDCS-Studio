@@ -28,6 +28,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # thread's own) can resolve in dev mode; frozen builds never need this (PyInstaller bundles fairy directly).
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.join(HERE, "bridge", "bridge-app"))
+# t2657 (BACKLOG #84) — PyInstaller's own --splash module: exists ONLY inside a frozen build with --splash baked
+# in (build_fairy.ps1), so it is never importable in dev (`python fairy_gateway.py`) or in a build made without
+# that flag. Guarded here once so every caller below just checks `pyi_splash is not None`.
+try:
+    import pyi_splash
+except ImportError:
+    pyi_splash = None
 HOST = "127.0.0.1"
 # Port fallback: the exe binds the first FREE port in this range (so it still launches if 8765 is taken).
 # ALL of these must be registered as Google OAuth "Authorized JavaScript origins" (http://127.0.0.1:<p>) so the
@@ -466,11 +473,28 @@ def main():
             # silent skip. Still never blocks boot — only the visibility changed.
             print(f"[fairy] boot sweep of old builds failed ({e}) — continuing.")
 
+        # t2657 (BACKLOG #84) — close the splash NOW: start_persistent() below is the blocking call that actually
+        # triggers pywebview's own native window to paint, so this is the latest safe point that still covers the
+        # whole silent gap (unpack + gateway start + webview init) the splash exists for, without an early close
+        # leaving a second gap before the real window appears.
+        if pyi_splash is not None:
+            try:
+                pyi_splash.close()
+            except Exception:
+                pass   # already closed / splash unavailable — never let this block the app from opening
         from fairy.webview_storage import start_persistent
         start_persistent(webview)             # blocks until the window closes
         print("[fairy] window closed — gateway down.")
         os._exit(0)                           # daemon threads + serial released; guarantee no orphan
     except Exception as e:
+        # t2657 — the webview path above never reached its own close() call (it raised before getting there):
+        # without this, a failed native-window init would leave the splash on screen forever over the browser
+        # fallback below.
+        if pyi_splash is not None:
+            try:
+                pyi_splash.close()
+            except Exception:
+                pass
         # No webview backend (headless / missing WebView2): fall back to the default browser.
         print(f"[fairy] native window unavailable ({e}); opening {url} in your browser. Ctrl+C to stop.")
         try:

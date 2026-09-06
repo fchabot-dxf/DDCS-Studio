@@ -77201,3 +77201,49 @@ timing entirely.
 confirmed via the shared-file-tree fact, not a second build. `git status` clean except this entry and the
 files named below.
 
+## t2657 (SMALL ITEM, separate commit) — BACKLOG #84: the exe splash screen
+
+Dispatch: PyInstaller's own `--splash` + `pyi_splash.close()` once the webview is up — a static image with the
+app name, no fake progress bar (the unpack gives no real progress signal to draw).
+
+### THE IMAGE — already existed, no new asset
+
+`desktop/ddcs.png` (512×512, the app's own icon export) already carries the logo mark AND "DDCS / CNC MACRO
+STUDIO" lettering baked in — viewed directly before using it, it already IS "a static image with the app
+name/logo," matching the dispatch's own ask verbatim. Reused as-is rather than commissioning a new asset.
+
+### THE WIRING
+
+`desktop/build_fairy.ps1`: added `--splash`, `"desktop/ddcs.png"` to the PyInstaller CLI args (this build has
+no committed `.spec` file — the script IS the source of truth, per its own header — so this is the one place
+to add it). `desktop/fairy_gateway.py`: a guarded `import pyi_splash` (only importable inside a build that
+used `--splash`; `None` in dev or an unsplashed build) near the top, and `pyi_splash.close()` called at the
+LATEST safe point that still covers the whole silent gap — right before `start_persistent(webview)`, the
+blocking call that actually triggers the native window to paint. Closing any earlier would leave a second,
+smaller gap; any later would mean two things covering the same moment. Also closed in the `except` fallback
+branch (headless/no WebView2 → opens a browser instead) — without that, a failed webview init would leave the
+splash on screen forever, since the main path's own close() is never reached.
+
+### VERIFIED — a REAL local build, not spec-only
+
+The dispatch's own fallback ("if a local exe build is too heavy for the turn... say LIVE-UNTESTED plainly")
+was checked against rather than assumed: `pyinstaller`, `tkinter`, and `pywebview` were already importable in
+this environment; `websockets` and `qrcode` (declared in `desktop/requirements-build.txt`, just not yet
+installed here) were installed via pip to complete the documented build-dependency set. Ran
+`build_fairy.ps1 -Name ddcs-splash-test` for real: **PyInstaller 6.20.0 built a genuine 47 MB onefile exe with
+`--splash desktop/ddcs.png` baked in, exit code 0** — a malformed/unsupported splash image would have failed
+the build at this step, not silently; it did not.
+
+**Stopped short of launching the built exe**, deliberately: `netstat` showed port 8765 already LISTENING on
+this machine (a live gateway instance) before the test build even started — `fairy_gateway.py`'s own
+`_pick_port()`/takeover flow would have prompted to close whatever is running there, and per this project's
+own live-controller safety rule this is not a decision to make unilaterally. So the SPLASH IMAGE ACTUALLY
+APPEARING AND CLOSING ON SCREEN is LIVE-UNTESTED — everything upstream of that (the config accepting the
+image, the build completing, the close() call sitting at the correct point in the boot sequence) is verified.
+The next real desktop build/release (or a CI run on `desktop-build-check.yml`, which builds cleanly without a
+live gateway occupying the port) closes this last gap.
+
+The test exe and its `build/`/`dist/` intermediates were deleted after verification — a throwaway
+compile-check, not a shipped artifact.
+
+`git status` clean except this entry, `desktop/build_fairy.ps1`, and `desktop/fairy_gateway.py`.

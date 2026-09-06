@@ -101,6 +101,15 @@ VSVersionInfo(
         "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noupx", "--windowed", "--name", $Name,
         "--icon", "desktop/ddcs.ico",
         "--version-file", $verFile,
+        # BACKLOG #84 — the real silent gap between double-click and the window appearing (unpack + gateway start
+        # + webview init) gets a static splash: the SAME logo/name image the app icon already uses, no new asset,
+        # no fake progress bar (the unpack gives no real progress signal to draw). Closed from fairy_gateway.py's
+        # own main() via pyi_splash.close() once the webview is actually up. Windows-only in PyInstaller (fine —
+        # this build script is Windows-only already; see BACKLOG #74 for the macOS CI story).
+        # ⚠ BUILD-MACHINE REQUIREMENT: --splash needs tkinter importable in the Python building this exe (it
+        # bundles a small Tk runtime for the splash window itself) — most standard Windows Python installs have
+        # it; a stripped-down one may need `pip install tk` or the "tcl/tk" optional component reinstalled.
+        "--splash", "desktop/ddcs.png",
 
         "--paths", "bridge/bridge-app",
         "--add-data", "bridge/bridge-app/web/ui${sep}console",
