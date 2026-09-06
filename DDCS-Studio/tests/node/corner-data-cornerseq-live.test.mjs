@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ③b — corner (FL/FR/BL/BR) + probeSeq (YX/XY) go LIVE on the "Corner (data)" twin, the last structural params. They are
@@ -8,6 +8,9 @@ import { test, expect } from '@playwright/test';
  * HARDENED (assert-the-value from the START, per the wcs-harden lesson): read each enum binding's OWN wiring, assert ALL 8
  * combos == cornerStack byte-for-byte (prune correctness), AND pin each combo's DERIVED values (first/second-wall probe var,
  * header dir labels, footer name, reposition default sign) against an INDEPENDENT hardcoded truth table (NOT twin-vs-self).
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('③b corner×probeSeq LIVE: enum bindings drive all 8 combos == cornerStack byte-for-byte + independent-truth derived values', async ({ page }) => {
   await page.goto('http://localhost:3211');

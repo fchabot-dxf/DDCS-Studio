@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * CORNER-PORT inc B1 — EMIT. The corner built-in expressed as a DATA def (blocks/dataOps/cornerData.js) emits G-code
@@ -12,6 +12,9 @@ import { test, expect } from '@playwright/test';
  * Z-surface step), safeZ (fan-out → #19 + the computed #17), and the structural corner quadrant. The derive-robustness
  * block proves the helper RE-FINDS the shifted #23/#24 when probeZFirst inserts #21/#22 — defect #1's ROOT guard.
  * SCOPE: emit only — no cornerView/panel (inc B3), no sim starts / inferStarts (inc B2).
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly in each test.
  */
 test('corner-data-emit: functional G-code == cornerStack across a bound-scalar sweep + derived-binding wiring', async ({ page }) => {
   await page.goto('http://localhost:3211');

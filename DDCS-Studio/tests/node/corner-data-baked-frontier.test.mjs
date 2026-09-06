@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * BAKED-FRONTIER GATE — the FINAL frontier guard. All the operator-facing structural params are now LIVE: probeZFirst /
@@ -9,6 +9,10 @@ import { test, expect } from '@playwright/test';
  *
  * The built-in Corner is now RETIRED (④ move 2a) — the twin is its replacement. Test (2) asserts the retirement landed +
  * guards re-registration; the SHIM (cornerStack / BUILDERS.corner / SCHEMA.corner) stays so legacy saved 'corner' ops render.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: test (1) calls `registerUserOp`
+ * explicitly; test (2) reads `listEntries()` from wizardLibrary.js, a static declared registry unrelated to the
+ * user-ops twin store.
  */
 
 // (1) `level` is the last baked frontier — DELIBERATELY baked-final (non-operator-facing). The twin diverges from cornerStack

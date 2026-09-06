@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ② B4 step 4b — travelApproach goes LIVE on the "Corner (data)" twin (batch fork 1/3). An ENUM structural toggle
@@ -13,6 +13,9 @@ import { test, expect } from '@playwright/test';
  *       #1505 jog-prompt KIND-B text — proving the nested guards prune correctly in every combination;
  *   (3) the real toggle symptom on BOTH traverses: manual → the "Jog clear" #1505 prompts + no G0 seq move; auto → the
  *       G0 X#.. Y#.. seq moves + no jog prompt.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('travelApproach LIVE: enum binding drives auto/manual == cornerStack byte-for-byte across the probeZFirst×travelApproach matrix', async ({ page }) => {
   await page.goto('http://localhost:3211');

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t929 B2b-2c — CORNER's wall1→wall2 traverse now reads the declared CLEARANCE MODE (clearLiftNodes), so the built-in
@@ -6,6 +6,9 @@ import { test, expect } from '@playwright/test';
  * repoTraverse) reads the mode; WALL2 (the final retract) + the error handler stay Max (always max caution). safeZ (#19)
  * is the PLUNGE/approach and is UNCHANGED. Max is BYTE-IDENTICAL to today (clearLiftNodes('max') === safeRetractNode).
  * (This is the EMIT foundation; the corner data-op FORM to SELECT the mode is a separate follow-up — see WORK-LOG.)
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding needed: works directly with cornerStack, no
+ * user-ops registry involved at all.
  */
 const em = async (page, params, dialectId) => page.evaluate(async ({ p, d }) => {
   const { cornerStack } = await import('/wizards/cornerWizard.js');

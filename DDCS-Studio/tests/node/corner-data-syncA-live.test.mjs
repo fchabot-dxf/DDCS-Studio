@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ② B4 step 4d — syncA goes LIVE on the "Corner (data)" twin (batch fork 3/3 — the LAST prune-shaped toggle). A BOOL
@@ -9,6 +9,9 @@ import { test, expect } from '@playwright/test';
  * HARDENED live-spec pattern WITH THE VALUE-PIN (from 4c-harden): reads the bool binding's OWN wiring + asserts ON/OFF ==
  * cornerStack byte-for-byte + the toggle symptom, AND pins the slave-offset VALUE against an INDEPENDENT hardcoded truth
  * (#74=[#70+3] + #[#74]=#883) — NOT twin-vs-self parity, which is blind to a value both the prune + the source share.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('syncA LIVE: bool binding toggles the dual-gantry sync == cornerStack byte-for-byte; slave-offset value PINNED independently', async ({ page }) => {
   await page.goto('http://localhost:3211');

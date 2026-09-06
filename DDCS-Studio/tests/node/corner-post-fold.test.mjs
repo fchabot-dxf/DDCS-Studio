@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * CORNER PER-POST FOLD (F1/E1, Option 1) — COMPLETE. The corner probe wizard leaked LITERAL Expert registers on
@@ -8,6 +8,9 @@ import { test, expect } from '@playwright/test';
  *
  * Classes: probe-STATUS (already clean — probecheck folds []); TRIGGER read (radiuscomp probeTrigVar); HMI (#1505 →
  * hmiline); WCS WRITE (wcsbaseinto + wcswrite: Expert #[#70]/#73 indirect / other posts G92; #883 sync → honest comment).
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding needed at all: every test works directly with
+ * cornerStack/edgeStack/middleStack/alignmentStack/rotaryCenterStack/rotaryClockStack, never the user-ops registry.
  */
 async function emitCorner(page, params) {
     return page.evaluate(async (params) => {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * SCALAR PARITY (t138) — the Corner (data) twin's emit must equal cornerStack byte-for-byte when the 6 SUMMARY SCALARS
@@ -6,6 +6,9 @@ import { test, expect } from '@playwright/test';
  * static template froze the 2 human-readable header comments at CORNER_DEFAULTS; its postInstantiate hook recomposes them
  * from the resolved params (via the shared cornerHeaderComments format) so the comment tracks the live scalars. This spec
  * closes the previously-missed gap: skipping that recompose leaves the header stale → these asserts go RED.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('the twin == cornerStack byte-for-byte across NON-DEFAULT scalars (header comment tracks them)', async ({ page }) => {
   await page.goto('http://localhost:3211');

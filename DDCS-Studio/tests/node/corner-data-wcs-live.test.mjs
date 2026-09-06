@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ② B4 step 4c — wcs goes LIVE on the "Corner (data)" twin (batch fork 2/3; the highest-risk 7-way). A 7-WAY enum toggle
@@ -13,6 +13,9 @@ import { test, expect } from '@playwright/test';
  *       fork too) — 14 combos;
  *   (3) the real toggle symptom: 'active' reads #578; a fixed target writes the literal base + "Target: G5x" + the labelled
  *       save notes, with the active read gone.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte across the wcs×probeZFirst matrix', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -86,7 +89,7 @@ test('wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte 
   expect(r.g59HasLiteral, 'G59: writes the literal base #70=830 + "Target: G59"').toBe(true);
   // (4) INDEPENDENT LITERAL PINS — assert every fixed WCS writes the CORRECT #70 base against a HARDCODED truth table (NOT
   //     read from WCS_BASE), cross-checked vs the active formula 805+idx*5. A wrong base = the corner written to the WRONG
-  //     WCS register on a real machine; twin-vs-self parity can't catch it (both sides share WCS_BASE). ASSERT THE VALUE.
+  //     WCS register on a real machine; twin-vs-self parity can't catch it. ASSERT THE VALUE.
   const WCS_TRUTH = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
   Object.keys(WCS_TRUTH).forEach((w, i) => {
     expect(WCS_TRUTH[w], `truth table self-consistent: ${w} == 805 + idx*5 (idx=${i})`).toBe(805 + i * 5);

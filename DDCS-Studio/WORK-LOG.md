@@ -78796,3 +78796,77 @@ node tests run together in one process = 1.52s. **~13.3x aggregate.**
 `git status` clean except this entry and the 22 files (11 new `tests/node/*.test.mjs`, 11 deleted
 `tests/*.spec.js`, whole-file moves, no splits this batch).
 
+## t2693 — TIER-MIGRATION BATCH 4: the CORNER emit cluster — 10 of 11 files moved whole, 1 split, and an
+INFRA REGRESSION found + fixed mid-turn (my own t2691 TaskStop orphaned the mem-server)
+
+Dispatched to move the corner probe emit cluster (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch4.md`):
+`corner-data-emit`, `corner-data-wcs-live`, `corner-data-cornerseq-live`, `corner-data-probeZFirst-live`,
+`corner-data-syncA-live`, `corner-data-travelApproach-live`, `corner-data-start-live`, `corner-data-baked-
+frontier`, `corner-scalar-parity`, `corner-clearance-emit-929`, `corner-post-fold` — 11 files, 21 tests.
+Shape-gated every one by reading (batches 1–3's own lesson): 10 files moved whole, clean; 1 file
+(`corner-data-start-live`) split — its own test (1) is pure `import()`+`evaluate`, but test (2) opens a real
+wizard (`window.openWiz`), waits on a real DOM selector, and reads a live `.wiz-viz3d` panel's `__panel`
+instance to call `onStartDrag`/`getPassStarts` on the actual rendered 3D preview — a genuine app+DOM+render
+dependency the dispatch's own named exclusion list didn't cover by filename but the shape-gate caught anyway
+(the same pattern as batch 2's `lathe-surfaces-1295`/`lathe-preview-1297`). Split into
+`tests/corner-data-start-live-drag.spec.js`, left in the browser tier. **20 tests moved to node, 2 stay
+browser** (the split test + none other — every other file in this batch was already fully pure).
+
+### THE SEEDING PATTERN — all three known shapes present, no new one found
+
+Every twin-touching file already called `registerUserOp(cornerDataDef())` explicitly in-test (the correct,
+pre-existing pattern from batches 1–3) — no seeding fix needed anywhere in this batch. `corner-clearance-
+emit-929` and `corner-post-fold` need no registration at all (they work directly with `cornerStack`/
+`edgeStack`/`middleStack`/`alignmentStack`/`rotaryCenterStack`/`rotaryClockStack`, never the user-ops
+registry). `corner-data-baked-frontier`'s second test reads `listEntries()` from `wizardLibrary.js` — a
+static declared registry, unrelated to the twin store.
+
+### AN INFRA REGRESSION, FOUND AND FIXED — my own doing, from the PRIOR turn
+
+Mid-batch, ALL filtered/targeted `npx playwright test <file>` invocations started returning "0 tests" (exit
+1) — including on completely untouched, pre-existing spec files (confirmed with `actual-drop-descent-1524
+.spec.js`, unrelated to any batch). `--list` (no execution) found tests fine at every scope (a single file, the
+whole suite); only actual EXECUTION of a filtered subset failed. Diagnosed rather than routed around: found
+`playwright.config.js`'s own `webServer.reuseExistingServer: false` (a t1666 decision, deliberately strict —
+its own comment names the exact failure class: "a leftover process from an earlier (aborted, Ctrl-C'd,
+force-killed) run silently served a STALE snapshot"). t2691's own `TaskStop` on the backgrounded `npm test`
+(done to honor that turn's verify-relaxation amendment) killed the top-level bash wrapper but orphaned its
+child `node tests/support/mem-server.cjs 3211` (confirmed via the Windows process tree — the orphan's parent
+chain traced straight back to that killed run's own `playwright test` process). The orphan kept serving on
+port 3211; `reuseExistingServer:false` then made every NEW filtered Playwright invocation refuse to start
+("port already used"), silently reported as "0 tests" rather than a clear error (the abort path bypasses the
+custom progress reporter's own error surface). A FULL unfiltered run never re-triggered its own webServer
+start check in a way that surfaced this in my earlier probing, which is why it took several isolation steps
+(unrelated file, `-g` grep, a fresh PowerShell process, clearing `test-results/.last-run.json` and
+`/tmp/playwright-transform-cache`, killing the OTHER stray `playwright test-server` process — none of these
+fixed it) before checking the actually-relevant thing: `Get-CimInstance Win32_Process | Where-Object
+CommandLine -match 'mem-server'`, which named the orphan directly. Killed PID 83068 (`mem-server.cjs`) + its
+`cmd.exe` wrapper 86976 — port 3211 freed, filtered runs immediately worked again (confirmed on
+`corner-post-fold.spec.js`: 0/7 → 7/7 clean). **Flagging for the advisor**: any future `TaskStop` on a
+backgrounded `npm test`/`playwright test` run should be followed by a mem-server orphan check
+(`Get-CimInstance Win32_Process | Where-Object CommandLine -match 'mem-server'`) before trusting the next
+Playwright invocation — this is the second time in two turns a `TaskStop` on this specific command shape has
+left the environment in a state that needed hand-diagnosis (t2691's stopped run left no residue; this one
+did, likely because the app server started successfully whereas the earlier stop happened before/without it
+mattering).
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite, per the LIGHT VERIFY MODEL still in force from t2691's
+amendment): the 11 original files + the new split-off drag file run together in the browser (22 tests,
+including one duplicate — the drag test counted once in the not-yet-deleted original file, once in the new
+split file) = **18.05s summed per-test duration**. The 20 tests that actually moved, run together in one
+node process = **1.38s**. **~13x aggregate** — consistent with batch 3's ~13.3x, the same small-file-cluster
+shape.
+
+### VERIFY (LIGHT MODEL, per t2691's still-active amendment)
+
+`npm run test:node`: 372/372 (352 prior + 20 this batch, exactly).
+
+`npx playwright test --list`: **3117 tests — down from batch 3's 3137 by EXACTLY 20**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 11 new `tests/node/*.test.mjs` files, 1 new split-off browser spec
+(`corner-data-start-live-drag.spec.js`), and 11 deleted browser specs (10 whole-file moves + the trimmed-
+then-deleted `corner-data-start-live.spec.js`). Process tree clean (0 flagged) after the mem-server fix.
+

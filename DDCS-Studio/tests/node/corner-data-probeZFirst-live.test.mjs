@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ② B4 step 4a — probeZFirst goes LIVE on the "Corner (data)" twin. The twin SEEDs cornerStack in SUPERSET mode (both arms
@@ -10,6 +10,9 @@ import { test, expect } from '@playwright/test';
  *   (3) the preview shows 3 ALIGNED markers under Z (2 without), and the semantic relTo anchors the reposition drag to the
  *       SAME wall-1 pass in BOTH states (resolveRelToIndex maps {row:'wall1'} past the zsurf row's +1 shift).
  *   (4) probeZFirst is a real BOOL binding (drives the form toggle + the marker schema).
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. No twin-seeding fix needed: this file already calls
+ * `registerUserOp(cornerDataDef())` explicitly.
  */
 test('probeZFirst LIVE: OFF/ON emit == cornerStack byte-for-byte; toggle adds the Z shape; markers + semantic relTo anchor', async ({ page }) => {
   await page.goto('http://localhost:3211');

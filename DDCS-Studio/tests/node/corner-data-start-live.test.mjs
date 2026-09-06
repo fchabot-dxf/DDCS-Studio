@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ③ stock-datum drag handles — the EMITTING Z-first start handle (#21/#22 = startX/startY) + the SIM-ONLY first-start.
@@ -8,10 +8,14 @@ import { test, expect } from '@playwright/test';
  *
  * (4a) the EMITTING handles write the correct datum-relative value vs an INDEPENDENT truth (the non-degenerate default
  *      expressions + a bound literal), the start handle anchors to the zsurf pass, and it is GATED on probeZFirst.
- * (4b) THE CRITICAL — dragging the SIM-ONLY first-start (userStarts) CHANGES the preview but leaves the EMIT BYTE-IDENTICAL.
+ *
+ * t2693 — TIER MIGRATION BATCH 4: moved browser→node. ONLY this first test moved — it's pure import()+evaluate
+ * (registerUserOp + builderOf + opSimStarts, no DOM). The file's second test ("(4a gate + 4b)... the SIM-ONLY
+ * first-start drag") opens a real wizard (window.openWiz), waits on a real DOM selector, and reads a live
+ * `.wiz-viz3d`'s `__panel` instance to call `onStartDrag`/`getPassStarts` on the actual rendered 3D preview —
+ * a genuine app+DOM+render dependency, not a candidate for this tier. Split into
+ * tests/corner-data-start-live-drag.spec.js, left in the browser tier.
  */
-test.use({ viewport: { width: 1400, height: 1000 } });
-
 test('③(4a) EMITTING start handle: startX/startY wiring + non-degenerate default + bound datum-relative value + zsurf anchor', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
@@ -62,51 +66,4 @@ test('③(4a) EMITTING start handle: startX/startY wiring + non-degenerate defau
   // the anchor resolves to the zsurf pass (filtered index 0 under probeZFirst) at its independent frac position.
   expect(r.anchorIdx, 'startX relTo {row:zsurf} → filtered index 0 under probeZFirst').toBe(0);
   expect(Math.abs(r.anchorX - 7) < 0.01 && Math.abs(r.anchorY - 7) < 0.01, 'the start handle anchors to the zsurf marker (7,7) on this stock — datum-relative, not (0,0)').toBe(true);
-});
-
-test('③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-start drag changes the preview but NOT the emit', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
-
-  await page.evaluate(async () => {
-    const U = await import('/blocks/userOps.js');
-    const CD = await import('/blocks/dataOps/cornerData.js');
-    localStorage.removeItem('ddcs_user_ops');
-    U.createUserOp(CD.cornerDataDef());
-  });
-  await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
-
-  // (4a gate) the EMITTING FeatureCanvas handles: 1 off (reposition) → 2 on (+ start), via the whenOk handle-gate.
-  const gate = await page.evaluate(async () => {
-    const { layoutSpecFromOp } = await import('/wizards/ops/panelTypes.js');
-    const { cornerDataDef, CORNER_DEFAULTS } = await import('/blocks/dataOps/cornerData.js');
-    const def = cornerDataDef();
-    const S = (o) => ({ ...CORNER_DEFAULTS, ...o });
-    const n = (p) => (layoutSpecFromOp(def, S(p)).handles || []).length;
-    return { off: n({ probeZFirst: 0 }), on: n({ probeZFirst: 1 }) };
-  });
-  expect(gate.off, 'probeZFirst OFF: 1 emitting handle (the wall-2 reposition #23/#24)').toBe(1);
-  expect(gate.on, 'probeZFirst ON: 2 emitting handles (+ the wall-1 start #21/#22) — the whenOk handle-gate').toBe(2);
-
-  // (4b THE CRITICAL) drag the SIM-ONLY first-start (the createPreviewPanel userStarts seam) → the preview marker MOVES
-  // (computePassStarts reflects it) but the EMIT is BYTE-IDENTICAL (Option-B — userStarts never touches params/emit).
-  const beforeCode = await page.evaluate(() => (document.getElementById('wiz_user_code') || {}).textContent || '');
-  const drag = await page.evaluate(() => {
-    const c = document.getElementById('userViz3dContainer_tree');
-    const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
-    const panel = host && host.__panel;
-    if (!panel || typeof panel.onStartDrag !== 'function' || typeof panel.getPassStarts !== 'function') return { wired: false };
-    const before0 = panel.getPassStarts()[0] || null;
-    panel.onStartDrag({ x: 33, y: 44, z: -3 }, 0);   // SIM-ONLY: move pass-0's start (userStarts[0])
-    const after0 = panel.getPassStarts()[0] || null;
-    return { wired: true, before0, after0 };
-  });
-  const afterCode = await page.evaluate(() => (document.getElementById('wiz_user_code') || {}).textContent || '');
-  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
-
-  expect(drag.wired, 'the wizard preview panel exposes the userStarts seam (onStartDrag / getPassStarts)').toBe(true);
-  expect(Math.abs(drag.after0.x - 33) < 1 && Math.abs(drag.after0.y - 44) < 1, 'the SIM-ONLY drag moves the preview first-start marker (userStarts beats the hint)').toBe(true);
-  expect(afterCode, 'THE INVARIANT — the sim-only first-start drag leaves the EMIT BYTE-IDENTICAL (Option-B: never emitted)').toBe(beforeCode);
-  expect(beforeCode.length, 'sanity: there was real emitted code to compare').toBeGreaterThan(100);
 });
