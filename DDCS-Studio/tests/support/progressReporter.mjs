@@ -163,7 +163,15 @@ export default class ProgressReporter {
             // "test:e2e" from inside the Playwright process either way. `npm_command` ('run') is the documented
             // fallback for the rare case the lifecycle var is absent (e.g. no npm wrapper at all) — a coarser
             // signal, but still real, never fabricated.
-            tier: process.env.npm_lifecycle_event || process.env.npm_command || '',
+            // t2679 — `npm_lifecycle_event` alone is AMBIGUOUS: it reads 'test:e2e' identically whether a
+            // person ran `npm run test:e2e` standalone or test-all.cjs spawned it as the e2e HALF of `npm test`
+            // — two different facts a viewer needs told apart (a standalone e2e run finishing means the whole
+            // thing is done; the full suite's e2e portion finishing does not — test-all.cjs still has its own
+            // flaky-count summary to print). `DDCS_TIER` is test-all.cjs's own declared env var
+            // ('full suite', set only on ITS spawn of the e2e child) — preferred here when present; a
+            // standalone `npm run test:e2e` never sets it, so it falls through to the SAME npm_lifecycle_event
+            // reading as before, unchanged.
+            tier: process.env.DDCS_TIER || process.env.npm_lifecycle_event || process.env.npm_command || '',
         };
 
         // Each surface writes independently — one failing (a locked file, a full disk) must never take the others down.
