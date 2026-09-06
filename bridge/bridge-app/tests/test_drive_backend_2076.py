@@ -275,6 +275,91 @@ def test_legacy_flat_jobs_detector_fires_on_a_seeded_legacy_folder_and_stays_qui
     assert other.legacy_flat_jobs() == 1, other.legacy_flat_jobs()
 
 
+# ── t2659 (BACKLOG #81, item 1 corrected) — SINGLE-CANDIDATE AUTO-DISCOVERY ──────────────────────────────
+# "the delivered .ddcs/first job can seed [machine_name] when Setup never did": a blank name, given
+# auto_discover=True (bridge.py's real startup path only — see DriveBackend's own docstring for why a bare
+# construction must stay side-effect-free), adopts the ONE existing non-reserved folder under the container
+# rather than refusing outright — that folder can only be the workspace whose own client-side send already
+# created it (Studio's driveJobs.js submitJobToDrive, keyed by fileSavedStem — the SAME key machine_name is).
+import tempfile
+
+
+def _blank_backend(fake, config_path=None):
+    """Construct with a BLANK name + auto_discover=True against a pre-seeded FakeDrive. Discovery runs
+    INSIDE __init__ (before an instance exists to patch _req/_token onto, unlike _backend() above), so the
+    seam is patched at the CLASS level for the span of this one construction, then restored."""
+    orig_req, orig_token = DriveBackend._req, DriveBackend._token
+    DriveBackend._req = fake.req
+    DriveBackend._token = lambda self: "fake-token"
+    try:
+        cfg = Config(backend="drive", google_client_id="cid", google_client_secret="sec", machine_name="",
+                     config_path=config_path or os.path.join(tempfile.mkdtemp(prefix="fairy_cfgtest_"), "config.json"))
+        b = DriveBackend(cfg, auto_discover=True)
+    finally:
+        DriveBackend._req = orig_req
+        DriveBackend._token = orig_token
+    # the class-level patch only needs to cover __init__'s own discovery call; pin the fake onto the
+    # INSTANCE too (same technique _backend() uses above) so callers can keep using `b` afterward.
+    b._req = fake.req
+    b._token = lambda: "fake-token"
+    return b, cfg
+
+
+def test_a_bare_construction_never_auto_discovers_even_with_a_blank_name():
+    """The default (auto_discover=False) must stay EXACTLY the pre-t2659 contract: a blank name refuses
+    with NO Drive call at all, real or fake — the existing test above already proves this against the REAL
+    _req; this proves it stays true even when a fake WOULD have answered, i.e. the gate is real, not
+    accidental (a fake that answers "one candidate" but is never even asked)."""
+    fake = FakeDrive()
+    seed, _ = _backend("Solo Rig", fake)
+    seed.put_heartbeat({"ok": True})   # creates the one machine folder + its gateway/heartbeat.json
+    cfg = Config(backend="drive", google_client_id="cid", google_client_secret="sec", machine_name="")
+    try:
+        DriveBackend(cfg)   # auto_discover defaults False — must refuse, not silently find "Solo Rig"
+    except DriveError:
+        return
+    raise AssertionError("a bare DriveBackend(cfg) must never auto-discover, even when a candidate exists")
+
+
+def test_auto_discover_adopts_the_one_existing_machine_folder_and_persists_it():
+    fake = FakeDrive()
+    seed, _ = _backend("Rig B", fake)
+    seed.put_heartbeat({"ok": True})   # the only real-world way a machine folder pre-exists: it published once
+
+    b, cfg = _blank_backend(fake)
+    assert b.machine_name == "Rig B", b.machine_name
+    with open(cfg.config_path, encoding="utf-8") as f:
+        assert json.load(f)["machine_name"] == "Rig B", "discovery must persist, or every reboot re-discovers"
+    # and the discovered backend actually WORKS — same machine folder, not a fresh duplicate
+    b.put_job("J1", "(rig b)\nM30\n", {"total_beacons": 1})
+    machine_folders = [f for f in fake.files.values() if f["mimeType"] == _FOLDER_MIME and f["name"] == "Rig B"]
+    assert len(machine_folders) == 1, f"discovery must reuse the existing folder, not create a second one: {machine_folders}"
+
+
+def test_two_existing_machine_folders_cannot_be_disambiguated_so_it_still_refuses():
+    fake = FakeDrive()
+    a, _ = _backend("Rig A", fake)
+    a.put_heartbeat({"ok": True})
+    c, _ = _backend("Rig C", fake)
+    c.put_heartbeat({"ok": True})
+    try:
+        _blank_backend(fake)
+    except DriveError:
+        return
+    raise AssertionError("two candidates must refuse — adopting either would be a coin flip on whose folder it is")
+
+
+def test_zero_existing_machine_folders_still_refuses_with_auto_discover_on():
+    """The empty-Drive case (genuinely nothing has ever synced) must read identically to before t2659 —
+    auto_discover changes nothing when there is nothing TO discover."""
+    fake = FakeDrive()
+    try:
+        _blank_backend(fake)
+    except DriveError:
+        return
+    raise AssertionError("zero candidates must still refuse, same as the pre-t2659 blank-name contract")
+
+
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items()
                            if n.startswith("test_") and callable(f)):

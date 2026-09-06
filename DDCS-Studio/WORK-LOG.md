@@ -77247,3 +77247,144 @@ The test exe and its `build/`/`dist/` intermediates were deleted after verificat
 compile-check, not a shipped artifact.
 
 `git status` clean except this entry, `desktop/build_fairy.ps1`, and `desktop/fairy_gateway.py`.
+
+## t2659 — BACKLOG #81: cloud reachability out of the box
+
+Dispatch: the owner's own question made true — "so the fix applies to all users not only me right?" — plus
+the entry's own same-night CORRECTION (machine_name must be the WORKSPACE STEM the phone already keys its
+Drive lookup by, never a hostname convention) and two hazards found live (the shipped `.bat` cannot start
+the gateway at all; the startup banner crashes under a non-UTF-8 console).
+
+### THE TWO IMMEDIATE BREAKAGES, both fixed and verified live
+
+1. **`START_GATEWAY.bat` still passed `--no-slave`**, a flag t2649's beacon removal deleted from argparse
+   entirely — the shipped double-click path exited 2, unable to start the gateway at all. Removed the flag
+   and the stale "tick Beacons" comment. **Verified live on this machine**: ran the exact resulting command
+   line (`--serve --http-port 18765 ...`, an alternate port so as not to touch the real gateway already
+   running on 8765) and confirmed it reaches "[bridge] polling… (Ctrl+C to stop)" and stays up.
+2. **The startup banner crashes under a non-UTF-8 console.** ⚠ CORRECTION, measured while building the
+   test: the entry's own "cp1252" is imprecise — cp1252 actually ENCODES an em dash fine (byte 0x97;
+   Western-European codepages keep it in their extended range). The codepage that genuinely fails is
+   **cp437**, the classic DOS/OEM codepage a raw `cmd.exe` window (exactly what the `.bat` runs in) defaults
+   to — confirmed directly: `'—'.encode('cp437')` raises, `'—'.encode('cp1252')` does not. t2103 already hit
+   this SAME class of bug once (the role-conflict WARNING line, made plain ASCII — cp1252 genuinely lacks
+   the ⚠ symbol, so that ONE fix was correctly scoped) — but a SECOND, unrelated line (`run_loop`'s own
+   startup banner) crashed the same way later, proving per-line ASCII patching does not generalize: every
+   future non-ASCII print is an unpatched landmine. Fixed at the ENTRYPOINT instead
+   (`fairy.bridge.main()`'s own `sys.stdout`/`stderr.reconfigure(encoding="utf-8")`, guarded for `None` — a
+   frozen `--windowed` build's real stdout — and for `fairy_gateway.py`'s own `_Tee` wrapper, which has no
+   `.reconfigure()` and is already protected by its own per-stream exception swallowing, so a no-op there is
+   correct, not a gap) — one place, protects every print in the process against every codepage this class of
+   bug can come from, including ones not yet written.
+   **Non-vacuity**: `tests/test_unicode_banner_2659.py` spawns a REAL subprocess with
+   `PYTHONIOENCODING=cp437` forced — reverting the fix reproduces the EXACT reported crash
+   (`UnicodeEncodeError` at the banner's own line), restoring it passes; 2/2 stable re-runs.
+
+### ITEM 1, CORRECTED — the workspace-stem key, learned two ways
+
+`DriveBackend`'s own `machine_name` IS the Drive folder key (VERBATIM, trimmed — its own docstring), and
+the phone's own `readGatewayHeartbeat(fileSavedStem())` (status.js) looks up that SAME string, trimmed, via
+`driveJobs.js`'s `findChild` — confirmed by reading both sides, not assumed. So "the gateway learns the
+workspace name" has to mean THIS exact key, never a hostname.
+
+- **"Setup names it explicitly"** — already built (`admin.js`'s own `machine_name` text input, `renderSetup`)
+  before this turn; nothing to add there.
+- **"the first delivered job/.ddcs can seed it when Setup never did"** (new this turn) —
+  `DriveBackend.__init__` gained an opt-in `auto_discover` parameter: when `machine_name` is blank, scan the
+  container's own existing child folders (excluding the six reserved leaf names); if exactly ONE non-reserved
+  folder exists, it can only be the workspace whose own client-side send (`driveJobs.js`'s
+  `submitJobToDrive`) already created it under `fileSavedStem()` — adopt it, persist it to `config.json` (the
+  same file/key Setup's own `set_config` writes), and proceed. Two-or-more candidates cannot be
+  disambiguated safely (which one is THIS machine?) and zero means genuinely nothing has synced yet — both
+  fall through to the pre-existing refusal, unchanged.
+  ⛔ **`auto_discover` DEFAULTS FALSE, and this is load-bearing, not incidental**: discovery makes a REAL
+  Drive API call, and a bare `DriveBackend(cfg)` must stay the side-effect-free construction the existing
+  `test_a_blank_machine_name_refuses_rather_than_falling_back_to_the_flat_folder` test already relies on
+  ("the caller learns before any Drive call is even attempted"). Only `bridge.py`'s own `build()` — the real
+  gateway startup path — opts in (`make_backend(config, auto_discover=True)`); `self_test()`'s own `build()`
+  calls are unaffected since `auto_discover` only ever matters for `backend=="drive"`, which `self_test()`
+  never uses.
+
+### ITEM 2 — sign in already said what they want
+
+`Config.from_env()`: when `"backend"` is entirely ABSENT from `config.json` (never written — Setup's own
+`save.onclick` always sends `backend` explicitly, so absence means "never saved once," a DIFFERENT fact from
+"persisted as `local`," which must never be touched) AND `oauth.connected()` (a local file-presence check —
+a stored refresh_token, no network round trip) is true, default `backend` to `"drive"`. An explicit CLI
+`--backend` still wins (applied after, unchanged ordering).
+
+**A real bug found and fixed along the way, not just a test-isolation artifact**: `oauth.py`'s own
+`_TOKEN_FILE` was a module-level constant computed ONCE at import (`os.path.join(os.path.expanduser("~"),
+...)`) — the EXACT class of bug `Config`'s own `default_config_path`/`default_local_root`/`default_log_path`
+are all functions specifically to avoid (their own comments say so). Caught live: adding the
+`oauth.connected()` call inside `from_env()` made a PRE-EXISTING, previously-passing test
+(`test_legacy_bridge_data_migrates_forward_once_idempotently`) fail — its own `_HomeSwap()` isolator patches
+`os.path.expanduser` for the test's `with` block, but `oauth.py`'s frozen constant, computed at the SUITE's
+first import (long before any test's own swap), never saw it — so `oauth.connected()` silently read THIS
+machine's own REAL, live Google token (this dev box has an active gateway), returned `True`, and flipped
+`backend` to `"drive"` even inside the test's supposedly-isolated `Config.from_env()` call — which then
+skipped the `backend=="local"`-gated legacy-migration the test was checking for. Fixed by converting
+`_TOKEN_FILE` into a function (`_token_file()`), computed fresh on every call, matching the established
+pattern. Confirmed: full bridge-app suite went from 126 passed (pre-t2659 baseline, isolated by a full
+revert) → 1 failed (my change alone, reproducing the finding above) → 138 passed, stable across 2 full runs,
+once the oauth.py fix landed alongside it.
+
+### ITEM 3 — say the state either way
+
+`cloud_state_line(config)` (new, `bridge.py`, same "extract the decision so a test can assert it" discipline
+as `_sound_allowed`): `'publishing to Drive as "<name>"'` / `"publishing to Drive — no machine name set yet
+(Setup)"` / `"local-only (not publishing to the cloud)"`. Printed once at gateway startup, right after the
+existing `[bridge] up —` banner. Mirrored in Setup's own console: `admin.js`'s existing (but terse) `gateway
+v<ver> · backend <name>` footer line upgraded to the same three-way wording, replacing a line that said
+WHICH transport but never WHICH name or whether local was a deliberate choice.
+
+### THE HONESTY CEILING, stated per the dispatch's own instruction
+
+The full first-run cloud path (a genuinely fresh `~/.ddcs-bridge`, a real sign-in, a real heartbeat landing
+in Drive, a real phone reading it) cannot be end-to-end proven from this seat — no second device, and this
+dev machine's own `~/.ddcs-bridge` already carries a real, live-configured install. What IS proven, per link:
+- The `.bat` fix: a REAL local gateway process reaching "polling…" — see above.
+- The encoding fix: a REAL subprocess crash reproduced and then fixed — see above.
+- Backend auto-default + `cloud_state_line`: unit-level against `Config`/`oauth.connected` (monkeypatched,
+  no real token touched) — 7 new tests, `tests/test_cloud_defaults_2659.py`.
+- Machine-name discovery: unit-level against the SAME `FakeDrive` harness `test_drive_backend_2076.py`
+  already established for `DriveBackend` (t2076) — 4 new tests (bare-construction-never-discovers,
+  single-candidate-adopts-and-persists, two-candidates-refuses, zero-candidates-refuses).
+NOT proven: the actual Google Drive wire format for any of this (same limit `test_drive_backend_2076.py`'s
+own header already states, unchanged by this turn), and the phone-side experience end to end. Both need a
+real signed-in run on real hardware — named here so the next session does not re-discover the same ceiling.
+
+### VERIFY
+
+`test_unicode_banner_2659.py` (1, non-vacuous), `test_cloud_defaults_2659.py` (7), `test_drive_backend_2076.py`
+(16, 4 new + the existing 12 unchanged), full bridge-app pytest suite **138 passed**, stable across 2 runs.
+Studio side: `settings-role-gate-2111.spec.js` (4/4, the one existing Playwright test touching admin.js's
+Setup view) unaffected by the footer-line wording change; `npm run test:node` 236/236. No full e2e run — the
+dispatch's own TIER ("full suite only if shared render is touched"); `admin.js`'s own footer-line edit is
+narrow and isolated, not a shared render path. The `.bat` actually starts a gateway on this machine (above).
+The seeding rule is stated in code (drive.py's own comments) and here. `git status` clean except this entry
+and the files named below.
+
+### SECOND DELIVERABLE — t2639's gap list, the remaining four (of eight)
+
+t2639 found 8 gaps in the canvas-authoring path, marked impossible (blocks a person) vs annoying (slows
+them). Four are now closed: **param_field** (#2, the silent dead-end field — closed t2641, made it error
+loudly instead of rendering dead); **canvas default** (#8, feature_canvas/point_handle silently rendering
+nothing — closed t2643, root-caused as `hasTreeLayout`'s own split-only trigger plus a dead PANEL-field
+default, t2643's own title: "t2639's blank canvas was never hasTreeLayout, it was a dead default");
+**user_root** (#1, buried near the bottom of a 28-entry flyout — closed t2653 Part 1, reordered to lead its
+category); **the preview message collision** (#3, "live view never refreshes" — root-caused t2653 Part 2 as
+a MESSAGE collision, not a refresh bug: a 90%-configured field and a genuinely blank Presentation mouth
+produced the byte-identical message, now disambiguated).
+
+**The remaining four, one line each, from t2639's own WORK-LOG entry (Part 3):**
+- **#4 — mouth-drop-target precision** (Presentation/Execution sit close on `user_root`; a bad drop connects
+  silently in the wrong one) — ANNOYING ALONE, was rated "compounds toward impossible" only in combination
+  with #3 (now closed), so its own severity is now just ANNOYING on its own.
+- **#5 — precise canvas drag-and-drop is genuinely hard to land** — ANNOYING (a general Blockly-editor
+  friction class, not specific to this arc).
+- **#6 — corner-specific leftover blocks clutter the generic Wizard Inputs palette** — ANNOYING (pure
+  discoverability tax, no functional block).
+- **#7 — "Save wizard…" also inserts an instance into the current program, unannounced** — ANNOYING
+  (surprising, not destructive — Undo exists).
+None fixed this turn (out of scope for BACKLOG #81); listed so the next dispatch draws from the record.

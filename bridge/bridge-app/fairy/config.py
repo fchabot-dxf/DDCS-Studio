@@ -158,6 +158,22 @@ class Config:
         except (OSError, ValueError):
             pass
 
+        # ── Default backend to drive when the user already signed in and never chose (BACKLOG #81) ────
+        # t2659 — "backend" ABSENT from persisted config (never written by Setup's own save at all — see
+        # admin.js's own save.onclick, which always sends `backend`, so absence means "never saved once")
+        # is a DIFFERENT fact from "backend PERSISTED as 'local'" (the user's own explicit choice, which
+        # this must never override). Only the absent case is touched. `oauth.connected()` is a local
+        # file-presence check (a stored refresh_token) — no network round trip, safe to call on every
+        # startup. Signing in already said what the user wants; a user who never signed in stays local,
+        # untouched (oauth.connected() is False, this whole branch is skipped).
+        if "backend" not in persisted:
+            try:
+                from . import oauth
+                if oauth.connected():
+                    c.backend = "drive"
+            except Exception:
+                pass
+
         # ── Seed Google OAuth ────────────────────────────────────────────────────────────────────────
         # t2079b — SEEDING "IF MISSING" WAS NOT ENOUGH, and this is the correction to t2079's own fix.
         # t2079 made a FRESH install pick the Desktop client, but an EXISTING install already had the wrong

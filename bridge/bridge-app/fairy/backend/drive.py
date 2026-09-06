@@ -80,10 +80,35 @@ def _q(s):
     return str(s).replace("\\", "\\\\").replace("'", "\\'")
 
 
+def _persist_discovered_name(config, name):
+    """t2659 — write an auto-discovered machine_name to config.json, the SAME file/key Setup's own
+    set_config (ops.py) writes, so the discovery survives a restart and Setup shows it as already-set
+    rather than re-discovering (or re-asking) every single boot. Best-effort: a write failure here means
+    the NEXT boot re-discovers instead (this same single-candidate scan is idempotent), never a crash.
+    """
+    import json
+    import os
+    path = getattr(config, "config_path", "") or ""
+    if not path:
+        from ..config import Config
+        path = Config.default_config_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        existing = {}
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                existing = json.load(f)
+        existing["machine_name"] = name
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2)
+    except (OSError, ValueError):
+        pass
+
+
 class DriveBackend(Backend):
     POLL_FLOOR_S = 15.0   # t2097 — the deliberate floor for SENDING (see the module docstring's quota warning)
 
-    def __init__(self, config):
+    def __init__(self, config, auto_discover=False):
         self.cfg = config
         self.root_name = getattr(config, "drive_folder", "") or "DDCS Bridge"
         # t2101 (S4) — EACH MACHINE GETS ITS OWN FOLDER. Before this, every machine's gateway shared ONE flat
@@ -92,17 +117,51 @@ class DriveBackend(Backend):
         # different dialect). The name is machine_name VERBATIM, trimmed, never slugged: a slug would force two
         # independent implementations (here and driveJobs.js on the web side) to agree on one transform forever,
         # which is exactly the jobId hazard t2080 already paid for once. Drive takes spaces in a folder name fine.
-        # ⛔ A BLANK NAME MUST NOT FALL BACK TO THE FLAT FOLDER — that fallback IS the hazard this exists to close,
-        # so it refuses to start instead. Raised here, in __init__, so the caller learns before any Drive call
-        # is even attempted, not on the first operation.
+        # ⛔ A BLANK NAME MUST NOT FALL BACK TO THE FLAT FOLDER — that fallback IS the hazard this exists to close.
+        # A blank name still refuses to start, in __init__ — t2659 below just inserts ONE honest attempt to
+        # avoid the refusal (a single-candidate auto-discovery) before it, never a silent fallback.
         self.machine_name = (getattr(config, "machine_name", "") or "").strip()
+        self._root_id = None
+        self._machine_root_id = None
+        self._folders = {}          # "inbox" -> folder id (resolved once, then cached)
+        # t2659 (BACKLOG #81, item 1 CORRECTED) — "the delivered .ddcs/first job can seed it when Setup
+        # never did": a blank name no longer refuses outright — first try ONE honest guess. Studio's own
+        # client-side send (ui/cloud/driveJobs.js's submitJobToDrive) already writes a job into
+        # <container>/<fileSavedStem()>/inbox/ using the WORKSPACE STEM as the folder name — the SAME key
+        # this class's own machine_name IS (see the class docstring: "VERBATIM, trimmed"). So if exactly
+        # ONE non-reserved folder already sits under the container, it can only be that workspace's own
+        # folder — adopt it and persist it, so every later boot (and Setup's own display) already has it.
+        # Two-or-more candidates cannot be disambiguated safely (which one is THIS machine?), and zero means
+        # genuinely nothing has synced yet — both fall through to the refusal below, unchanged.
+        # ⛔ auto_discover DEFAULTS FALSE ON PURPOSE — this makes a REAL Drive API call, and a bare
+        # `DriveBackend(cfg)` must stay the side-effect-free construction every existing caller (and every
+        # unit test not deliberately opting in) already relies on — see
+        # test_a_blank_machine_name_refuses_rather_than_falling_back_to_the_flat_folder's own contract
+        # ("the caller learns before any Drive call is even attempted"). Only bridge.py's real `build()`
+        # startup path opts in.
+        if not self.machine_name and auto_discover:
+            discovered = self._discover_single_machine_name()
+            if discovered:
+                self.machine_name = discovered
+                _persist_discovered_name(config, discovered)
         if not self.machine_name:
             raise DriveError(
                 "Drive backend needs a machine name to keep each machine's jobs in their own folder — "
                 "set one in Setup before turning Drive on")
-        self._root_id = None
-        self._machine_root_id = None
-        self._folders = {}          # "inbox" -> folder id (resolved once, then cached)
+
+    def _discover_single_machine_name(self):
+        """The one-candidate auto-adopt described above. Best-effort: any failure (no token yet, network,
+        an unreadable response) falls through to the caller's own refusal — this NEVER raises itself, since
+        an honest guess that cannot be made is not a reason to fail differently than a guess that was never
+        attempted."""
+        try:
+            container = self._root()
+            q = f"'{_q(container)}' in parents and trashed = false and mimeType = '{_FOLDER_MIME}'"
+            names = [f["name"] for f in self._list(q)
+                     if f["name"] not in (_INBOX, _STATUS, _HISTORY, _COMMANDS, _GATEWAY, _CNCDISK)]
+        except Exception:
+            return ""
+        return names[0] if len(names) == 1 else ""
 
     # ── plumbing ────────────────────────────────────────────────────────────────────────────────
     def _token(self):

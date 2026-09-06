@@ -324,6 +324,13 @@ export default {
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
 
       ...(hideWiring ? [] : [this.profileBlock(prof)]),
-      el("div", { class: "wiz-usage" }, `gateway v${d.version || "?"} · backend ${d.backend || "?"}`));
+      // t2659 (BACKLOG #81, item 3) — SAY THE STATE EITHER WAY, mirroring fairy.bridge.cloud_state_line's
+      // own wording: the terse "backend {d.backend}" fragment this replaced didn't say WHICH name Drive
+      // publishes under, so "silently off" stayed silent for the local case too (nothing distinguished a
+      // deliberate local-only choice from an unconfigured one).
+      el("div", { class: "wiz-usage" }, `gateway v${d.version || "?"} · `
+        + (d.backend === "drive"
+          ? (d.machine_name ? `publishing to Drive as "${d.machine_name}"` : "publishing to Drive — no machine name set yet (above)")
+          : "local-only (not publishing to the cloud)")));
   },
 };

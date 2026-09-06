@@ -24,8 +24,18 @@ import webbrowser
 _AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN = "https://oauth2.googleapis.com/token"
 _SCOPE = "https://www.googleapis.com/auth/drive.file"
-_TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "google_token.json")
 _pending = {}   # state -> {verifier, redirect_uri}; in-memory, one sign-in at a time is fine
+
+
+def _token_file():
+    """t2659 — a FUNCTION, not a frozen module-level constant: `config.py`'s own default_config_path/
+    default_local_root/default_log_path are all functions for the identical reason (their own comments
+    say so) — a path baked in at import time bakes in whatever os.path.expanduser('~') returned THEN,
+    which is wrong the moment a caller (a test's HOME swap, a relaunch under a different user) changes it
+    afterward. Caught live: a test isolating ~ via _HomeSwap for its own `with` block never reached this
+    file when it was still a frozen constant, so oauth.connected() silently read the REAL developer's
+    token instead of the test's fake-empty one."""
+    return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "google_token.json")
 
 
 def _b64url(b):
@@ -131,15 +141,16 @@ def callback(client_id, client_secret, state, code):
 
 def _load():
     try:
-        with open(_TOKEN_FILE, encoding="utf-8") as f:
+        with open(_token_file(), encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
         return {}
 
 
 def _save(d):
-    os.makedirs(os.path.dirname(_TOKEN_FILE), exist_ok=True)
-    with open(_TOKEN_FILE, "w", encoding="utf-8") as f:
+    path = _token_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(d, f)
 
 
@@ -172,6 +183,6 @@ def connected():
 
 def disconnect():
     try:
-        os.remove(_TOKEN_FILE)
+        os.remove(_token_file())
     except OSError:
         pass

@@ -64,7 +64,10 @@ def _log_profile_validation(ops):
 
 
 def build(config, position_poller=None):
-    backend = make_backend(config)
+    # t2659 — auto_discover only ever bites for backend=="drive" with a blank machine_name (make_backend's
+    # own gate); every other case (local/r2, or drive with a name already set) is unaffected, so this is
+    # safe to pass unconditionally rather than threading a second flag through every build() call site.
+    backend = make_backend(config, auto_discover=True)
     transfer = Transfer(config)
     if position_poller is None and config.enable_position_poll:
         position_poller = PositionPoller(
@@ -97,6 +100,15 @@ def _make_sound_hook(config, chime):
         if _sound_allowed(config, event):
             chime.play(config.studio_dir, event)
     return _on_sound
+
+
+def cloud_state_line(config):
+    """t2659 (BACKLOG #81, item 3) — SAY THE STATE EITHER WAY: 'silently off' was the whole bug (backend
+    defaulted to local, forever, with no line anywhere saying so). A plain function (not inlined in
+    run_loop's own print) so a test can assert the ACTUAL decision, same discipline as _sound_allowed."""
+    if config.backend == "drive":
+        return f"publishing to Drive as \"{config.machine_name}\"" if config.machine_name else "publishing to Drive — no machine name set yet (Setup)"
+    return "local-only (not publishing to the cloud)"
 
 
 def run_loop(config):
@@ -159,6 +171,7 @@ def run_loop(config):
     role = effective_role(config)
     why = "role_override" if config.role_override else ("a controller disk is configured" if config.expert_dest else "no controller disk is configured")
     print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  role={role} ({why})")
+    print(f"[bridge] {cloud_state_line(config)}")
     if role_conflict(config):
         # t2103 — plain ASCII on purpose: a genuine UnicodeEncodeError was hit live testing this exact line
         # with a non-UTF-8 Windows console codepage (cp1252 has no U+26A0 WARNING SIGN), which crashed the
@@ -514,6 +527,22 @@ def provision(config, machine_id=None, name=None):
 
 
 def main(argv):
+    # t2659 (BACKLOG #81) — a piped/redirected Windows console defaults Python's stdout/stderr to the OS
+    # ANSI codepage (cp1252/850), which cannot encode this module's own em dashes/⚠ — reproduced live: the
+    # process DIES on its own first startup print (line ~161 below) under exactly that condition, three
+    # times. Forcing UTF-8 here (not just stripping THIS one banner to ASCII) protects every print() in the
+    # whole process against the same class of crash, including future ones — the ASCII-only fix would need
+    # re-doing at every new non-ASCII line. Guarded for None (a frozen --windowed build's real stdout is
+    # None) and for "already something that isn't a raw stream" (fairy_gateway.py's own _Tee wrapper, once
+    # _setup_logging() has swapped it in, has no .reconfigure() — that path is already protected by _Tee's
+    # own per-stream exception swallowing, so a no-op here is correct, not a gap).
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is None:
+            continue
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     if "--self-test" in argv:
         return self_test()
     if "--demo" in argv:

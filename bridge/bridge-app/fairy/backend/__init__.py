@@ -82,7 +82,11 @@ class Backend(ABC):
         """Delete commands/<cmdId>.json once fairy has processed it."""
 
 
-def make_backend(config):
+def make_backend(config, auto_discover=False):
+    """t2659 — `auto_discover` (drive only) is a single-candidate machine_name auto-adopt that makes a
+    REAL Drive API call when the name is blank (see DriveBackend's own docstring). Defaults False so every
+    existing caller — tests included — keeps today's side-effect-free construction; bridge.py's real
+    startup path (build(), below) is the one caller that opts in."""
     if config.backend == "local":
         from .local_folder import LocalFolderBackend
         return LocalFolderBackend(config.local_root)
@@ -94,5 +98,5 @@ def make_backend(config):
         # r2.py needs boto3, which build_fairy.ps1 EXCLUDES from the exe, so the R2 path can never run in
         # the shipped app. This one can.
         from .drive import DriveBackend
-        return DriveBackend(config)
+        return DriveBackend(config, auto_discover=auto_discover)
     raise ValueError(f"unknown backend: {config.backend!r} (expected 'local', 'r2' or 'drive')")
