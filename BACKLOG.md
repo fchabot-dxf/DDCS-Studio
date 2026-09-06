@@ -8401,6 +8401,21 @@ CONNECTION section does not render at all. The CONTROLLER section (the remote ga
 
 Scope guard: display only, `ui/gateway/views/status.js` — no polling change, no role logic change; the
 role condition already exists for the pill. On a GATEWAY device nothing changes.
+
+### 84. Splash screen on the exe for loading time — owner-requested
+
+**[OPEN, owner-requested 2026-09-05.]**
+
+The desktop exe has a real silent gap between double-click and the window appearing (PyInstaller unpack +
+gateway start + webview init) — nothing on screen tells the user anything is happening.
+
+**The cheap declared path first:** PyInstaller has a built-in splash (`--splash <image>` + the `pyi_splash`
+module — show at unpack, `pyi_splash.close()` once the webview is up). One image, two lines, no custom
+window machinery. ⚠ Windows-only in PyInstaller — fine today, [[desktop-packaging-pywebview]] builds Windows
+locally; note it in the macOS CI story (#74) rather than blocking on it.
+
+Keep it honest: a static image with the app name/logo — not a fake progress bar; the unpack gives no real
+progress signal to draw.
 blocked, and now migrated.** The container-ID mechanism this entry (#77) fixed was never in play for commscreen
 — its own mount target (`userVizContainer_tree`) is already built correctly by `formWidgets.js`'s own
 pre-existing standalone `feature_canvas` branch. A DIFFERENT, genuinely new defect was found instead, live:
