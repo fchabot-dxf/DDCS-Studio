@@ -80095,3 +80095,95 @@ cross-shell discrepancy to chase.
 ⛔ `context/` **NOT touched** (the Ranchy advisor is mid-commit there this hour) and `NEXT-SESSION.md` **NOT
 touched** (it belongs to the Ranchy loop). The only tracked write this turn is this WORK-LOG entry; everything
 else is gitignored scratchpad or a Windows registry value.
+
+## t3003 (ASUS) — unattended shard run PROVED green + no-sleep; power config already satisfied "never sleep on AC" so NOTHING was changed
+
+**ASUS local turn 3.** Dispatch: `DDCS-Studio/scratchpad/DISPATCH-asus-t3003-unattended-power.md`, narrowed by an
+owner amendment absorbed before any change was made (see below). Tier **NONE** beyond the one shard run,
+which is the instrument under test, not a regression gate.
+
+### MEASURED FIRST, as required — the pre-change readout
+Full raw output: `DDCS-Studio/scratchpad/powercfg-prechange-readout-t3003-asus.txt`.
+
+- **Sleep states supported:** `powercfg /a` → **Standby (S3)** and **Hibernate** available. **Modern Standby
+  (S0 Low Power Idle) is NOT supported** — the firmware does not implement it. So this is classic S3, and
+  "never sleep" here means the S3/hibernate timers, not an S0 connected-standby policy.
+- **Active scheme:** High performance (`6fecc5ae-f350-48a5-b669-b472cb895ccf`).
+- **AC standby timeout:** `0` = **never** (already). **AC hibernate timeout:** `0` = **never** (already).
+- ⚠ **Not asked for, but found and worth recording:** **DC (battery) standby and hibernate are ALSO `0` =
+  never**, on this scheme. The dispatch assumed DC would differ from AC ("leave DC/battery settings alone …
+  there is no reason to burn the battery") — it doesn't need touching either way since it was already never,
+  but the assumption that AC and DC differ here was wrong. Not changed, per the dispatch's own instruction to
+  leave DC alone regardless.
+- **Lid-close action:** `0` = **do nothing**, on **both** AC and DC.
+- **Display timeout:** AC 60 min, DC 15 min. Harmless either way with a headless suite (`playwright.config.js:67`
+  confirmed still `headless: true`); left as found.
+- **`powercfg /requests`** — **could not run.** It requires elevation and this session is not elevated
+  (`FRED-ASUS-TUF\danse`, non-admin). Named here rather than silently skipped: nothing is known about
+  currently-held wake locks. Does not block the finding below, which comes from event-log evidence instead.
+
+### ⇒ Owner amendment absorbed BEFORE any change — correctly, since it matched what I'd already measured
+Polled at the phase boundary right after the initial measurement, before touching any setting: the owner
+stated the box is already set up to stay awake 24/7, and narrowed the task to *measure and report; change
+nothing unless there's a real gap*. **There was no gap** — AC standby/hibernate were already `0` on the active
+scheme, lid-close was already "do nothing." **No power setting was changed. No backup file was needed** because
+nothing was written; the full pre-change readout above stands as the record instead.
+
+⚠ **A gap that exists but is out of the amendment's scope, named rather than acted on:** this box has **four**
+power schemes (Balanced, Power saver, High performance *[active]*, ASUS Recommended). Only High performance
+has AC-never; **Balanced hibernates at 180 min on AC**, and **Power saver / ASUS Recommended standby at 15 min
+AC**. Armoury Crate and several other ASUS scheme-switching services are running
+(`ArmouryCrateService`, `ASUSSwitch`, `ASUSOptimization`, …) — I did not find evidence they switch schemes
+automatically, but I didn't rule it out either, and I am not elevated so I could not fully audit their
+triggers. **The current finding is about the ACTIVE scheme only; it says nothing about whether something could
+switch the box off it.** Flagging rather than fixing — the amendment scoped this turn to measurement, and
+scheme-switching behavior is a different, unmeasured question.
+
+### THE RUN — `node scripts/test-all.cjs --shard=3/40`, machine left untouched throughout
+Full log: `DDCS-Studio/scratchpad/shard3-run-t3003.log`. Port 3211 confirmed clear before starting
+(`netstat -ano | grep :3211 | grep LISTENING` → no match).
+
+```
+[progress] suite starting -- 72 tests, 4 workers
+[progress] DONE in 1m26s -- 67 passed, 0 failed, 0 flaky, 5 skipped
+=== SUMMARY: test:node exit 0 (skipped -- node tier runs once, on shard 1 only), test:e2e exit 0 ===
+EXIT CODE: 0
+```
+
+**Finding 1 — the run completed green.** 67/67 passed, 0 failed, 0 flaky, exit 0. Comparable to shard 2/40's
+67/67 at `7388bc73`, as the dispatch expected.
+
+**Finding 2 — the box did not sleep during the run window.** Evidence, not inference (per the dispatch's own
+instruction not to infer this from the run finishing):
+- `Get-WinEvent` against `Microsoft-Windows-Kernel-Power` (ids 42/107/109/507/566) and
+  `Microsoft-Windows-Power-Troubleshooter` (id 1) for the hour surrounding the run: **zero sleep, resume, or
+  shutdown transitions.** Collector script kept at `DDCS-Studio/scratchpad/power-evidence-t3003.ps1`; raw
+  captures in `power-evidence-PRE-t3003.txt` / `power-evidence-POST-t3003.txt`.
+- Uptime climbed monotonically across the window (241.25 h → 241.29 h, consistent with elapsed wall time) —
+  a resume from S3 would show as a fresh, much-shorter uptime instead.
+
+### ⚠ WHAT THIS DOES *NOT* PROVE — stated plainly, per the dispatch's own warning against overclaiming
+The run window was **~2.5 minutes** end to end (1m26s of actual test time plus setup/teardown). That is far
+too short to be an independent test of a 15-minute-class idle timer. **It doesn't need to be, here** — the
+active scheme's AC standby/hibernate were already `0` (never) before the run started, so there was no timer
+armed to defeat in the first place. What this run actually establishes is narrower and still real: **a
+completed, unattended, hands-off shard run produces a clean 0-failed result with nobody at the machine** —
+which is the condition every branch of the still-parked §2b runner decision (Actions runner / synced folder /
+git one-shots) equally depends on. It is not a proof that the never-sleep configuration survives a long idle
+period, because the configuration was never idle-limited to begin with.
+
+### ⚠ One loose end, named rather than buried
+`GetLastInputInfo` (real HID input, not process activity) read **0.0 min** idle at the pre-run measurement and
+**0.3 min (21 s)** idle at the post-run measurement — i.e., something generated genuine keyboard/mouse input a
+few seconds before the post-run check, despite the "leave it untouched" condition. I did not touch the
+keyboard or mouse from this session (Bash/PowerShell tool calls spawn processes; they don't synthesize HID
+events), and a targeted check of the RDP session-manager event log for that window came back empty (RustDesk,
+if that's the remote channel in use, may not log there — not confirmed either way). **Unexplained, small,
+and not chased further given tier NONE** — recording it as observed, not resolved, rather than smoothing it
+into the "untouched" claim.
+
+### Scope discipline
+No power setting changed (measurement only, per the amendment). No repo code changed. No suite run beyond the
+one shard instrument. `context/` and `NEXT-SESSION.md` not touched. `blob-report-collected/report-02.zip` left
+alone — the run's own `report-03.zip` landed in the same directory as a normal side effect of `test-all.cjs`,
+not touched or committed. `git pull --rebase` before committing; stash stack unchanged (still empty).
