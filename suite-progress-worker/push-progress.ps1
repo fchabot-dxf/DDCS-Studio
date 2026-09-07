@@ -7,7 +7,10 @@
 # The push key lives OUTSIDE the repo: ~/.ddcs-bridge/progress-push-key.txt
 # (the same value as `npx wrangler secret put PUSH_KEY`).
 
-$dir  = "C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\test-results"
+# $dir derives from THIS script's own location so it works on any box/clone path — a hardcoded absolute
+# path silently broke every non-matching node (the catch{} swallows it; ASUS-flagged). Env override wins.
+$dir  = if ($env:DDCS_PROGRESS_DIR) { $env:DDCS_PROGRESS_DIR }
+        else { [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\DDCS-Studio\test-results')) }
 $name = "progress.md"
 $pf   = Join-Path $dir $name
 $key  = (Get-Content "$env:USERPROFILE\.ddcs-bridge\progress-push-key.txt" -Raw).Trim()
