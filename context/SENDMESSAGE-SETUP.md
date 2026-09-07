@@ -17,8 +17,15 @@ spawned. A session in *connected* mode gets `ListAgents` populated with your acc
 machines + cloud, and `SendMessage` that routes to them "over Remote Control."
 
 ## To enable it (on the seat that can't send)
-- Convert the running session: type **`/remote-control`** in its prompt, **or**
-- Launch fresh: **`claude --remote-control "<Session Name>"`**
+⛔ **You must START A FRESH session in connected mode — a `/remote-control` toggle on an already-running
+session does NOT work.** Confirmed empirically 2026-09-07: toggling RC on a running session leaves `SendMessage`
+subagents-only and adds no `ListAgents` at all — **the cross-session tools are fixed at STARTUP and cannot be
+retrofitted mid-session.** So:
+```
+claude --remote-control "<Session Name>"
+```
+Launch that as a NEW session (connected from the first moment) and continue the work there. Toggling
+`/remote-control` inside an existing session is a dead end for this.
 
 Then **verify**: run **`/list-agents`** (or the `ListAgents` tool). You should see "Remote Control sessions on
 other machines." If you see the peer, `SendMessage` to it works.
