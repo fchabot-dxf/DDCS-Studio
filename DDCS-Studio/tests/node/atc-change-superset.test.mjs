@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-CHANGE E0 (t562) — the data-op twin seam (the homing/atc_test toolkit applied to atc_change, the hardest of the ATC
@@ -7,6 +7,11 @@ import { test, expect } from '@playwright/test';
  * to the chosen arm → BYTE-IDENTICAL to the concrete build. The inlineTnc arm reads Settings → ATC I/O LIVE (by design, the
  * codes stay out of the marker); the twin (E1) re-derives `_arm` + regenerates the live arm. E0 gates the ROUTING: prune ==
  * concrete across all 5 methods × callMacro × magazine/I-O configs.
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. Neither test calls registerUserOp/builderOf at all — both
+ * call the wizard's exported functions (atcChangeStack, atcChangeEffectiveArm) directly, so no seeding is needed.
+ * Measured: browser 2s/2 tests (4 workers) vs node — see the work-package report for the exact node duration_ms; not a
+ * regression at this combo count (30-combo sweep).
  */
 const CFG_EMPTY = { atc: {}, outputs: [], inputs: [] };
 const CFG_ATC = {

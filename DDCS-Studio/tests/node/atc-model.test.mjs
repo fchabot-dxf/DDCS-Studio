@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * COMPOSABLE ATC MODEL (RE-PLAN #2, I1) — the declared GRIP × MOTION vocabulary + the 3 shipped methods as grip×motion

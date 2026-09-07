@@ -1,10 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC TOOL CHECK — the last quick win (t411), INHERITS the Tool Length light-ATC recipe exactly. A NEW twin
  * (user_atc_check_data) via userOpFromStack + 8 scalar bindingSpecs by #var identity (+tolerance #20), the two source-touches
  * (header recompose + source-chips), wired IN-PLACE. VERIFY: emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep
- * on BOTH profiles (studio AND Expert, source-resolver stubbed) · in-place + plain title + form · sim.
+ * on BOTH profiles (studio AND Expert, source-resolver stubbed) · cross-dialect · in-place + plain title.
+ *
+ * TIER MIGRATION WORK PACKAGE D: moved browser→node. Three of the four tests moved — plain import()+evaluate over
+ * declared builders/emitters/registries, no DOM. The file's 4th test ("DRIVE: ... a NON-EMPTY form ... + the 3D
+ * machine sim renders") opens the twin via window.openWiz, reads real DOM, and screenshots the panel — a genuine
+ * app+DOM dependency, not a candidate for this tier. Split into tests/atc-check-in-place-drive.spec.js. Both moved
+ * emit-comparison tests explicitly `registerUserOp(atcCheckDataDef())` the twin, since the node tier never runs
+ * web/app.js's seedDefaultPortedUserOps() that seeds it in the browser.
  */
 const OPTYPE = 'user_atc_check_data';
 
@@ -15,7 +22,9 @@ test('emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep — studio 
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcToolCheckStack } = await import('/wizards/atcToolCheckWizard.js');
-        const { ATC_CHECK_DEFAULTS } = await import('/blocks/dataOps/atcCheckData.js');
+        const { ATC_CHECK_DEFAULTS, atcCheckDataDef } = await import('/blocks/dataOps/atcCheckData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        registerUserOp(atcCheckDataDef());   // the node tier never runs web/app.js's seedDefaultPortedUserOps()
         const sweep = [
             ATC_CHECK_DEFAULTS,
             { ...ATC_CHECK_DEFAULTS, tolerance: 0.1, blockHeight: 60, safeZ: 15 },
@@ -58,7 +67,9 @@ test('CROSS-DIALECT: the twin emit == atcToolCheckStack for EVERY registered dia
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcToolCheckStack } = await import('/wizards/atcToolCheckWizard.js');
-        const { ATC_CHECK_DEFAULTS } = await import('/blocks/dataOps/atcCheckData.js');
+        const { ATC_CHECK_DEFAULTS, atcCheckDataDef } = await import('/blocks/dataOps/atcCheckData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        registerUserOp(atcCheckDataDef());   // the node tier never runs web/app.js's seedDefaultPortedUserOps()
         const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');   // t2137 — in-memory, test-only (see dialects/index.js)
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null;
@@ -89,24 +100,4 @@ test('opensAs wiring: ATC Tool Check opens the twin IN-PLACE (plain title, twin 
     expect(r.opensAs, 'the built-in ATC Tool Check entry opensAs the twin').toBe(OPTYPE);
     expect(r.title, 'the seamless in-place title is the built-in plain label').toBe('Tool Check');
     expect(r.twinRetired, "the twin's own atc_datawiz entry is retired").toBe(true);
-});
-
-test.use({ viewport: { width: 1400, height: 1000 } });
-test('DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. tolerance) + the 3D machine sim renders', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate((op) => window.openWiz(op), OPTYPE);
-    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForTimeout(500);
-    const r = await page.evaluate(() => {
-        const f = document.getElementById('wiz_user_form');
-        const params = Array.from(f.querySelectorAll('[data-param]')).map((e) => e.getAttribute('data-param'));
-        const canvas = document.querySelector('#wiz_user canvas');
-        return { fieldCount: params.length, params, hasViz: !!canvas };
-    });
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_check_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
-    expect(r.fieldCount, 'the in-place form renders its 8 knobs').toBeGreaterThan(5);
-    expect(r.params.includes('tolerance'), 'the Tolerance knob renders (the check-specific param)').toBe(true);
-    expect(r.hasViz, 'the 3D machine-frame sim renders').toBe(true);
-    console.log('ATC-CHECK IN-PLACE FORM: ' + r.fieldCount + ' fields → ' + r.params.join(', '));
 });

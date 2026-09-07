@@ -1,31 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * ATC-TABLE E2 (t568) — COMPLETES port 3 of 3 AND the WHOLE PORT CAMPAIGN (every wizard is now a data twin). The
- * user_atc_table_data twin is seeded + wired IN-PLACE via the Tool Table slot's `opensAs`. VERIFY: the slot opensAs the twin
- * (plain title, twin retired) · the in-place form = the two include toggles + the 'Edit table…' action button + the emit
+ * ATC-TABLE E2 (t568) — the in-place form = the two include toggles + the 'Edit table…' action button + the emit
  * preview (NO second table editor — the edit UI stays Settings → Tool table) · the machine + magazine 3D sim.
+ *
+ * Split from atc-table-in-place.spec.js at the tier migration work package D; its sibling test (the pure opensAs
+ * wiring + opSimContext check) moved to tests/node/atc-table-in-place.test.mjs. This one stayed because it opens the
+ * twin via window.openWiz, reads real DOM, and screenshots the panel.
  */
 const OPTYPE = 'user_atc_table_data';
-
-test('opensAs wiring: Tool Table opens the twin IN-PLACE (plain title, twin retired) + opSimContext machine+magazine', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
-    const r = await page.evaluate(async (OPTYPE) => {
-        const WL = await import('/blocks/wizardLibrary.js');
-        const { opSimContext } = await import('/viz/opSimContext.js');
-        const { builderOf } = await import('/blocks/opBuilders.js');
-        const entries = WL.listEntries();
-        const slot = entries.find((e) => e.id === 'atc_table');
-        const twinEntry = entries.find((e) => e.type === OPTYPE);
-        return { opensAs: slot && slot.opensAs, title: WL.builtinLabelForTwin(OPTYPE), twinRetired: !twinEntry, registered: !!builderOf(OPTYPE), ctx: opSimContext(OPTYPE) };
-    }, OPTYPE);
-    expect(r.registered, 'the twin is seeded/registered on boot').toBe(true);
-    expect(r.opensAs, 'the built-in Tool Table slot opensAs the twin').toBe(OPTYPE);
-    expect(r.title, 'the seamless in-place title is the built-in plain label').toBe('Tool Table');
-    expect(r.twinRetired, "the twin's own atc_datawiz menu entry is retired").toBe(true);
-    expect(r.ctx.forceMachine && r.ctx.showMagazine, 'FORCE_MACHINE + WITH_MAGAZINE carry to the twin').toBe(true);
-});
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 test('DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-table button + the live-view emit + the 3D sim', async ({ page }) => {

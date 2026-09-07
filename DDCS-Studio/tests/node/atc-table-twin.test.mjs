@@ -1,10 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-TABLE E1 (t568) — the user_atc_table_data TWIN emit. On the E0 superset: deriveGuards injects the section keys;
  * postInstantiate is a DECLARED LIVE-VIEW — it REGENERATES the whole body from the CURRENT settings.atc.tools/magazine via
  * atcTableStack (the ONE source). VERIFY: twin == atcTableStack byte-diff ZERO across toggle × table-size × profile; a
  * tool-length edit in Settings → the NEXT emit tracks (no snapshot). NOT registered/in-place (E2, done alongside).
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. Both tests already call registerUserOp explicitly (pattern 1).
  */
 test('E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table sizes × EVERY registered dialect (t1900, was Expert + V4.1 only; live table)', async ({ page }) => {
     await page.goto('http://localhost:3211');

@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-TABLE E0 (t568) — the data-op twin seam (the toolkit applied to atc_table, THE LAST WIZARD). atcTableStack(params,
  * {superset:true}) carries BOTH include sections GUARDED by the derived _lengths/_pockets/_pocketsNA keys; pruneGuards
  * collapses to the chosen toggles → BYTE-IDENTICAL to the concrete build. Each section UNROLLS its rows from the tools[]/
  * magazine[]. E0 gates the toggle routing: prune == concrete across include toggles × table sizes × profiles.
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. No registerUserOp/builderOf here — calls atcTableStack
+ * directly, and setActiveProfile/DEFAULT_PROFILE_ID (controllerProfiles.js) only touch localStorage (stubbed in register.mjs).
  */
 const mkTools = (n) => Array.from({ length: n }, (_, i) => ({ num: i + 1, length: 40 + i * 3, name: 'T' + (i + 1) }));
 const mkMag = (n) => Array.from({ length: n }, (_, i) => ({ pocket: i + 1, x: 100 + i * 10, y: 50, z: -20 - i }));

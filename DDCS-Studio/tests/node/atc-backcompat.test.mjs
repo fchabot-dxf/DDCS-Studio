@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // INC-D — BACK-COMPAT migrate-on-rebuild + round-trip stability for atc_change markers. These pin the FINAL emit at
 // the FILE level: an old/legacy marker rebuilds to the T# M6 call (gentle migrate), a T# M6 region is byte-stable

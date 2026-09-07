@@ -1,11 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC TOOL LENGTH — light NEW port (t409; the pilot for the light-ATC-port recipe, Tool Check inherits it). A NEW twin
  * (user_atc_length_data) created via userOpFromStack + bindingSpecs by #var identity, then wired IN-PLACE (opensAs). The
  * two source-touches (corner precedent): the interpolated SUMMARY header RECOMPOSED from resolved params; the #5/#6
  * source-chips re-applied post-instantiate. VERIFY: emit BYTE-IDENTICAL to atcLengthStack across a scalar sweep on BOTH
- * profiles (studio AND Expert, source-resolver stubbed — the middle E1-fix precedent) · in-place + plain title + form · sim.
+ * profiles (studio AND Expert, source-resolver stubbed — the middle E1-fix precedent) · cross-dialect · in-place + plain title.
+ *
+ * TIER MIGRATION WORK PACKAGE D: moved browser→node. Three of the four tests moved — plain import()+evaluate over
+ * declared builders/emitters/registries, no DOM. The file's 4th test ("DRIVE: ... a NON-EMPTY form + the 3D machine
+ * sim renders") opens the twin via window.openWiz, reads real DOM, and screenshots the panel — a genuine app+DOM
+ * dependency, not a candidate for this tier. Split into tests/atc-length-in-place-drive.spec.js. Both moved
+ * emit-comparison tests explicitly `registerUserOp(atcLengthDataDef())` the twin, since the node tier never runs
+ * web/app.js's seedDefaultPortedUserOps() that seeds it in the browser.
  */
 const OPTYPE = 'user_atc_length_data';
 
@@ -16,7 +23,9 @@ test('emit BYTE-IDENTICAL to atcLengthStack across a scalar sweep — studio AND
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcLengthStack } = await import('/wizards/atcLengthWizard.js');
-        const { ATC_LENGTH_DEFAULTS } = await import('/blocks/dataOps/atcLengthData.js');
+        const { ATC_LENGTH_DEFAULTS, atcLengthDataDef } = await import('/blocks/dataOps/atcLengthData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        registerUserOp(atcLengthDataDef());   // the node tier never runs web/app.js's seedDefaultPortedUserOps()
         const sweep = [
             ATC_LENGTH_DEFAULTS,
             { ...ATC_LENGTH_DEFAULTS, blockHeight: 60, safeZ: 15 },
@@ -62,7 +71,9 @@ test('CROSS-DIALECT: the twin emit == atcLengthStack for EVERY registered dialec
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcLengthStack } = await import('/wizards/atcLengthWizard.js');
-        const { ATC_LENGTH_DEFAULTS } = await import('/blocks/dataOps/atcLengthData.js');
+        const { ATC_LENGTH_DEFAULTS, atcLengthDataDef } = await import('/blocks/dataOps/atcLengthData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        registerUserOp(atcLengthDataDef());   // the node tier never runs web/app.js's seedDefaultPortedUserOps()
         const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');   // t2137 — in-memory, test-only (see dialects/index.js)
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null;
@@ -93,24 +104,4 @@ test('opensAs wiring: ATC Tool Length opens the twin IN-PLACE (plain title, twin
     expect(r.opensAs, 'the built-in ATC Tool Length entry opensAs the twin').toBe(OPTYPE);
     expect(r.title, 'the seamless in-place title is the built-in plain label').toBe('Tool Length');
     expect(r.twinRetired, "the twin's own atc_datawiz entry is retired (one-source hide)").toBe(true);
-});
-
-test.use({ viewport: { width: 1400, height: 1000 } });
-test('DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate((op) => window.openWiz(op), OPTYPE);
-    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
-    await page.waitForTimeout(500);
-    const r = await page.evaluate(() => {
-        const f = document.getElementById('wiz_user_form');
-        const params = Array.from(f.querySelectorAll('[data-param]')).map((e) => e.getAttribute('data-param'));
-        const canvas = document.querySelector('#wiz_user canvas');   // the form3d machine preview
-        return { fieldCount: params.length, params, hasViz: !!canvas };
-    });
-    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_length_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
-    expect(r.fieldCount, 'the in-place form renders its knobs (maxDist/retract/feeds/port/blockHeight/safeZ)').toBeGreaterThan(4);
-    expect(r.params.includes('blockHeight'), 'the Setter Block Height knob renders').toBe(true);
-    expect(r.hasViz, 'the 3D machine-frame sim renders (form3d + forceMachine)').toBe(true);
-    console.log('ATC-LENGTH IN-PLACE FORM: ' + r.fieldCount + ' fields → ' + r.params.join(', '));
 });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-TEST E1 (t558) — the user_atc_test_data TWIN emit. On the E0 superset (826f23f): deriveGuards (the mode) collapses the
@@ -7,6 +7,8 @@ import { test, expect } from '@playwright/test';
  * are the DECLARED ATC I/O (Settings → ATC I/O). VERIFY: twin emit == atcTestStack byte-diff ZERO across the mode × magazine
  * size × drawbar-count sweep for the CURRENT settings; a magazine / declared-code change is TRACKED by the NEXT emit (no
  * frozen snapshot); a user edit inside an unrolled arm SURVIVES the recompose (the M2 gate). NOT registered/in-place yet (E2).
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. All tests already call registerUserOp explicitly (pattern 1).
  */
 function setAtc(page, magazine, io) {
     return page.evaluate(({ magazine, io }) => {

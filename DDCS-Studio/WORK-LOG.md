@@ -78948,3 +78948,103 @@ total precisely.
 panel`'s own `__panel` instance) and the dispatch's own 12-file skip list are untouched. Process tree clean
 (0 flagged).
 
+## t2697 — TIER-MIGRATION BATCH 6: the ATC cluster — FIRST BIG BATCH (~20 files → 22 files/60 tests moved),
+done via 4 parallel background agents on the proven mechanism + one more self-caught misclassification
+
+Dispatched as the first upsized batch (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch6.md`, ~20 files),
+explicitly told to "shape-gate HARD and TRUST RUNNING OVER THE DISPATCH'S LABELS" after batch 5 caught two
+misclassifications in both directions plus a node-tier event-bus boundary. Given the scale (19 named move
+candidates + 5 uncertain + 5 in-place + 9 skip-list files + 7 form-reproduction files ≈ 43 files to read),
+split the work into 4 parallel background agents, each given the full mechanism writeup (the harness/
+register.mjs contract, the 3 seeding patterns, the shape-gate criteria including the `dispatchEvent` trap,
+and — critically — the instruction to RUN every new node file before trusting it, mirroring what running
+(not just reading) caught in t2695). Spot-checked the dispatch's own "expect to SKIP" list myself in parallel
+and found ONE more misclassification the agents' assigned lists didn't cover.
+
+### RESULT: 22 files touched, 60 tests moved, 0 regressions
+
+- **12 files moved whole**: `atc-backcompat` (3), `atc-model` (4), `atc-warmup-as-data` (2), `atc-cap-gate`
+  (1), `atc-inline-onesource` (7), `atc-change-twin` (3), `atc-table-twin` (2), `atc-test-twin` (5),
+  `atc-change-superset` (2), `atc-table-superset` (1), `atc-test-superset` (2).
+- **10 files split** (pure tests moved, UI/render/event tests stayed in a new `-drive.spec.js`/`-order.spec.js`):
+  `atc-dialect`, `atc-interpreter` (both matched the dispatch's own prediction exactly), `atc-io-labeling`
+  (only 2 of 7 tests were pure — the most UI-heavy split), `atc-leftovers-885`, `atc-collet`,
+  `atc-change-in-place`, `atc-table-in-place`, `atc-test-in-place`, `atc-check-in-place`, `atc-length-in-place`
+  (the 5 in-place files all split close to the dispatch's own expectation: one pure emit/opensAs test + one
+  DRIVE test each, except check/length-in-place which had 3 pure tests each), and — found by ME, not any
+  agent — `atc-batch-form-reproduction-2383` (see below).
+- **8 files confirmed genuinely UI, left completely untouched**: `atc-magazine-frame`, `atc-envelope`,
+  `atc-currenttool-refusal-1894`, `atc-setup-numeric`, `atc-tnc-verify` (all real wizard/settings-panel DOM
+  or Three.js reads), `atc-pocket-swap`, `atc-disk-swap`, `atc-station-devices` (all real render/`io_change`-
+  listener dependencies). Plus the dispatch's own 9-file skip list and 6 remaining `atc-*-form-reproduction-*`
+  files (spot-checked, confirmed genuine real-DOM `renderOpForm`/`renderUiTree` dependencies — `atc-preview`
+  and `atc-tool-setter` specifically read, both 100% Three.js/DOM).
+
+### THE THIRD MISCLASSIFICATION — my own spot-check catch, not any agent's assigned scope
+
+`atc-batch-form-reproduction-2383.spec.js` was on the dispatch's own "expect to SKIP" list, bucketed with the
+other 6 `atc-*-form-reproduction-*` files (all genuinely 100% real-DOM). Reading it found it is actually
+MIXED: each of the 6 ATC wizards gets TWO tests — "every binding's own section matches the shell's mapping"
+(reads `def.bindings` directly, ZERO DOM) and "declared bindings place fields in the shell's own order (live
+DOM)" (builds a real DOM tree via `renderOpForm` + `querySelectorAll('[data-param]')`, which the node tier's
+structural-only document cannot fake). Split: the 6 pure section-mapping tests moved to
+`tests/node/atc-batch-form-reproduction-2383.test.mjs`; the 6 live-DOM-order tests stayed in
+`tests/atc-batch-form-reproduction-2383-order.spec.js`. This means "form-reproduction" as a NAME is not a
+reliable skip signal on its own — the remaining 6 form-reproduction files were spot-checked (grep + a read of
+the two lowest-hit-count ones) and confirmed genuinely 100% DOM, but the family's own convention (a
+declarative check + a live-DOM check per case) means any UNCHECKED form-reproduction file should be read in
+full before the next batch that touches one, not skip-listed by name alone.
+
+### THE `io_change` EVENT-BUS TRAP — hit independently by 3 of the 4 agents plus one already known from t2695
+
+Confirming this is now a RECURRING shape, not a one-off: `atc-dialect`'s 3rd test (M156-161 output pins),
+`atc-collet`'s tests 3-4, and multiple `atc-station-devices` tests all register a real
+`window.addEventListener('io_change', ...)` and expect `dispatchEvent` to actually invoke it — register.mjs's
+event bus is deliberately inert (same finding as `homing-limit-trip` in t2695). Every agent correctly
+recognized this and left those tests in the browser tier rather than trying to force them or touch the shared
+harness. Worth naming as its own checklist item for future batches: "does this test drive `io_change`?" is now
+as standard a shape-gate question as "does this test call `page.click`?".
+
+### OTHER JUDGMENT CALLS WORTH RECORDING
+
+- **`atc-inline-onesource`'s tests 6-7** needed `window.ddcsLoadBlockStack`/`window.ddcsGetBlockProgram`, which
+  only exist after `initProgramModel()` runs (`web/app.js`'s boot sequence, never reached by the node harness's
+  `page.goto` stub). Traced `initProgramModel()`'s own dependency graph and confirmed it's entirely pure (its
+  one DOM touchpoint safely short-circuits to `undefined` when `window.ddcsStudio` doesn't exist — exactly the
+  node-tier condition) — added one `pm.initProgramModel()` seed line before the two tests that need it. Not one
+  of the 3 named seeding patterns verbatim (those are about the user-ops twin registry specifically) but the
+  same underlying idea applied to a different app-boot side effect. Verified empirically, not just by
+  inspection.
+- **`atc-change-twin`/`atc-change-superset`'s combinatorial sweeps** (210 and 30 combos respectively) were
+  measured, not assumed, per the standing rule after `middle-superset`'s own regression in t2687: both run
+  FASTER in node (change-twin: 3s browser → 916.5ms node for 3 tests; change-superset: 2s browser → 703.9ms
+  node for 2 tests) — no regression, both kept in node as planned. Confirms 210/30-combo sweeps behave like
+  `pocket-data-emit`'s 144-combo precedent, not like `middle-superset`'s 14336-combo one.
+- **All 5 in-place files' pure tests failed on FIRST run** with `builderOf(OPTYPE) is not a function` —
+  exactly seeding pattern 2 (rely on `seedDefaultPortedUserOps()`, which the node harness never runs). Fixed
+  with one `registerUserOp(xxxDataDef())` line per affected test. The "opensAs wiring" test in each file needed
+  no fix (reads `wizardLibrary.js`'s static `listEntries()`, unrelated to twin seeding).
+- One agent created a stray duplicate `TIER-MIGRATION-PLAN.md` at `tests/TIER-MIGRATION-PLAN.md` (out of its
+  assigned scope — a duplicate of the pre-existing tracked `scratchpad/TIER-MIGRATION-PLAN.md`, with a
+  divergent/stale progress table). Deleted before committing; the pre-existing scratchpad copy is untouched by
+  this turn.
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite): restored all 22 deleted originals from git, ran them
+together in the browser (83 tests: the 60 that moved + the 23 that stayed) = **77.50s summed duration**.
+Isolated the staying set by running the 11 new split-off browser files directly (23 tests, exactly matching)
+= **35.22s**. So the 60 tests that actually moved = **42.28s browser vs 2.01s node — ~21x aggregate**,
+consistent with the 13-28x range across batches 3-5.
+
+### VERIFY (LIGHT MODEL — no full suite, per the standing amendment)
+
+`npm run test:node`: 456/456 (396 prior + 60 this batch, exactly).
+
+`npx playwright test --list`: **3033 tests — down from batch 5's 3093 by EXACTLY 60**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 22 new `tests/node/*.test.mjs` files, 11 new split-off browser specs,
+and 22 deleted browser specs. Process tree clean (0 flagged) across all 4 background agents plus the main
+session's own work.
+

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC CAP GATE + probe-miss (t640). Three fixes: (1) the ATC pneumatic/drawbar M-codes DECLARE cap:'atc' → they fold to a

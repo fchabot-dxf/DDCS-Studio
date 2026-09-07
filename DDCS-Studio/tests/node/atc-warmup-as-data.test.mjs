@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — Stage 5, the 2nd port (ROADMAP STRATEGIC #3). Validates the equivalence harness on a SECOND,
@@ -14,10 +14,25 @@ import { test, expect } from '@playwright/test';
  * ⇒ The COMPUTED-ANNOTATION-TEXT frontier is CLOSED for value-FREE messages; it returns only for a VALUE-BEARING one
  *   (e.g. a probe "Probing 50mm — press Enter" the operator checks before committing), which a future GENERAL
  *   annotation-text atom must render from a BOUND param — built when an op forces it, not speculatively. See NEXT-SESSION.
+ *
+ * TIER MIGRATION — moved browser→node. The browser version deliberately does NOT call registerUserOp in-page: the
+ * real app boot (seedDefaultPortedUserOps) already seeds this twin once per page load, and re-registering it a
+ * second time in the SAME page session throws (a stale block-index derivation colliding with the first,
+ * already-successful registration). The node harness's page.goto() never runs that boot seeding, so boot() below
+ * seeds the twin itself — via createUserOp, guarded by a fresh listUserOps() existence check on every call (not
+ * memoized), because node's module state persists across both of this file's tests in one process, unlike the
+ * browser's per-test page reload.
  */
+const boot = async (page) => {
+    const uo = await import('/blocks/userOps.js');
+    const { atcWarmupDataDef, ATC_WARMUP_DATA_OPTYPE } = await import('/blocks/dataOps/atcWarmupData.js');
+    if (!uo.listUserOps().some((d) => d.opType === ATC_WARMUP_DATA_OPTYPE)) uo.createUserOp(atcWarmupDataDef());
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+};
+
 test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep + binding-wiring', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await boot(page);
 
   const r = await page.evaluate(async () => {
     const { atcWarmupStack } = await import('/wizards/atcWarmupWizard.js');
@@ -28,11 +43,7 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
     const { SCHEMA } = await import('/blocks/opSchema.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
 
-    // t1585 — do NOT registerUserOp here: app.js's init() already auto-seeds every SEED_BUILDERS twin (incl. this
-    // one) via seedDefaultPortedUserOps() before this test's own code runs. Registering it a SECOND time in the
-    // same page session throws ("binding does not resolve in the template" — a stale block-index derivation
-    // colliding with the first, already-successful registration), which is exactly what made this test red. Resolve
-    // the builder against the ALREADY boot-seeded def instead.
+    // the twin is already seeded (boot(), above) — resolve the builder against that def, don't register a second time.
     const dataBuilder = builderOf(ATC_WARMUP_DATA_OPTYPE);   // === instantiate(def, …): an INDEPENDENT path from atcWarmupStack
 
     const base = ATC_WARMUP_DEFAULTS;
@@ -112,8 +123,7 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
 // settings.profileId), one more comparison per dialect, no new machinery — mirrors pocket-data-emit.spec.js's
 // own cross-dialect test (t1900).
 test('atc-warmup-as-data: cross-dialect — byte-identical to atcWarmupStack for EVERY registered dialect', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await boot(page);
 
   const r = await page.evaluate(async () => {
     const { atcWarmupStack } = await import('/wizards/atcWarmupWizard.js');
@@ -122,8 +132,7 @@ test('atc-warmup-as-data: cross-dialect — byte-identical to atcWarmupStack for
     const { builderOf } = await import('/blocks/opBuilders.js');
     const { listPosts } = await import('/wizards/dialects/index.js');
 
-    // t1585 — do NOT registerUserOp: this twin is already boot-seeded (seedDefaultPortedUserOps); a second
-    // registration in the same page session throws (see the main test's own comment above).
+    // the twin is already seeded (boot(), above) — resolve the builder against that def, don't register a second time.
     const dataBuilder = builderOf(ATC_WARMUP_DATA_OPTYPE);
     const S = (o) => ({ ...ATC_WARMUP_DEFAULTS, ...o });
     const sweep = [S({}), S({ rpm1: 8000, time1: 45 }), S({ rpm2: 18000, time2: 5 })];

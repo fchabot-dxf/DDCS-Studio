@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-TEST E0 (t556) — the data-op twin seam (the homing-port toolkit applied to atc_test). atcTestStack(params,{superset:true})
@@ -6,6 +6,9 @@ import { test, expect } from '@playwright/test';
  * the concrete build. The pockets arm UNROLLS the current magazine; the drawbar arm is the counted GOTO loop — the twin (E1)
  * re-unrolls the pockets from the CURRENT settings.atc.magazine + sources the drawbar/sensor M-codes from Settings→ATC I/O.
  * E0 gates the MODE selection: prune==concrete across modes × magazine sizes (0/1/3/8) × drawbar counts.
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. No registerUserOp/builderOf here — both tests call
+ * atcTestStack directly.
  */
 test('E0 GATE: prune(atcTestStack superset) == concrete, byte-identical across modes × magazine sizes × drawbar counts', async ({ page }) => {
     await page.goto('http://localhost:3211');

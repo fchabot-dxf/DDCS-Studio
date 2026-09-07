@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — t2383: THE ATC BATCH. All 6 ATC wizards (atc_warmup, atc_check, atc_length, atc_table,
@@ -39,6 +39,15 @@ import { test, expect } from '@playwright/test';
  *
  * Every wizard's own emit proven byte-identical (unchanged specs, re-run this same turn): atc-warmup-as-data,
  * atc-check-in-place, atc-length-in-place, atc-table-twin, atc-change-twin, atc-test-twin.
+ *
+ * t2697 — TIER MIGRATION BATCH 6: moved browser→node. This file was on the dispatch's own "expect to SKIP"
+ * list (grouped with the other 6 `atc-*-form-reproduction-*` files, all genuinely real-DOM), but per-test
+ * reading found it is actually MIXED: each wizard has TWO tests, and only the second ("declared bindings
+ * place fields in the shell's own order (live DOM)") builds a real DOM tree via `renderOpForm`+
+ * `querySelectorAll('[data-param]')` — the node tier's structural-only document can't fake that. The FIRST
+ * test per wizard ("every binding's own section matches...") reads `def.bindings` directly with zero DOM.
+ * Split: the 6 pure section-mapping tests moved here; the 6 live-DOM-order tests stayed in
+ * tests/atc-batch-form-reproduction-2383-order.spec.js.
  */
 
 const CASES = [
@@ -96,23 +105,5 @@ for (const c of CASES) {
 
         expect(r.count, `${c.wiz} has ${c.expectedOrder.length} bindings today — a changed count is worth a fresh look at this spec`).toBe(c.expectedOrder.length);
         expect(r.sectionOf).toEqual(c.sectionOf);
-    });
-
-    test(`${c.wiz}-form-reproduction: declared bindings place fields in the shell's own order (live DOM)`, async ({ page }) => {
-        await page.goto('http://localhost:3211');
-        await page.waitForFunction(() => window.ddcsGetBlockProgram);
-
-        const fields = await page.evaluate(async ({ mod, fac }) => {
-            const dd = await import(mod);
-            const { formBindings, renderOpForm } = await import('/ui/formWidgets.js');
-            const def = dd[fac]();
-            const binds = formBindings(def);
-            const host = document.createElement('div');
-            document.body.appendChild(host);
-            renderOpForm(host, binds);
-            return [...host.querySelectorAll('[data-param]')].map((el) => el.dataset.param);
-        }, { mod: c.mod, fac: c.fac });
-
-        expect(fields).toEqual(c.expectedOrder);
     });
 }

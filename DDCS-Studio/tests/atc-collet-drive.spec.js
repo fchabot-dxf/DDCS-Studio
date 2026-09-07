@@ -1,29 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * PICK-PLACE choreography kind + the COLLET device (P-C.3a, t193). generic/disk resolve to a NEW 'pick-place' kind via
- * the seam; the spindle COLLET opens on M154 (OUT_SPINDLE_UNCLAMP) / closes on M155 (OUT_SPINDLE_CLAMP), driven by the
- * setAtcSwap io_change listener (reuses the P-C.2b device pattern, but on the SPINDLE — part frame). The input SENSOR
- * live-lighting activates (generic/disk wait on M300/301/302 → the io-tab pins light via the P-C.2f waitCode join).
- * SIM/VISUAL only → emit byte-identical. Asserts the VALUE.
+ * The spindle COLLET device (P-C.3a, t193) opens on M154 (OUT_SPINDLE_UNCLAMP) / closes on M155 (OUT_SPINDLE_CLAMP),
+ * driven by the setAtcSwap io_change listener (reuses the P-C.2b device pattern, but on the SPINDLE — part frame). The
+ * input SENSOR live-lighting activates (generic/disk wait on M300/301/302 → the io-tab pins light via the P-C.2f
+ * waitCode join). SIM/VISUAL only → emit byte-identical. Asserts the VALUE.
+ *
+ * Split from atc-collet.spec.js at the tier migration work package D; its sibling test (the pure choreography-kind
+ * seam) moved to tests/node/atc-collet.test.mjs. These three stayed: (2) reads a real wizard panel's Three.js viz
+ * object (`_animParts.collet`); (3) fires a real `window.dispatchEvent(new CustomEvent('io_change', …))` and expects a
+ * live listener registered by the app to actually run it — the node tier's dispatchEvent is a deliberate no-op that
+ * never invokes listeners; (4) queries real DOM (`.io-input[data-pin]`) built by the io panel.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
-
-test('(1) the seam resolves generic/disk to the pick-place kind (firmware stays push, m6 macro-call)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const c = await page.evaluate(async () => {
-    const { atcChoreography } = await import('/wizards/atcChangeWizard.js');
-    return {
-      generic: atcChoreography({ method: 'generic' }), disk: atcChoreography({ method: 'disk' }),
-      firmware: atcChoreography({ method: 'firmware' }).kind, m6: atcChoreography({ method: 'm6' }).kind, manual: atcChoreography({ method: 'manual' }),
-    };
-  });
-  expect(c.generic, 'generic → pick-place / magazine').toMatchObject({ kind: 'pick-place', variant: 'magazine' });
-  expect(c.disk, 'disk → pick-place / carousel').toMatchObject({ kind: 'pick-place', variant: 'carousel' });
-  expect(c.firmware, 'firmware stays push').toBe('push');
-  expect(c.m6, 'm6 stays macro-call').toBe('macro-call');
-  expect(c.manual, 'manual → no inline choreography').toBeNull();
-});
 
 test('(2) the collet device opens/closes (position + tint) on setStationDevice', async ({ page }) => {
   await page.goto('http://localhost:3211');

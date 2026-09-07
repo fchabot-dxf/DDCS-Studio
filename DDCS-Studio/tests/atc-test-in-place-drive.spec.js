@@ -1,33 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * ATC TEST E2 (t560) — COMPLETES port 1 of 3. The user_atc_test_data twin is seeded + wired IN-PLACE via the built-in ATC
- * Test slot's `opensAs`. VERIFY: the slot opensAs the twin (plain title, twin retired) · opSimContext carries FORCE_MACHINE +
- * WITH_MAGAZINE + the machine-frame intent · the in-place panel renders the form (both modes' fields) + the emit preview + the
- * machine-frame 3D sim with the magazine · the E0/E1 emit sweeps + M2 stay green (their own specs) · full suite green.
+ * ATC TEST E2 (t560) — the in-place panel renders the form (both modes' fields) + the emit preview + the machine-frame
+ * 3D sim with the magazine.
+ *
+ * Split from atc-test-in-place.spec.js at the tier migration work package D; its sibling test (the pure opensAs
+ * wiring + opSimContext check) moved to tests/node/atc-test-in-place.test.mjs. This one stayed because it opens the
+ * twin via window.openWiz, reads real DOM, clicks a segmented-control button, and screenshots the panel.
  */
 const OPTYPE = 'user_atc_test_data';
-
-test('opensAs wiring: ATC Test opens the twin IN-PLACE (plain title, twin retired) + opSimContext carries machine+magazine', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
-    const r = await page.evaluate(async (OPTYPE) => {
-        const WL = await import('/blocks/wizardLibrary.js');
-        const { opSimContext } = await import('/viz/opSimContext.js');
-        const { builderOf } = await import('/blocks/opBuilders.js');
-        const entries = WL.listEntries();
-        const slot = entries.find((e) => e.id === 'atc_test');
-        const twinEntry = entries.find((e) => e.type === OPTYPE);
-        return { opensAs: slot && slot.opensAs, title: WL.builtinLabelForTwin(OPTYPE), twinRetired: !twinEntry, registered: !!builderOf(OPTYPE), ctx: opSimContext(OPTYPE) };
-    }, OPTYPE);
-    expect(r.registered, 'the twin is seeded/registered on boot').toBe(true);
-    expect(r.opensAs, 'the built-in ATC Test slot opensAs the twin').toBe(OPTYPE);
-    expect(r.title, 'the seamless in-place title is the built-in plain label').toBe('ATC Test');
-    expect(r.twinRetired, "the twin's own atc_datawiz menu entry is retired (no duplicate slot)").toBe(true);
-    expect(r.ctx.forceMachine, 'FORCE_MACHINE membership carries → the sim forces the envelope').toBe(true);
-    expect(r.ctx.showMagazine, 'WITH_MAGAZINE membership carries → the sim renders the magazine').toBe(true);
-    expect(r.ctx.toolMachineFrame, 'the machine-frame intent carries (atc_test is a G53 machine op, like homing)').toBe(true);
-});
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 test('DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim', async ({ page }) => {

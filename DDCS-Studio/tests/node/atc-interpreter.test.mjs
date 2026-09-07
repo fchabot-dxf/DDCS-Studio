@@ -1,10 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * CHOREOGRAPHY INTERPRETER (RE-PLAN #2, I4) — walks a combo's declared MOTION.steps → a SIM-ONLY path that drives the
  * preview, so a from-zero / RapidChange config (magnet × plunge × linear, no hand-written stack) SIMS by walking its
  * steps. SIM-ONLY (the emit is the M6/T.nc call, I5). The 3 shipped presets keep their played-inline sim (unaffected —
  * their motions aren't `candidate`). Asserts the VALUE: the plunge path + the tool swap.
+ *
+ * TIER MIGRATION — moved browser→node. Two tests stayed (each opens a real wizard/settings panel and reads live DOM —
+ * a `.wiz-viz3d` canvas host, `#atc_gen_tnc` button clicks, `#atc_tnc_out` textarea value — the node tier's
+ * structural-only `document` cannot fake any of that): "a RapidChange config (from-zero) SIMS via the interpreter"
+ * and "I5b-2a: Generate T.nc routes a candidate combo AND the DRAWBAR changer through the interpreter". Both moved to
+ * tests/atc-interpreter-drive.spec.js. The remaining 4 tests here call `motionToSimGcode`/`motionToTnc` directly and
+ * assert on the returned G-code text — no DOM involved.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -32,34 +39,6 @@ test('the interpreter walks a PLUNGE motion → a sim path (plunge + swap, NO dr
   expect(path, 'and no pusher/pneumatic codes').not.toMatch(/M15[6-9]|M16[0-3]/);
 });
 
-test('a RapidChange config (from-zero) SIMS via the interpreter — the tool plunges + swaps', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
-  await page.evaluate((atc) => {
-    const s = window.ddcsGetSettings();
-    s.machine = { x: 600, y: 400, z: -150, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
-    s.preview = s.preview || {}; s.preview.autoLoop = false;
-    s.atc = Object.assign(s.atc || {}, atc);
-  }, RAPID);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('atc_change'));
-  await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
-  await page.evaluate(() => window.ddcsStudio.wizardManager.update());
-  await page.waitForTimeout(300);
-  // the preview is now playing the INTERPRETER's plunge path (not a hand-written stack)
-  const host = () => document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d');
-  const gc = await page.evaluate(() => document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').__gcode);
-  expect(gc, 'the preview plays the interpreter walk, not a stack').toContain('interpreter walk');
-  expect(gc, 'with the plunge descend').toContain('G1 Z-40');
-  // the FORK/DOCK stations render (magnet grip → fork device) at the dock positions
-  const hasFork = await page.evaluate(() => !!document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').__panel.viz._forkGroup);
-  expect(hasFork, 'the fork/dock stations render for the magnet grip').toBe(true);
-  // ▶ run it → the #1300 flip at the plunge fires the swap
-  await page.evaluate(() => document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').querySelector('.pp-run').click());
-  await page.waitForFunction(() => { const v = document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').__panel.viz; return v && v._simTool && Number(v._simTool.num) === 5; }, null, { timeout: 20000 });
-  const spindle = await page.evaluate(() => Number(document.getElementById('atcChangeViz').parentElement.querySelector('.wiz-viz3d').__panel.viz._simTool.num));
-  expect(spindle, 'the tool swapped to the target (5) at the plunge — a config-only changer SIMS').toBe(5);
-});
-
 test('I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro + M99, a STANDALONE subprogram)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings);
@@ -76,40 +55,6 @@ test('I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro +
   expect(nc, 'the linear docks come from the magazine (dock 1 = T2)').toContain('return T2 to dock 1');
   expect(nc, 'the magnet grip emits NO drawbar M154 (empty release/clamp)').not.toContain('M154');
   expect(nc, 'and no pneumatic M-codes').not.toMatch(/M15[6-9]|M16[0-3]/);
-});
-
-test('I5b-2a: Generate T.nc routes a candidate combo AND the DRAWBAR changer through the interpreter (safety-complete shipped route)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetSettings && window.openSettings);
-  await page.evaluate((atc) => {
-    const s = window.ddcsGetSettings();
-    s.hardwareTabs = s.hardwareTabs || {}; s.hardwareTabs.atc = true;
-    s.atc = Object.assign(s.atc || {}, atc);
-    window.ddcsSaveSettings && window.ddcsSaveSettings();
-    window.openSettings({ group: 'hardware', panel: 'set_tab_atc' });
-  }, RAPID);
-  await page.waitForSelector('#atc_gen_tnc', { timeout: 8000 });
-  // RapidChange (candidate motion) → the interpreter O-program
-  await page.click('#atc_gen_tnc');
-  const rapidNc = await page.evaluate(() => document.querySelector('#atc_tnc_out').value);
-  expect(rapidNc, 'RapidChange → the interpreter O-program (plunge)').toMatch(/^O\d+/m);
-  expect(rapidNc).toContain('G53 G1 Z#3 F800');
-  expect(rapidNc, 'no drawbar in a magnet changer').not.toContain('M154');
-  // I5b-2a CUTOVER: the DRAWBAR changer now ALSO routes through the INTERPRETER (the shipped route) — a safety-complete
-  // O-program whose executable program is byte-identical to generateToolChangeNc + the O-header. Assert the SHIPPED
-  // output (the button) is safety-complete (this is where the safety assertion now lives — the shipped route).
-  await page.evaluate(() => {
-    const s = window.ddcsGetSettings();
-    s.atc.grip = 'drawbar'; s.atc.motion = 'pick-place'; s.atc.layout = 'linear';
-  });
-  await page.click('#atc_gen_tnc');
-  const drawbarNc = await page.evaluate(() => document.querySelector('#atc_tnc_out').value);
-  expect(drawbarNc, 'the shipped drawbar route now emits the interpreter O-program (O-header — a standalone macro)').toMatch(/^O\d+/);
-  expect(drawbarNc, 'SAFETY: the M300 spindle-stop wait (the element a naive route would have dropped)').toContain('M300');
-  expect(drawbarNc, 'the drawbar dance — release M154 then clamp M155').toMatch(/M154[\s\S]*M155/);
-  expect(drawbarNc, 'the settle dwells (G04 P500)').toContain('G04 P500');
-  expect(drawbarNc, 'the released + clamped sensor waits (M301 then M302)').toMatch(/M301[\s\S]*M302/);
-  expect(drawbarNc, 'a drawbar descend is a rapid G0, NOT the plunge G1 feed').not.toContain('G53 G1 Z#3 F800');
 });
 
 test('I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATION (matches the DDCS dance)', async ({ page }) => {

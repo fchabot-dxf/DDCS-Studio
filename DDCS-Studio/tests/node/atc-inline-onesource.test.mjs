@@ -1,10 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // INC-B2 / INC-B2b — the ONE-EMITTER hardened reference bar. The callMacro=false INLINE fallback (generic/disk) emits
 // the SAME executable body as ⚙ Generate T.nc (tncProgram, {body:true}), sourcing the drawbar/sensor codes LIVE from
 // the user's Settings → ATC I/O (4b — read at emit via ddcsGetSettings, NEVER snapshotted into the op/marker). Pins vs
 // INDEPENDENT truth: user-codes · body≡generator · T#M6-unchanged · marker(round-trip + NO snapshot) · freshness ·
 // reconcile-clean-null · RELOAD-freshness.
+//
+// t2695 — TIER MIGRATION WORK PACKAGE B: moved browser→node whole-file. All 7 tests are pure: every body is
+// page.goto + one page.evaluate that imports app modules, calls a builder/emitMapped/reconcile function, and
+// asserts on plain returned data — no DOM read, no click, no screenshot, no real-render canvas. Tests (6) and (7)
+// call `window.ddcsLoadBlockStack` / read `window.ddcsGetBlockProgram`, which the real app publishes at boot via
+// `initProgramModel()` (web/app.js) — the node tier's `page.goto` stub only imports settingsPanel.js, so those two
+// tests import `/blocks/programModel.js` and call `initProgramModel()` themselves first (mirrors the established
+// "seed what full app boot would have provided" pattern used elsewhere for `seedDefaultPortedUserOps()`).
 test.beforeEach(async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.ddcsGetSettings);
@@ -112,6 +120,8 @@ test('INC-B2 (5): re-emit after a live code change is FRESH', async ({ page }) =
 test('INC-B2 (6): reconcile over the RAW inline stack recovers the DECLARED fields (fix B)', async ({ page }) => {
   const r = await page.evaluate(async (atc) => {
     const s = window.ddcsGetSettings(); s.atc = atc; s.outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }]; s.inputs = [];
+    const pm = await import('/blocks/programModel.js');
+    pm.initProgramModel();   // node tier: page.goto doesn't run the full app boot that wires window.ddcsLoadBlockStack/ddcsGetBlockProgram
     const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
     rec.recordOp('atc_change', { method: 'generic', fixedT: 4, callMacro: false });   // declared method/fixedT/callMacro
@@ -129,9 +139,10 @@ test('INC-B2 (6): reconcile over the RAW inline stack recovers the DECLARED fiel
 test('INC-B2b (7): the marker carries NO settings snapshot; re-emit uses the CURRENT live codes (reload-fresh)', async ({ page }) => {
   const r = await page.evaluate(async (atc) => {
     const s = window.ddcsGetSettings(); s.atc = atc; s.outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }]; s.inputs = [];
+    const pm = await import('/blocks/programModel.js');
+    pm.initProgramModel();   // same node-tier seed as (6)
     const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
-    const pm = await import('/blocks/programModel.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     rec.recordOp('atc_change', { method: 'generic', callMacro: false });   // the params the wizard now records (NO _atc)

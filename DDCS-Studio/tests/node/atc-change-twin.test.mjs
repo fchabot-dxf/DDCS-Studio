@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ATC-CHANGE E1 (t564) — the user_atc_change_data TWIN emit. On the E0 superset (42c4ff9): deriveGuards injects the DERIVED
@@ -7,6 +7,10 @@ import { test, expect } from '@playwright/test';
  * twin == atcChangeStack byte-diff ZERO across the method × callMacro × config sweep on TWO profiles (Expert + V4.1); a live
  * ATC I/O change is TRACKED by the inline arm's next emit; a Blocks edit inside a static arm SURVIVES the recompose. NOT
  * registered/in-place yet (E2).
+ *
+ * t2691 — TIER MIGRATION WORK PACKAGE C: moved browser→node. All three tests already call registerUserOp explicitly (no
+ * pre-seeding dependency), so this converts as-is (pattern 1). Measured: browser 3s/3 tests (4 workers) vs node —
+ * see the work-package report for the exact node duration_ms; not a regression at this combo count (210-combo sweep).
  */
 const CFG_ATC = {
     atc: { magazine: [{ tool: 1, x: 100, y: 50, z: -20, pocket: 1 }, { tool: 2, x: 150, y: 50, z: -20, pocket: 2 }], grip: 'drawbar', motion: 'pick-place', layout: 'linear', safeZ: 10 },
