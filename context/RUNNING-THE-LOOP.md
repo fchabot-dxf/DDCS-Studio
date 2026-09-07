@@ -410,4 +410,32 @@ are fine. Reserve a cheaper/local worker for bulk, mechanical work with ONE shar
 criterion (e.g. renaming a field identically across 30 twins, gated by a single spec that must go from red to
 green) — never as the default worker seat.
 
+### 33. A fresh box's bare `python` is silently the Microsoft Store stub — and it fails a `wait` invisibly
+
+Every doc and both role skills call `python handoff.py …` / `python proc_health.py …`. On a fresh Windows box
+in Git Bash, bare `python` and `python3` resolve to the Microsoft Store **App Execution Alias** — a redirector
+stub (`WindowsApps\python.exe` → `Microsoft.DesktopAppInstaller\AppInstallerPythonRedirector.exe`) that prints
+`Python est introuvable` and exits non-zero. So the loop command runs, does nothing, and returns failure — and
+because a failed `wait` is indistinguishable from a quiet turn (§10, §16), the loop reads as alive while
+nothing is listening.
+
+⚠ **2026-09-07, the ASUS shard node.** Caught at setup. Root cause was pure **PATH ORDERING**, not a missing
+interpreter: the real interpreter's dir (`…\AppData\Local\Python\bin`) was already on PATH but sat *after*
+`…\Microsoft\WindowsApps`, so first-match-wins handed bare `python` to the stub. Real interpreter:
+`…\AppData\Local\Python\pythoncore-3.14-64\python.exe` (3.14.3).
+
+⛔ **"Lives under WindowsApps" is NOT what makes something a stub** — a directory-shaped test false-positives.
+WindowsApps holds BOTH `py.exe` (→ `PythonSoftwareFoundation.PythonManager…\py.exe`, the REAL launcher —
+`py -V` = 3.14.3, exit 0) and `python.exe` (→ the redirector stub). `command -v py` points straight into
+WindowsApps and *looks* damning — which is exactly how the ASUS worker wrongly concluded `py` was stubbed too.
+
+⇒ **The rule: verify with `<interp> -V` printing a real version — never assume from a path.** Exit-0 silence
+is not proof (§21); neither is a WindowsApps location proof of a stub. Until a durable fix, use `py` or the
+absolute interpreter path.
+
+⇒ **The durable fix (one-time, per box): reorder PATH so the real Python bin precedes `…\WindowsApps`** (shell
+profile), or disable the App Execution Aliases for `python.exe`/`python3.exe` (Windows Settings → Manage app
+execution aliases). Either makes bare `python` resolve to the real interpreter, so every doc's
+`python handoff.py …` works unmodified — which is the point, since the docs are not rewritten per box.
+
 ---
