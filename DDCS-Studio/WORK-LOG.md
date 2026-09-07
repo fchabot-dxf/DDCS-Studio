@@ -79916,3 +79916,80 @@ Exactly the dispatch's three named files: `playwright.config.js`, `push-progress
 `tests/TIER-MIGRATION-PLAN.md` untouched. No full sharded suite run. `verification/*.png` untouched (checked
 `git status` cleanly showed only the two intended files before staging).
 
+
+## t2717 — ASUS worker: throttling CORROBORATED (not discovered), and the node tier's real fixed cost is `@playwright/test`, NOT `register.mjs`
+
+⚠ **FRAMING FIRST — this is CORROBORATION, not a new finding.** I re-derived the throttling answer from
+scratch before reading `context/SHARD-COMMS.md`, and the headline was already there: §6 disproved throttling
+at **`e494e17d`**, and the "14×" it was fighting had already died when Ranchy re-timed its own node tier to
+~30s at **`f233a055`** (so the real comparison was always ~69s vs ~30s ≈ 2.3×). SHARD-COMMS §2 is titled
+"do not weight off the node tier" in as many words, and the shard split is weighted off the BROWSER tier
+(1.41×, re-measured 1.44×, giving 3/5 Ranchy + 2/5 ASUS). ⇒ **Nothing was about to be built on a wrong
+cause.** The repo-first rule ("grep for the capability, not the file's claim", `AGENTS.md` 8b) would have
+saved this whole pass. Logged so the next reader sees it was CHECKED, not re-derived.
+
+### Three data points that are genuinely STRONGER than what was on record
+The prior session observed high clocks under a 12-thread load (133%/130% of base). Mine close two holes it left:
+- **(a) `PROCTHROTTLEMIN` is pinned at 100% on AC**, alongside `PROCTHROTTLEMAX`. The earlier evidence was an
+  *observation* that clocks were high; this is a *configuration guarantee* that the CPU *cannot* downclock.
+- **(b) A 35 s SUSTAINED all-16-thread load held 4.04 GHz with 0.4 % droop** (139.6 % → 139.2 % of the 2.9 GHz
+  nominal, i.e. sustained boost ABOVE base). A snapshot perf-counter read cannot exclude *thermal* throttling
+  over time; a held load can. Also confirmed on AC (`PowerOnline: True`, battery 100 %, not discharging) with
+  the Windows plan already **High performance**.
+- **(c) A per-core scalar number free of the node tier's file-count artifact**: `SCALAR 282.7 ms`,
+  `ALLOC 65.6 ms`, `SPAWN 53.8 ms/process` (portable no-dep benchmark). Puts the true per-core gap near **2×**,
+  reached independently of the tier timings.
+
+### ⭐ NEW — the `register.mjs` cost estimate on record is WRONG, by an order of magnitude
+SHARD-COMMS attributes ~0.50 s/file to the `register.mjs` hook. **Measured, it is ~50 ms.** Decomposition
+(each an average of 3–5 runs, this box):
+
+| what | measured |
+|---|---|
+| bare `node -e 0` | **79 ms** |
+| `node --import register.mjs -e 0` | **129 ms**  ⇒ the register hook costs **~50 ms**, not ~500 |
+| `node --import register.mjs -e "import('node:test')"` | **137 ms** |
+| `node --import register.mjs -e "import('harness.mjs')"` | **802 ms**  ⇒ harness adds **~665 ms** |
+| `node -e "import('@playwright/test')"` | **747 ms** |
+| one real test file (2 trivial tests) | **1386 ms** |
+
+⭐ **The fixed cost is `@playwright/test`.** `tests/node/support/harness.mjs` does
+`export { expect } from '@playwright/test'`, and **all 219 of 219** `tests/node/*.test.mjs` import that harness.
+So the browser-FREE tier pays Playwright's full module graph — ~665 ms of marginal cost — in **every one of 219
+processes**, purely to obtain `expect`. That is **~146 CPU-seconds** against a tier whose total is ~304 CPU-s:
+**roughly half the node tier is importing a browser test framework it never uses.**
+
+⇒ ⭐ **This is NOT an ASUS property.** It lands identically on Ranchy, on CI, and on every future shard node.
+
+### `--test-isolation=none` — MEASURED AND REJECTED (don't spend a turn on it)
+Node 24 runs all files in one process natively, so this needed no code change to cost. Both runs, this box:
+
+```
+BASELINE   node --import register.mjs --test "tests/node/*.test.mjs"
+           62.4 s wall · 795 tests · 795 pass · 0 fail
+ISOLATION  … --test-isolation=none
+           51.0 s wall · 795 tests · 758 pass · 37 FAIL
+```
+
+⛔ **Only 18 % faster, and it breaks 37 tests.** It trades away per-file parallelism (serial execution) to win
+the shared module cache, so the two nearly cancel; and the shared process leaks state across files — e.g.
+`tapping-776.test.mjs:79` dies with `TypeError: Cannot assign to read only property 'spindle'`, a frozen object
+mutated by an earlier file. Making this viable means auditing cross-file state in 219 files to buy ~11 s.
+**Not worth it.** The parallelism is doing real work and should be kept.
+
+### ⇒ THE RECOMMENDATION (design + number, for the advisor to route)
+**Keep process isolation and parallelism. Remove Playwright from the node tier's import graph instead.**
+`expect` is the only thing taken from it — `harness.mjs` imports nothing else from `@playwright/test`.
+
+- Ceiling if that ~665 ms/process is eliminated at unchanged parallelism: **62.4 s → ~33 s** on this box.
+- ⚠ The standalone `expect` package is **ABSENT** from `node_modules` (checked), so this is not a one-line
+  swap — it is a dependency decision plus a matcher-compatibility question, and `harness.mjs`'s own header
+  states assertions were carried across "byte-for-byte", so any replacement must preserve the matcher surface
+  or the conversion guarantee breaks. ⛔ **Not costed here — that is the next scout, not this one.**
+- ⚠ Projection assumes parallel efficiency holds as fixed cost drops; unverified. Treat ~33 s as a ceiling.
+
+### Scope discipline / verify
+⛔ **No code changed. No test edited. `context/` NOT touched** (advisor owns that channel; it pushed
+`1ed704b6`/`7b39ae61` during this turn). Everything above is measurement on an unmodified tree — the only
+writes this turn are this WORK-LOG entry and two throwaway files in the session scratchpad, outside the repo.
+`git pull --rebase` before committing; baseline re-run confirms the tier is **795 pass / 0 fail** unmodified.
