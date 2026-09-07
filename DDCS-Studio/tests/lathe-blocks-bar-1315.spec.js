@@ -79,7 +79,11 @@ test('A PALETTE ENTRY IS THE OP ITSELF — its block stack emits exactly what th
 test('THE ROUND TRIP — every authored value survives the canvas, and an edit moves the program', async ({ page }) => {
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForTimeout(2200);
+    // t1315 (de-sleep) — __blkws is the app's OWN declared readiness signal for the Blocks tab (blocksApp.js's
+    // own comment on the showApp('blocks') rethrow: "a caller polling for the app's own readiness signal
+    // (window.__blkws)"). showApp('blocks') already awaits showBlocks()→buildWorkspace(), which sets __blkws as
+    // the LAST synchronous step, so this resolves as soon as the workspace is real — never later than 2200ms.
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 20000 });
     const r = await page.evaluate(async () => {
         const uo = await import('/blocks/userOps.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
@@ -123,7 +127,11 @@ test('ABSENCE SURVIVES THE CANVAS — no phantom axis words (t1315 found it, t13
     // DECLARES which of its fields may be absent, and the bridge keeps an empty socket empty in both directions.
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForTimeout(2200);
+    // t1315 (de-sleep) — __blkws is the app's OWN declared readiness signal for the Blocks tab (blocksApp.js's
+    // own comment on the showApp('blocks') rethrow: "a caller polling for the app's own readiness signal
+    // (window.__blkws)"). showApp('blocks') already awaits showBlocks()→buildWorkspace(), which sets __blkws as
+    // the LAST synchronous step, so this resolves as soon as the workspace is real — never later than 2200ms.
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 20000 });
     const r = await page.evaluate(async () => {
         const uo = await import('/blocks/userOps.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
@@ -152,7 +160,11 @@ test('THE DISCRIMINATING CASE — a phantom Z0 would move the tool, and the sim 
     // below ends absolute, so a phantom Z0 on that last move would drive Z to zero from 5. Executed both ways.
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForTimeout(2200);
+    // t1315 (de-sleep) — __blkws is the app's OWN declared readiness signal for the Blocks tab (blocksApp.js's
+    // own comment on the showApp('blocks') rethrow: "a caller polling for the app's own readiness signal
+    // (window.__blkws)"). showApp('blocks') already awaits showBlocks()→buildWorkspace(), which sets __blkws as
+    // the LAST synchronous step, so this resolves as soon as the workspace is real — never later than 2200ms.
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 20000 });
     const r = await page.evaluate(async () => {
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const { traceToolpath } = await import('/engine/trace.js');

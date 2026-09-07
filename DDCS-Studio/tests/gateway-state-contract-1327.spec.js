@@ -30,7 +30,15 @@ const openPanel = async (page, { reachable }) => {
     await page.reload();
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(() => window.showApp && window.showApp('gateway'));
-    await page.waitForTimeout(1500);
+    // t2687 (de-sleep) — was a flat waitForTimeout(1500). Status is the default tab (gatewayPanel.js's own
+    // activate(statusView) at init); its .role-identity line is written UNCONDITIONALLY by onPoll(), but only
+    // once (status.js — this.identity.replaceChildren(...) runs after `d = await ctx.client.descriptor()`
+    // resolves, on every branch, unlike `.dot` which status.js explicitly omits for a client with no local
+    // daemon — BACKLOG #83). That fetch and the panel's own poll() (gatewayPanel.js, triggered by
+    // setGatewayPanelVisible(true) right after) are both kicked off in the same tick against the same endpoint,
+    // so .role-identity appearing is a real, DOM-observable stand-in for "the gateway state has been asked at
+    // least once" — never earlier than the real condition, on either connected or unreachable path.
+    await page.waitForSelector('#gateway-app .gw-view .role-identity', { timeout: 10000 });
 };
 
 const goTab = async (page, label) => {
@@ -38,7 +46,22 @@ const goTab = async (page, label) => {
         const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === label);
         if (t) t.click();
     }, label);
-    await page.waitForTimeout(900);
+    // t2687 (de-sleep) — was a flat waitForTimeout(900). Each view's own onPoll() fetch (files.js's listFiles(),
+    // tracker.js's listQueue()) is what actually produces the markers below — waiting for one of them is the
+    // real completion signal instead of a guessed duration. Send's data-gw-state is set synchronously at mount
+    // (applyState() reads the panel's already-current ctx.desc, no fetch of its own), so that branch resolves
+    // immediately, which is correct — there is nothing further to wait for there.
+    await page.waitForFunction((label) => {
+        const root = document.querySelector('#gateway-app .gw-view');
+        if (!root) return false;
+        if (label === 'Files') return !!(root.querySelector('table') || root.querySelector('[data-gw-state]'));
+        if (label === 'Track') return !!root.querySelector('.bt-idle');
+        if (label === 'Send') {
+            const b = root.querySelector('.gw-state-banner');
+            return !!b && b.getAttribute('data-gw-state') !== '';
+        }
+        return true;
+    }, label, { timeout: 10000 });
 };
 
 test('THE CONTRACT IS DECLARED — every subtab says what it does when unreachable', async ({ page }) => {
@@ -209,7 +232,15 @@ test('THE PHANTOM ITSELF — rows from a live gateway must VANISH when it goes a
             ? Promise.reject(new TypeError('Failed to fetch'))
             : real(url, init));
     });
-    await page.waitForTimeout(3000);   // let the panel's own poll tick find it gone
+    // t2687 (de-sleep) — was a flat waitForTimeout(3000) guessing how long gatewayPanel.js's own real
+    // setInterval(poll, POLL_MS=1500) takes to tick and notice the fetch is now failing. This is the SAFE
+    // pattern, not the forbidden one: the assertion is about the RESULTING STATE (rows gone), not about the
+    // poll's timing itself, so polling the actual DOM for that state can only resolve once the real tick has
+    // happened — it is never able to resolve early on a false signal, only faster than the flat guess.
+    await page.waitForFunction(() => {
+        const root = document.querySelector('#gateway-app .gw-view');
+        return !!root && root.querySelectorAll('table tr').length === 0;
+    }, null, { timeout: 8000 });
     const after = await page.evaluate(() => {
         const root = document.querySelector('#gateway-app .gw-view');
         return { rows: root.querySelectorAll('table tr').length, deletes: root.querySelectorAll('button.danger').length, note: !!root.querySelector('[data-gw-state="unreachable"]') };

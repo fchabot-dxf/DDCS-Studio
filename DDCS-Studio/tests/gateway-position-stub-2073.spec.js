@@ -31,12 +31,22 @@ const boot = async (page, positionBody) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(() => window.showApp && window.showApp('gateway'));
-    await page.waitForTimeout(1500);
+    // t2687 (de-sleep) — was a flat waitForTimeout(1500). The Track tab's buttons are wired synchronously inside
+    // initGatewayPanel() (gatewayPanel.js), already done by the time showApp()'s promise resolves above — waiting
+    // for the tab strip to exist is the real (and much cheaper) precondition for the click below.
+    await page.waitForSelector('#gateway-app .settings-main-tab', { timeout: 10000 });
+    // The one fetch that matters for this file: tracker.js's mount() → onPoll() → renderPosition(ctx) calls
+    // ctx.client.getPosition() (→ /api/position) only once the Track tab is clicked. Arm the listener BEFORE the
+    // click so we can't miss it, then wait for the real response instead of guessing how long the mocked
+    // fetch + DOM update takes (gatewayPanel.js POLL_MS=1500 was the guess baked into the old flat wait, but
+    // this route is only ever hit by the click, never by the panel's own POLL_MS timer, since Track isn't the
+    // default view).
+    const posResp = page.waitForResponse('**/api/position', { timeout: 10000 });
     await page.evaluate(() => {
         const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Track');   // t2241 — was 'Tracking'
         if (t) t.click();
     });
-    await page.waitForTimeout(900);
+    await posResp;
 };
 
 test('position not enabled (the common case — not Poll mode) → the stub stays hidden entirely', async ({ page }) => {

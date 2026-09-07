@@ -76,10 +76,14 @@ test('COLD page, real Load: corner\'s reposition handle exists and writes into t
     const chooser = await chooserPromise;
     await chooser.setFiles(tmpFile);
 
-    await page.waitForTimeout(1000);
+    // de-sleep (Phase 2 browser-tier wait audit) — the real condition this padded was the async file-Load chain (FileReader → dynamic
+    // import of programModel.js → importMarkedNc → ddcsLoadBlockStack) actually landing; poll it directly
+    // instead of guessing how long that chain takes.
+    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 5000 });
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-    await page.waitForTimeout(1000);
+    // de-sleep (Phase 2 browser-tier wait audit) — stopLiveSim already polls for '.pp-run.on' up to 2000ms (support/simControls.js), so it
+    // already absorbs the pane's own render delay; a blind wait in front of it was pure padding.
     await stopLiveSim(page, '#blk_userViz3dBox');
     await page.waitForTimeout(600);
     await dismissToasts(page);
@@ -95,7 +99,12 @@ test('COLD page, real Load: corner\'s reposition handle exists and writes into t
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 25, box.y + box.height / 2 + 15, { steps: 6 });
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    // de-sleep (Phase 2 browser-tier wait audit) — poll the actual write (onDrag sets the field + dispatches 'input' synchronously per
+    // featureCanvas.js's own doc comment) instead of guessing how long it takes to land.
+    await page.waitForFunction(() => {
+        const f = document.querySelector('#blk_wiz_user_form [data-param="cross1_x"]');
+        return f && Number(f.value) !== 0;
+    }, null, { timeout: 3000 });
 
     const paneField = await page.evaluate(() => { const f = document.querySelector('#blk_wiz_user_form [data-param="cross1_x"]'); return f ? f.value : null; });
     expect(paneField, 'the drag wrote into the pane\'s own form field').not.toBeNull();
@@ -131,7 +140,9 @@ test('COLD page: a declared draggable handle on a SYNTHETIC non-corner op is wri
     await page.evaluate(() => window.ddcsLoadBlockStack([window.__t1804SynthOp]));
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-    await page.waitForTimeout(1000);
+    // de-sleep (Phase 2 browser-tier wait audit) — no toast is expected on this path (registerUserOp + ddcsLoadBlockStack, not the wizard
+    // Insert flow showRoundTripToastOnce fires from), and the handle-render race below is already handled by
+    // its own documented retry loop (t1904) — a blind wait here was pure padding.
     await dismissToasts(page);
 
     const handle = page.locator('#blk_wiz_user svg .fc-handle-move');
@@ -163,7 +174,11 @@ test('COLD page: a declared draggable handle on a SYNTHETIC non-corner op is wri
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2 + 10, { steps: 6 });
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    // de-sleep (Phase 2 browser-tier wait audit) — poll the actual write instead of guessing how long it takes to land.
+    await page.waitForFunction(() => {
+        const f = document.querySelector('#blk_wiz_user_form [data-param="mx"]');
+        return f && Number(f.value) !== 33;
+    }, null, { timeout: 3000 });
 
     const paneField = await page.evaluate(() => { const f = document.querySelector('#blk_wiz_user_form [data-param="mx"]'); return f ? f.value : null; });
     expect(paneField, 'the drag wrote into the pane\'s own form field for the synthetic op too').not.toBeNull();

@@ -21,7 +21,10 @@ const boot = async (page, kind, machine) => {
     }, { k: kind, m: machine });
 };
 
-const openStock = async (page) => { await page.evaluate(() => window.ddcsOpenStock()); await page.waitForTimeout(700); };
+// openStockEditor() (ui/stockEditor.js) builds the whole modal — fields, kind buttons, syncShape() — synchronously
+// before returning; only its canvas/3D panes defer a frame via requestAnimationFrame. Wait for the modal itself
+// rather than guessing how long that takes.
+const openStock = async (page) => { await page.evaluate(() => window.ddcsOpenStock()); await page.waitForSelector('.stock-editor-pop', { state: 'visible', timeout: 5000 }); };
 const vis = (page, id) => page.evaluate((i) => { const e = document.getElementById(i); return !!(e && e.offsetParent); }, id);
 const stock = (page) => page.evaluate(() => ({ ...window.ddcsGetSettings().stock }));
 
@@ -58,7 +61,9 @@ test('THE MODAL EDITS THE ONE BAR RECORD — change the Ø and the main preview 
         const d = document.getElementById('se_bar_dia');
         d.value = '40'; d.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await page.waitForTimeout(500);
+    // commit() (stockEditor.js) runs synchronously off the 'input' listener — applySettings() lands before
+    // dispatchEvent() returns — so this just confirms the real value rather than guessing how long it takes.
+    await page.waitForFunction(() => window.ddcsGetSettings().stock.diameter === 40, null, { timeout: 3000 });
     const s = await stock(page);
     expect(s.diameter, 'the record the wizards read').toBe(40);
     expect(s.shape).toBe('cylinder'); expect(s.axis).toBe('z'); expect(s.origin).toBe('finished-face');
@@ -66,7 +71,13 @@ test('THE MODAL EDITS THE ONE BAR RECORD — change the Ø and the main preview 
     // …the MAIN PREVIEW, which is where the user lives: close the modal and look at the bar it draws
     await page.evaluate(() => document.getElementById('se_done').click());
     await page.click('#view-toggle');
-    await page.waitForTimeout(1400);
+    // #view-toggle's first click constructs the main GcodeViz3D + its stock mesh for real (WebGL scene, geometry) —
+    // real work, not a fixed timer. Poll for the mesh existing (what the assertions below actually read) instead
+    // of guessing how long that construction takes.
+    await page.waitForFunction(() => {
+        const v = window.__ddcsLastViz;
+        return !!(v && v.stockMesh && v.stockMesh.geometry);
+    }, null, { timeout: 5000 });
     const drawn = await page.evaluate(() => {
         const v = window.__ddcsLastViz;
         // the lathe bar is a REVOLVED profile (a LatheGeometry), so its radius is read off the geometry itself
@@ -114,13 +125,18 @@ test('A MILL ROUND BLANK — Ø and height, standing on the table, datum at the 
     await boot(page, 'mill');
     await openStock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(400);
+    // syncShape() (called from commit(), fired synchronously by the click handler) is what flips se_round_fields
+    // to visible — wait on that instead of guessing how long the click's handler takes.
+    await page.waitForFunction(() => document.getElementById('se_round_fields').style.display !== 'none');
     await page.evaluate(() => {
         const d = document.getElementById('se_rd_dia'), h = document.getElementById('se_rd_len');
         d.value = '60'; d.dispatchEvent(new Event('input', { bubbles: true }));
         h.value = '30'; h.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await page.waitForTimeout(400);
+    await page.waitForFunction(() => {
+        const st = window.ddcsGetSettings().stock;
+        return st.diameter === 60 && st.z === 30;
+    }, null, { timeout: 3000 });
     const s = await stock(page);
     expect(s.shape).toBe('cylinder');
     expect(s.axis, 'standing on the table').toBe('z');
@@ -146,7 +162,7 @@ test('THE ALONG-THE-ROTARY CHOICE EXISTS ONLY WHERE A ROTARY IS DECLARED', async
     });
     await openStock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(400);
+    await page.waitForFunction(() => document.getElementById('se_round_fields').style.display !== 'none');
     const r = await page.evaluate(() => ({
         row: !!(document.getElementById('se_rd_axis_row') || {}).offsetParent,
         opts: [...document.querySelectorAll('#se_rd_axis option')].map((o) => o.value),
@@ -160,10 +176,10 @@ test('SWITCHING BACK TO BOX RESTORES A BOX — both ways, with no round facts le
     await openStock(page);
     const before = await stock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => window.ddcsGetSettings().stock.shape === 'cylinder', null, { timeout: 3000 });
     expect((await stock(page)).shape).toBe('cylinder');
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="box"]').click());
-    await page.waitForTimeout(300);
+    await page.waitForFunction((want) => window.ddcsGetSettings().stock.shape === want, before.shape, { timeout: 3000 });
     const after = await stock(page);
     expect(after.shape, 'a box again').toBe(before.shape);
     expect([after.x, after.y, after.z], 'with the dimensions it had').toEqual([before.x, before.y, before.z]);
@@ -177,7 +193,9 @@ test('DONE WITH NOTHING CHANGED IS A VALID CONFIRM — the standing stock-modal 
     const before = await stock(page);
     await openStock(page);
     await page.evaluate(() => document.getElementById('se_done').click());
-    await page.waitForTimeout(400);
+    // se_done's handler removes .stock-editor-pop synchronously (closeAndReturn → closeStockEditor) — wait
+    // on the actual close rather than guessing how long it takes.
+    await page.waitForFunction(() => !document.querySelector('.stock-editor-pop'), null, { timeout: 3000 });
     const after = await stock(page);
     expect(after, 'the record is exactly what it was').toEqual(before);
     expect(await page.evaluate(() => !!document.querySelector('.stock-editor-pop')), 'and the modal closed').toBe(false);
@@ -187,7 +205,7 @@ test('THE SHAPE TRAVELS — a round blank survives the .ddcs round trip', async 
     await boot(page, 'mill');
     await openStock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(400);
+    await page.waitForFunction(() => window.ddcsGetSettings().stock.shape === 'cylinder', null, { timeout: 3000 });
     const r = await page.evaluate(async () => {
         const B = await import('/data/backup.js');
         const before = { ...window.ddcsGetSettings().stock };
@@ -212,12 +230,15 @@ test('THE ROUND BLANK RENDERS ROUND — a cylinder on the table, and the carve d
     await boot(page, 'mill');
     await openStock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => document.getElementById('se_round_fields').style.display !== 'none');
     await page.evaluate(() => { const d = document.getElementById('se_rd_dia'); d.value = '60'; d.dispatchEvent(new Event('input', { bubbles: true })); });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => window.ddcsGetSettings().stock.diameter === 60, null, { timeout: 3000 });
     await page.evaluate(() => document.getElementById('se_done').click());
     await page.click('#view-toggle');
-    await page.waitForTimeout(1400);
+    await page.waitForFunction(() => {
+        const v = window.__ddcsLastViz;
+        return !!(v && v.stockMesh && v.stockMesh.geometry);
+    }, null, { timeout: 5000 });
     const r = await page.evaluate(() => {
         const v = window.__ddcsLastViz;
         v.setCarve(true);   // …material removal ON, which is what a mill program turns on
@@ -240,7 +261,7 @@ test('A CYLINDER IS DIAMETER AND LENGTH ONLY — no W/D/H rows, in either worksp
         await openStock(page);
         if (kind === 'mill') {
             await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-            await page.waitForTimeout(300);
+            await page.waitForFunction(() => document.getElementById('se_round_fields').style.display !== 'none');
         }
         const r = await page.evaluate(() => {
             const shown = (id) => { const e = document.getElementById(id); return !!(e && e.offsetParent); };
@@ -261,8 +282,10 @@ test('AND THE DERIVED TRIO TRACKS THE Ø — x = y = diameter, z = the length', 
     await boot(page, 'mill');
     await openStock(page);
     await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
-    await page.waitForTimeout(300);
-    const set = async (id, v) => { await page.evaluate(({ i, val }) => { const e = document.getElementById(i); e.value = val; e.dispatchEvent(new Event('input', { bubbles: true })); }, { i: id, val: v }); await page.waitForTimeout(250); };
+    await page.waitForFunction(() => document.getElementById('se_round_fields').style.display !== 'none');
+    // commit() runs synchronously off the 'input' listener, so the field's own DOM value is already the
+    // post-commit state by the time dispatchEvent() returns — wait on that instead of a fixed delay.
+    const set = async (id, v) => { await page.evaluate(({ i, val }) => { const e = document.getElementById(i); e.value = val; e.dispatchEvent(new Event('input', { bubbles: true })); }, { i: id, val: v }); await page.waitForFunction(({ i, val }) => document.getElementById(i).value === String(val), { i: id, val: v }, { timeout: 3000 }); };
     await set('se_rd_dia', '52'); await set('se_rd_len', '18');
     let s = await stock(page);
     expect([s.x, s.y], 'the cross-section IS the diameter, both ways').toEqual([52, 52]);

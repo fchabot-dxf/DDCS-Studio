@@ -47,12 +47,19 @@ const boot = async (page, { historyRows = HISTORY_ROWS } = {}) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(() => window.showApp && window.showApp('gateway'));
-    await page.waitForTimeout(1500);   // the panel's own first poll
+    // the panel's own first poll: status.js's onPoll() only fills #gateway-app .role-identity once the mocked
+    // descriptor resolves — real condition instead of guessing the poll always lands inside 1500ms.
+    await page.waitForFunction(() => !!document.querySelector('#gateway-app .role-identity'), null, { timeout: 10000 });
     await page.evaluate(() => {
         const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Send');
         if (t) t.click();
     });
-    await page.waitForTimeout(900);
+    // sendView.mount() fires off this._pollJobs(ctx) WITHOUT awaiting it (activate() doesn't await mount either),
+    // so the table lands asynchronously — wait for the table (or the "no jobs" empty state) rather than guessing.
+    await page.waitForFunction(() => {
+        const root = document.querySelector('#gateway-app .gw-view');
+        return !!root && (!!root.querySelector('table') || /no jobs sent yet/i.test(root.textContent));
+    }, null, { timeout: 10000 });
 };
 
 test('a human reaching History sees the finished jobs and a live Export CSV control', async ({ page }) => {

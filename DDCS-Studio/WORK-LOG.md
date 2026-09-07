@@ -79622,3 +79622,126 @@ All 13 named guard files (12 move-candidates + 1 already-known-skip) + all 21 st
 in full or (for the 2 already-known-UI stragglers) recalled from a specific, named prior-batch finding rather
 than assumed. Nothing outside scope touched. `register.mjs`/`harness.mjs` untouched. Process tree clean.
 
+## t2711 — PHASE 2, DE-SLEEP BATCH 1: the gateway 40s jackpot (reverted, documented) + 16 named ≥1s offenders
+
+First turn of Phase 2 (the node-tier migration is done; this optimizes what STAYS browser-tier). These tests
+are NOT moved anywhere — they stay in `tests/`, same Playwright browser tier, just faster/more-reliable.
+
+### ⭐ THE JACKPOT — `gateway-quiet-offline-1307.spec.js` (40s of fixed sleep) — investigated, NOT converted
+
+Read the spec AND `web/ui/gatewayStatus.js` (the code it drives) before touching anything, per the dispatch's
+own instruction. Confirmed: this is a REAL enforced exponential-backoff timer (`FAST=5000, MAX=30000`, both
+hardcoded module constants, doubling, no test injection point) — the wall-clock delay between polls IS the
+thing under test, not padding around a state reached quickly.
+
+**Attempted Playwright's Clock API** (`page.clock.install()` + `page.clock.runFor(N)`) to fast-forward the
+fake timers instead of eating real wall-clock time — this looked like the right tool (designed exactly for
+"test a debounce/backoff without the real wait") and made the suite fast (13s vs 40s+). But instrumented
+verification (a throwaway debug spec dumping the actual `hits` timestamps) showed the "gaps" it produced were
+garbage — a few hundred ms apart instead of the real 5000/10000ms — even though the test's own assertions
+still evaluated in a way that looked superficially plausible. Root cause: a documented class of incompatibility
+between Sinon-style fake timers and real async I/O (`fetch`/Promise chains inside a `setTimeout` callback) —
+the virtual clock doesn't reliably block for a pending async timer-callback's own promise before advancing
+past the next tick boundary, so the app's REAL `run()`→`tick()`→`await client.descriptor()`→`schedule()`
+sequence doesn't reproduce faithfully under `runFor`.
+
+**Reverted cleanly** (`git checkout --` back to the original real-`waitForTimeout` form, confirmed zero diff).
+**REPORTED per the dispatch's own framework** ("mock/shorten the timer or leave it, and REPORT which it is"):
+this is case 2 (a real enforced timeout the test genuinely waits out), the mock attempt is a genuine dead end
+for THIS specific class of test (any test whose assertion depends on the precise TIMING of multiple sequential
+async-await chains inside real timers), and the sleep should stay exactly as it is. **This finding is itself
+the deliverable** — worth recording so a future turn doesn't re-attempt the same mock and re-discover the same
+failure mode.
+
+### The 16 named ≥1s offenders — 4 parallel agents, ~116s aggregate reclaim across 15 files
+
+Every agent was briefed on the jackpot's own lesson before starting (verbatim): if a sleep is genuinely waiting
+out a real timer/animation duration with no DOM-observable proxy, LEAVE it and say so — never guess a shorter
+number, never fake-clock it. Every agent ran each de-slept spec 2-3x individually to prove no new flake before
+reporting. I then ran ALL 15 touched files together, TWICE, as a final combined gate: **78 tests, 76
+passed + 2 skipped (a pre-existing self-skip, `reachable:true` with no real local gateway in this environment
+— unrelated to this batch), 0 failed, 0 flaky, both runs** (48s and 52s combined wall-clock for all 15 files
+in parallel).
+
+**Group A (gateway, ~35s reclaimed):**
+- `watermark-timing-2188` — both 2500ms sleeps were padding `fileSaveState.js`'s `settleThenMark()` poll loop;
+  replaced with polling the actual `localStorage` write it produces. One 3rd occurrence (post-reload,
+  line ~99) LEFT AS-IS — no DOM-observable condition distinct from the test's own assertion exists there
+  without risking a false-positive mask.
+- `gateway-position-stub-2073` / `gateway-job-tracking-2647` — both pairs replaced with `waitForSelector`
+  (tab strip) + `page.waitForResponse('**/api/position'` or `tracking')` armed before the tab click.
+- `gateway-state-contract-1327` (3 occurrences) — replaced with `waitForSelector('.role-identity')` (after a
+  **caught flake**: the first attempt used `.dot`, which `status.js` deliberately omits for a client with no
+  local daemon — BACKLOG #83 — so every `reachable:false` test hung; switched to `.role-identity`, which
+  `onPoll()` always writes) + a label-specific completion marker per gateway subtab + a state-poll for the
+  PHANTOM test (safe pattern: the assertion is about the RESULTING state, not the poll's own timing, so
+  polling for it can only resolve at-or-after the real tick, never early).
+
+**Group B (gateway/io/stock, ~20s reclaimed):**
+- `gateway-jobs-history-view-2026` — both occurrences replaced with real completion markers
+  (`.role-identity`, then the Send table/empty-state landing).
+- `io-sim` — 1 of 4 occurrences de-slept (the pulse-release poll, a real `setTimeout(…,400)` in
+  `GcodeExecutionEngine._touchPulse`, replaced with polling `window.__io` for the release). The other 3 LEFT
+  AS-IS — each is a NEGATIVE assertion (proving a timer does NOT fire within N ms), where the wait duration
+  itself is the claim, same shape as the jackpot.
+- `io-sim-expert` — its one sleep is the identical negative-assertion shape; LEFT AS-IS entirely, zero diff.
+- `stock-shape-1313` (16 occurrences) — ALL de-slept; `stockEditor.js`'s `commit()` runs synchronously off
+  every input/click listener (no debounce), so every wait was replaceable with a direct state/DOM poll,
+  including the 2 view-toggle waits (real async WebGL mesh construction — polls for the mesh existing instead
+  of guessing 1400ms).
+
+**Group C (canvas/lathe, ~31.5s reclaimed):**
+- `canvas-handle-writable-1804` — de-slept the real ones (file-load landing, a drag's field write), removed 2
+  fully redundant ones (already covered by another poll or an unreachable toast path), left 2 alone (a shared
+  toast-timing idiom used identically across 6+ other files, and an absence-check with no positive signal to
+  poll).
+- `client-send-2080` — 2 of 3 de-slept (tab bar, Send-button text/state — traced `send.js`'s `applyState` and
+  confirmed those fields don't depend on the async heartbeat); the 3rd (a real `setInterval(poll,1500)` in
+  `gatewayPanel.js`, no test hook) LEFT AS-IS, same shape as the jackpot.
+- `lathe-feel-1321` — ⭐ the agent caught its OWN mistake mid-task: an initial JS-only-condition replacement
+  (`viz` object existing) passed the first pass but FAILED 2/3 repeat runs — traced to a real CSS
+  `transitionend` on `.viz3d-drawer` (0.22s slide-in) that the JS-ready check doesn't wait for, so `drag()`'s
+  own `getBoundingClientRect()` sometimes read the drawer's IN-TRANSIT position. Fixed with a `transitionend`
+  listener + a 500ms safety-timeout fallback (never hang under e.g. reduced-motion). Re-verified 3x clean.
+  This is exactly the failure class the jackpot's own lesson warned about, caught the same turn, in CSS this
+  time instead of JS timers — the discipline held.
+- `lathe-visible-1281` — the 1800ms wasn't padding; it covers a genuinely `requestAnimationFrame`-deferred
+  step (`createPreviewPanel.js`'s own "end-state carve", explicitly commented as deferred so it never blocks
+  a drag/wizard-open). Replaced with a double-rAF flush — the correct REAL-condition replacement, not a
+  shortened guess.
+
+**Group D (lathe-blocks-bar/value/handle/freeze, ~29.6s reclaimed):**
+- `lathe-blocks-bar-1315` (3 occurrences, confirmed identical condition, not assumed) + `value-fidelity-1520`
+  + `handle-face-readable-2681` — all replaced with `waitForFunction(() => !!window.__blkws)`, the app's OWN
+  declared readiness signal (`blocksApp.js`'s own comment names this exact pattern).
+- `freeze-value-2425` — 1 of 2 occurrences de-slept (a flat 2000ms replaced with the app's own declared
+  preview-quiescence signal, `window.__ddcsEditPerf().pending`, precedented by `blocks-edit-lag-788.spec.js`);
+  the other (inside an existing 160-iteration adaptive stabilize loop) was already a real poll, not touched.
+  **Honest negative finding**: the fix is correct and safer (waits on the actual documented hazard instead of
+  a guessed number) but produced **no measurable net speedup** — a separate, untouched 160×200ms
+  block-count-stabilize loop dominates this file's runtime for a 16-row chained template, swamping the ~2-4s
+  the swap could have saved. Recorded as architectural correctness, not a timing win, rather than overclaiming.
+
+### Left unconverted (not `page.waitForTimeout`, out of THIS batch's literal scope, flagged as future candidates)
+
+Two `new Promise((res) => setTimeout(res, N))` sleeps inside `page.evaluate()` browser-context code
+(`handle-face-readable-2681.spec.js:45`, 300ms field-visibility settle; `freeze-value-2425.spec.js:203`, 50ms
+context-menu-appear wait) — same padding pattern, different call shape, not what the dispatch's own grep
+named. Both look convertible (a documented "2 animation frames" mechanism; a pollable `.op-ctx-menu` element)
+but left for a future de-sleep turn rather than expanding scope unilaterally.
+
+### Verify
+
+Every touched spec run 2-3x individually by its own agent (all green, zero flake) BEFORE reporting, plus my
+own final combined gate: all 15 touched files together, twice, 78 tests, 0 failed, 0 flaky both times. No
+full suite run (out of scope, browser-tier de-sleeping doesn't change what needs the full-suite gate). Watched
+for the port-3211 mem-server orphan; none found, though a CONCURRENT seat sharing this repo/port did cause
+real transient contention during verification (traced and confirmed NOT caused by any of this batch's own
+edits — the same symptom reproduced on an untouched baseline file).
+
+### Scope discipline
+
+Exactly the dispatch's named 16 files + the jackpot (17 total investigated, 15 modified, 1 confirmed
+zero-diff, 1 reverted-and-documented). `verification/*.png` and the sharding config untouched (both
+explicitly out of scope). `tests/TIER-MIGRATION-PLAN.md` untouched. No node moves. No full suite run.
+

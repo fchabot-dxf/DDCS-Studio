@@ -21,12 +21,19 @@ const openSend = async (page, { signedIn }) => {
   if (signedIn) await page.evaluate(() => localStorage.setItem('ddcs_cloud_token', 'fake-token'));
   else await page.evaluate(() => localStorage.removeItem('ddcs_cloud_token'));
   await page.evaluate(() => window.showApp && window.showApp('gateway'));
-  await page.waitForTimeout(1200);
+  // de-sleep (Phase 2 browser-tier wait audit) — the real precondition for the click below is the tab bar existing (initGatewayPanel()
+  // builds it synchronously inside the showApp() promise this evaluate() already awaited); poll for it
+  // directly instead of a blind guess.
+  await page.waitForFunction(() => [...document.querySelectorAll('#gateway-app .settings-main-tab')].some((b) => b.textContent.trim() === 'Send'), null, { timeout: 5000 });
   await page.evaluate(() => {
     const t = [...document.querySelectorAll('#gateway-app .settings-main-tab')].find((b) => b.textContent.trim() === 'Send');
     if (t) t.click();
   });
-  await page.waitForTimeout(700);
+  // de-sleep (Phase 2 browser-tier wait audit) — the real precondition callers need is the Send view's own mount() having run (its
+  // applyState() call sets the button's final text synchronously — traced through send.js, it does not
+  // depend on the async heartbeat round-trip for text/title/disabled here); poll for the button existing
+  // with its expected text instead of guessing how long the mount takes.
+  await page.waitForFunction(() => [...document.querySelectorAll('#gateway-app button:not(.settings-main-tab)')].some((b) => /^Send( via Drive)?$/.test(b.textContent.trim())), null, { timeout: 5000 });
 };
 
 // the SEND CONTROL, not the tab of the same name

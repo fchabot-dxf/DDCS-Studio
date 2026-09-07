@@ -85,7 +85,9 @@ test('Probe: G31 contact pulses the probe input pin', async ({ page }) => {
   await page.locator(RUN).click();
 
   await expect(page.locator(STATUS)).toContainText('Execution complete', { timeout: 10000 });
-  await page.waitForTimeout(600);                       // let the release half of the pulse land
+  // The release half of the pulse is a REAL setTimeout(…, 400) in _touchPulse (GcodeExecutionEngine.js) — poll
+  // the recorded io_change list for the false entry instead of guessing a fixed delay past it.
+  await page.waitForFunction(() => window.__io.some((p) => p.pin === 'IN_3' && p.state === false), null, { timeout: 3000 });
   const pulses = await page.evaluate(() => window.__io);
   // IN3 = default 3D-probe pin → resolved name IN_3; pulsed ON at contact, then released
   expect(pulses.some((p) => p.pin === 'IN_3' && p.state === true)).toBe(true);

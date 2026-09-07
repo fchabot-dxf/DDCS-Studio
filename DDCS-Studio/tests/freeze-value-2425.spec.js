@@ -40,9 +40,15 @@ async function bootCustomize(page, opType = 'user_corner_data') {
     last = n;
     await page.waitForTimeout(200);
   }
-  await page.waitForTimeout(2000);   // settle: toolbox flyout, initial paint, live-form seeding, AND blocksApp's
-  // own deferred preview recompute (reproject()'s schedulePreview, ~RECOMPUTE_MS of quiescence) — a right-click
-  // opened just before that fires can have its own context menu wiped out by the resulting re-render.
+  // t2425 (de-sleep) — REAL conditions in place of the flat 2000ms "settle": `[data-param]` is the live form's
+  // own DOM-observable seeding signal (blocksApp.js itself queries this same selector to resolve a param row —
+  // see its t2397/t1748 comments), and `__ddcsEditPerf().pending` is the app's own declared signal for "no
+  // deferred preview recompute is in flight" (reproject()'s schedulePreview/RECOMPUTE_MS quiescence timer) —
+  // the SAME signal blocks-edit-lag-788.spec.js already polls this way. Both must be true before a right-click
+  // is safe: a context menu opened while the recompute is still pending can have its own DOM wiped out by the
+  // resulting re-render (see this file's header).
+  await page.waitForSelector('[data-param]', { timeout: 5000 });
+  await page.waitForFunction(() => window.__ddcsEditPerf && !window.__ddcsEditPerf().pending, null, { timeout: 5000 });
 }
 
 // t2631 — corner now declares `field_ref` rows (group_box), not `param_field` — the same FROZEN_MARKER_TYPES

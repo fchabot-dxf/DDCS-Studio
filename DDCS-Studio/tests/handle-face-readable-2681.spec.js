@@ -19,7 +19,11 @@ const inBlocks = async (page) => {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForTimeout(2200);
+    // t2681 (de-sleep) — __blkws is the app's OWN declared readiness signal for the Blocks tab (blocksApp.js's
+    // own comment on the showApp('blocks') rethrow: "a caller polling for the app's own readiness signal
+    // (window.__blkws)"). showApp('blocks') already awaits showBlocks()→buildWorkspace(), which sets __blkws as
+    // the LAST synchronous step, so this resolves as soon as the workspace is real — never later than 2200ms.
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 20000 });
 };
 
 test('rect_handle: hidden fields (sx/sy, clamps, cornerParam) round-trip byte-identical through a REAL Blockly workspace, regardless of visibility', async ({ page }) => {

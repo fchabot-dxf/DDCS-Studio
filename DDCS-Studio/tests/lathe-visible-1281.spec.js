@@ -193,7 +193,14 @@ test('A MILL WORKSPACE IS UNTOUCHED — the lathe scene is a declaration, not a 
 test('ONE BAR, ON THE AXIS — and the only other cylinder in the scene is the chuck', async ({ page }) => {
     await boot(page);
     await page.evaluate(() => window.openWiz('user_lathe_odturn'));
-    await page.waitForTimeout(1800);
+    // de-sleep (Phase 2 browser-tier wait audit) — openWiz()/update()/preview3D() are synchronous all the way to the scene existing (traced
+    // through wizardManager.js/userOpView.js/createPreviewPanel.js — no async gap there), but the lathe's own
+    // END-STATE CARVE (createPreviewPanel.js's scheduleEndStateCarve, ~line 320-340) is DELIBERATELY DEFERRED
+    // one requestAnimationFrame "so it never blocks setGcode/a drag/a wizard open" — and it is what rebuilds
+    // the bar's own mesh (a lathe "always carves its profile", the comment there says), which this test reads
+    // (v.stockMesh). A double-rAF flush is the real condition ("has the scheduled carve frame run"), not a
+    // guessed duration — resolves as soon as that one frame passes instead of always waiting 1800ms for it.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const r = await page.evaluate(() => {
         const v = window.__ddcsActiveViz;
         if (!v || !v.scene) return null;

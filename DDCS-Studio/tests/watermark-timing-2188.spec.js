@@ -35,7 +35,12 @@ import { test, expect } from '@playwright/test';
 async function ready(page) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
-    await page.waitForTimeout(2500);   // let the watermark-settle poll finish (fileSaveState.js)
+    // t2687 (de-sleep) — was a flat waitForTimeout(2500) guessing how long fileSaveState.js's settleThenMark()
+    // takes. The real condition is the watermark key landing in localStorage (settleThenMark's onSettled fires
+    // ensureWorkspaceWatermark()/markWorkspaceSavedToFile(), both of which write WATERMARK_KEY synchronously —
+    // data/backup.js). Poll that directly: it can only resolve once the real settle has happened, never before,
+    // so it can only be FASTER than the flat wait, never wrong. Margin covers settleThenMark's own 8s safety cap.
+    await page.waitForFunction(() => localStorage.getItem('ddcs_file_watermark') != null, null, { timeout: 9000 });
 }
 
 test('the settings key is persisted at boot, not lazily on first Settings interaction', async ({ page }) => {
@@ -75,7 +80,8 @@ test('CLEAN ON OPEN: a truly fresh browser, opening a workspace as its very firs
     try {
         await page.goto('http://localhost:3211');
         await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
-        await page.waitForTimeout(2500);
+        // same real condition as ready() above — see its comment.
+        await page.waitForFunction(() => localStorage.getItem('ddcs_file_watermark') != null, null, { timeout: 9000 });
 
         // build a "file" from the current (post-boot) state, then open it — the same restore + reload shape
         // ui/workspaceManager.js's own openWorkspaceObject uses, via its window.__ddcsNoReload-free real path.

@@ -16,7 +16,21 @@ const boot = async (page, machine) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate(async (m) => { const M = await import('/data/workspaceMachine.js'); M.setMachine(m, false); }, machine);
     await page.click('#view-toggle');
-    await page.waitForTimeout(1400);
+    // de-sleep (Phase 2 browser-tier wait audit) — the ORIGINAL 1400ms padded TWO real things: (a) the JS viz construction, which is fully
+    // synchronous (traced setGcodeView → ensureViz/GcodeViz3D ctor → _applyCamera — no async/rAF gap), and (b)
+    // the drawer's OWN CSS slide-in (.viz3d-drawer, styles.css — transform: translateX(105%) → 0, 0.22s ease).
+    // The JS state is ready almost instantly; the drawer's ON-SCREEN position is not stable until that CSS
+    // transition actually ends — which matters because drag() below reads getBoundingClientRect() to target the
+    // canvas (confirmed live: without waiting for transitionend, drag() intermittently missed the canvas while
+    // the drawer was still sliding in). Wait on both real conditions instead of guessing a duration.
+    await page.waitForFunction(() => window.__ddcsLastViz && window.__ddcsLastViz.camera && window.__ddcsLastViz.renderer, null, { timeout: 3000 });
+    await page.evaluate(() => new Promise((resolve) => {
+        const el = document.querySelector('.viz3d-drawer');
+        if (!el) return resolve();
+        const done = () => { el.removeEventListener('transitionend', done); resolve(); };
+        el.addEventListener('transitionend', done);
+        setTimeout(resolve, 500);   // safety net — never hang if the transition doesn't fire (e.g. reduced-motion)
+    }));
 };
 const cam = (page) => page.evaluate(() => {
     const v = window.__ddcsLastViz, c = v.camera;
@@ -26,9 +40,19 @@ const cam = (page) => page.evaluate(() => {
 });
 const drag = async (page, dx, dy) => {
     const b = await page.evaluate(() => { const r = window.__ddcsLastViz.renderer.domElement.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    // de-sleep (Phase 2 browser-tier wait audit) — theta/phi update SYNCHRONOUSLY inside the pointermove handler (gcodeViz3d.js's
+    // _bindControls onMove → this.theta/phi → _applyCamera() → render(), no rAF deferral), so the real
+    // condition is "did either change from its pre-drag value" — captured here instead of guessing a
+    // duration; any real drag (dx or dy nonzero) moves at least one of them.
+    const before = (dx || dy) ? await page.evaluate(() => ({ theta: window.__ddcsLastViz.theta, phi: window.__ddcsLastViz.phi })) : null;
     await page.mouse.move(b.x, b.y); await page.mouse.down();
     await page.mouse.move(b.x + dx, b.y + dy, { steps: 6 }); await page.mouse.up();
-    await page.waitForTimeout(250);
+    if (before) {
+        await page.waitForFunction((prev) => {
+            const v = window.__ddcsLastViz;
+            return v.theta !== prev.theta || v.phi !== prev.phi;
+        }, before, { timeout: 2000 });
+    }
 };
 
 test('ORBIT ON A LATHE — up never moves, and left-right walks AROUND the bar', async ({ page }) => {
@@ -157,12 +181,18 @@ test('THE STOCK IS SCOPED PER KIND — a mill gets its box back, and the bar sur
         window.ddcsGetSettings().stock = barStock({ diameter: 33, stickOut: 70, allowance: 2 }, window.ddcsGetSettings().stock);
         window.ddcsSaveSettings && window.ddcsSaveSettings();
     });
-    await page.waitForTimeout(300);
+    // de-sleep (Phase 2 browser-tier wait audit) — M.setMachine()/the bar assignment above are synchronous (traced through
+    // workspaceMachine.js's setMachine + latheScene.js's ddcs:machine-changed listener — no setTimeout
+    // anywhere in that chain), so poll the actual value instead of guessing how long it takes to land.
+    await page.waitForFunction(() => { const s = window.ddcsGetSettings().stock; return s && s.diameter === 33; }, null, { timeout: 3000 });
     // …back to the mill: the box returns, and the lathe furniture goes with the bar
     await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'mill' }, false); });
-    await page.waitForTimeout(600);
+    await page.waitForFunction((shape) => { const s = window.ddcsGetSettings().stock; return s && s.shape === shape; }, millBox.shape, { timeout: 3000 });
     await page.click('#view-toggle');
-    await page.waitForTimeout(1300);
+    await page.waitForFunction((shape) => {
+        const s = window.ddcsGetSettings().stock, v = window.__ddcsLastViz;
+        return !!(s && v && s.shape === shape && !v._latheChuck);
+    }, millBox.shape, { timeout: 3000 });
     const back = await page.evaluate(() => {
         const v = window.__ddcsLastViz, s = window.ddcsGetSettings().stock;
         return { shape: s.shape, x: s.x, y: s.y, z: s.z, chuck: !!v._latheChuck, tool: v._simTool && v._simTool.type };
@@ -173,7 +203,7 @@ test('THE STOCK IS SCOPED PER KIND — a mill gets its box back, and the bar sur
     expect(back.tool, 'nor a turning tool').not.toBe('turning');
     // …and NOTHING WAS DESTROYED: back on the lathe, the bar is exactly as it was left
     await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'lathe', chuck: 'axis' }, false); });
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => { const s = window.ddcsGetSettings().stock; return s && s.diameter === 33; }, null, { timeout: 3000 });
     const bar = await page.evaluate(() => ({ ...window.ddcsGetSettings().stock }));
     expect(bar.diameter, 'the declared bar came back untouched').toBe(33);
     expect(bar.z, 'stick-out and raw end included').toBe(72);
