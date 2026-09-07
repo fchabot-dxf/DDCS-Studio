@@ -19,6 +19,7 @@
     "test:node": "node --import ./tests/node/support/register.mjs --test \"tests/node/*.test.mjs\"",
     "test:smoke": "playwright test -c playwright.smoke.config.js",
     "test:changed": "playwright test --only-changed",
+    "test:merge-reports": "node scripts/merge-shards.cjs",
     "lint": "eslint web"
   },
   "keywords": [

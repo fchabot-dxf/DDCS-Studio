@@ -7,3 +7,8 @@ output/
 # Playwright test output (regenerated)
 test-results/
 verification/out/
+
+# t2713 (sharding plumbing) — per-shard blob reports + their merged html output, all regenerated
+blob-report/
+blob-report-collected/
+playwright-report/

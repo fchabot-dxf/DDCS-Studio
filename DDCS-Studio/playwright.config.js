@@ -21,7 +21,13 @@ export default defineConfig({
   // test-results/progress.{md,html,json} — run local+CI alike) but keeps its own console output CI-silent
   // (CI already has `dot`+`html`; doubling that up was never this entry's complaint). See the reporter's own
   // header for the full surface/stdout-shape reasoning.
-  reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : []), ['./tests/support/progressReporter.mjs'], ['json', { outputFile: 'test-results/summary.json' }]],
+  // t2713 (SHARDING PLUMBING batch 1) — `blob` ALONGSIDE progressReporter/json, never replacing either: each
+  // shard writes its own `blob-report/report-<N>.zip` (Playwright auto-suffixes the shard number onto the
+  // filename when `--shard=X/Y` is on the command line, so two shards on two machines never collide once their
+  // blobs land in the same merge directory). `npm run test:merge-reports` (scripts/merge-shards.cjs) turns a
+  // directory of these blobs back into one HTML report — see context/HANDOFF-TO-ASUS.md for the full per-shard
+  // command + merge workflow. Unconditional (local + CI), matching the json reporter's own precedent above.
+  reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : []), ['./tests/support/progressReporter.mjs'], ['json', { outputFile: 'test-results/summary.json' }], ['blob']],
   workers: 4,  // t2443 (2026-08-31) — RE-MEASURED, replacing t1593's own w6 pick: on THIS SAME i7-13700F (16c/24t/32GB), w6 now
                // comes back 46 FAILED (spanning totally unrelated domains — alignment drag physics, ATC rendering, Blocks find,
                // add-operation G-code identity — the signature of resource starvation, not a logic defect), reproduced IDENTICALLY

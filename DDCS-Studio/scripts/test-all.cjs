@@ -7,9 +7,23 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-function run(label, script, extraEnv) {
-    console.log(`\n=== ${label} (npm run ${script}) ===`);
-    const r = spawnSync('npm', ['run', script], { stdio: 'inherit', shell: true, env: extraEnv ? { ...process.env, ...extraEnv } : process.env });
+// t2713 (SHARDING PLUMBING batch 1) — `--shard=X/Y` on the command line forwards straight to the e2e tier's own
+// `playwright test --shard=X/Y` (see playwright.config.js's `blob` reporter, which auto-names its output per
+// shard when this flag is present). The node tier is NOT sharded (795 tests, ~5s total — sharding it would cost
+// more in per-invocation overhead than it could ever save) — it runs ONCE, only on shard 1, so shard 2+ is
+// e2e-only and never duplicates node's own coverage. A plain `npm test` (no `--shard` at all) parses to
+// shardNum=1 the same as `--shard=1/Y` would, so the no-arg path is byte-for-byte what it always was: node runs,
+// e2e gets no extra args, nothing about the default behavior changed by this turn.
+const shardArg = process.argv.find((a) => a.startsWith('--shard='));
+const shardNum = shardArg ? parseInt(shardArg.slice('--shard='.length).split('/')[0], 10) : 1;
+const runNode = shardNum === 1;
+
+function run(label, script, extraEnv, extraArgs) {
+    const argsLabel = extraArgs && extraArgs.length ? ' -- ' + extraArgs.join(' ') : '';
+    console.log(`\n=== ${label} (npm run ${script}${argsLabel}) ===`);
+    const args = ['run', script];
+    if (extraArgs && extraArgs.length) args.push('--', ...extraArgs);
+    const r = spawnSync('npm', args, { stdio: 'inherit', shell: true, env: extraEnv ? { ...process.env, ...extraEnv } : process.env });
     return r.status == null ? 1 : r.status;
 }
 
@@ -34,9 +48,14 @@ function writePhaseMarker(phase, text) {
     try { fs.writeFileSync(path.join(outDir, 'progress.html'), `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="2"><title>Suite progress</title><style>body{font:16px monospace;background:#0b0f14;color:#e6edf3;padding:16px;}</style></head><body><h2>${text}</h2><p>Heartbeat: ${now}</p></body></html>`); } catch (_) {}
 }
 
-writePhaseMarker('node', 'node tier running…');
-const nodeCode = run('test:node', 'test:node');
-writePhaseMarker('e2e-collecting', `node ✓ (exit ${nodeCode}) · e2e tier collecting tests…`);
+let nodeCode = 0;
+if (runNode) {
+    writePhaseMarker('node', 'node tier running…');
+    nodeCode = run('test:node', 'test:node');
+} else {
+    console.log(`\n=== test:node SKIPPED (${shardArg} — the node tier runs once, on shard 1 only) ===`);
+}
+writePhaseMarker('e2e-collecting', `node ${runNode ? '✓ (exit ' + nodeCode + ')' : 'skipped (not shard 1)'} · e2e tier collecting tests…`);
 // t2679 — DDCS_TIER declares "this e2e run is the e2e PORTION OF A FULL SUITE" to the child process, closing
 // the ambiguity progressReporter.mjs's own `tier` field otherwise carries: `npm_lifecycle_event` reads
 // 'test:e2e' identically whether a person ran `npm run test:e2e` standalone or test-all.cjs spawned it as half
@@ -44,7 +63,30 @@ writePhaseMarker('e2e-collecting', `node ✓ (exit ${nodeCode}) · e2e tier coll
 // the WHOLE thing is done; the full-suite's e2e portion finishing does not, the flaky-count summary below still
 // has to run). progressReporter.mjs prefers this env var when present, falling back to npm_lifecycle_event
 // unchanged for a standalone run (which never sets it).
-const e2eCode = run('test:e2e', 'test:e2e', { DDCS_TIER: 'full suite' });
+const e2eCode = run('test:e2e', 'test:e2e', { DDCS_TIER: 'full suite' }, shardArg ? [shardArg] : undefined);
+
+// t2713 — COLLECT THE BLOB OUT of Playwright's own working dir the instant this shard's run ends. Playwright's
+// blob reporter WIPES `blob-report/` at the START of every run (its own documented behavior, meant for a CI
+// job whose runner gets recycled between shards, each one uploading its own blob as an artifact right after) —
+// confirmed empirically this same turn: running shard 1 then shard 2 back to back left ONLY shard 2's zip in
+// `blob-report/`, shard 1's was gone. So on ONE machine running several shards sequentially (Ranchy's own
+// "3 of 5" split), the SECOND invocation would silently destroy the FIRST shard's blob before anyone could
+// merge it. Copying into a directory Playwright never touches (`blob-report-collected/`, a sibling, NOT a
+// subdirectory of `blob-report/`) is the local equivalent of a CI artifact upload — every shard this machine
+// has run accumulates there untouched by the next invocation's wipe. Only runs when `--shard` was actually
+// passed; an unsharded `npm test` never touches this at all (byte-for-byte the old behavior).
+if (shardArg) {
+    try {
+        const srcDir = path.join(__dirname, '..', 'blob-report');
+        const dstDir = path.join(__dirname, '..', 'blob-report-collected');
+        fs.mkdirSync(dstDir, { recursive: true });
+        const zips = fs.existsSync(srcDir) ? fs.readdirSync(srcDir).filter((f) => f.endsWith('.zip')) : [];
+        for (const f of zips) fs.copyFileSync(path.join(srcDir, f), path.join(dstDir, f));
+        console.log(`\n=== blob collected: ${zips.length ? zips.join(', ') : '(none written — did test:e2e run?)'} -> blob-report-collected/ ===`);
+    } catch (e) {
+        console.log(`\n=== blob collect FAILED: ${e.message} (blob-report/ contents are unaffected, but this shard's blob was NOT copied out — copy it manually before the next shard runs) ===`);
+    }
+}
 
 // t1724 — THE FLAKY COUNT IS THE HEALTH METRIC, read here rather than left in scrollback. A per-spec retries
 // list goes stale every run as the contention-starved population shifts (measured at t1719: the next run's
@@ -58,6 +100,6 @@ try {
     flakySummary = `expected ${stats.expected}, flaky ${stats.flaky}, unexpected ${stats.unexpected}, skipped ${stats.skipped}`;
 } catch (e) { flakySummary += ` (${e.message})`; }
 
-console.log(`\n=== SUMMARY: test:node exit ${nodeCode}, test:e2e exit ${e2eCode} ===`);
+console.log(`\n=== SUMMARY: test:node exit ${nodeCode}${runNode ? '' : ' (skipped)'}, test:e2e exit ${e2eCode}${shardArg ? ' (' + shardArg + ')' : ''} ===`);
 console.log(`=== FLAKY COUNT (the health metric): ${flakySummary} ===`);
 process.exit(nodeCode === 0 && e2eCode === 0 ? 0 : 1);

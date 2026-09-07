@@ -79745,3 +79745,95 @@ Exactly the dispatch's named 16 files + the jackpot (17 total investigated, 15 m
 zero-diff, 1 reverted-and-documented). `verification/*.png` and the sharding config untouched (both
 explicitly out of scope). `tests/TIER-MIGRATION-PLAN.md` untouched. No node moves. No full suite run.
 
+## t2713 — SHARDING PLUMBING batch 1: the repo-side `--shard` interface for the ASUS shard node
+
+Built the CORE interface the ASUS advisor's own runner will call — `test-all.cjs --shard` pass-through, a
+`blob` reporter alongside (not replacing) `progressReporter`, a merge script, and the finalized doc. Verified
+end-to-end at small scale (`--shard=1/20` + `--shard=2/20`), NOT a full sharded suite, per the dispatch's own
+light-verify instruction.
+
+### 1. `scripts/test-all.cjs` — `--shard=X/Y` pass-through
+
+Parses `--shard=X/Y` off `process.argv`; when present, forwards it straight through to `npm run test:e2e --
+--shard=X/Y`. The node tier (795 tests, ~5s — sharding it would cost more in per-invocation overhead than it
+could ever save) runs ONCE, gated on `shardNum === 1` — true for shard 1 of any split, AND true when `--shard`
+is omitted entirely (parses to the same `shardNum=1` default), so a plain `npm test` is byte-for-byte its old
+self: same node run, same e2e invocation with no extra args, same exit-code logic. `progressReporter.mjs` is
+untouched — the phase-marker text was extended to say "skipped (not shard 1)" when applicable, nothing about
+its own mechanism changed.
+
+### 2. `playwright.config.js` — `blob` reporter, added to the array, not swapped in
+
+`reporter: [...(CI ? [dot,html] : []), progressReporter, json, **blob**]` — pure addition, same pattern the
+`json` reporter already established (unconditional, local+CI alike).
+
+### ⭐ THE TRAP FOUND (and fixed) — Playwright wipes `blob-report/` on every invocation
+
+Confirmed empirically, not assumed: ran `--shard=1/20` then `--shard=2/20` back to back with the config as
+first written, and `blob-report/` held ONLY `report-02.zip` afterward — shard 1's blob was silently gone. This
+is Playwright's own documented behavior (each `playwright test` run clears its blob reporter's output
+directory at the start, on the assumption a CI job's runner gets recycled between shards and uploads its own
+blob as an artifact immediately after). That assumption doesn't hold for ONE machine running SEVERAL shards
+SEQUENTIALLY (Ranchy's own "3 of 5" split) — the second invocation would destroy the first shard's blob before
+anyone could merge it.
+
+**Fix**: `test-all.cjs` now copies the freshly-written blob OUT of `blob-report/` into a sibling directory,
+`blob-report-collected/`, the instant each shard's e2e run ends (only when `--shard` was actually passed — an
+unsharded run never touches this). `blob-report-collected/` is never Playwright's own output target, so it
+accumulates safely across as many sequential shard runs as one machine does — the local equivalent of a CI
+artifact upload, done inline instead of via a separate pipeline step.
+
+### 3. `scripts/merge-shards.cjs` — the merge script
+
+Wraps `npx playwright merge-reports <dir> --reporter=html`, defaulting `<dir>` to `blob-report-collected/`
+(not `blob-report/`, per the fix above). Fails LOUDLY with a clear message ("copy the other machine's blobs in
+first") if the directory is missing or has no `.zip` files, rather than surfacing Playwright's own more opaque
+error for what will be a common mistake once two machines are actually involved. Wired as `npm run
+test:merge-reports`.
+
+### 4. `context/HANDOFF-TO-ASUS.md` — the finalized interface, for the ASUS advisor to follow
+
+- "clone the branch" → **"clone/track `main`"** — confirmed `origin/main` and `origin/wizards-as-data-blocks`
+  are the IDENTICAL commit as of this turn (the merge already happened), so a fresh ASUS checkout should track
+  `main`, not the now-redundant feature branch.
+- Added §2a (the finalized repo-side interface: the exact per-shard command for both machines, the
+  Ranchy-1-3/ASUS-4-5-of-5 split per the measured 3:2 speed ratio, where each shard's blob actually lands
+  including the wipe-trap explanation above, and the exact merge command) and renumbered the pre-existing
+  runner-setup content to §2b ("what's still yours to build, box-local").
+- Refreshed §1 (STATE) and §5 (STILL OPEN) to reflect the ACTUAL current state accurately rather than leave
+  stale claims standing: the merge to `main` is done (was "owner's timing" in the prior draft), Phase 2
+  de-sleep batch 1 has landed, and the repo-side sharding plumbing itself is now DONE — the only open item is
+  the ASUS's own box-local runner setup (§2b), which was always its job per the settled division of labor.
+
+### Verify (light, per the dispatch's own instruction — NOT a full sharded suite)
+
+- Static check of the `shardArg`/`shardNum`/`runNode` parsing logic (no-arg, `--shard=1/5`, `--shard=3/5`,
+  `--shard=2/20`) — all four cases resolved exactly as designed.
+- `npx playwright test --shard=1/20 --list`: config loads cleanly with the new `blob` reporter added, shard
+  flag collects the expected ~1/20 slice (137 of ~2695) without error.
+- `node scripts/test-all.cjs --shard=1/20`: node tier ran (795/795 green), e2e ran shard 1 (137/137 green),
+  blob collected to `blob-report-collected/report-01.zip`.
+- `node scripts/test-all.cjs --shard=2/20`: node tier correctly SKIPPED ("not shard 1"), e2e ran shard 2 (122
+  passed + 2 flaky healed by retries + 9 skipped, 0 failed), blob collected to `report-02.zip` ALONGSIDE
+  shard 1's (not overwriting it — the fix above holds).
+  A concurrent seat (ASUS advisor, active on this same repo/port this whole turn) was the likely source of the
+  2 flaky retries — distinguished from a regression by checking they weren't the SAME tests that flaked on
+  shard 1 (0 flaky there) and by the port-3211 contention pattern matching last turn's own already-documented
+  concurrent-seat symptom, not anything this batch's own edits touched.
+- `npm run test:merge-reports`: merged both collected blobs into one HTML report, zero errors ("merging events
+  · processing test events · building final report · finished building report").
+- Confirmed the error path: pointed `merge-shards.cjs` at a nonexistent directory, got the clear failure
+  message + exit code 1, not a bare crash.
+- Cleaned up all local test artifacts (`blob-report/`, `blob-report-collected/`, `playwright-report/`) after
+  verifying; added all three to `.gitignore` (they weren't covered before — this turn is what first created
+  them) alongside the pre-existing `test-results/` entry.
+
+### Scope discipline
+
+Exactly the dispatch's named scope: `test-all.cjs`, `playwright.config.js` (reporter array only), the new
+merge script, `HANDOFF-TO-ASUS.md`, plus `.gitignore`/`package.json` as the necessary small companions to
+those (new output dirs need ignoring; the merge script needs an npm alias). `verification/*.png` and the
+sharding CONFIG ITSELF (the ASUS's own box-local setup, watchdog, Defender, etc.) untouched — both explicitly
+someone else's job per the dispatch and the settled division of labor. `tests/TIER-MIGRATION-PLAN.md`
+untouched. No full sharded suite run. Progress-multi-room explicitly NOT built (next batch, per the dispatch).
+

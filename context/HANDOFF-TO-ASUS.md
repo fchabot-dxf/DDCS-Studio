@@ -11,7 +11,7 @@ TUF with (1) the current state, and (2) the job: **make the ASUS an unattended P
 
 ---
 
-## 0. ⛔ GIT DISCIPLINE — two machines + a second agent, one repo, shared branch
+## 0. ⛔ GIT DISCIPLINE — two machines + a second agent, one repo, shared `main`
 - `git pull --rebase` before every commit; expect rejected pushes. ⛔ **Never force-push.** ⛔ **No `git stash`**
   (the stack is global/shared).
 - ⛔ **Do NOT delete `DDCS-Studio/tests/TIER-MIGRATION-PLAN.md`** — it's the tracked migration plan (a worker
@@ -19,49 +19,100 @@ TUF with (1) the current state, and (2) the job: **make the ASUS an unattended P
 - ⚠ **Don't leave an untracked file in the shared tree during a worker turn** — the worker sweeps strays.
   Working files → `scratchpad/`; to track one, commit it immediately in a clean window (worker idle).
 
-## 1. STATE — migration DONE and GREEN (context for the setup work)
-- Branch `wizards-as-data-blocks`, **cleanly ahead of `main`** (fast-forward-able, 0 divergence). 12 batches,
-  0 regressions. Latest: batch 12 `dfcb0c95`, plan `c36ca2fe`.
+## 1. STATE — migration DONE, MERGED to `main`, Phase 2 underway (context for the setup work)
+- **`wizards-as-data-blocks` is MERGED into `main`** — `origin/main` and `origin/wizards-as-data-blocks` are the
+  identical commit as of t2713. Everything below lives on `main`; clone/track that, not the feature branch.
+  12 migration batches, 0 regressions.
 - Node tier **236 → 795** tests (runs in ~5s); browser tier **3253 → 2695**. `npm test` → `scripts/test-all.cjs`
   runs BOTH tiers, so coverage is preserved by construction.
 - ⭐ **MILESTONE full suite GREEN**: 2655 passed, **0 failed**, 12 flaky (all healed by retries), 28 skipped.
-  e2e 38m27s, total 39m24s. **Merge gate CLEARED** — merge `wizards-as-data-blocks → main` whenever (no `.ver`
-  bump, test-only; `pull --rebase`, coordinate with the other seat).
-- ⚠ **Honest outcome**: the migration bought only **~5% of suite wall-time** (moved tests were the cheap ~0.7s
-  ones; the ~3.4s-avg expensive tests — 3D/canvas/drag/sleeps — all stayed). Its real win is the **~5s node
-  logic loop** + code health, NOT suite time. **The ~50% the owner wants is THIS sharding job**, not the moves.
+  e2e 38m27s, total 39m24s.
+- ⚠ **Honest outcome on the migration itself**: it bought only **~5% of suite wall-time** (moved tests were the
+  cheap ~0.7s ones; the ~3.4s-avg expensive tests — 3D/canvas/drag/sleeps — all stayed). Its real win is the
+  **~5s node logic loop** + code health, NOT suite time. **The ~50% the owner wants is THIS sharding job**, not
+  the moves.
+- **Phase 2 (in-place browser-tier speedups) is IN PROGRESS**, separate from sharding — see §3. De-sleep batch
+  1 landed (~116s reclaimed across 15 files); the 40s `gateway-quiet-offline-1307` "jackpot" was investigated
+  and left as-is on purpose (a real enforced backoff timer, not padding — see that file's own turn in
+  `DDCS-Studio/WORK-LOG.md`, t2711, for why a fake-clock mock was tried and reverted).
 
 ## 2. ⭐ THE JOB — make the ASUS an unattended shard node (this is where the ~50% is)
 Ranchy is **CPU-bound at 93% on 4 workers**. **RAM is NOT the bottleneck** (6 GB free mid-run) and **6 workers
 measured WORSE** (contention → flake). So more workers on one box is out — the lever is the **second machine (the ASUS)**.
 
-**Build:**
-1. **Playwright sharding**: `--shard=1/2` on Ranchy, `--shard=2/2` on the ASUS. Weight it if the ASUS is slower
-   (e.g. Ranchy 2/3 + ASUS 1/3). ⭐ Shards run INDEPENDENTLY — **zero inter-machine traffic during the run** — so
-   remote-over-RustDesk is fine; latency is irrelevant.
-2. **`test-all.cjs --shard` pass-through** — it runs the whole e2e tier today; add a shard arg it forwards to
-   playwright. Only the **browser** tier shards (node is ~5s — run it once, on Ranchy).
-3. **Merge**: add a **blob reporter** alongside `progressReporter` (⛔ don't override the reporter), collect both
-   shards' blobs, `npx playwright merge-reports`.
-4. **ASUS as an UNATTENDED runner** (the actual setup):
-   - Needs first: the repo cloned + `npm install` + Playwright browsers + the `mem-server` webServer (test-all
-     starts it).
-   - *Clean:* a **self-hosted GitHub Actions runner** (repo's on GitHub) — auto-picks-up, runs headless, uploads
-     artifacts, CI merges the shards.
-   - *Simple:* a scheduled/polling wrapper — `git pull` to Ranchy's exact commit, run its shard, upload the blob.
+**Division of labor (settled over Remote Control): ASUS owns box-local (runner, no-sleep, watchdog, Defender);
+Ranchy owns the repo plumbing.** The plumbing (§2a below) is DONE, landed on `main`, and verified — this is
+what you build the runner ON TOP OF, not something you also need to build.
+
+### 2a. ⭐ THE REPO-SIDE INTERFACE — DONE (t2713), this is what you call
+
+**Clone/track `main`** — not a feature branch. `wizards-as-data-blocks` was merged; everything (the whole
+test-tier migration + Phase 2 de-sleeping + this sharding plumbing) is on `main` now.
+
+**The exact command each shard runs** (measured 3:2 — Ranchy is 1.41× faster, so it takes the bigger slice):
+```
+# Ranchy — shards 1, 2, 3 of 5 (run sequentially, one after another; node tier runs on shard 1 only)
+node scripts/test-all.cjs --shard=1/5
+node scripts/test-all.cjs --shard=2/5
+node scripts/test-all.cjs --shard=3/5
+
+# ASUS — shards 4, 5 of 5 (run sequentially; node tier never runs here — shard 1 already covered it)
+node scripts/test-all.cjs --shard=4/5
+node scripts/test-all.cjs --shard=5/5
+```
+`--shard=X/Y` forwards straight to `playwright test --shard=X/Y` (Playwright's own native sharding — each shard
+gets its own disjoint slice of the ~2695 browser-tier tests). The node tier (795 tests, ~5s) is NOT sharded —
+`test-all.cjs` runs it once, only when the shard numerator is `1` (or when `--shard` is omitted entirely, which
+still behaves exactly like an unsharded `npm test` always has). **Zero inter-machine traffic during the run** —
+each machine's sequence above is fully independent; RustDesk latency is irrelevant.
+
+**Where each shard's blob lands**: `blob-report-collected/report-NN.zip`, ONE file per shard, accumulating
+across that machine's own sequential runs. ⚠ NOT the bare `blob-report/` directory — Playwright's own blob
+reporter WIPES `blob-report/` at the START of every invocation (confirmed empirically this turn: running shard
+1 then shard 2 back to back left only shard 2's zip in `blob-report/`), so `test-all.cjs` copies each shard's
+freshly-written blob OUT into `blob-report-collected/` (a sibling directory Playwright never touches) the
+instant that shard's own run ends. That is the directory to collect from this machine — both `blob-report/`
+and `blob-report-collected/` are gitignored (regenerated, never committed).
+
+**The merge**: after BOTH machines have run their sequence, copy the ASUS's 2 blobs
+(`blob-report-collected/report-04.zip`, `report-05.zip`) onto Ranchy (or vice versa — whichever machine does
+the merge) into the SAME `blob-report-collected/` directory as Ranchy's own 3, so all 5 sit together. Exact
+transfer mechanism (shared folder / scp / a CI artifact upload) is part of the runner setup below — your call.
+Then:
+```
+npm run test:merge-reports
+```
+(wraps `npx playwright merge-reports blob-report-collected --reporter=html`; a small validation script,
+`scripts/merge-shards.cjs`, fails loudly with a clear message if the directory is missing or has no `.zip`
+files, rather than letting a bare Playwright error stand in for "you forgot to copy the other machine's blobs
+in first"). Output lands in `playwright-report/` (gitignored), same as a normal `--reporter=html` run.
+
+⛔ **Same-commit discipline unchanged**: both machines MUST run the identical commit or the merged report is
+garbage — nothing above enforces this for you, it's still on whoever kicks off a run to `git pull --rebase`
+first on both sides.
+
+### 2b. What's still YOURS to build (box-local, ASUS)
+1. **ASUS as an UNATTENDED runner** — needs first: the repo cloned (tracking `main`, per above) + `npm install`
+   + Playwright browsers + the `mem-server` webServer (each `test-all.cjs` invocation starts its own; no
+   separate setup needed for it).
+   - *Clean:* a **self-hosted GitHub Actions runner** (repo's on GitHub) — auto-picks-up, runs headless,
+     uploads artifacts, CI merges the shards.
+   - *Simple:* a scheduled/polling wrapper — `git pull` to Ranchy's exact commit, run its own shard sequence
+     (§2a), upload the blobs.
    - ⛔ **POWER is the real gotcha**: disable sleep/hibernate, lid-close → "do nothing", keep it plugged in. A
      sleeping laptop = no runs.
-   - Add a **WATCHDOG** (kill + report a hung run) and a **CLEAN-START** (kill any stale `mem-server` on port 3211
-     BEFORE running — see Hazards). **Headless needs no display**; Playwright runs headless fine.
-5. ⛔ **Same-commit discipline**: both shards MUST run the identical commit or the merged report is garbage.
+   - Add a **WATCHDOG** (kill + report a hung run) and a **CLEAN-START** (kill any stale `mem-server` on port
+     3211 BEFORE running — see Hazards). **Headless needs no display**; Playwright runs headless fine.
 
-Expected: **~1.5–1.8×** (not a clean 2× — the ASUS is likely slower + coordination overhead) → ~39 min down to
-~22–26 min. The owner drives physical/RustDesk steps on the ASUS.
+Expected: **~1.7×** (Ranchy 3/5 + ASUS 2/5 of the measured 3:2 speed ratio — not a clean 2×, coordination
+overhead is real) → ~39 min down to **~23 min**. The owner drives physical/RustDesk steps on the ASUS.
 
 ## 3. PHASE 2 — in-place suite speedups (separate from sharding). Detail: `DDCS-Studio/tests/TIER-MIGRATION-PLAN.md`
-- ⭐ **DE-SLEEP** (~90–130s of fixed `waitForTimeout`): jackpot = **`gateway-quiet-offline-1307.spec.js` = 40s in
-  ONE file** (22000+7000+11000). Replace fixed sleeps with `waitForFunction`/state waits. Regenerate the list on
-  any machine: `grep -rn "waitForTimeout(" DDCS-Studio/tests`.
+- ⭐ **DE-SLEEP**: batch 1 DONE (t2711, ~116s reclaimed across 15 files). The 40s
+  `gateway-quiet-offline-1307.spec.js` jackpot (22000+7000+11000) was investigated and LEFT AS-IS — it's a real
+  enforced backoff timer, not padding (see `DDCS-Studio/WORK-LOG.md` t2711 for the fake-clock mock attempt and
+  why it was reverted). Remaining `waitForTimeout` offenders below ~1s, plus anything the earlier grep missed:
+  regenerate on any machine with `grep -rn "waitForTimeout(" DDCS-Studio/tests`.
 - **3D SCENE-GRAPH sweep** (more free node moves): many "3D" tests assert positions/matrices — Three.js math,
   **NO GL** — so they move to node free. Only true `readPixels`/screenshot 3D needs **headless-gl** (a later,
   measured spike — native dep + fidelity differs; prototype on ONE test first). **Check scene-graph FIRST.**
@@ -74,11 +125,15 @@ under-modeled how CHEAP the movable tests were and how much the expensive UI/3D/
 migration is a **dev-feedback + health** win; the ~50% lives in **sharding (hardware)** — the job above.
 
 ## 5. STILL OPEN
-- **Merge** `wizards-as-data-blocks → main` (green gate cleared; owner's timing).
+- ~~Merge `wizards-as-data-blocks → main`~~ — DONE (t2713, see §1).
+- ~~Repo-side `--shard` interface~~ — DONE (t2713, see §2a: `test-all.cjs --shard` pass-through, blob reporter,
+  `merge-shards.cjs`). **What's left is §2b — the ASUS's own box-local runner setup.**
 - Optional: a **definitive before/after** suite measurement (pre-migration run, ~40 min) to nail the exact
   migration % (estimate ~5%).
-- **Set up the ASUS shard node** (§2) — the headline job.
-- **Phase 2** batches (§3).
+- **Set up the ASUS shard node** (§2b) — the headline job, and the ONLY thing standing between here and the
+  ~1.7× wall-time win.
+- **Phase 2** batches (§3) — de-sleep batch 1 done, more `waitForTimeout` offenders + the 3D scene-graph sweep +
+  the PNG freebie all still open.
 - LATER spikes, prototype+measure first: **headless-gl** for true-pixel 3D; **jsdom** middle tier for the ~146
   DOM-logic tests still in the browser.
 
