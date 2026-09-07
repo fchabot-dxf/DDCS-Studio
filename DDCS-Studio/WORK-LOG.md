@@ -79048,3 +79048,103 @@ total precisely.
 and 22 deleted browser specs. Process tree clean (0 flagged) across all 4 background agents plus the main
 session's own work.
 
+## t2699 — TIER-MIGRATION BATCH 7: the CAM cluster — biggest yet, 32 files/107 tests moved via 4 parallel
+background agents, incl. a genuinely NEW class of node-tier boundary (engine behavior divergence)
+
+Dispatched as the biggest batch yet (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch7.md`, ~20
+whole-move + ~12 split + a UI remainder). Reused t2697's proven 4-parallel-background-agent approach (0
+regressions last time), each agent given the full mechanism writeup — now updated with the two standing gate
+questions from t2695/t2697 ("does it drive `io_change`?", "form-reproduction is NOT a skip signal by name")
+and all 4 known seeding patterns. Spot-checked the dispatch's own 17-file skip list myself in parallel.
+
+⛔ **Note on the file the advisor flagged**: `tests/TIER-MIGRATION-PLAN.md` (the advisor's own tracked plan,
+committed 791b38a2 after t2697 swept it as untracked) was explicitly named do-not-touch in this dispatch and
+in every agent's own instructions — confirmed untouched at close (`git status`/`git diff` on it both empty).
+
+### RESULT: 32 files touched, 107 tests moved, 0 regressions
+
+- **20 files moved whole** (65 tests): `cam-allocfields-superset` (1), `cam-arm-classify-1410` (6),
+  `cam-block-native-params-s2` (4), `cam-block-native-params-s3` (3), `cam-block-native-params-s4b-core` (1),
+  `cam-compose-framing` (4), `cam-expose-classify` (2), `cam-op-seed` (4), `cam-row-honesty-1414` (3),
+  `cam-scratch-alloc` (3), `cam-slot-guards-977` (1), `cam-slot-syntax-guards-2141` (4), `cam-stack-to-slot`
+  (1), `cam-substack` (3), `cam-toolpath-feed-expose` (2), `cam-universal-route` (3), `cam-universal-scratch`
+  (4), `slot-cam-bearing-domain-1510` (5), `slot-cam-pack-1512` (8), `slot-cam-pack-scout-1508` (3).
+- **12 files split** (42 moved, 19 stayed): `cam-slot-sim` (⭐ the big one — 11 moved, 6 stayed, 3 MORE stay
+  cases than the dispatch's own ~14/~3 guess — see below), `cam-enum-params-1323` (6/1, matched the dispatch
+  exactly), `cam-block-native-params-s53` (4/1), `cam-drill-single-pattern` (4/1), `cam-block-native-params`
+  [s1] (2/1), `cam-block-native-params-s4b` (3/1), `cam-block-native-params-s5` (2/1),
+  `cam-block-native-params-s52` (2/1), `cam-scratch-guard` (2/1), `cam-substack-fork` (2/1), `cam-substack-s5`
+  (2/1), `cam-substack-save-fork` (2/3).
+- **17 files confirmed genuinely UI/event-coupled, left untouched** — the dispatch's own skip list, spot-checked
+  by me in parallel with the agents (not delegated). Two worth naming: `cam-slot-roundtrip-s43` had ZERO grep
+  hits for the usual DOM/click/screenshot signals (the same red flag that caught `homing-play-complete`'s
+  misclassification in t2695) — but reading it found the dependency is TRANSITIVE, not textual: the test calls
+  `initMacrosApp()` (from `/ui/macrosApp.js`), which registers `window.addEventListener('ddcs:userops-changed',
+  ...)` internally, and `updateUserOp()` fires that event via `window.dispatchEvent` — confirmed by grepping
+  both source files directly. Same `io_change`-class trap, different event name, invisible to a test-file-only
+  grep. Correctly on the skip list; no misclassification this time. `cam-substack-edit-blocks-s44` read in
+  full and confirmed 100% real Blockly-workspace + modal DOM, also correctly skipped.
+
+### THE BIG SPLIT — `cam-slot-sim`, and a genuinely NEW class of node-tier finding
+
+Three tests LOOKED pure on reading (plain `page.evaluate`, no DOM/canvas/click) and were shape-gated as MOVE
+— "corner probe slot", "edge probe slot", "boss-centre slot" — but FAILED when actually run under the node
+harness: the first probe segment toward the machine's home-side edge came back zero-length. Root-caused to
+`GcodeExecutionEngine`'s own "no stock → homing-seek envelope clamp" fallback behaving DIFFERENTLY under the
+node stub than under real Chromium — not a DOM/event issue at all, a genuine ENGINE BEHAVIOR divergence.
+Verified empirically before accepting the finding (the "run before trust" discipline, not just "the file
+mis-shape-gated"): ran the exact unmodified original spec in real Playwright with a name filter isolating
+just those 3 tests — all 3 passed there, confirming the divergence is real and specific to the node
+environment, not a flaky test. Moved to the drive split rather than patched. This is a NEW class of node-tier
+boundary beyond the two named in the dispatch (DOM/event) — worth adding to the standing gate-question list
+for future batches: **"does this test rely on engine fallback behavior that might read environment state
+differently (no-stock clamps, machine-envelope inference) — verify empirically, don't just trust a clean
+read."** The other 2 STAY cases matched expectation: "auto-icon renders a valid 360x180 BMP" needs a real
+`canvas.getContext('2d')` (the node stub's fake element has none), and "preview panel mounts"/"duplicate a
+legacy slot" need real DOM+clicks.
+
+### OTHER JUDGMENT CALLS AND FIXES WORTH RECORDING
+
+- **A new I/O-boundary pattern**: two files (`slot-cam-pack-1512`, `slot-cam-pack-scout-1508`) used
+  `fetch('/data/....js')` to read a module's own source TEXT for a regex/structural check — there is no page
+  origin for a relative `fetch()` to resolve against in node. Fixed with `fs.readFileSync` against the same
+  file on disk (reusing `webResolve.mjs`'s own root-mapping logic), identical bytes, identical regex. Not seen
+  in the prior 6 batches — flagging for future batches that hit `fetch('/...')` for source introspection
+  rather than app data.
+- **`defVOf(opType)` reads the PERSISTED store, not the live registry** — a subtler variant of the seeding-
+  pattern distinction found in 3 files (`cam-substack-fork`, `cam-substack-s5`, `cam-substack-save-fork`):
+  `wrapRecognizedForFork` stamps a rebuilt opunit's `defV` via `defVOf`, which reads
+  `readStore()`/localStorage — the SAME store only `createUserOp` populates — so a plain `registerUserOp` left
+  `defVOf` reading a stale/zero value even though `getUserDef` (which DOES read the live registry) worked
+  fine. First attempt failed non-vacuously (a real assertion mismatch, not a silent pass) — caught, then fixed
+  by seeding through `createUserOp` instead. Confirms `createUserOp` is sometimes needed even when a test
+  never calls `listUserOps()` directly — `defVOf` is a second, independent reason to reach for it.
+- **`cam-row-honesty-1414`'s `boot()` called `page.on('dialog', ...)`** — the node harness's `page.on` only
+  understands `'console'` and throws by design otherwise. Confirmed via reading that no test's own logic
+  touches dialogs (pure real-browser-boot boilerplate); dropped the call entirely rather than working around
+  it. Same file needed 6 built-in twins (pocket/surfacing/corner/edge/slot/drill) seeded via `registerUserOp`
+  in a shared `beforeEach` — traced against `web/app.js`'s own `SEED_BUILDERS` list to confirm all 6 were
+  genuinely referenced by the sweep, not guessed.
+- **`cam-arm-classify-1410`'s "UN-GUARDED TWINS" test sweeps the ENTIRE live registry** via `listUserOps()` —
+  needed 8 representative built-in twins seeded via `createUserOp` with existence checks (not just the one or
+  two a narrower test would need).
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite): restored all 32 deleted originals from git, ran them
+together in the browser (126 tests: the 107 that moved + the 19 that stayed) = **141.38s summed duration**.
+Isolated the staying set by running the 12 new split-off browser files directly (19 tests, exactly matching,
+dominated by `cam-slot-sim`'s own canvas/modal cost) = **65.56s**. So the 107 tests that actually moved =
+**75.82s browser vs 3.32s node — ~23x aggregate**, consistent with the 13-28x range across batches 3-6.
+
+### VERIFY (LIGHT MODEL — no full suite, per the standing amendment)
+
+`npm run test:node`: 563/563 (456 prior + 107 this batch, exactly).
+
+`npx playwright test --list`: **2926 tests — down from batch 6's 3033 by EXACTLY 107**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 32 new `tests/node/*.test.mjs` files, 12 new split-off browser specs,
+and 32 deleted browser specs. `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean
+(0 flagged) across all 4 background agents plus the main session's own work.
+
