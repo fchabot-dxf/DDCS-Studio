@@ -29,9 +29,10 @@ Ranchy `--shard=1/40` e2e showed 3 fails through `retries:2` (align-rotate-gui, 
 add-operation-1940). Re-run ISOLATED (1 worker, retries=0): **8/8 PASS, 19s.** Diff archaeology (ASUS): nothing
 since the migration merge touched those specs / `web/` / `tests/`. ⇒ Not broken — a threshold: the box crosses
 a contention limit under node-then-e2e at 4 workers, tipping borderline specs past even 2 retries; 1 worker
-stays under. A property of the CONFIG, not the tests, landing harder on the weaker box. ⚠ Flaky-watch entry
-pending the ASUS's **t3005** worker-count number — will note the ASUS measurement is at `a7ab5d74` not
-`1f46c9f9` (delta = progress-worker fixes, zero `tests/`, so comparable).
+stays under. A property of the CONFIG, not the tests, landing harder on the weaker box. ✅ t3005 landed and CONFIRMS
+it two-box: my 3 pass clean at 2/4/6 on the ASUS, but the ASUS's own w4 flaked 3 DIFFERENT specs — the
+load shape induces flake on both boxes; which specs tip is box-specific. Full record + Ranchy's own
+worker-count-may-be-stale flag: `VERIFICATION.md` § TWO-BOX CONFIRMATION (t3005). ASUS → `PW_WORKERS=2`.
 
 ### 3. THE PROGRESS WORKER — deployed (it never was) + two bugs fixed
 The multi-room worker (written+merged 76dca562) had **never been `wrangler deploy`'d** — the live worker was

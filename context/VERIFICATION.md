@@ -97,6 +97,32 @@ a dated comment recording the new measurement (`playwright.config.js`'s own comm
 log of every past measurement — extend it, don't replace it). If the failures do NOT collapse, stop and
 treat it as a real regression instead — bisect the day's own commits.
 
+### ⭐ TWO-BOX CONFIRMATION (t3005, 2026-09-07) — the flake is the LOAD SHAPE, not the specs
+
+Measured on the ASUS (Ryzen 7 4800H, half Ranchy's cores) under the exact `node scripts/test-all.cjs
+--shard=1/40` node-then-e2e shape:
+
+```
+workers   wall     flaky   unexpected      (each row = 70 tests)
+2         1m55s    0       0
+4 (dflt)  1m44s    3       0
+6         1m45s    5       0
+```
+
+Two things this settles. **(1)** Ranchy's 3 shard-1 flakes (`align-rotate-gui`, `alignment-canvas-refit-732`,
+`add-operation-1940`) are NOT defective specs — they pass single, no-retry, at 2/4/6 workers on the ASUS,
+checked individually. **(2)** The ASUS's own w4 run flaked too — three specs, DIFFERENT ones
+(`alignment-correction-840`, +more at w6). ⇒ **The node-then-e2e-at-N-workers shape induces contention flake
+on BOTH boxes; WHICH specs tip is box-specific. The lever is the load shape + worker count, never the specs.**
+Note it heals on retry when watched but is a false red in an unattended merged report — hence the ASUS runs
+`PW_WORKERS=2` (t3007): ~10% slower wall, bought for determinism in its unattended role. `PW_WORKERS` is the
+per-box mechanism; the committed default stays `4`.
+
+⚠ **Ranchy's own `4` (t2443, 2026-08-31) is now itself inherited.** This box has since added a pusher, the
+progress worker, and a second Claude seat to its baseline — the exact "load grew, re-measure" condition above.
+The shard-1 flakes are plausibly that. A re-measure against the CURRENT baseline is a non-urgent open item
+(`PW_WORKERS` here too if it earns it) — not yet done.
+
 ## ⚠ AND THE COST THAT IS NOT WALL-CLOCK
 
 The reporter also keeps the worker's captured stdout at **~2.8 KB instead of ~530 KB** (the old per-test
