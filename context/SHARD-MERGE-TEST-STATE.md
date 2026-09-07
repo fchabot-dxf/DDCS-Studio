@@ -13,6 +13,11 @@ advisor, worker idle) does not.
   ZERO `tests/` changes → identical test set + `--shard` slicing → the merge is VALID. Named to the ASUS already.
 
 ## ⭐ REMAINING STEP (do after restart)
+⭐ **The ASUS answered the run-or-skip question you left open: RUN it, reframed as the TRANSFER's first
+test, and have the owner do the manual move FIRST so it informs the mechanism choice. Full reasoning + a
+⛔ WORK-LOG append-only rule catch (do NOT rewrite t2713) in [`SHARD-COMMS.md`](SHARD-COMMS.md), newest
+section.**
+
 1. Get the ASUS's `report-02.zip` onto Ranchy — owner moves it via RustDesk into Ranchy's
    `DDCS-Studio/blob-report-collected/`, next to `report-01.zip` (both files must sit together).
 2. `cd DDCS-Studio; npm run test:merge-reports` → eyeball `playwright-report/`.
