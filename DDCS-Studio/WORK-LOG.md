@@ -80187,3 +80187,92 @@ No power setting changed (measurement only, per the amendment). No repo code cha
 one shard instrument. `context/` and `NEXT-SESSION.md` not touched. `blob-report-collected/report-02.zip` left
 alone — the run's own `report-03.zip` landed in the same directory as a normal side effect of `test-all.cjs`,
 not touched or committed. `git pull --rebase` before committing; stash stack unchanged (still empty).
+
+## t3005 (ASUS) — worker-count measured on THIS box: recommend PW_WORKERS=2 (flake ↑ with workers, wall-clock flat); Ranchy's 3-spec failure is CORROBORATED as load-specific, not inherently borderline
+
+**ASUS local turn 5.** Dispatch: `DDCS-Studio/scratchpad/DISPATCH-asus-t3005-worker-count.md`. `playwright.config.js`
+**not touched** — no committed config changed, per the dispatch's own instruction; everything below is a
+measurement plus a recommendation for `PW_WORKERS` on this box specifically.
+
+### Vehicle and method
+- **Baseline (must include the node tier, to reproduce Ranchy's exact load shape):** `node scripts/test-all.cjs
+  --shard=1/40` at the committed default (`workers: 4`). Log: `scratchpad/t3005-baseline-w4.log`.
+- **Worker-count variants:** `PW_WORKERS=N npx playwright test --shard=1/40` directly (bypassing
+  `test-all.cjs`) for N = 2 and 6 — the node tier is not sharded and not Playwright, so re-running it every
+  pass would waste minutes; going around the wrapper for the repeats was the way to skip it while keeping the
+  **same 70-test e2e slice** as the baseline (same shard numerator). Logs: `scratchpad/t3005-w2.log`,
+  `scratchpad/t3005-w6.log`. Confirmed `test-results/summary.json` is written unconditionally by
+  `playwright.config.js`'s own reporter list regardless of which wrapper invokes `playwright test`, so this
+  substitution doesn't lose the flaky-count evidence.
+- Port 3211 confirmed clear before starting. Runs executed strictly one at a time (never two Playwright suites
+  live at once, per `VERIFICATION.md` trap 2) — each command's own background task was allowed to finish before
+  the next was launched.
+- ⚠ **PW_WORKERS=8 was NOT run.** The dispatch made it conditional on the first three configs leaving the
+  picture ambiguous. They didn't — see the trend below, which is monotonic and consistent across all three
+  points collected. Naming this as a judgment call rather than silently skipping the box's own suggestion.
+
+### THE NUMBERS
+
+| workers | wall clock | expected | flaky | unexpected(fail) |
+|---|---|---|---|---|
+| 2 | 1m55s | 70 | **0** | 0 |
+| **4 (committed default)** | 1m44s | 67 | **3** | 0 |
+| 6 | 1m45s | 65 | **5** | 0 |
+
+Node tier (baseline run only, unsharded): 795 pass / 0 fail, 64.05s — unaffected by `PW_WORKERS`, included
+here only because the baseline run carried it.
+
+⭐ **The pattern is clean, not noisy: flaky count rises monotonically with worker count (0 → 3 → 5), while wall
+clock is essentially FLAT from 4 workers up (1m44s vs 1m45s) and only ~11s slower at 2 workers.** On an 8c/16t
+box that is 1.41× slower per core than the machine the default of 4 was measured on, adding parallelism past 2
+buys effectively nothing in throughput and pays for it entirely in flake.
+
+### ⇒ RECOMMENDATION: set `PW_WORKERS=2` on this box
+Not "keep 4" — the data says down, not up. Mechanism is the existing `PW_WORKERS` env var (shipped t2715);
+`playwright.config.js`'s committed default of 4 is untouched, since that default is Ranchy's own measured
+number for a different, larger machine and changing it is not this turn's call. Routing this recommendation to
+you rather than acting on it further — the dispatch reserved the actual `PW_WORKERS=2` decision/wiring for
+this box to the advisor.
+
+### ⭐ SEPARATE FINDING, as instructed — Ranchy's 3-spec failure is CORROBORATED as load-specific
+Ranchy's `--shard=1/40` regen hit deterministic failures (surviving `retries:2`) in exactly three specs:
+`align-rotate-gui`, `alignment-canvas-refit-732`, `add-operation-1940`. **On this box, at the identical
+shard/config, all three passed clean — single `passed` result, no retry — at EVERY worker count tested (2, 4,
+and 6).** Checked explicitly each time, not assumed from an aggregate pass count. Raw extraction:
+`scratchpad/t3005-w4-baseline-extracted.txt`, `scratchpad/t3005-summary-w6.json` (w2's summary carried no
+flaky entries to check, since its flaky count was 0 across the board).
+
+⇒ **This settles the open question the dispatch named: inherently-borderline-at-4-workers-on-any-box is
+RULED OUT.** The ASUS is the more resource-constrained machine of the two (half the cores, ~1.41× slower per
+core) and did not reproduce Ranchy's three failures at any tested worker count — including 6, which is *more*
+contention than Ranchy's own 4 on its bigger box. The failures are tied to something about Ranchy's own load
+conditions (the dispatch's own theory: 795 node tests immediately followed by a 4-worker e2e slice, on an
+already-busy box), not to the specs themselves or to worker-count-vs-cores in general.
+
+⚠ **This box has its OWN flaky trio instead, and it is NOT Ranchy's.** `alignment-correction-840.spec.js`
+(2 of its tests) flaked at **both** w4 and w6 — the only spec that repeated across configs. At w6, three
+further specs flaked once each that didn't appear at w4:
+`alignment-fresh-seat.spec.js`, `alignment-handle-visible-exit.spec.js`, `alignment-in-place.spec.js`. All
+retried clean on the second attempt (Playwright's own `retries:2` absorbed every one; none reached
+`unexpected`). Full identity lists are in `scratchpad/t3005-w4-baseline-extracted.txt` and the w6 summary.
+Not investigated further — out of this turn's scope, which was the worker-count number and Ranchy's specific
+three specs, not a general flake audit. Naming it rather than letting a "different box, different flake" fact
+disappear.
+
+### ⚠ One thing I should have done and didn't — named plainly, not smoothed over
+I didn't copy the w4 baseline's raw `test-results/summary.json` out before starting the w2 run, which
+overwrites it in place. By the time I went to preserve it, it was already gone. The specific numbers and spec
+identities above for w4 are a faithful transcription from the `python`/`py`-driven analysis I ran against that
+file **while it was still on disk**, captured to `scratchpad/t3005-w4-baseline-extracted.txt` immediately
+after — but the raw JSON itself for that one run is not recoverable. w2 and w6's raw summaries **were** saved
+(`scratchpad/t3005-summary-w2.json`, `scratchpad/t3005-summary-w6.json`). Lesson for next time: copy the
+summary out before launching the next variant, not after.
+
+### Scope discipline
+`playwright.config.js` not touched. No repo code changed. No full suite run (three ~2-minute instrument runs
+plus the one baseline node-tier pass, all named above — not a 39-minute full gate, and the dispatch is explicit
+that the runs themselves ARE the tier here). `context/`, `NEXT-SESSION.md` not touched.
+`blob-report-collected/report-02.zip` — confirmed untracked again as of `a7ab5d74` per the dispatch, left
+alone; this turn's own blob collection (`report-01.zip`, from the baseline's `test-all.cjs` run) landed
+alongside it as the normal, gitignored side effect. `git pull --rebase` before committing; stash stack
+unchanged.
