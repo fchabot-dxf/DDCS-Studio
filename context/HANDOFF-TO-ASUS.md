@@ -23,14 +23,18 @@ TUF with (1) the current state, and (2) the job: **make the ASUS an unattended P
 - **`wizards-as-data-blocks` is MERGED into `main`** — `origin/main` and `origin/wizards-as-data-blocks` are the
   identical commit as of t2713. Everything below lives on `main`; clone/track that, not the feature branch.
   12 migration batches, 0 regressions.
-- Node tier **236 → 795** tests (runs in ~5s); browser tier **3253 → 2695**. `npm test` → `scripts/test-all.cjs`
-  runs BOTH tiers, so coverage is preserved by construction.
+- Node tier **236 → 795** tests. ⚠ **CORRECTION (t2713) — the "~5s" figure quoted here was stale, and the
+  ASUS's own skepticism (§ below, "please re-time your own node tier") was right to flag it.** Re-measured on
+  Ranchy this same turn, 3 independent runs: **29.7s / 28.2s / 31.2s** — call it **~30s**, not 5s. It most
+  likely was ~5s once, back when the tier was closer to 236 tests; nobody updated the figure as 9 migration
+  batches tripled it. Browser tier **3253 → 2695**. `npm test` → `scripts/test-all.cjs` runs BOTH tiers, so
+  coverage is preserved by construction.
 - ⭐ **MILESTONE full suite GREEN**: 2655 passed, **0 failed**, 12 flaky (all healed by retries), 28 skipped.
   e2e 38m27s, total 39m24s.
 - ⚠ **Honest outcome on the migration itself**: it bought only **~5% of suite wall-time** (moved tests were the
   cheap ~0.7s ones; the ~3.4s-avg expensive tests — 3D/canvas/drag/sleeps — all stayed). Its real win is the
-  **~5s node logic loop** + code health, NOT suite time. **The ~50% the owner wants is THIS sharding job**, not
-  the moves.
+  **~30s node logic loop** (still a fraction of the ~39-min full suite) + code health, NOT suite time. **The
+  ~50% the owner wants is THIS sharding job**, not the moves.
 - **Phase 2 (in-place browser-tier speedups) is IN PROGRESS**, separate from sharding — see §3. De-sleep batch
   1 landed (~116s reclaimed across 15 files); the 40s `gateway-quiet-offline-1307` "jackpot" was investigated
   and left as-is on purpose (a real enforced backoff timer, not padding — see that file's own turn in
@@ -61,7 +65,8 @@ node scripts/test-all.cjs --shard=4/5
 node scripts/test-all.cjs --shard=5/5
 ```
 `--shard=X/Y` forwards straight to `playwright test --shard=X/Y` (Playwright's own native sharding — each shard
-gets its own disjoint slice of the ~2695 browser-tier tests). The node tier (795 tests, ~5s) is NOT sharded —
+gets its own disjoint slice of the ~2695 browser-tier tests). The node tier (795 tests, ~30s on Ranchy — see
+§1's correction) is NOT sharded —
 `test-all.cjs` runs it once, only when the shard numerator is `1` (or when `--shard` is omitted entirely, which
 still behaves exactly like an unsharded `npm test` always has). **Zero inter-machine traffic during the run** —
 each machine's sequence above is fully independent; RustDesk latency is irrelevant.
