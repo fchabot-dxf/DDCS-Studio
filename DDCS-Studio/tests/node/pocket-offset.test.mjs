@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Pocket WALL OFFSET (signed): the tool-centre region insets by (toolR − offset). +offset → bigger pocket (walls
 // out / cut oversize), −offset → smaller pocket (leave stock). 0 = exact typed size. region.w = typed − 2·(r−off).

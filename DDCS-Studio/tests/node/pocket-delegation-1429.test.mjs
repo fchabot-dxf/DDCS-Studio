@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1429 — THE DELEGATION: the rect pocket's clearing body IS the raster atom.

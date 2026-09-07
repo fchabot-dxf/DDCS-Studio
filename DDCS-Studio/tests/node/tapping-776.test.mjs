@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t776 — THE TAPPING WIZARD (floating-holder). The pitch-locked feed is DERIVED (F = RPM × pitch; imperial pitch =

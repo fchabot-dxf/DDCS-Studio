@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1431 — REST IS DIAGNOSED, NOT HALF-BUILT: the declared boundary, and the MEASUREMENT that keeps it honest.

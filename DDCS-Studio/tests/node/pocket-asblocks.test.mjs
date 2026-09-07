@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // The cutting wizards are REWRITTEN as block stacks — one implementation each (generate() emits its stack
 // through emitMapped, no converter). Verify each is deterministic (regenerate → byte-identical) and produces

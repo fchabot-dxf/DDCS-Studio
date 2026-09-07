@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1391 ACT 1 — POCKET'S TENANT MOVES OUT: the too-small fallback re-points through holecycle.

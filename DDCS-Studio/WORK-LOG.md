@@ -79148,3 +79148,80 @@ total precisely.
 and 32 deleted browser specs. `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean
 (0 flagged) across all 4 background agents plus the main session's own work.
 
+## t2701 — TIER-MIGRATION BATCH 8: milling remainder (pocket/contour/rest/tapping) — 13 files/88 tests
+moved via 2 parallel agents, plus a form-reproduction finding that overturns in the SKIP direction
+
+Dispatched as a medium batch (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch8.md`, ~15 move/uncertain
+candidates + 2 form-reproduction to read + 7 skip). Used 2 parallel background agents (proven pattern, 0
+regressions across batches 6-7) for the move/uncertain candidates, handled the 2 form-reproduction files and
+the skip-list spot-check myself in parallel.
+
+### RESULT: 13 files touched, 88 tests moved, 0 regressions
+
+- **10 files moved whole** (63 tests): `pocket-delegation-1429` (15), `pocket-wall-parametric-1433` (17),
+  `pocket-tenant-extraction-1391` (11), `pocket-e0-superset` (2), `pocket-offset` (1), `pocket-asblocks` (1),
+  `contour-ramp-chorded-1474` (4), `contour-op` (1), `rest-parametric-boundary-1431` (2), `tapping-776` (4).
+- **3 files split** (25 moved, 6 stayed): `pocket-rides-raster-1406` (26/1 — the one UI test drives
+  `window.openWiz/updateWiz/insertWiz/closeWiz` and reads the live block program), `pocket-depth` (1/3 — the
+  dispatch's own uncertain flag, confirmed correct: 3 of 4 tests instantiate `GcodeViz3D` against a real DOM
+  host and read Three.js buffer geometry or drive a real field+screenshot), `rest-machining-871` (3/2 — the 2
+  UI tests drive a real wizard form + canvas screenshot).
+- **2 files confirmed genuinely UI, left untouched**: `pocket-cavity-2d` (the dispatch's own uncertain flag,
+  confirmed correct — creates a real `<canvas>`, calls `createToolpath2d`, reads pixel data via
+  `ctx.getImageData`), `skim-blocks-roundtrip-1636` (depends on `window.Blockly`, the vendored UMD library
+  lazily loaded when the Blocks tab mounts — no node equivalent exists).
+- **7 skip-list files spot-checked, all confirmed genuinely UI** (`pocket-canvas`, `pocket-canvas-mount-2627`,
+  `pocket-in-place`, `contour-canvas`, `contour-canvas-mount-2621`, `contour-in-place`, `contour-wizard`) —
+  healthy non-zero hit counts across all 7 on the standard grep sweep; read `pocket-canvas.spec.js` in full as
+  a representative sample (real pointer drags on a real SVG canvas via `page.mouse.down/move/up`) to confirm
+  the pattern, not just trust the grep.
+
+### THE FORM-REPRODUCTION FINDING — this time it overturns in the SKIP direction
+
+Batch 6 established "form-reproduction is NOT a skip signal by name" after finding a mixed file where ONE test
+per case was purely declarative. This batch's two form-reproduction files
+(`pocket-form-reproduction-2301.spec.js`, `contour-form-reproduction-2375.spec.js`) use a DIFFERENT,
+SHARED test-generator — `tests/support/formReproduction.js`'s own `registerFormReproductionSuite(cfg)` — not
+per-file `test()` calls. Read the shared engine's own source (not just the two caller files) to settle this
+properly: it unconditionally registers exactly 3 tests per wizard, and ALL THREE build/query a real DOM tree
+(`document.createElement` + `renderUiTree`/`renderOpForm` + `querySelectorAll('[data-param]')`) — even the
+"declared order" test, which in batch 6's `atc-batch-form-reproduction-2383` shape was the PURE half of the
+split, here still constructs and queries a real DOM tree to read back field order. There is no purely-
+declarative variant in this engine's own 3-test shape. Confirmed by reasoning, not just running: register.mjs's
+`document.createElement` stub returns fake elements whose `querySelectorAll` always returns `[]`, so
+`r.fields`/`r.explicit` would come back empty regardless of what got appended, failing the very first
+assertion immediately. Left BOTH files completely untouched — the dispatch's own "likely MIXED... split them"
+guess, reasonable by analogy to batch 6, did not hold once the actual shared engine was read. Flag for future
+batches: "form-reproduction is not skip-by-name" cuts BOTH ways — read the actual test-generation mechanism a
+given family of form-reproduction files uses (per-file `test()` calls vs. a shared suite-generator), don't
+assume one file's shape generalizes to a same-named sibling.
+
+### OTHER NOTES
+
+No `io_change`/event-listener trap and no `GcodeExecutionEngine` environment-fallback divergence (the two
+newest standing gate questions) were hit anywhere in this batch — both agents confirmed explicitly that
+`traceToolpath`'s window-dependent branches (homing-seek clamp, probe/motor reads) are gated on G31/M98
+opcodes that pocket/contour/rest/tapping G-code never emits, so they never fired. `pocket-asblocks`'s own
+`page.goto` targeted a specific dev.html URL, which the harness's `page.goto()` ignores entirely (it always
+just imports `settingsPanel.js`) — safe, since the test body never depended on that specific URL's DOM,
+only on class-based `.generate()` calls.
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite): restored all 13 deleted originals from git, ran them
+together in the browser (94 tests: the 88 that moved + the 6 that stayed) = **89.50s summed duration**.
+Isolated the staying set by running the 3 new split-off browser files directly (6 tests, exactly matching)
+= **12.03s**. So the 88 tests that actually moved = **77.47s browser vs 2.67s node — ~29x aggregate**, the
+highest of the 8 batches so far, consistent with the general 13-29x range.
+
+### VERIFY (LIGHT MODEL — no full suite, per the standing amendment)
+
+`npm run test:node`: 651/651 (563 prior + 88 this batch, exactly).
+
+`npx playwright test --list`: **2838 tests — down from batch 7's 2926 by EXACTLY 88**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 13 new `tests/node/*.test.mjs` files, 3 new split-off browser specs,
+and 13 deleted browser specs. `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean
+(0 flagged).
+

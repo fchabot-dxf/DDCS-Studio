@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1433 — THE WALL FINISH GOES PARAMETRIC: the freeze, then the bridge, then the re-point.

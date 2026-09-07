@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Contour `side` (software cutter-comp): `on` = tool centre on the boundary (the pocket-wall finish, default —
 // pocket pre-insets its region so this is an inside finish); `outside`/`inside` = offset the toolpath by the tool
