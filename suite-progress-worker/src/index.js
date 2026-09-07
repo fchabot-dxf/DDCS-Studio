@@ -142,7 +142,7 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>elapsed</span><b id="elapsed">–</b></div>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
-  <div class="spec"><span>now running</span><div id="spec">–</div></div>
+  <div class="spec"><span id="speclabel">now running</span><div id="spec">–</div></div>
   <div class="agg" id="agg">
     <h2>All machines</h2>
     <div class="abar"><div class="afill" id="aggFill" style="width:0%"></div></div>
@@ -219,6 +219,9 @@ const PAGE = `<!doctype html>
     if (!hb) return;
     var ageMin = (Date.now() - hb) / 60000;
     var mm = Math.round(ageMin);
+    // "now running" is only honest while the run is genuinely live; a finished/dead/idle run shows its
+    // LAST spec, never a false "now running" (owner-reported: a finished 100% still said "now running").
+    g('speclabel').textContent = (status === 'running' && ageMin * 60 <= 120) ? 'now running' : 'last spec';
     g('age').textContent = ageMin < 1 ? (wsOpen ? 'live' : 'recent') : mm + ' min old';
     var b = g('banner');
     // ⚠ Impossible numbers outrank every other state: say the data is inconsistent
