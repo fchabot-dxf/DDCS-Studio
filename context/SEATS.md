@@ -7,7 +7,7 @@ Getting this wrong wastes a seat's evening — it has already happened in both d
 |---|---|---|---|
 | **Fairy** | `CNC-FAIRY` (Toughbook) | the studio | ⭐ **DDCS Expert / M350** — wired, motors, tools, a real table. Runs the **gateway**. SMB `\192.168.0.99`, Modbus on **COM6** (on-site only). |
 | **Ranchy** | `RENDERRANCHY` | **home** | ⭐ **bench DDCS V4.1 — MOTORLESS**, home LAN `10.0.0.50` over SMB. Mostly on 24/7. The main dev seat (~90% of dev). |
-| — | **ASUS TUF** | the studio | none. A laptop on the same WiFi, metres from Fairy. ⭐ **CONFIRMED 2026-09-07: a Claude seat DOES run on it** (`Fred-ASUS-TUF`) — the second shard node. Was recorded as "INFERRED: no Claude seat runs on it". |
+| — | **ASUS TUF** | the studio | none. A laptop on the same WiFi, metres from Fairy. ⭐ **CONFIRMED 2026-09-07: a Claude seat DOES run on it** (`Fred-ASUS-TUF`) — the second shard node, clone root `c:\Users\danse\APPS\ddcs-studio-project` (post-rename 2026-09-07, matches Ranchy). Was recorded as "INFERRED: no Claude seat runs on it". |
 
 ## ⭐ THE AUTHORITY SPLIT IS BY CONTROLLER, NOT BY "HAS HARDWARE"
 
@@ -40,6 +40,28 @@ sentence about what is safe to run.** Ask.
 
 ⇒ ⭐ **They can relay between seats in seconds.** Never say *"I'll wait for the other seat"* as though it were
 a session boundary. Name the blocker to them — that is the whole routing protocol, and it beats any document.
+
+## ⭐ TWO ADVISOR/WORKER LOOPS, ONE REPO — the coordination that keeps them from colliding
+
+As of **2026-09-07** there are **two independent advisor/worker pairs** on one shared repo: **Ranchy** (the home
+dev seat) and the **ASUS** (the studio shard node). Owner's ruling on who talks to whom:
+
+```
+advisor ⇄ advisor         the two advisors coordinate directly
+advisor → its OWN worker   each advisor drives only its own worker
+ASUS worker                reached by telling the ASUS ADVISOR — never message the other pair's worker directly
+```
+
+Three shared-file conventions, because both loops stage in one tree (see `RUNNING-THE-LOOP.md` §3, §12):
+- ⭐ **`WORK-LOG.md` t-numbers are partitioned** so the one append-only file never collides: **Ranchy owns the
+  continuing 2xxx line** (stays <3000); **the ASUS owns t3001+** (odd); each entry is **seat-tagged** —
+  `t2719 (Ranchy)` / `t3001 (ASUS)`. A seat's LOCAL handoff marker (turn N on its box) is separate from the log
+  number — the marker drives wait/pass, the t-number is only the shared archaeology label; do not sync them.
+- **`NEXT-SESSION.md` is Ranchy's** dispatch channel. The ASUS carries its dispatches in the `pass --note` or the
+  repo `scratchpad/` (§9), never in NEXT-SESSION — so a silent NEXT-SESSION is **not** "the ASUS has no plan."
+- **Messaging is one-way + ephemeral**: Ranchy→ASUS `SendMessage` works; the ASUS's durable reply path is
+  `context/SHARD-COMMS.md` (committed + pushed; Ranchy pulls). Refs die on restart — re-list before trusting one.
+  See `SENDMESSAGE-SETUP.md`.
 
 ## ⭐ THE VS CODE SETUP — both seats work inside it
 
