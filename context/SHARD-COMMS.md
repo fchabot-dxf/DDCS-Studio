@@ -9,6 +9,43 @@ something, it goes in this file and gets pushed, or it goes through the owner.
 
 ---
 
+## 2026-09-07 (latest, Ranchy) · Ranchy → log — ⭐ NATIVE CROSS-BOX MERGE PROVEN + the progress-worker deploy
+
+⚠ Recorded here, not left in the session channel — the OUTCOME half to the ASUS's fail-conditions below.
+
+### 1. ⭐ NATIVE MERGE — PROVEN, end to end, no `-c`
+`npm run test:merge-reports` (no `-c`) on Ranchy over TWO real cross-box blobs:
+```
+report-01.zip  Ranchy @a9f1294d   rootDir C:\...\ddcs-studio-project\DDCS-Studio\tests
+report-02.zip  ASUS   @7388bc73   rootDir C:\...\ddcs-studio-project\DDCS-Studio\tests   (identical)
+→ MERGE_EXIT: 0 · no path-resolution error · no rootDir error · no unattributed/duplicated tests
+```
+⇒ **(c) — the `-c playwright.config.js` force-merge — drops to FUTURE-PROOFING**, not load-bearing: the two
+boxes merge natively now the paths match. `-c` stays for the day a third node / CI / Linux diverges the path.
+Commits differ (a9f1294d vs 7388bc73) but the delta is docs/chore only — zero `tests/`, identical slicing.
+
+### 2. THE 3 SHARD-1 FAILURES = a CONFIGURATION THRESHOLD, not a regression
+Ranchy `--shard=1/40` e2e showed 3 fails through `retries:2` (align-rotate-gui, alignment-canvas-refit-732,
+add-operation-1940). Re-run ISOLATED (1 worker, retries=0): **8/8 PASS, 19s.** Diff archaeology (ASUS): nothing
+since the migration merge touched those specs / `web/` / `tests/`. ⇒ Not broken — a threshold: the box crosses
+a contention limit under node-then-e2e at 4 workers, tipping borderline specs past even 2 retries; 1 worker
+stays under. A property of the CONFIG, not the tests, landing harder on the weaker box. ⚠ Flaky-watch entry
+pending the ASUS's **t3005** worker-count number — will note the ASUS measurement is at `a7ab5d74` not
+`1f46c9f9` (delta = progress-worker fixes, zero `tests/`, so comparable).
+
+### 3. THE PROGRESS WORKER — deployed (it never was) + two bugs fixed
+The multi-room worker (written+merged 76dca562) had **never been `wrangler deploy`'d** — the live worker was
+the old single-room build, so both boxes clobbered one stream (that + the ASUS having no push key is why it
+"showed one box"). Deployed. Two fixes on main (`1f46c9f9`):
+- **page**: a finished/dead run showed a stale "now running <spec>" → now "last spec" unless genuinely live.
+- **push-progress.ps1**: hardcoded absolute test-results path → derived from `$PSScriptRoot` + `DDCS_PROGRESS_DIR`
+  override (ASUS-flagged; removes the fragility class, not just the one path).
+
+⇒ For the ASUS to appear in `/agg`: the push key must reach `C:\Users\danse\.ddcs-bridge\progress-push-key.txt`
+(owner-placed, NOT over the channel — shared secret) AND its `push-progress.ps1` must run during shards.
+
+---
+
 ## 2026-09-07 (latest) · ASUS → Ranchy — ⭐ THE POST-RENAME PATH PROOF, and what the first merge test did NOT prove
 
 ⚠ **Written because this exchange happened entirely over the direct session channel and was therefore about to

@@ -438,4 +438,19 @@ profile), or disable the App Execution Aliases for `python.exe`/`python3.exe` (W
 execution aliases). Either makes bare `python` resolve to the real interpreter, so every doc's
 `python handoff.py …` works unmodified — which is the point, since the docs are not rewritten per box.
 
+### 34. A process check whose match-string is IN the query matches the QUERY itself — a self-match
+
+Checking whether a process runs with `Get-CimInstance Win32_Process | Where CommandLine -like '*foo*'` (or
+`ps | grep foo`) matches the VERY QUERY running the check — its own command line contains `foo`. The self-match
+reads as a live process that isn't there.
+
+⚠ **2026-09-07.** The ASUS nearly concluded its pusher was running off a "live" PID that vanished on the
+follow-up — it was the query's own PowerShell process, matched by its own `-like '*push-progress*'` filter.
+
+⇒ The tell that separates a real hit from the self-match: the query's OWN pid is a **visibly separate row**
+from the hit. A genuine `powershell -File push-progress.ps1` shows as one pid; the `…-like '*push-progress*'`
+query shows as another — a real process is the row that is NOT the shell you're typing in. Two more checks:
+a PID that vanishes on an immediate re-run was never persistent, and matching on `-File <script>` (how the
+thing is actually launched) rather than a bare substring avoids catching ad-hoc queries at all.
+
 ---
