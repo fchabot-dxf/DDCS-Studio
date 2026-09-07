@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1579 — AN UNRESOLVABLE LOOP / STEP-DOWN BOUND EMITS THE AUTHOR'S TEXT INSTEAD OF GUESSING.

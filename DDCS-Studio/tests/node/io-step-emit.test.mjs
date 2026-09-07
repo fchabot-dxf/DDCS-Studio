@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * SETUP/IO increment 2 — the grouped I/O-step wizard E1: the emit CORE. ioStepStack emits the right G-code per MODE

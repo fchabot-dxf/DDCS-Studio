@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * O-WORD BALANCE on flow:'oword' posts (rs274/grbl) — t646 (polish item 5, from the t632 flag). The GOTO-skip idiom maps
@@ -7,7 +7,6 @@ import { test, expect } from '@playwright/test';
  * LinuxCNC/grblHAL parser rejects. emitMapped's balanceOwords drops the orphans. This asserts the emitted program is
  * o-word BALANCED (every endif closes an if, no stragglers), incl. the o-number COLLISION case the old Set logic mishandled.
  */
-test.use({ viewport: { width: 1000, height: 800 } });
 
 // balance check: walk the o-words as a stack; return {balanced, maxDepth, endBalance}. balanced ⟺ every endif closed an
 // open if of its number AND every if was closed.

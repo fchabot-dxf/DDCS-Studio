@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * Regression lock for custom-op root wrappers: `user_root` / `param_group` are STRUCTURAL containers

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * PROTOCOL VALIDATOR — the single guard that every op respects the format/parser contract. This is the safety

@@ -3,6 +3,11 @@ import { test, expect } from '@playwright/test';
 /**
  * t1408 — EVERY `N` IN A PROGRAM IS UNIQUE, AND THE PROOF IS THAT BOTH OPS RUN.
  *
+ * TIER MIGRATION (batch 12): the pure "THE DIRECT BODY IS UNMOVED" test moved to
+ * tests/node/flow-labels-unique-1408.test.mjs — see that file's own header for why. Every test below calls a
+ * real app-boot global (`window.openWiz`/`insertWiz`/`updateWiz`/`ddcsSerializeWithMarkers`/etc, published
+ * only by the real app.js boot sequence) and stays here.
+ *
  * ── THE DEFECT, MEASURED IN RELEASED CODE ─────────────────────────────────────────────────────────────────────────
  * `surfaceraster` wrote its flow labels as literals — 91/92 for the refusal, 13-18 / 21-22 / 31 / 41-42 / 51-52 for
  * the walks and descents. Safe for exactly one such body per program; a program can hold two. A DRILL op beside a
@@ -74,45 +79,6 @@ for (const cfg of PAIRS) {
         for (const o of r.per) expect(o.sec, `the ${o.t} op EXECUTES (a body skipped by a mis-bound GOTO reports 0)`).toBeGreaterThan(0);
     });
 }
-
-/**
- * THE DEFAULTS ARE THE LEGACY NUMBERS — so nothing that reads the body DIRECTLY moved.
- *
- * This is the half of the change that keeps the arc's bridges honest: `surfaceRasterLines(p)` carries no label params,
- * so it prints exactly the numbers it has printed since t1329. Only the EMITTED PROGRAM renumbers, which is what has
- * to happen for the numbers to be unique. Asserted so the two halves cannot drift into one.
- */
-test('THE DIRECT BODY IS UNMOVED — the legacy numbers are the declaration defaults', async ({ page }) => {
-    await boot(page);
-    const r = await page.evaluate(async () => {
-        const { surfaceRasterLines, surfaceRasterBlock } = await import('/wizards/ops/surfaceraster.js');
-        const S = { w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5 };
-        const body = surfaceRasterLines(S).join('\n');
-        const ring = surfaceRasterLines({ ...S, strategy: 'concentric' }).join('\n');
-        const ramp = surfaceRasterLines({ ...S, entry: 'ramp' }).join('\n');
-        const helix = surfaceRasterLines({ ...S, entry: 'helix' }).join('\n');
-        const skim = surfaceRasterLines({ ...S, zMode: 'skim' }).join('\n');
-        const inset = surfaceRasterLines({ ...S, inset: 3 }).join('\n');
-        return {
-            row: ['GOTO91', 'GOTO13', 'N13', 'GOTO14', 'N14', 'GOTO15', 'N15', 'GOTO16', 'N16', 'GOTO17', 'N17', 'GOTO18', 'N18'].every((w) => body.includes(w)),
-            ring: ['GOTO21', 'N21', 'GOTO22', 'N22'].every((w) => ring.includes(w)),
-            ramp: ['GOTO41', 'N41', 'GOTO42', 'N42'].every((w) => ramp.includes(w)),
-            helix: ['GOTO51', 'N51', 'GOTO52', 'N52'].every((w) => helix.includes(w)),
-            skim: ['GOTO93', 'N93', 'GOTO94', 'N94'].every((w) => skim.includes(w)),
-            inset: ['GOTO95', 'N95', 'GOTO96', 'N96'].every((w) => inset.includes(w)),
-            // and the DECLARATION only claims labels the body will really write
-            plungeParallel: surfaceRasterBlock.flowLabels({ strategy: 'parallel', entry: 'plunge' }),
-            rampConcentric: surfaceRasterBlock.flowLabels({ strategy: 'concentric', entry: 'ramp', inset: 3, confirmEvery: 2 }),
-        };
-    });
-    for (const k of ['row', 'ring', 'ramp', 'helix', 'skim', 'inset'])
-        expect(r[k], `the ${k} labels still print their legacy numbers on a direct call`).toBe(true);
-    // A LABEL IS CLAIMED ONLY WHEN THE BODY EMITS IT — holecycle's own rule, so the numbering stays tight and honest.
-    expect(r.plungeParallel, 'a plain parallel/plunge body claims its refusal + the six row labels, nothing else')
-        .toEqual(['errLabel', 'okLabel', 'rowStepLabel', 'rowCutLabel', 'rowNearLabel', 'rowEndLabel', 'rowFarLabel', 'rowStartLabel']);
-    expect(r.rampConcentric, 'a concentric ramp with an inset and a confirm cadence claims exactly those')
-        .toEqual(['errLabel', 'okLabel', 'insetErrLabel', 'insetOkLabel', 'ringStepLabel', 'ringCutLabel', 'confirmLabel', 'rampPlungeLabel', 'rampEndLabel']);
-});
 
 /**
  * MULTI-DIGIT LABELS ARE DEMONSTRATED, NOT ASSUMED. Three bodies push the counter past 99, and the question "does the

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * PREVIEW DIALECT PARITY (t634). The wizard PREVIEW (code panel + sim) emitted `emitMapped(stack).text` with NO dialect →
@@ -14,9 +14,16 @@ import { test, expect } from '@playwright/test';
  * proven byte-identical to cornerStack/edgeStack by fork-parity-1593) replace the deleted classes' generate() as "the
  * preview path" — this still verifies the real thing users see (the twin IS the preview now), it just no longer
  * exercises a separate class-based implementation (there isn't one to exercise anymore).
+ *
+ * TIER MIGRATION (batch 12 straggler sweep): split out of tests/preview-dialect-parity.spec.js — only THIS test is
+ * pure (no DOM); the sibling "REAL-SYMPTOM" test drives the real wizard preview panel DOM and stays in
+ * tests/preview-dialect-parity-drive.spec.js. GcodeExecutionEngine here is constructed WITH an explicit `stock`
+ * object, so it does not touch the no-stock env-fallback (gate trap 3).
+ *
+ * SEEDING (pattern 2): the browser original relies on `app.js`'s boot-time `seedDefaultPortedUserOps()` having
+ * already registered `user_corner_data`/`user_edge_data` before `builderOf(...)` resolves them. Node's
+ * `page.goto()` never runs that seed pass, so this file registers both defs explicitly first.
  */
-test.use({ viewport: { width: 1300, height: 950 } });
-
 const POSTS = ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500'];
 
 test('the twin builder folds per ACTIVE post (== the insert-path emit); v41 shows #1500 not #1925; Expert unchanged; sim plays each', async ({ page }) => {
@@ -30,6 +37,11 @@ test('the twin builder folds per ACTIVE post (== the insert-path emit); v41 show
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         const { GcodeExecutionEngine } = await import('/engine/index.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { cornerDataDef } = await import('/blocks/dataOps/cornerData.js');
+        const { edgeDataDef } = await import('/blocks/dataOps/edgeData.js');
+        registerUserOp(cornerDataDef());
+        registerUserOp(edgeDataDef());
         const cornerP = { corner: 'FL', probeDia: 6, safeZ: 5, overtravel: 3, feed: 100 };
         const edgeP = { edge: 'left', probeDia: 6, safeZ: 5, overtravel: 3, feed: 100 };
         const cornerBuild = builderOf('user_corner_data'), edgeBuild = builderOf('user_edge_data');
@@ -67,28 +79,4 @@ test('the twin builder folds per ACTIVE post (== the insert-path emit); v41 show
         expect(r[id].trace.drawable, `edge sim traces a drawable route @ ${id}`).toBe(true);
         expect(r[id].trace.probe, `edge sim fires the probes @ ${id}`).toBeGreaterThan(0);
     }
-});
-
-test('REAL-SYMPTOM: the edge wizard preview panel shows the V4.1 emit (no #1925), then Expert (with #1925)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.openWiz);
-
-    // V4.1 active → open the edge wizard → the preview code panel shows the V4.1 emit. t1730 — 'edge' opens the twin
-    // now (its coded view is retired); '#wiz_user'/'#wiz_user_code' are the shared twin panel/code element.
-    await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-v41'); });
-    await page.evaluate(() => window.openWiz('user_edge_data'));
-    await page.waitForSelector('#wiz_user_code', { timeout: 8000 });
-    await page.waitForFunction(() => (document.getElementById('wiz_user_code')?.textContent || '').length > 20, null, { timeout: 8000 });
-    const v41Panel = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
-    expect(v41Panel, 'the V4.1 edge preview panel has NO Expert #1925 register').not.toContain('#1925');
-    await page.screenshot({ path: 'scratchpad/preview-v41.png' });
-
-    // switch to Expert → the panel re-renders with the Expert emit (#1925 back)
-    await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-expert-m350'); });
-    await page.evaluate(() => window.updateWiz && window.updateWiz());
-    await page.waitForFunction(() => (document.getElementById('wiz_user_code')?.textContent || '').includes('#1925'), null, { timeout: 8000 });
-    const expertPanel = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
-    expect(expertPanel, 'the Expert edge preview panel uses #1925').toContain('#1925');
-    expect(expertPanel, 'the panel actually changed between posts').not.toBe(v41Panel);
-    await page.screenshot({ path: 'scratchpad/preview-expert.png' });
 });

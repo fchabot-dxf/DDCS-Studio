@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * Comm/MDI PORT E0 (t516) — the commStack SUPERSET gate (the alignment/rotaryClock E0 pattern). `commStack(P,{superset:true})`

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t2305 — LIVE DEFECT, owner-reported: inserting Drill emitted a header comment with a NESTED paren

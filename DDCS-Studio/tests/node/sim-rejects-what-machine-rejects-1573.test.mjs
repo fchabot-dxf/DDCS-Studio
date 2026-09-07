@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1573 — THE SIM MUST REJECT WHAT THE MACHINE REJECTS. Hardware-grounded, not invented.

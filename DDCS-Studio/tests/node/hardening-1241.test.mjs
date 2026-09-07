@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -9,8 +9,11 @@ import { fileURLToPath } from 'url';
  * The point of this file is that each fix here was a CLASS, not an incident: a setter that re-traced the route and
  * left the running engine behind, an anchor expression hand-copied instead of shared, a token declared and never read.
  * A test that only checked today's six sites would let the seventh in tomorrow, so these are TRIPWIRES on the shape.
+ *
+ * TIER MIGRATION (batch 12): this file now lives one directory deeper (tests/node/, not tests/), so the two
+ * relative paths below (the web/ root, and smoke.manifest.mjs) both go up ONE MORE level than the original.
  */
-const web = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'web');
+const web = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'web');
 const read = (p) => readFileSync(join(web, p), 'utf8');
 
 test('A TRIPWIRE — every panel setter that re-traces also reseeds a running engine', () => {
@@ -73,7 +76,7 @@ test('D15 — the declared showMagazine intent is actually applied', () => {
 });
 
 test('E — the two contract guards are in the smoke tier', async () => {
-    const { SMOKE_SPECS } = await import('./smoke.manifest.mjs');
+    const { SMOKE_SPECS } = await import('../smoke.manifest.mjs');
     expect(SMOKE_SPECS, 'the zero-boot-errors / new-file 404 tripwire').toContain('check-console.spec.js');
     expect(SMOKE_SPECS, 'the op-type → declared-intent contract').toContain('op-sim-context.spec.js');
 });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * Comm/MDI PORT 1b-ii — the user_comm_data TWIN emit == commStack byte-for-byte across the type sweep × HMI + non-HMI.

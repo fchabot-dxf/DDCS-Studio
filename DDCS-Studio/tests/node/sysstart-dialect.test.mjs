@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * SYSSTART PER-POST DIALECT (t646, polish item 1). The Macros → sysstart Generate/Push/Deploy build the boot macro with
@@ -6,8 +6,6 @@ import { test, expect } from '@playwright/test';
  * (getDialect) and REFUSES a homing sequence on a non-Expert post (unverified M98/param map). This asserts the boot macro on
  * V4.1 is the honest refusal (no Expert homing sequence) and Expert is unchanged byte-for-byte.
  */
-test.use({ viewport: { width: 1000, height: 800 } });
-
 const SETTINGS = {
     machine: { x: 300, y: 200, z: 120, softLimits: true },
     homing: { axes: {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1577 — A SET BLOCK PROPAGATES ITS FAILURE INSTEAD OF SUBSTITUTING 0.

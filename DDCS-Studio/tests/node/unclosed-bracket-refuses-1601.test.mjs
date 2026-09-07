@@ -1,4 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * t1601 — AN UNCLOSED BRACKET IS UNRESOLVABLE. The third member of the t1573 family (trailing tokens, the
@@ -18,7 +21,36 @@ import { test, expect } from '@playwright/test';
  *
  * ⚠ SYNTAX, NOT VALUE — the separation t1573 exists to protect. An unset #var still reads as `unsetValue`
  * (0 on the engine, null in the preview); only the GRAMMAR tightened.
+ *
+ * TIER MIGRATION (batch 12): the "ZERO goldens move" test below sweeps EVERY registered data twin via
+ * `U.listUserOps()`. The browser original relies on `app.js`'s boot-time `seedDefaultPortedUserOps()` having
+ * already run; node's `page.goto()` never runs it, so this file seeds the registry itself, reusing the same
+ * discovery+seed technique as `twin-form-completeness-1581.test.mjs` (batch 11) — `app.js` is not importable
+ * here (it calls `finishBoot()` at module scope), so the twin set is discovered from `blocks/dataOps/*Data.js`
+ * (every `/DataDef$/` export) rather than read off `app.js`'s own `SEED_BUILDERS`.
  */
+
+const ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+const WEB = path.join(ROOT, 'web');
+
+async function collectBuilders() {
+    const dir = path.join(WEB, 'blocks', 'dataOps');
+    const files = fs.readdirSync(dir).filter((f) => /Data\.js$/.test(f)).sort();
+    const builders = [];
+    for (const f of files) {
+        const mod = await import('/blocks/dataOps/' + f);
+        for (const key of Object.keys(mod).filter((k) => /DataDef$/.test(k))) builders.push(mod[key]);
+    }
+    return builders;
+}
+
+async function seedAllTwins(U, builders) {
+    const have = new Set(U.listUserOps().map((d) => d.opType));
+    for (const fn of builders) {
+        const def = fn();
+        if (!have.has(def.opType)) { U.createUserOp(def); have.add(def.opType); }
+    }
+}
 
 test('S6f: an unclosed bracket is unresolvable at every bracket site; closed forms are untouched', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -97,6 +129,8 @@ test('ZERO goldens move: every shipped twin\'s default emit still passes the tig
         const U = await import('/blocks/userOps.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+        const builders = await collectBuilders();
+        await seedAllTwins(U, builders);
         const rows = [];
         for (const s of U.listUserOps()) {
             let verdict;

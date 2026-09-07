@@ -79497,3 +79497,128 @@ shortcuts taken (unlike batch 10's skip-list, which leaned on names for the fina
 named blocks/authoring files touched. `register.mjs`/`harness.mjs` untouched. Process tree clean (all 4
 background agents' own processes exited on completion).
 
+## t2709 — TIER-MIGRATION BATCH 12 (FINAL NAMED CLUSTER): refuse/validation guards + a straggler-sweep
+
+The last named cluster, done solo (no parallel agents -- small, near-all-pure), plus a completeness sweep
+across the remaining browser tier per the dispatch's own instruction. **33 tests moved across 20 files** (17
+whole-moves, 3 splits). Node tier 762->795 (+33 exact). Browser `--list` 2728->2695 (+33 exact -- no
+manufactured-test exception this batch, unlike t2707).
+
+### Named cluster (12 files, 21 tests, all pure -- near-zero surprises)
+
+**Whole moves (11 files, 20 tests):** `protocol-validator`(1), `sysstart-dialect`(1), `oword-balance`(1),
+`hardening-1241`(8 -- see note below), `sim-rejects-what-machine-rejects-1573`(2),
+`set-value-propagates-failure-1577`(1), `bounds-refuse-not-guess-1579`(1), `if-conditions-refuse-1581`(1),
+`atan-comma-form-1583`(1), `unclosed-bracket-refuses-1601`(2), `comment-nesting-guard-2305`(1).
+
+**`hardening-1241`** — moving the file one directory deeper (`tests/`->`tests/node/`) broke two relative
+paths that were never previously exercised by any prior batch: the `web/` root computed via
+`join(fileURLToPath(...), '..', 'web')` needed a second `'..'`, and a plain relative `import('./smoke.
+manifest.mjs')` needed to become `'../smoke.manifest.mjs'`. Both fixed, both confirmed by running (8/8 green
+on first re-run after the fix). Worth flagging for any FUTURE file that resolves its own path via
+`import.meta.url` or a bare relative import -- neither is caught by grep, only by running.
+
+**`unclosed-bracket-refuses-1601`**'s 2nd test ("ZERO goldens move") sweeps the FULL registered-twin registry
+via `U.listUserOps()` -- needed the same discovery+seed technique batch 11's `twin-form-completeness-1581.
+test.mjs` already established (`app.js` not importable in node; twins discovered from `blocks/dataOps/
+*Data.js`'s own `/DataDef$/` exports, seeded via `createUserOp` with an existence check). Also confirmed
+`GcodeExecutionEngine.defaultSyntaxVerify` is a pure STATIC text-parser (no instance, no `traceToolpath`) --
+gate trap 3 does not apply to it, by design, not just by luck this run.
+
+**`flow-labels-unique-1408`** (SPLIT, 1 moved / 5 stayed) — the dispatch's own note on this file ("the audit
+notes a 'DIRECT BODY IS UNMOVED' test that stays") read, on actually reading every test body, the OPPOSITE
+way round from what the phrasing suggests: the 4 "EVERY OP RUNS" tests and "THE LABELS STAY INSIDE
+DEMONSTRATED FORM" all call real app-boot globals (`window.openWiz`/`insertWiz`/`updateWiz`/
+`ddcsSerializeWithMarkers`, none published by node's minimal stub) and stay; "THE DIRECT BODY IS UNMOVED" is
+the ONE test with zero DOM/window dependency (just `surfaceRasterLines`/`surfaceRasterBlock.flowLabels`) and
+is the one that moves. Flagging clearly since a name-only read of the dispatch note would have gotten this
+backwards.
+
+**Untouched (1 file, confirmed 100% UI):** `write-param-enum-guard-2557.spec.js` -- real app boot
+(`document.documentElement.dataset.ddcsReady`) + constructed-DOM query (gate trap 1).
+
+### Straggler-sweep (completeness check across the remaining browser tier)
+
+Grepped the movable-family globs (`*-data-emit`, `*-superset`, `*-twin`, `*-as-data`, `*-dialect`,
+`*-interpreter`, `*-backcompat`, `*-post-fold`, `*-scalar-parity`, `*-emit`) against every remaining
+`tests/*.spec.js`, excluding files this migration's own prior batches already created (the `-drive.spec.js`
+splits). Found 16 fresh candidate files + 2 already-known-UI ones (`alignment-fork2-twin-auto`,
+`homing-refusal-reaches-twin-1898`, both re-confirmed via memory of their own prior-batch findings, not
+re-read in full this turn).
+
+**Moved (8 files, 12 tests):**
+- `comm-e0-superset`(1), `comm-twin`(1), `io-step-twin`(1), `io-step-emit`(2), `user-root-transparent-emit`(1)
+  -- all pure, whole-file moves.
+- `middle-data-emit`(2, whole move) — a 1792-combo structural sweep + a 15-combo scalar sweep. RUN-BEFORE-
+  TRUST paid off differently here: it's genuinely pure (no DOM), so it converts and passes cleanly, but its
+  own TIMING tells a real story (see Verify below) -- this is NOT another `middle-superset`-class regression,
+  but it is the same CLASS of finding (a giant single-sweep compute test does not get the "many small tests"
+  speedup).
+- `preview-dialect-parity` (SPLIT, 1 moved / 1 stayed) -- the moved test needed **seeding pattern 2**
+  (`registerUserOp(cornerDataDef())`/`registerUserOp(edgeDataDef())` before `builderOf('user_corner_data'/
+  'user_edge_data')` resolves) — caught by running (first attempt: `TypeError: cornerBuild is not a
+  function`), fixed, re-ran green. The stayed test drives the real preview panel DOM.
+- `corner-data-sim-marker-emits` (SPLIT, 3 moved / 4 stayed) -- (A)/(D)/(E) are pure `opSimStarts`/emit
+  checks; (B) drives the real wizard DOM, (C)/(C2) render into a real `<canvas>` + `getImageData` (no 2D
+  canvas context exists in node), (F) drives the real Layout pane DOM.
+
+**Untouched, confirmed 100% UI (5 files):** `io-step-edge-dialect` (real wizard form + screenshot),
+`homing-preview-plays-real-emit` (real `.wiz-viz3d` panel + `page.waitForFunction` polling live sim state),
+`census-finding2-emits-teal-1684` (all 4 tests render into a real DOM container + `getComputedStyle`, which
+has no meaning without a real layout engine), `alignment-fork2-twin-auto` and
+`homing-refusal-reaches-twin-1898` (both already confirmed UI in prior batches -- batch 10's skip-list and
+batch 5 respectively).
+
+**REPORTED, NOT MOVED — 3 files, for the advisor's own mop-up decision:**
+1. **`middle-superset.spec.js`** — already deliberately excluded at t2687 (batch 1): a measured REGRESSION
+   (81.3s browser -> 133s node) for this specific 14336-combo SHARDED mega-sweep. Reappeared in this sweep's
+   own grep hit list (matches `*-superset`) but is NOT a new finding -- re-flagging only because the straggler
+   sweep's glob would otherwise silently re-surface it as if unassessed.
+2. **`slot-twin-repoint-1500.spec.js`** — a large (668-line, 13-test) mixed file. On reading: 7 tests are pure
+   (`THE TWIN == THE BUILDER` >500-combo sweep, `THE WIDTH-14 CASE`, `THE SWAP`, `THE PATTERN CLAUSE`, `THE
+   INVERSE IS EXACT`, `THE ARC RECORDS THE RE-POINT` [needs a `fetch('/data/opCamMap.js')`->
+   `fs.readFileSync` swap], `THE DERIVED SOCKETS ARE LIVE`); 5 tests are 100% real-app UI (`THE ROUND TRIP`
+   drives a real Blockly workspace, `THE RECONCILER` x2 drive `window.ddcsStudio.wizardManager`, `the payoff
+   shot` takes real screenshots, `THE DEFAULT RAMPING SLOT IS PARAMETRIC` drives the real form). Not converted
+   this turn: the pure sweep's own scale (>500 combos, `test.setTimeout(180000)` in the original) carries the
+   same performance-regression risk class `middle-superset` already proved out, and a careful split of a
+   13-test file deserved its own turn's budget rather than being squeezed into this one's remainder.
+3. **`comm-post-fold.spec.js`** — otherwise fully pure (1 test, `commStack`/`emitMapped`/dialect sweep,
+   already re-confirmed by `comm-e0-superset`/`comm-twin`'s own successful moves above), but opens with
+   `page.on('pageerror', (e) => errs.push(String(e)))` -- the node harness's own `page.on` only supports
+   `'console'` and explicitly THROWS on anything else, with the literal message "this spec is not a candidate
+   for the node tier". The `errs` check ("no pageerrors") has no real meaning outside a browser process (any
+   thrown error in node fails the test directly already), so converting would mean DROPPING that one
+   assertion -- a real semantic change, not inert scaffolding, so left as a named decision for the advisor
+   rather than made unilaterally.
+
+### Verify (LIGHT model)
+
+- `npm run test:node`: 795/795 green (762 + 33 moved = 795 exact).
+- `npx playwright test --list`: 2695 (2728 - 33 moved = 2695 exact -- no manufactured-test exception this
+  batch, every split's moved-count matched a real subtracted browser test 1:1).
+- Cluster-aggregate timing: restored all 20 deleted originals via `git checkout HEAD --`, ran them together in
+  real Playwright (43 tests: 33 moved + 10 stayed, matching per-file original counts exactly; 2 pre-existing
+  flakes auto-retried green, unrelated to this batch's own changes -- occurred in unmodified restored-original
+  files during the timing-only cycle). Summed durations from `test-results/summary.json` (88284ms all-43
+  total), subtracted the 10 stayed-test durations (20266ms) to isolate the moved-only browser baseline:
+  **68018ms**. Ran all 20 new node files together: 33/33 green, **~13824ms** total (1608ms named cluster +
+  12215ms straggler sweep, the latter dominated by `middle-data-emit`'s own ~11.6s). Ratio ~= **4.9x** --
+  NOTABLY LOWER than the batch's own established 7-16x range, entirely explained by `middle-data-emit`: its
+  1792-combo sweep measured 11691ms in browser vs ~11571ms in node (a ~1.06x wash, not a real speedup),
+  dragging the whole batch's aggregate down even though every OTHER moved test hit the usual multiplier. This
+  is the same finding class as `middle-superset`'s known regression, one size class smaller: a single giant
+  compute-bound sweep does not benefit from the node tier the way many small DOM-free tests do, though unlike
+  `middle-superset` this one is still a net (if small) win, not an actual regression -- correctly left moved.
+  Re-deleted the 20 restored originals afterward; confirmed `git status` back to the exact same 43-line diff
+  (20 deleted + 20 new node + 3 new drive files) as before the restore cycle.
+- `tests/TIER-MIGRATION-PLAN.md`: confirmed untouched.
+- No full browser suite run this batch (milestone-only per the relaxed verify model) -- per the dispatch's own
+  scope note, the advisor's NEXT turn is the milestone full-suite run to completion, gating the merge.
+
+### Scope discipline
+
+All 13 named guard files (12 move-candidates + 1 already-known-skip) + all 21 straggler-sweep candidates read
+in full or (for the 2 already-known-UI stragglers) recalled from a specific, named prior-batch finding rather
+than assumed. Nothing outside scope touched. `register.mjs`/`harness.mjs` untouched. Process tree clean.
+

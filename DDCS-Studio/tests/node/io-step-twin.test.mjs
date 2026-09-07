@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * SETUP/IO increment 2, E2 — the user_io_step TWIN emit == ioStepStackResolved byte-for-byte across the mode × declared/raw

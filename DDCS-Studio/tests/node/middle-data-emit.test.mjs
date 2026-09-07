@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * MIDDLE PORT E1 — the middle built-in expressed as a DATA def (blocks/dataOps/middleData.js) emits G-code BYTE-IDENTICAL
@@ -9,7 +9,6 @@ import { test, expect } from '@playwright/test';
  * writes (sentinel injection). axis/dir stay baked (E1 scope); the byte-test holds axis/dir at defaults on BOTH sides.
  */
 test('middle-data-emit: data-op == built-in middleStack byte-identical across the structural + scalar sweep + derived wiring', async ({ page }) => {
-  test.setTimeout(120000);   // the 896-combo structural sweep runs both builders + emits per combo
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
