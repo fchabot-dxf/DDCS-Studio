@@ -98,6 +98,22 @@ const PAGE = `<!doctype html>
   .spec span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
   .spec div{font-family:ui-monospace,Consolas,monospace;font-size:13px;
             overflow-wrap:anywhere;margin-top:4px}
+  /* t2715 — the ALL-MACHINES aggregate card, added BENEATH the existing single-room view, never replacing
+     it: a combined bar (Σpassed/Σtotal across every reporting room) + one row per machine. Hidden until the
+     first successful /agg poll has real rooms to show, so an aggregate of nothing never flashes on load. */
+  .agg{display:none;background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:12px 16px}
+  .agg.show{display:block}
+  .agg h2{font-size:12px;margin:0 0 8px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .agg .abar{height:12px;background:var(--bar-bg);border-radius:6px;overflow:hidden;margin-bottom:4px}
+  .agg .abar .afill{height:100%;background:var(--bar-fill);border-radius:6px;transition:width .5s}
+  .agg .atotal{font-size:13px;color:var(--muted);margin-bottom:10px}
+  .agg .aroom{display:flex;justify-content:space-between;align-items:center;padding:6px 0;
+              border-bottom:1px solid var(--edge);font-size:13px}
+  .agg .aroom:last-child{border-bottom:none}
+  .agg .aroom .aname{font-weight:600;text-transform:none}
+  .agg .aroom .adot{width:7px;height:7px;border-radius:50%;background:var(--skip);display:inline-block;margin-right:6px}
+  .agg .aroom .adot.on{background:var(--ok)}
+  .agg .aroom .astat{color:var(--muted);font-variant-numeric:tabular-nums}
   .banner{display:none;border-radius:12px;padding:12px 16px;font-size:16px;font-weight:700;
           color:#fff;text-align:center}
   .banner.finished-ok{display:block;background:var(--ok)}
@@ -127,6 +143,12 @@ const PAGE = `<!doctype html>
     <div class="r time"><span>eta</span><b id="eta">–</b></div>
   </div>
   <div class="spec"><span>now running</span><div id="spec">–</div></div>
+  <div class="agg" id="agg">
+    <h2>All machines</h2>
+    <div class="abar"><div class="afill" id="aggFill" style="width:0%"></div></div>
+    <div class="atotal" id="aggTotal">–</div>
+    <div id="aggRooms"></div>
+  </div>
 </div>
 <script>
   var hb = 0, wsOpen = false, status = '', pctNow = '', failsNow = 0;
@@ -301,10 +323,16 @@ const PAGE = `<!doctype html>
         beep([[440, 0, 250], [330, 300, 400]]);                                    // falling: finished with reds
     }
   }
+  // t2715 — MULTI-ROOM: whatever query string this PAGE was opened with (e.g. ?room=asus) rides straight
+  // onto every /live and /raw call, so a link naming a specific room views THAT room's own live stream —
+  // byte-for-byte the old behavior when the page URL carries no room at all (qs is '', worker defaults to
+  // 'main'). This is the per-room half; the aggregate below is additive and always polls every known room
+  // regardless of which one (if any) this page is currently viewing.
+  var qs = location.search || '';
   var sock = null;
   function connect(){
     try {
-      var ws = sock = new WebSocket('wss://' + location.host + '/live');
+      var ws = sock = new WebSocket('wss://' + location.host + '/live' + qs);
       ws.onopen = function(){ wsOpen = true; g('dot').className = 'dot on';
         try { ws.send('hi'); } catch(_){} };   // the DO answers with current state
       ws.onmessage = function(e){ if (e.data && e.data.length > 10) render(e.data); };
@@ -329,13 +357,41 @@ const PAGE = `<!doctype html>
   });
   function pull(){
     if (wsOpen && hb) return;   // socket healthy AND we have data: no polling at all
-    fetch('/raw', { cache: 'no-store' })
+    fetch('/raw' + qs, { cache: 'no-store' })
       .then(function(r){ return r.text(); })
       .then(function(t){ if (t && t.length > 10) render(t); })
       .catch(function(){});
   }
-  connect(); pull();
-  setInterval(pull, 12000); setInterval(tick, 30000);
+  // t2715 — THE AGGREGATE POLL, independent of the single-room WebSocket above: /agg already did the
+  // summing server-side (see index.js), so this only has to paint it. Hidden (via the .show class) until a
+  // real room shows up, so a fresh deploy with nobody reporting yet never shows an empty "0/0" aggregate.
+  function pullAgg(){
+    fetch('/agg', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var names = Object.keys(d.rooms || {});
+        var card = g('agg');
+        if (!names.length) { card.className = 'agg'; return; }
+        card.className = 'agg show';
+        var a = d.agg;
+        var pv = a.total > 0 ? Math.min(100, (a.done / a.total) * 100) : 0;
+        g('aggFill').style.width = pv + '%';
+        g('aggTotal').textContent = a.done + ' / ' + a.total + ' tests · ✅ ' + a.pass + ' ❌ ' + a.fail +
+          ' ⚠ ' + a.flaky + ' ⊘ ' + a.skip + (a.status === 'running' ? ' · running' : '');
+        names.sort();
+        var rows = '';
+        for (var i = 0; i < names.length; i++) {
+          var n = names[i], p = d.rooms[n];
+          rows += '<div class="aroom"><span class="aname"><span class="adot' +
+            (p.status === 'running' ? ' on' : '') + '"></span>' + n + '</span>' +
+            '<span class="astat">' + p.done + '/' + p.total + (p.status ? ' · ' + p.status : '') + '</span></div>';
+        }
+        g('aggRooms').innerHTML = rows;
+      })
+      .catch(function(){});
+  }
+  connect(); pull(); pullAgg();
+  setInterval(pull, 12000); setInterval(tick, 30000); setInterval(pullAgg, 10000);
 </script>
 </body></html>`;
 
@@ -393,6 +449,24 @@ export class ProgressRoom {
       return new Response(t, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
     }
 
+    // t2715 (sharding support batch 2) — THE ROOM REGISTRY. A fixed DO instance name (`__rooms__`, see the
+    // top-level fetch below) reuses this SAME class purely for its generic storage — `/register` appends a
+    // room name (deduped) the first time it POSTs; `/rooms` lists everyone who ever has. This is what lets
+    // `/agg` discover which named rooms exist to aggregate, without hardcoding a machine list anywhere: a
+    // brand-new shard node self-registers on its very first push. (Any ORDINARY progress room also answers
+    // these two paths if asked — harmless, just an unread list nobody queries on that instance.)
+    if (request.method === 'POST' && url.pathname === '/register') {
+      const name = url.searchParams.get('name');
+      if (!name) return new Response('missing name', { status: 400 });
+      const rooms = (await this.state.storage.get('rooms')) || [];
+      if (!rooms.includes(name)) { rooms.push(name); await this.state.storage.put('rooms', rooms); }
+      return new Response('ok');
+    }
+    if (url.pathname === '/rooms') {
+      const rooms = (await this.state.storage.get('rooms')) || [];
+      return new Response(JSON.stringify(rooms), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    }
+
     return new Response('not found', { status: 404 });
   }
 
@@ -407,17 +481,68 @@ export class ProgressRoom {
   async webSocketError(ws) { try { ws.close(); } catch (_) {} }
 }
 
+// t2715 (sharding support batch 2) — the SAME extraction the page's own client-side `render()` does,
+// reimplemented server-side for `/agg` (a page-less consumer that never runs that JS). Kept a plain function,
+// not shared as a module import, so the page's inline `<script>` stays copy-paste-able into a browser
+// console for debugging the way it always has — duplicated intentionally, not by oversight.
+function parseProgress(t) {
+  const dt = t.match(/\*\*(\d+)\s*\/\s*(\d+)\*\*/);
+  const pass = t.match(/✅\s*(\d+)/), fail = t.match(/❌\s*(\d+)/);
+  const flaky = t.match(/⚠\s*(\d+)/), skip = t.match(/⊘\s*(\d+)/);
+  const running = /·\s*running\b/.test(t);
+  const finished = /\d+\s*\/\s*\d+ passed/.test(t) && !running;
+  return {
+    done: dt ? +dt[1] : 0, total: dt ? +dt[2] : 0,
+    pass: pass ? +pass[1] : 0, fail: fail ? +fail[1] : 0,
+    flaky: flaky ? +flaky[1] : 0, skip: skip ? +skip[1] : 0,
+    status: running ? 'running' : (finished ? 'finished' : ''),
+  };
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === '/') {
       return new Response(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
     }
+
+    // t2715 — THE AGGREGATE. Asks the registry which rooms exist, reads each one's own `/raw` (a same-Worker
+    // DO call — no real network hop), sums into ΣpassedΣ/Σtotal. Polled by the page (no live-socket fan-out
+    // across rooms — a WebSocket already exists per room; aggregating N of them live is real complexity this
+    // "small, focused" batch does not need, and a page-side poll every ~10s is imperceptible on a progress bar).
+    if (url.pathname === '/agg') {
+      const registry = env.ROOM.get(env.ROOM.idFromName('__rooms__'));
+      const names = await (await registry.fetch('https://do/rooms')).json();
+      const rooms = {};
+      const agg = { done: 0, total: 0, pass: 0, fail: 0, flaky: 0, skip: 0, status: '' };
+      let anyRunning = false;
+      for (const name of names) {
+        const raw = await (await env.ROOM.get(env.ROOM.idFromName(name)).fetch('https://do/raw')).text();
+        const p = parseProgress(raw);
+        rooms[name] = p;
+        agg.done += p.done; agg.total += p.total; agg.pass += p.pass;
+        agg.fail += p.fail; agg.flaky += p.flaky; agg.skip += p.skip;
+        if (p.status === 'running') anyRunning = true;
+      }
+      agg.status = anyRunning ? 'running' : (names.length ? 'finished' : '');
+      return new Response(JSON.stringify({ rooms, agg }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    }
+
     if (url.pathname === '/u') {
       if (url.searchParams.get('k') !== env.PUSH_KEY) return new Response('no', { status: 403 });
     }
-    // /u (key-checked above), /live, /raw — all served by the one room.
-    const room = env.ROOM.get(env.ROOM.idFromName('main'));
+    // t2715 — MULTI-ROOM: `?room=` picks which named DO instance serves /u, /live, /raw. Absent entirely,
+    // this resolves to 'main' — BYTE-FOR-BYTE the prior single-room behavior, so an old/unmodified pusher (or
+    // a manual test POST with no room param) keeps working exactly as it always did.
+    const roomName = url.searchParams.get('room') || 'main';
+    if (url.pathname === '/u') {
+      // Fire-and-forget: register this room name so /agg can discover it, without adding a round-trip to the
+      // hot push path (push-progress.ps1 posts on every file write). A room that never registers just never
+      // appears in the aggregate — it still works standalone via its own /live or /raw?room=.
+      const registry = env.ROOM.get(env.ROOM.idFromName('__rooms__'));
+      ctx.waitUntil(registry.fetch('https://do/register?name=' + encodeURIComponent(roomName), { method: 'POST' }));
+    }
+    const room = env.ROOM.get(env.ROOM.idFromName(roomName));
     return room.fetch(request);
   },
 };

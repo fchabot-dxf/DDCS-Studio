@@ -28,7 +28,11 @@ export default defineConfig({
   // directory of these blobs back into one HTML report — see context/HANDOFF-TO-ASUS.md for the full per-shard
   // command + merge workflow. Unconditional (local + CI), matching the json reporter's own precedent above.
   reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : []), ['./tests/support/progressReporter.mjs'], ['json', { outputFile: 'test-results/summary.json' }], ['blob']],
-  workers: 4,  // t2443 (2026-08-31) — RE-MEASURED, replacing t1593's own w6 pick: on THIS SAME i7-13700F (16c/24t/32GB), w6 now
+  // t2715 (sharding support batch 2) — PW_WORKERS lets a box tune its own worker count without editing this
+  // shared file (the ASUS's own hardware, 8c/16t, is a different shape than Ranchy's 16c/24t — the number
+  // below is Ranchy's own measured optimum, not necessarily anyone else's). Defaults to 4 (unchanged) when
+  // unset, so every existing local/CI invocation keeps behaving exactly as it always has.
+  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 4,  // t2443 (2026-08-31) — RE-MEASURED, replacing t1593's own w6 pick: on THIS SAME i7-13700F (16c/24t/32GB), w6 now
                // comes back 46 FAILED (spanning totally unrelated domains — alignment drag physics, ATC rendering, Blocks find,
                // add-operation G-code identity — the signature of resource starvation, not a logic defect), reproduced IDENTICALLY
                // across two separate clean runs (retries:2 below already absorbs ordinary one-off contention, so 46 tests failing

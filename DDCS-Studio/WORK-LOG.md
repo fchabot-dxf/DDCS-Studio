@@ -79837,3 +79837,82 @@ sharding CONFIG ITSELF (the ASUS's own box-local setup, watchdog, Defender, etc.
 someone else's job per the dispatch and the settled division of labor. `tests/TIER-MIGRATION-PLAN.md`
 untouched. No full sharded suite run. Progress-multi-room explicitly NOT built (next batch, per the dispatch).
 
+## t2715 — SHARDING SUPPORT batch 2: workers env-override + progress-monitor multi-room
+
+Two small repo pieces, both DONE. Everything's on `main` now (main==branch, confirmed identical SHA both
+before and after this turn's own two commits).
+
+### 1. `playwright.config.js` — `workers` env-overridable
+
+`workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 4` — the exact form the ASUS asked for.
+Default 4 (Ranchy's own measured optimum, t2443) unchanged; the t2443 comment explaining WHY 4 kept verbatim.
+Verified: `node -e` importing the config directly with/without `PW_WORKERS` set (4 and 8 respectively,
+correctly), plus `npx playwright test --list` showing "4 workers" in its own progress line, confirming the
+default path is genuinely untouched, not just theoretically so.
+
+### 2. `suite-progress-worker` — MULTI-ROOM (both shards report to one live page, aggregated)
+
+**`push-progress.ps1`**: the POST URL gains `&room=$room`, where `$room = $env:SHARD_ROOM` if set, else
+`$env:COMPUTERNAME` (zero-config, always distinct per real machine).
+
+**`src/index.js`** — three additions, all keeping the existing single-room path byte-for-byte when no room is
+given (Worker-side default still resolves to `'main'`):
+- **The room registry**: reused the SAME `ProgressRoom` DO class (no new class needed — it already just
+  stores whatever it's told to) as a fixed extra instance named `__rooms__`, with two new endpoints:
+  `POST /register?name=X` (dedupe-appends to a stored array) and `GET /rooms` (lists it). Chosen over a
+  hardcoded machine list specifically so a brand-new shard node self-registers on its very first push — no
+  config to update when the topology changes, matching the "declare over hand-roll" default: the room set is
+  DATA discovered at runtime, not a name list someone has to remember to edit.
+- **`GET /agg`**: asks the registry for known room names, reads each one's own `/raw` (same-Worker DO calls,
+  no real network hop), parses each with a server-side `parseProgress()` (a deliberate line-for-line
+  reimplementation of the page's own client-side regex extraction — kept duplicated, not shared via import, so
+  the page's inline `<script>` stays a self-contained copy-paste block the way it always has been), and returns
+  `{ rooms: {name: parsed}, agg: summed }`.
+- **Registration is fire-and-forget** (`ctx.waitUntil`) off every `/u` POST — added `ctx` as a third param to
+  the top-level `fetch(request, env, ctx)`, which the original code never took. Keeps the hot push path (posts
+  on every progress.md write) from paying a round-trip for a registration that only needs to succeed once ever.
+- **The page**: a new "All machines" card added BENEATH the existing single-room hero/bar (never replacing
+  it — matches the dispatch's own "per-machine breakdown line beneath" wording precisely), hidden until the
+  first `/agg` poll finds a real room (so a fresh deploy with nobody reporting never flashes an empty 0/0).
+  Polls `/agg` every 10s, independent of the existing per-room WebSocket (deliberately NOT a live cross-room
+  socket fan-out — real complexity a "small, focused" batch doesn't need; a 10s poll on a progress bar is
+  imperceptible). Also threaded `location.search` through the existing `/live` WebSocket URL and `/raw`
+  fallback fetch, so a page opened as `?room=asus` now views THAT room's own live stream specifically — a
+  small bonus the room-routing already made nearly free, not separately requested but directly useful.
+
+### ⭐ A syntax trap caught by actually checking, not assumed clean
+
+My own first draft of the `?room=asus` comment (inside the client `<script>`, itself nested inside the
+Worker's own PAGE template literal) used inline markdown-style backticks around the example — an UNESCAPED
+backtick inside an OUTER backtick-delimited template literal, which silently truncates the string at that
+point and reopens it, corrupting every line of the file from there to the next stray backtick. `node -c` on
+the raw file caught it immediately (a clean parse error pointing at the literal's own close 70 lines later).
+Every other file in this repo that embeds a literal backtick inside this SAME template literal already
+escapes it (`'\`'`, see line ~209) — I hadn't matched that convention on this one comment. Fixed by dropping
+the markdown-style backticks from the comment text entirely (plain prose reads fine without them).
+
+### Verify
+
+- `playwright.config.js`: see §1 above.
+- `suite-progress-worker`: ran the REAL Worker locally (`npx wrangler dev --local`, a throwaway `.dev.vars`
+  with a test `PUSH_KEY`, cleaned up after) rather than reading the code and hoping — the dispatch's own "a
+  local/wrangler check" language, taken literally. Posted to two rooms (`ranchy`, `asus`) with real UTF-8
+  payloads (a first attempt via a shell `$'...'` string mangled the emoji/middle-dot bytes — traced to a
+  shell-encoding artifact in MY OWN test command, not the Worker, and re-verified via a Node-written file
+  instead): confirmed (a) neither room clobbers the other's `/raw`, (b) `/agg` sums them correctly
+  (102=42+60 done, 160=100+60 total, 2 flaky matching only the room that reported flaky), (c) the aggregate
+  persists across repeat `/agg` calls with no new posts, (d) a POST with NO room param at all still lands on
+  `'main'` and `main` then self-registers into `/agg` too — the exact backward-compat path the dispatch asked
+  for, (e) the root page (`/` and `/?room=ranchy`) both return 200 and contain the new `#agg`/`pullAgg`
+  markup. Extracted and syntax-checked the REAL evaluated client script (via the module's own `fetch()`, not
+  a naive text-slice of the raw source, which would have flagged the pre-existing intentional
+  double-backslash regex escaping as a false failure) — clean. Stopped the local dev server and removed the
+  throwaway `.dev.vars` + a stray misnamed temp file from an earlier failed extraction attempt afterward.
+
+### Scope discipline
+
+Exactly the dispatch's three named files: `playwright.config.js`, `push-progress.ps1`,
+`suite-progress-worker/src/index.js`. `progressReporter.mjs` untouched (the dispatch's own explicit rule).
+`tests/TIER-MIGRATION-PLAN.md` untouched. No full sharded suite run. `verification/*.png` untouched (checked
+`git status` cleanly showed only the two intended files before staging).
+

@@ -11,7 +11,12 @@ $dir  = "C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\test-results"
 $name = "progress.md"
 $pf   = Join-Path $dir $name
 $key  = (Get-Content "$env:USERPROFILE\.ddcs-bridge\progress-push-key.txt" -Raw).Trim()
-$url  = "https://ddcs-suite-progress.dansemur.workers.dev/u?k=$key"
+# t2715 (sharding support batch 2) — MULTI-ROOM: each machine reports under its own room so two shard
+# nodes posting at once don't clobber one shared stream. $env:SHARD_ROOM lets a run declare its own room
+# explicitly (e.g. a CI job naming itself by shard index); absent that, the machine's own hostname is a
+# stable, zero-config default — no two real machines share one, and it never needs setting by hand.
+$room = if ($env:SHARD_ROOM) { $env:SHARD_ROOM } else { $env:COMPUTERNAME }
+$url  = "https://ddcs-suite-progress.dansemur.workers.dev/u?k=$key&room=$room"
 $lastHash = ""
 
 $fsw = [System.IO.FileSystemWatcher]::new($dir, $name)
