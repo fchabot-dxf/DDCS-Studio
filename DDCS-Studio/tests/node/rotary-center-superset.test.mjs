@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ROTARY CENTRELINE PORT E0 — the rotaryCenterStack SUPERSET is the GATE + the golden baseline.

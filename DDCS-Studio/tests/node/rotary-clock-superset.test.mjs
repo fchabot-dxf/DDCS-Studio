@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ROTARY CLOCK PORT E0 — the rotaryClockStack SUPERSET is the GATE + the golden baseline (phase C, the A-axis inheritor).

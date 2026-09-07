@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ROTARY CLOCK PORT E1 — the data-op twin's emit is BYTE-IDENTICAL to the built-in rotaryClockStack (phase C). The E0

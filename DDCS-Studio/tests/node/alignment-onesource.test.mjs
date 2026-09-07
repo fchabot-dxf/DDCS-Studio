@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ALIGNMENT geometry (t506 foundation, REDEFINED t544). The declared geometry is a SCALAR SPAN (mm along checkAxis) + a
@@ -6,6 +6,10 @@ import { test, expect } from '@playwright/test';
  * anchor fraction × stock) + B (A + the span along checkAxis); (2) the emit AUTO probes A IN PLACE (no travel/Confirm) then
  * does ONE relative checkAxis jog of the span to B; MANUAL keeps the Confirm gates; (3) AUTO no longer needs a stock (the
  * span is plain mm). The 2D-handle wiring (A = sim start, B = span) + the twin flow are the fork specs.
+ *
+ * t2694 — TIER MIGRATION WORK PACKAGE 4: moved browser→node whole-file. All 4 tests are pure: every body is
+ * page.goto + one page.evaluate that imports app modules (alignPoints.js/opSimStarts.js/alignmentWizard.js/
+ * blockEmitter.js/opSchema.js), calls a builder/emit function, and asserts on plain returned data — no DOM read.
  */
 test('opSimStarts.alignment = A (the anchor fraction) + B (A + the declared span along checkAxis)', async ({ page }) => {
     await page.goto('http://localhost:3211');

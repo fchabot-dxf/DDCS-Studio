@@ -79289,3 +79289,113 @@ total precisely.
 `git status` clean except this entry, 15 new `tests/node/*.test.mjs` files, and 15 deleted browser specs (no
 splits this batch). `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean (0 flagged).
 
+## t2705 — TIER-MIGRATION BATCH 10: edge/rotary/wcs/alignment probing family (BIGGEST batch, 4 parallel agents + 1 solo)
+
+Closes the probing family per the dispatch (`scratchpad/dispatch-tier-migration-batch10.md`). 23 named MOVE
+candidates split across 4 background agents (~6 files each), plus 6 form-reproduction files and a 24-file
+skip-list confirmed by hand. **31 tests moved across 19 files** (13 whole-moves, 6 splits), node tier
+690->721, browser `--list` 2799->2768. Zero regressions, every numeric cross-check exact.
+
+### Per-file outcomes
+
+**Whole moves (13 files, 20 tests):** `edge-data-emit`(1), `edge-sim-starts`(1), `rotary-center-superset`(2),
+`rotary-clock-superset`(2), `rotary-center-data-emit`(2), `rotary-clock-data-emit`(2), `wcs-dialect-emit`(1),
+`wcs-datum`(2), `alignment-superset`(2), `alignment-onesource`(4), plus `wcs-form-reproduction-2381`'s ONE
+pure test (1, see form-reproduction section below).
+
+**Splits (6 files, 11 moved / 13 stayed):**
+- `edge-probe-vector` -- 1 moved (`probeVector` gesture math, pure `canvasWidgets.js`), 1 stayed (real
+  wizard drag/DOM) -> `edge-probe-vector-drive.spec.js`.
+- `rotary-homing` -- 3 moved, 2 stayed (`dual-Y exclusivity`, `SIM rotary map populated` -- see trap below) + 1
+  pre-known UI test -> `rotary-homing-drive.spec.js`.
+- `rotary-center-rig-decouple` -- 1 moved (E4 emit), 1 stayed (Three.js `_partGroup`/`matrixWorld` rig test) ->
+  `rotary-center-rig-decouple-drive.spec.js`.
+- `rotary-center-sim-starts` / `rotary-clock-sim-starts` -- 1 moved each (pure `opSimStarts` marker math), 1
+  stayed each (real-symptom preview render) -> matching `-drive.spec.js` files.
+- `wcs-emit-resolved` -- 1 moved (atom-fix resolve, pure), 1 stayed (`REPRO: sweep rotary twins` -- drives the
+  real editor textarea) -> `wcs-emit-resolved-drive.spec.js`.
+- `alignment-sim-starts-at-a` -- 1 moved (intent carries `seatAtStart`, needed **seeding pattern 2**:
+  `registerUserOp(alignmentDataDef())` before `opSimContext('user_alignment_data')`), 1 stayed (canvas-driven
+  trace-start check) -> `alignment-sim-starts-at-a-drive.spec.js`.
+- `alignment-data-emit` -- 2 moved (E1 byte-diff, E2 sim-starts -- both already `registerUserOp`'d, pattern 1),
+  1 stayed (real-symptom BOX+fence-starts render) -> `alignment-data-emit-drive.spec.js`.
+
+**Untouched -- actually 100% UI, contrary to being MOVE candidates (5 files):** `edge-start-position.spec.js`
+(real wizard + `viz.starts` + `waitForFunction` polling a live app state -- would pass vacuously under the
+node no-op stub, not just fail), `rotary-bar-declared.spec.js` (Three.js `stockMesh.geometry.parameters`),
+`rotary-stock-revert.spec.js` (`window.openWiz` on the very first line -- an explicit gate-1 disqualifier),
+`wcs-sync-gate-1906.spec.js` (DOM-gating verification across controller profiles -- `dataset.opGated` polling),
+`alignment-correction-840.spec.js` (all 3 tests drive the Transform modal via `page.click`/`page.fill`/
+`page.locator`/`page.screenshot` -- the dispatch's own SPLIT guess for this file did not survive reading it).
+
+### Form-reproduction (6 files) -- read the generation mechanism per the standing rule
+
+None of the 6 (`edge-form-reproduction-2599`, `wcs-form-reproduction-2381`, `wcs-form-reproduction-2605`,
+`rotary-clock-form-reproduction-2597`, `rotary-center-form-reproduction-2599`,
+`alignment-form-reproduction-2599`) use the shared `registerFormReproductionSuite` engine -- each carries its
+own per-file `test()` calls, explicitly because these ops have NO real classic shell page to compare against
+(`#wiz_*` retired at t1730), so the shared engine's shell-comparison test doesn't apply. But reading each
+test body showed a NEW distinction within this "per-file" shape: **most of these per-file tests still copy
+the shared engine's own DOM-construction-and-query pattern verbatim** (`document.createElement` +
+`renderOpForm`/`renderUiTree` + `host.querySelectorAll('[data-param]')`) -- which fails under node's
+structural-only `document` stub exactly like the shared-engine case (batch 8's finding), even though it's not
+literally calling `registerFormReproductionSuite`. So 5 of the 6 files are 100% UI and stayed untouched
+whole: `edge-form-reproduction-2599` (2/2 DOM), `wcs-form-reproduction-2605` (3/3 DOM+real-symptom),
+`rotary-clock-form-reproduction-2597` (2/2 DOM), `rotary-center-form-reproduction-2599` (2/2 DOM),
+`alignment-form-reproduction-2599` (2/2 DOM).
+
+The ONE exception: `wcs-form-reproduction-2381.spec.js` (4 tests) had one test -- "every binding's own section
+matches the shell's field-to-section mapping" -- that reads `def.bindings` **directly**, no DOM at all (an
+older, more surgical style than the other 5 files' copy-pasted engine logic). Split: that 1 test moved to
+`tests/node/wcs-form-reproduction-2381.test.mjs`; the other 3 (DOM order-check, real-shell independent check,
+DOM edit-round-trip) moved verbatim to `tests/wcs-form-reproduction-2381-drive.spec.js`.
+
+**Refined rule for future batches:** "per-file test() vs shared engine" is not itself the deciding axis --
+what matters is whether an INDIVIDUAL test constructs/queries DOM, regardless of which file it lives in or
+whether it was copy-pasted from the shared engine. Read every test body, every time.
+
+### New gate-trap class found (`rotary-homing`, work package 2) -- beyond the 3 standing gate questions
+
+2 of `rotary-homing`'s 5 outwardly-pure tests (no DOM/canvas/`openWiz` anywhere in the body) failed once
+converted. Root cause: `window.ddcsGetSettings()` (`web/ui/settingsPanel.js`) returns a **module-level
+singleton**. The node harness's `page.goto()` only re-imports the module (a no-op after the first call, since
+ESM caches modules) rather than performing a fresh navigation the way Playwright's real per-test `page.goto()`
+does. So a stray `s.__sel = ['x']` from one test, and a full monkey-patch of `window.ddcsGetSettings` itself
+from another, silently leaked across tests in the same node process. Verified per the standing procedure: ran
+the exact unmodified originals in real Playwright first (`-g` filtered) -- both passed there, confirming the
+divergence was real, not a mis-shape-gate. Moved both to the drive split rather than patching anything.
+**This is a 4th class of node-tier boundary**, generalized: any file with multiple tests that mutate a shared
+global-settings (or similar module-singleton) getter across sequential checks carries this risk -- not just
+files with an explicit `GcodeExecutionEngine` env-fallback. Nothing in `register.mjs`/`harness.mjs` touched.
+
+### Verify (LIGHT model, per the relaxed verify amendment)
+
+- `npm run test:node`: 721/721 green (690 + 31 moved = 721 exact).
+- `npx playwright test --list`: 2768 (2799 - 31 moved = 2768 exact).
+- Cluster-aggregate timing: restored all 19 deleted originals via `git checkout HEAD --`, ran them together in
+  real Playwright (44 tests total: 31 moved + 13 stayed), summed each spec's own duration from
+  `test-results/summary.json` (71130ms all-44 total), subtracted the 13 stayed-test durations (34064ms,
+  identified by title) to isolate the moved-only browser baseline: **37066ms**. Ran the 19 new node files
+  standalone: 31/31 green, **3157ms** total. Ratio ~= **11.7x** -- consistent with the batch's own prior
+  7-16x finding (t2687-era mega-sweep vs many-small-file measurement). Re-deleted the 19 restored originals
+  afterward, confirmed `git status` back to the exact same 47-line diff (19 deleted + 19 new node + 9 new
+  drive files) as before the restore cycle.
+- `tests/TIER-MIGRATION-PLAN.md`: confirmed untouched (`git status --porcelain` empty for that path).
+- No full browser suite run this batch (milestone-only per the relaxed verify model).
+
+### Scope discipline
+
+24 SKIP-candidate files (`wcs-flash`, `edge-view`, `edge-seamless-title`, `edge-wall-picker`,
+`rotary-collision`, `rotary-datum-glyph`, `rotary-a-jog`, `rotary-fit-sim`, `rotary-center-sim`,
+`rotary-center-roundbar`, `rotary-clock-handles`, `rotary-center-in-place`, `rotary-clock-in-place`,
+`wcs-in-place`, `alignment-in-place`, `alignment-handles-independent`, `alignment-canvas-refit-732`,
+`alignment-handle-visible-exit`, `alignment-fork1-handles`, `alignment-probe-collides`,
+`alignment-envelope-unclamp`, `alignment-clamp-730`, `alignment-span-verify`, `alignment-fresh-seat`,
+`alignment-fork2-twin-auto`) confirmed to exist and show zero `git status` diff -- none touched, as expected
+(render/handle/glyph/in-place/collision UI per their names, not individually re-read this batch given the
+budget already spent on the 23 move-candidates + 6 form-reproduction files -- flagging this as the one area of
+this batch that leaned on naming convention rather than a full read, unlike everything else in the batch).
+
+Process tree clean (all 4 background agents' own node/playwright processes exited on completion; no orphaned
+mem-server this batch).
+

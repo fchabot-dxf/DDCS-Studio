@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ALIGNMENT PORT E0 — the alignmentStack SUPERSET is the GATE + the golden baseline (the LAST probe fan-out port).
@@ -9,6 +9,10 @@ import { test, expect } from '@playwright/test';
  * structural sweep. F1: the checkAxis(X|Y) × probeDir(pos|neg) forks are GUARDED (4 arms) — the axis-letter + probe-var swap
  * threads through ~16 atoms + the entangled header comment, too pervasive to recompose. safeZFrame is a VALUE-swap (read from
  * params on BOTH sides). Sweep = checkAxis × probeDir × safeZFrame = 2×2×2 = 8. F2: #20 restructured [0-safeZ] → [0-#19].
+ *
+ * t2694 — TIER MIGRATION WORK PACKAGE 4: moved browser→node whole-file. Both tests are pure: each body is
+ * page.goto + one page.evaluate that imports app modules, calls alignmentStack/pruneGuards/emitMapped, and asserts on
+ * plain returned data — no DOM read, no click, no screenshot.
  */
 test('E0 GATE: prune(alignmentStack superset) == concrete alignmentStack, byte-identical across the full 8-combo structural sweep', async ({ page }) => {
     await page.goto('http://localhost:3211');

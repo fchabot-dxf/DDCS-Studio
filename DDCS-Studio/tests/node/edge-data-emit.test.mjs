@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * EDGE-PORT E1 — EMIT. The edge built-in expressed as a DATA def (blocks/dataOps/edgeData.js) emits G-code byte-identical

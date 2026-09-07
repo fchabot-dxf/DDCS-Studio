@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * ROTARY CENTRELINE PORT E4 — the rig decouple (sim-device layer; sim-only, emit byte-identical).
+ * ROTARY CENTRELINE PORT E4 — the rig decouple (sim-device layer). Split off tests/rotary-center-rig-decouple.spec.js
+ * (tier migration): this test drives a real Three.js viz (_partGroup parenting/spin, stockMesh identity across
+ * toggles) and stays in the browser tier. The pure emit-identity half moved to
+ * tests/node/rotary-center-rig-decouple-emit.test.mjs.
  *
  * The 4th-axis RIG (chuck + tailstock) used to be built/disposed INLINE inside setStock and rebuilt by
  * setRotaryFixture calling a full setStock — entangled with the stock. E4 extracts it into setRotaryRig
@@ -14,7 +17,7 @@ import { test, expect } from '@playwright/test';
  *  3. it SPINS with the part (rotating _partGroup rotates the rig's world transform),
  *  4. toggling the rig off/on no longer rebuilds the STOCK mesh (the decouple — same stockMesh identity),
  *  5. a stock change RE-DERIVES the rig (still a child of _partGroup),
- *  6. emit stays BYTE-IDENTICAL (the rig is a sim-device — no emit).
+ *  6. emit stays BYTE-IDENTICAL (the rig is a sim-device — no emit; see the node-tier split for this half).
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -70,21 +73,4 @@ test('E4: the rotary rig is a decoupled sim-device — child of _partGroup, spin
   expect(r.rigBackOnToggle, 'toggling the rig back ON re-builds it as a child of _partGroup').toBe(true);
   expect(r.stockSameAfterOn, 'toggling the rig back ON still does NOT rebuild the stock mesh').toBe(true);
   expect(r.rigRederived, 'a stock change re-derives a fresh rig, still a child of _partGroup').toBe(true);
-});
-
-test('E4: emit stays byte-identical (the rig is a sim-device — no emit)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  const same = await page.evaluate(async () => {
-    const { rotaryCenterDataDef, ROTARY_CENTER_DEFAULTS } = await import('/blocks/dataOps/rotaryCenterData.js');
-    const { registerUserOp } = await import('/blocks/userOps.js');
-    const { builderOf } = await import('/blocks/opBuilders.js');
-    const { emitMapped } = await import('/blocks/blockEmitter.js');
-    const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
-    registerUserOp(rotaryCenterDataDef());
-    const known = emitMapped(builderOf('user_rotary_center_data')({ ...ROTARY_CENTER_DEFAULTS })).text === emitMapped(rotaryCenterStack({ ...ROTARY_CENTER_DEFAULTS })).text;
-    const fit = emitMapped(builderOf('user_rotary_center_data')({ ...ROTARY_CENTER_DEFAULTS, method: 'fit' })).text === emitMapped(rotaryCenterStack({ ...ROTARY_CENTER_DEFAULTS, method: 'fit' })).text;
-    return known && fit;
-  });
-  expect(same, 'the E4 rig decouple changes nothing in the emitted G-code (sim-only)').toBe(true);
 });

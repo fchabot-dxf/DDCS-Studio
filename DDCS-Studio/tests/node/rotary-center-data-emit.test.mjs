@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ROTARY CENTRELINE PORT E1 — the data-op twin's emit is BYTE-IDENTICAL to the built-in rotaryCenterStack (t413). The E0

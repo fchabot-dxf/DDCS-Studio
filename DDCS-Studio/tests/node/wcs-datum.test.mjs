@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * PROBE-DATUM CORRECTNESS (t644, F4). The WCS-write must land such that the TOUCHED FACE reads the intended work coordinate

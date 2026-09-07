@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * ROTARY HOMING (t670, advisor-ruled). A rotary A/B axis is homeable by SWITCH-SEEK (not just set-zero): the direction is
@@ -81,16 +81,6 @@ test('no declared direction → honest skip; set-zero method → no motion; LINE
     expect(linX, 'linear X uses the confirmed P#1045 L#1047').toMatch(/G31 X-?\d+ F800 P#1045 L#1047/);
 });
 
-test('dual-Y exclusivity: a SLAVE-role axis is never seek/set-zero-homed (no A arm, no #883 clash)', async ({ page }) => {
-    const slaveA = await emitFor(page, `
-        s.motors.a = { role:'slave', follows:'y' };   // A is a gantry slave, NOT rotary → default derivation excludes it
-        s.homing = { philosophy:'sequential', axes:{ a:{ rotary:'seek', enable:true }, y:{ enable:true } } };
-        s.limits.aHomeDir = 'pos'; s.machine.y = 400; s.limits.yMaxHome = true;`);
-    // A must NOT get its own home arm (homingRunParams excludes a slave role); Y's homing syncs it instead
-    expect(slaveA, 'no independent A rotary seek arm for a slave axis').not.toContain('G31 A');
-    expect(slaveA, 'the A slave is synced from its master (fndzero tail), not homed').toMatch(/G31 Y/);
-});
-
 test('the homing DATA TWIN recomposes the rotary seek arm byte-identically (E1 unroll)', async ({ page }) => {
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
@@ -111,43 +101,4 @@ test('the homing DATA TWIN recomposes the rotary seek arm byte-identically (E1 u
     });
     expect(r.twin, 'the data twin emits the rotary A seek arm').toMatch(/G31 A380 F1000 P#1054 L#1056/);
     expect(r.match, 'the twin recomposes the rotary seek arm byte-identically to homingStack (E1 unroll covers it)').toBe(true);
-});
-
-test('the SIM rotary map is populated for a rotary axis (the homing preview spins A on the emitted A move)', async ({ page }) => {
-    const rax = await page.evaluate(async () => {
-        window.ddcsGetSettings().motors.a = { role: 'rotary', around: 'x' };
-        const { getRotaryAxes } = await import('/ui/settingsPanel.js');
-        return getRotaryAxes();
-    });
-    expect(rax.a, 'motors.a=rotary → getRotaryAxes maps A around X → the emitted G31 A move spins the part in the preview').toBe('x');
-});
-
-test('REAL APP: the method select renders for rotary ONLY; the rotary home I/O row syncs aHomeDir', async ({ page }) => {
-    await page.waitForFunction(() => window.openSettings);
-    await page.evaluate(async () => {
-        const s = window.ddcsGetSettings();
-        s.motors.a = { role: 'rotary', around: 'x' };
-        s.homing = { philosophy: 'sequential', axes: { a: { rotary: 'seek', enable: true } } };
-        // declare a rotary home switch in the I/O inputs, then re-sync the flat limits (the ONE source homing reads)
-        s.inputs = (s.inputs || []).filter((r) => r.type !== 'home');
-        s.inputs.push({ id: 'home_a', type: 'home', label: 'A home', axis: 'a', dir: 'pos', pin: 7, level: 0 });
-        const { syncIO } = await import('/ui/settingsPanel.js');
-        syncIO();
-    });
-    // open Machine → Homing and assert the rotary method select renders for A, and NOT for X
-    await page.evaluate(() => window.openSettings({ group: 'hardware', panel: 'set_tab_machine' }));
-    await page.waitForSelector('#set_homing_axes .homing-axis-row', { timeout: 8000 });
-    const ui = await page.evaluate(() => {
-        const rows = [...document.querySelectorAll('#set_homing_axes .homing-axis-row')];
-        const rowOf = (ax) => rows.find((r) => r.getAttribute('data-axis') === ax);
-        const a = rowOf('a'), x = rowOf('x');
-        return {
-            aHasSelect: !!(a && a.querySelector('.hm-rotmode')),
-            xHasSelect: !!(x && x.querySelector('.hm-rotmode')),
-            aHomeDir: window.ddcsGetSettings().limits.aHomeDir,
-        };
-    });
-    expect(ui.aHasSelect, 'rotary A shows the Set-zero|Switch-seek method select').toBe(true);
-    expect(ui.xHasSelect, 'linear X keeps the fixed method text (no select)').toBe(false);
-    expect(ui.aHomeDir, 'the rotary home I/O row synced its direction to settings.limits.aHomeDir').toBe('pos');
 });

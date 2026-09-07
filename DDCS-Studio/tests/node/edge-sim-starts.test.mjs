@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * EDGE-PORT E2 — SIM-STARTS. The edge data-op declares ONE 'edge'-anchor preview pass (edge datum = a LINE / one wall → one

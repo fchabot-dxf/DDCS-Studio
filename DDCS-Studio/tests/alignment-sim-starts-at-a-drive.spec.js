@@ -6,19 +6,13 @@ import { test, expect } from '@playwright/test';
  * AUTO probes A IN PLACE, the sim's "in place" = the engine's initial seat = origin. FIX (reuse the homing t540 initialPos
  * seam via a declared seatStart intent): seat the trace/engine INITIAL POSITION at marker A, so the drawn path BEGINS at A
  * (probe A at A → the span jog lands at B → the path connects the handles). Emit unchanged (sim-only).
+ *
+ * t2694 — TIER MIGRATION WORK PACKAGE 4: split from alignment-sim-starts-at-a.spec.js. This test opens a real wizard
+ * (window.openWiz), waits on a real DOM selector + a rendered canvas, and reads a live wizardManager panel's
+ * getSegments/getPassStarts — a genuine app+DOM+render dependency, not a pure import()+evaluate. Its sibling ("the
+ * alignment intent carries seatAtStart" — pure opSimContext, no DOM) moved to tests/node/alignment-sim-starts-at-a.test.mjs.
  */
 test.use({ viewport: { width: 1300, height: 950 } });
-
-test('the alignment intent carries seatAtStart (the declared sim{seatStart} → opSimContext)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
-    const ctx = await page.evaluate(async () => {
-        const { opSimContext } = await import('/viz/opSimContext.js');
-        return opSimContext('user_alignment_data');
-    });
-    expect(ctx.seatAtStart, 'the alignment twin declares seatStart → opSimContext.seatAtStart').toBe(true);
-    expect(ctx.toolMachineFrame, 'but NOT the machine-frame tool render (alignment is a local/part-frame probe)').toBe(false);
-});
 
 test('the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0}', async ({ page }) => {
     await page.goto('http://localhost:3211');
