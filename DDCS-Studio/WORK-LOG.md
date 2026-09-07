@@ -79225,3 +79225,67 @@ total precisely.
 and 13 deleted browser specs. `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean
 (0 flagged).
 
+## t2703 — TIER-MIGRATION BATCH 9: engine/expr/gcode/guard core — 15 files/39 tests moved, the CLEANEST
+batch yet, and the flagged trap didn't materialize even once
+
+Dispatched as a medium batch (`DDCS-Studio/scratchpad/dispatch-tier-migration-batch9.md`, 17 named files),
+explicitly flagged by the advisor as the files MOST LIKELY in the whole migration to hit the
+`GcodeExecutionEngine` environment-fallback divergence found in t2699 (`cam-slot-sim`'s "no stock →
+homing-seek envelope clamp" case). Used 2 parallel background agents (proven across batches 6-8), each told
+specifically to budget real attention to that trap and RUN every test, not just read.
+
+### RESULT: 15 files touched, 39 tests moved, 0 regressions, ZERO instances of the flagged trap
+
+- **15 files moved whole** (39 tests): `engine-trace` (7), `engine-dro` (1), `engine-subprogram-760` (3),
+  `sim-starts-data` (3), `relativize-program-979` (3), `op-sim-context` (1), `op-sim-starts-registry` (2),
+  `expr-compare-1630` (1), `expr-functions-ternary-1566` (1), `expr-lint-names-the-cause-1566` (1),
+  `gcode-to-stack` (8), `gcode-absolute-latch-1774` (1), `gcode-dialect-emit-invariants-1870` (4),
+  `guard-prune` (1), `fills` (2).
+- **2 files confirmed genuinely UI, left untouched**: `engine-lifecycle` (both tests drive
+  `document.getElementById('editor')`, `page.locator(...).click()`, and assert a real DOM class
+  `.pp-run.on`), `guard-roundtrip-1595` (end-to-end Blockly-canvas UI: `window.__blkws`, `page.locator`,
+  `.fill()`, `page.on('dialog', ...)`).
+
+### THE FLAGGED TRAP DIDN'T FIRE — and both agents verified WHY, not just that it didn't
+
+Despite being explicitly warned this batch was the most likely to hit the `GcodeExecutionEngine`
+environment-fallback divergence, NEITHER agent found a single instance, on the two files most exposed to it
+(`gcode-absolute-latch-1774`, `gcode-dialect-emit-invariants-1870` — both trace G-code through
+`GcodeExecutionEngine`/`traceToolpath`). Read `web/engine/GcodeExecutionEngine.js` BEFORE running (not
+after a failure) to confirm why: `window.ddcsGetSettings()` reads (machine/motors/probes) resolve correctly
+in the node tier because `page.goto()` already imports `/ui/settingsPanel.js` first, publishing the SAME
+default settings object the browser boot produces (localStorage empty in both tiers, so the defaults match).
+The specific env-fallback the dispatch named (t499's "no stock → homing-seek envelope clamp") never triggers
+in either file because both explicitly pass a real `stock: {x,y,z}` object to `traceToolpath` — the clamp's
+own fallback path is a NO-STOCK-specific branch, and neither test exercises it. This is a genuinely useful
+negative result: the trap is real (t2699 proved it) but conditional on the specific "no stock" code path,
+not a blanket engine/node-tier hazard — future batches touching `GcodeExecutionEngine` should check whether
+their own tests pass an explicit stock object before assuming the trap applies.
+
+### OTHER NOTES
+
+No `io_change`/event-listener trap and no `formReproduction.js` shared-suite pattern encountered anywhere in
+this batch. `engine-subprogram-760.spec.js` imports from `/engine/GcodeExecutionEngine.js` directly rather
+than the usual `/engine/index.js` re-export — verified both resolve to the identical class, no behavior
+difference. `gcode-dialect-emit-invariants-1870` needed seeding pattern 2 for 5 twins (corner/edge/middle/
+rotary_center/rotary_clock) via a shared `seedProbeOpTwins(page)` helper with an existence guard.
+
+### THE MEASURED DELTA
+
+Cluster aggregate (targeted run, not full suite, no splits this batch so a single measurement): restored all
+15 deleted originals from git, ran them together in the browser (39 tests, exactly matching the moved total —
+0 tests stayed) = **28.00s summed duration**. The 15 new node files run together = **2.19s**. **~13x
+aggregate** — on the lower end of the 13-29x range across all 9 batches, likely because several of these
+files are already fast, small (1-3 test) browser specs with little boot-tax to reclaim per test relative to
+their own compute cost.
+
+### VERIFY (LIGHT MODEL — no full suite, per the standing amendment)
+
+`npm run test:node`: 690/690 (651 prior + 39 this batch, exactly).
+
+`npx playwright test --list`: **2799 tests — down from batch 8's 2838 by EXACTLY 39**, matching the moved
+total precisely.
+
+`git status` clean except this entry, 15 new `tests/node/*.test.mjs` files, and 15 deleted browser specs (no
+splits this batch). `tests/TIER-MIGRATION-PLAN.md` confirmed untouched. Process tree clean (0 flagged).
+

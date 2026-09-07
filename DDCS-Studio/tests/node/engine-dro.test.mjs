@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // ENGINE (t143) — the sim populates the machine DRO registers (ALL dialect bases) each step so read-machine (RM) returns the
 // real tool coord instead of an unset 0. The general read-machine gap; step 1 of the real rotary 3-point fit sim (the fit

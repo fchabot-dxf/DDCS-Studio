@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1630 — COMPARISON PREDICATES: the deliberate widening t1566 deferred, ruled in.

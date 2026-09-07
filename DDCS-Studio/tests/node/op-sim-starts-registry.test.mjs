@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // SIM-SIDE DECLARE-NOT-INFER, increment 1: the per-pass start inference moved into ONE shared REGISTRY
 // (viz/opSimStarts.js), federated like opSimContext — a pristine BUILT-IN layer (moved verbatim) + a USER_* layer so the

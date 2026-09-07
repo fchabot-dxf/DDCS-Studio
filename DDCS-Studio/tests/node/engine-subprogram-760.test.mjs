@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t760 (Text Stage 2, foundation) — the sim engine executes GENERAL `M98 P####` subprogram calls to O-words DEFINED in

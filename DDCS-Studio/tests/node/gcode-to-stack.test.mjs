@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Layer 1: G-code → leaf-atom parser. The inverse of blockModel.emit for line-level atoms. The core guarantee
 // is ROUND-TRIP: emit(stack) → parse → emit must be byte-identical for the leaf ops (so editing/projecting

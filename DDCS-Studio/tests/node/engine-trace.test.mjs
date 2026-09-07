@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Engine fast-trace (preview foundation). trace() runs the program to completion through the engine's OWN
 // _executeStep — resolving #vars, following IF/GOTO loops, auto-detecting probes — and returns the EXACT

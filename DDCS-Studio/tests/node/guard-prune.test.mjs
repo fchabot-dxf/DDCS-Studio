@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { waitReady } from './_boot.js';
+import { test, expect } from './support/harness.mjs';
+import { waitReady } from '../_boot.js';
 
 /**
  * ② B4 M2 step 2 — the generic STRUCTURAL-TOGGLE capability (built ONCE, corner-agnostic): the shared `whenOk` evaluator,

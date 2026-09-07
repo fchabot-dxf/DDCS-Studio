@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1774 — THE ANCHOR-CONTAMINATION FIX. The user reported corner's preview drawing the start marker at what

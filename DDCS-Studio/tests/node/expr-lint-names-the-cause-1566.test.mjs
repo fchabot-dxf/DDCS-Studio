@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1566 — A BROKEN EXPRESSION MUST NAME ITS CAUSE, and a clean program must stay QUIET.

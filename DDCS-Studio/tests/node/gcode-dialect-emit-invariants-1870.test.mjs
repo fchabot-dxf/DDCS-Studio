@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1866→t1868→t1870 — THE STANDING CROSS-DIALECT EMIT SUITE. Generalizes gcode-v41-modal-restore-1868 (deleted,
@@ -71,6 +71,11 @@ import { test, expect } from '@playwright/test';
  *   branches. None found in the 5 wizards this turn beyond the emit-atom calls already covered (their own
  *   branch structure — probeZ/probeZFirst/twoAxis/etc — is dialect-AGNOSTIC, the same branches fire regardless
  *   of controller profile; only the LEAF atom's own output differs per dialect, which IS covered here).
+ *
+ * t2695 TIER MIGRATION — seeding: the browser tier reached these 5 data-op twins via `U.getUserDef`/`builderOf`
+ * on the assumption that `app.js`'s `seedDefaultPortedUserOps()` had already registered them at boot. The node
+ * harness never runs that boot sequence, so each test explicitly `registerUserOp`s the 5 twins first (mirrors
+ * the seeding pattern used elsewhere in this tier — see tests/node/support/register.mjs's own contract note).
  */
 
 const V41 = 'ddcs-v41', DM500 = 'ddcs-v3-dm500', EXPERT = 'ddcs-expert-m350';
@@ -90,6 +95,23 @@ const PROBE_OPS = [
 async function boot(page) {
     await page.goto('/');
     await page.waitForFunction(() => window.ddcsGetBlockProgram, null, { timeout: 30000 });
+}
+
+/** t2695 — seed the 5 dialect-sensitive probe-op twins the real app boot registers via seedDefaultPortedUserOps(),
+ *  which this tier's page.goto() stub does not run. Guarded by an existence check since node persists module
+ *  state (USER_DEFS) across every test in one process — re-registering an already-registered opType throws. */
+async function seedProbeOpTwins(page) {
+    await page.evaluate(async () => {
+        const U = await import('/blocks/userOps.js');
+        const defs = await Promise.all([
+            import('/blocks/dataOps/cornerData.js').then((m) => m.cornerDataDef()),
+            import('/blocks/dataOps/edgeData.js').then((m) => m.edgeDataDef()),
+            import('/blocks/dataOps/middleData.js').then((m) => m.middleDataDef()),
+            import('/blocks/dataOps/rotaryCenterData.js').then((m) => m.rotaryCenterDataDef()),
+            import('/blocks/dataOps/rotaryClockData.js').then((m) => m.rotaryClockDataDef()),
+        ]);
+        for (const def of defs) if (!U.getUserDef(def.opType)) U.registerUserOp(def);
+    });
 }
 
 /** Runs the whole (dialect × op) matrix in ONE page — one navigation, not ten — for speed; each combo's own
@@ -140,8 +162,8 @@ function checkDistanceMode(gcode) {
 }
 
 test('INVARIANT A+B — distance mode is decided (never silently leaked) before the next move, across every probe op × every non-Expert DDCS dialect', async ({ page }) => {
-    test.setTimeout(60_000);
     await boot(page);
+    await seedProbeOpTwins(page);
 
     const rows = await buildMatrix(page, NON_EXPERT_DIALECTS, PROBE_OPS);
     const failures = [];
@@ -157,8 +179,8 @@ test('INVARIANT A+B — distance mode is decided (never silently leaked) before 
 });
 
 test('CONTROL — Expert never emits G92 in any of the 5 probe ops (structural form; generalizes the corner-only check)', async ({ page }) => {
-    test.setTimeout(60_000);
     await boot(page);
+    await seedProbeOpTwins(page);
 
     const rows = await buildMatrix(page, [EXPERT], PROBE_OPS);
     const withG92 = rows.filter((r) => /G92\b/.test(r.gcode)).map((r) => r.label);
@@ -170,7 +192,6 @@ test('CONTROL, stated separately: Expert\'s datum-write atoms themselves make no
     // about the ATOM's own emit touching G90/G91 AT ALL. Asserted directly on the atom's own return value (not
     // scanned out of a full program, where an unrelated op could coincidentally carry a G90/G91) so the two
     // assertions can never silently collapse into each other (t1868 amendment).
-    test.setTimeout(60_000);
     await boot(page);
 
     const lines = await page.evaluate(async () => {
@@ -185,8 +206,8 @@ test('CONTROL, stated separately: Expert\'s datum-write atoms themselves make no
 });
 
 test('the drawing, as a consequence: V4.1 corner\'s own drawn Y matches the ground truth (the emitted reposition math)', async ({ page }) => {
-    test.setTimeout(60_000);
     await boot(page);
+    await seedProbeOpTwins(page);
 
     const result = await page.evaluate(async () => {
         const { setMachine } = await import('/data/workspaceMachine.js');

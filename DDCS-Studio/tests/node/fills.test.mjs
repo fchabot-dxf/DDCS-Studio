@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // The heavy fill blocks: Fill Zigzag (arbitrary angle + cut direction) and Fill Concentric (ring order +
 // finish pass). Kernels live in clearing.js; the blocks layer under Step Down over a Region socket.

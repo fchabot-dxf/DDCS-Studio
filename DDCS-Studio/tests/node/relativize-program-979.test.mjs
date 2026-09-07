@@ -1,7 +1,7 @@
 // t979 — relativizeProgram: absolute→incremental for the surfacing "Skim" Z-mode. Per-axis first-ref → 0 delta
 // (that axis's start = the jog position); subsequent moves are deltas; G53 machine-frame + G91 moves are left
 // absolute; feeds/comments preserved. The caller wraps the result in G91 … G90.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 test('relativizeProgram: deltas from the jog ORIGIN (0,0,0); G53 + G91 left alone; feeds preserved', async ({ page }) => {
   await page.goto('http://localhost:3211');

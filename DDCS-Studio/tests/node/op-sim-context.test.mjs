@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * opSimContext — the SIM INTENT layer contract. Locks the declared op-type → preview-render-intent translation so

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * B1 — `def.sim.starts` declarative path (Option A: structured anchor+offset ROWS). A CUSTOM op declares its per-pass
