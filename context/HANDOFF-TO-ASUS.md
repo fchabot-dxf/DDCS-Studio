@@ -191,6 +191,9 @@ reports the nominal value on Windows, not the live one. The perf-counter reading
 219 test FILES, one process each
   bare node startup + modules   ~0.75 s/file
 + register.mjs hook (node:module register → hooks thread, node 22+)   ~0.50 s/file
+  ⛔ WRONG — MEASURED ~50 ms at t2717 (0f4d3bb9). The total below is right; the CAUSE is not.
+  ⭐ The real ~665 ms/file is @playwright/test, pulled into all 219 files by harness.mjs:25.
+  See context/SHARD-COMMS.md, the t2717 correction section.
                                 ─────────
                                  1.37 s/file × 219 ≈ 300 s serial
 observed 64 s wall  ⇒ ~4.7× effective parallelism (16 threads available)
