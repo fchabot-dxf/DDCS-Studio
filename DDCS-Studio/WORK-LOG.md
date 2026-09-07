@@ -79993,3 +79993,105 @@ mutated by an earlier file. Making this viable means auditing cross-file state i
 `1ed704b6`/`7b39ae61` during this turn). Everything above is measurement on an unmodified tree — the only
 writes this turn are this WORK-LOG entry and two throwaway files in the session scratchpad, outside the repo.
 `git pull --rebase` before committing; baseline re-run confirms the tier is **795 pass / 0 fail** unmodified.
+
+## t3001 (ASUS) — bare `python` now resolves to the real interpreter on the ASUS box (user-PATH reorder). No repo code changed.
+
+**ASUS local turn 1** — the first turn of the ASUS advisor/worker loop. Dispatch:
+`DDCS-Studio/scratchpad/DISPATCH-asus-t3001-python-path.md`. Tier **NONE** as dispatched, and that is the
+right call: this turn changes a Windows user environment variable, not a single file under `web/`, `tests/`
+or `scripts/`. `test:changed` would map it to nothing.
+
+### BUILT — the fix, and it is a pure reorder
+`C:\Users\danse\AppData\Local\Python\bin` moved from position 5 to position 2 in the **USER** PATH, ahead of
+`C:\Users\danse\AppData\Local\Microsoft\WindowsApps`. The advisor's diagnosis was correct and was taken as
+given — nothing was missing, nothing was installed, no app-execution alias was touched.
+
+```
+1. C:\Users\danse\.local\bin
+2. C:\Users\danse\AppData\Local\Python\bin                 <-- moved up (was 5)
+3. C:\Users\danse\AppData\Local\Microsoft\WindowsApps      <-- was 2
+4. C:\Users\danse\AppData\Local\Programs\Microsoft VS Code\bin
+5. C:\Users\danse\AppData\Local\Programs\Antigravity\bin
+6. C:\Users\danse\AppData\Roaming\npm
+7. C:\Users\danse\AppData\Local\GitHubDesktop\bin
+```
+
+Same 7 entries, no duplicate added, no entry dropped, identical 312-char length — asserted before writing
+(`Compare-Object` set-equality + a duplicate check), not eyeballed. MACHINE PATH untouched, and it contains
+no `python`/`WindowsApps` entry at all, so USER scope was sufficient.
+
+⛔ **`setx` was NOT used** (it truncates at 1024 chars). Written with
+`[Environment]::SetEnvironmentVariable('Path', <new>, 'User')`, per the spec.
+
+**Backup, for anyone who is not me:** `DDCS-Studio/scratchpad/PATH-backup-user-t3001-asus.txt` — the verbatim
+pre-change user PATH, written before the first mutation. Restore is a single
+`[Environment]::SetEnvironmentVariable('Path', (Get-Content <that file> -Raw), 'User')`.
+
+### ⚠ ONE THING THE SPEC DID NOT MENTION, AND IT WOULD HAVE BEEN A SILENT REGRESSION
+`[Environment]::SetEnvironmentVariable` **silently downgraded the registry value type**. `HKCU:\Environment\Path`
+was `REG_EXPAND_SZ` (`ExpandString`) before the call and came back `REG_SZ` (`String`) after it. Measured both
+sides, not assumed.
+
+Harmless *today* — the value contains no `%VAR%` to expand (checked). But it is a latent trap: the next person
+who adds `%USERPROFILE%\something` through the System Properties GUI would get a literal, non-expanding entry.
+Restored to `ExpandString` with `Set-ItemProperty -Path 'HKCU:\Environment' -Name Path -Type ExpandString`,
+value confirmed byte-identical across the type fix.
+
+Because `Set-ItemProperty` writes the registry *without* the broadcast that `SetEnvironmentVariable` does, a
+`WM_SETTINGCHANGE`/`"Environment"` broadcast was then sent explicitly (`SendMessageTimeout` to `HWND_BROADCAST`,
+returned delivered) so Explorer-launched processes pick the new order up without a logoff.
+
+### MEASURED — verified in a shell that composes PATH the way a NEW shell does
+⚠ **A child process of this agent session inherits the session's STALE env**, so `Start-Process` proves
+nothing. Both checks therefore rebuild PATH from the registry itself (`Machine` + `;` + `User`) — which is
+exactly what the session manager does at logon. Scripts kept at
+`DDCS-Studio/scratchpad/verify-python-path-t3001.ps1` and `…-t3001.sh` (both gitignored).
+
+| check | PowerShell (`-NoProfile`) | Git Bash (`bash -l`) |
+|---|---|---|
+| `python --version` | `Python 3.14.3`, **exit 0** | `Python 3.14.3`, **exit 0** |
+| `python handoff.py status` from the git root | prints the marker (turn 1 → WORKER), **exit 0** | same, **exit 0** |
+| `python3 --version` | `Python 3.14.3`, **exit 0** | `Python 3.14.3`, **exit 0** |
+| first `python` on PATH | `…\Python\bin\python.exe` | `…/Python/bin/python` |
+
+Check 2 is the one that matters — a failed `python handoff.py wait` is indistinguishable from a quiet turn,
+which is what made this a loop-killer rather than a nuisance.
+
+### ⇒ THE SPEC WAS WRONG ON ONE FACT, IN OUR FAVOUR — `python3` needed no decision
+The dispatch stated: *"The shim dir ships `python3-64.exe`, **not** `python3.exe`. So reordering PATH fixes
+bare `python` but leaves bare `python3` resolving to the stub"*, and delegated `python3` to the worker.
+
+**It ships both.** Full listing of `C:\Users\danse\AppData\Local\Python\bin`:
+
+```
+pip.exe  pip3.exe  python.exe  python3-64.exe  python3.exe  python3.14-64.exe  python3.14.exe
+pythonw.exe  pythonw3-64.exe  pythonw3.exe  pythonw3.14-64.exe  pythonw3.14.exe
+```
+
+⇒ `python3` was fixed by the same reorder, for free. **No separate change was made and none is needed** — the
+answer the spec asked for is in the table above: `python3 --version` → 3.14.3, exit 0, both shells. Recording
+the correction rather than quietly benefiting from it, per `RUNNING-THE-LOOP.md` §23 (observed, not inferred).
+
+### ⚠ STILL OPEN — the two windows already running did NOT get the fix
+Environment is inherited at process start, so **every session launched before this change keeps the old
+order**, including this worker window and (almost certainly) the ASUS advisor's. Measured in this session's
+own shell after the fix landed: `python` still resolves to `…\WindowsApps\python.exe` and still prints
+*"Python est introuvable"*.
+
+⇒ **Until each window is restarted, keep calling `py`** (or the absolute
+`C:\Users\danse\AppData\Local\Python\bin\python.exe`). New sessions get bare `python` correctly. This is not a
+defect in the fix and there is nothing further to do about it from inside a running process.
+
+### Amendment absorbed
+One amendment polled at the phase boundary, **informational, no scope change**: `py.exe` in `WindowsApps` is a
+symlink to the real PythonSoftwareFoundation launcher while `python.exe` there is the App-Installer
+redirector, so "lives under WindowsApps" is a false-positive test for stub-ness. It confirms the plan rather
+than altering it. It also asked me to report any shell where `py` genuinely fails — **`py` worked in every
+shell I touched here**, including the Git Bash the amendment itself was polled from, so there is no
+cross-shell discrepancy to chase.
+
+### Scope discipline
+⛔ **No repo code changed. No test edited. No suite run** (tier NONE, as dispatched — and I agree with it).
+⛔ `context/` **NOT touched** (the Ranchy advisor is mid-commit there this hour) and `NEXT-SESSION.md` **NOT
+touched** (it belongs to the Ranchy loop). The only tracked write this turn is this WORK-LOG entry; everything
+else is gitignored scratchpad or a Windows registry value.
