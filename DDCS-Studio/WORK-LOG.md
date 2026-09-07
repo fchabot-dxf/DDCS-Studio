@@ -80276,3 +80276,103 @@ that the runs themselves ARE the tier here). `context/`, `NEXT-SESSION.md` not t
 alone; this turn's own blob collection (`report-01.zip`, from the baseline's `test-all.cjs` run) landed
 alongside it as the normal, gitignored side effect. `git pull --rebase` before committing; stash stack
 unchanged.
+
+## t3007 (ASUS) — evidence gap closed (0 flaky under the FULL shape too), PW_WORKERS=2 wired durably for this box, progress pusher verified live with real content
+
+**ASUS local turn 7.** Dispatch: `DDCS-Studio/scratchpad/DISPATCH-asus-t3007-workers-2.md`. Three independent
+items, reported separately as instructed. `playwright.config.js` **not touched** throughout.
+
+### 1. THE GAP — closed, assumption held
+t3005's `w2 → 0 flaky` was measured `PW_WORKERS=2 npx playwright test --shard=1/40` (e2e only, no node tier) —
+lighter than the node-then-e2e shape the recommendation is actually for. Ran the real shape this turn:
+
+```
+PW_WORKERS=2 node scripts/test-all.cjs --shard=1/40
+```
+
+`test-results/summary.json` copied out **immediately** on completion, before anything else touched it —
+closing the loop on the exact mistake named in t3005. Saved to
+`DDCS-Studio/scratchpad/t3007-summary-w2-fullshape.json`. Log: `t3007-w2-fullshape.log`.
+
+```
+node tier:  795 pass / 0 fail, 60.43s
+e2e tier:   70 passed, 0 failed, 0 flaky, 0 skipped, wall 1m59s
+stats: {expected: 70, skipped: 0, unexpected: 0, flaky: 0}
+```
+
+**Zero flake under the full shape too.** Checked individually, not inferred from the aggregate — every one of
+Ranchy's three named specs (`align-rotate-gui`, `alignment-canvas-refit-732`, `add-operation-1940`) AND this
+box's own trio from t3005 (`alignment-correction-840`, `alignment-fresh-seat`, `alignment-handle-visible-exit`,
+`alignment-in-place`) came back single `passed`, no retry, all 19 tests across those seven spec files. Full
+list in the saved JSON. **The assumption the decision was made on holds — proceeding to step 2 as instructed.**
+(Had it come back non-zero, this entry would stop here with the number and nothing wired; it didn't come to
+that.)
+
+### 2. WIRED — `PW_WORKERS=2` as a **user-scope environment variable**, this box only
+`playwright.config.js`'s committed `4` is untouched — Ranchy's own measured number for its bigger machine, and
+this turn doesn't touch shared plumbing.
+
+**Mechanism chosen: `[Environment]::SetEnvironmentVariable('PW_WORKERS', '2', 'User')`.** Trade-off, stated as
+asked rather than picked silently: this is **global to the user account on this box** — every future
+Playwright invocation by this user picks it up, not only shard runs. Chose it anyway because (a) it is the
+only option that needs zero future action and survives every reboot, which is exactly what an unattended node
+requires; (b) the evidence behind it (t3005's 0→3→5 flake trend, and this turn's full-shape confirmation) is a
+property of *this hardware* — half the cores and ~1.41× slower per core than Ranchy's box — not specific to
+being unattended, so an interactive run of the same suite on this same box would plausibly want fewer workers
+too; (c) it remains a one-line override for a specific invocation (`PW_WORKERS=6 npx playwright test …` in Git
+Bash, or `$env:PW_WORKERS=6; npx …` in PowerShell) if the owner ever wants more workers for a one-off run on
+this box, so choosing the global default doesn't foreclose anything per-run.
+
+**The t3001 registry trap, checked rather than assumed absent:** a brand-new value written by
+`SetEnvironmentVariable` was created as `REG_SZ`, confirmed with `(Get-Item HKCU:\Environment).GetValueKind
+('PW_WORKERS')`. That is **correct here**, unlike the t3001 PATH case — `"2"` has no `%VAR%` to expand, so
+there is nothing to restore. Recording that I checked rather than skipping the concern because "it probably
+doesn't apply."
+
+**Verified via the same registry-rebuild proxy as t3001**, in both shells, and the same honest limitation
+applies: a process descended from this already-running session inherits its stale environment regardless of
+the `WM_SETTINGCHANGE` broadcast sent after the write, so both checks manually rebuilt `$env:PW_WORKERS` (and
+`$env:Path`) from the registry before spawning the child — which is what a genuinely new, non-descended process
+would see automatically without any manual step.
+
+```
+PowerShell (rebuilt env):  PW_WORKERS = 2
+Git Bash (rebuilt env, login shell): PW_WORKERS = 2
+```
+
+### 3. PROGRESS PUSHER — started after the measurement run finished, verified via room content not process state
+Ordering respected: launched only after step 1's run had completely finished, per the dispatch's own
+contention-contamination concern.
+
+Push key confirmed present first: `C:\Users\danse\.ddcs-bridge\progress-push-key.txt`, 40 bytes. Launched the
+FIXED script (`$PSScriptRoot`-derived path, confirmed at `suite-progress-worker/push-progress.ps1:12-13`) as a
+**detached** process (`Start-Process powershell.exe -WindowStyle Hidden -File …`, not a child of this Bash
+session) so it survives independent of this turn — it is meant to run continuously as the unattended node's
+standing pusher, not a per-turn utility. **PID captured directly from `Start-Process`'s own return value
+(20120)**, not found via a `CommandLine -like` search — avoids exactly the self-match trap the advisor named
+from their own mistake this turn. Confirmed still alive by that known PID after the checks below.
+
+**Verified by content, not by "it launched":**
+```
+GET /agg
+  "FRED-ASUS-TUF": {"done":70,"total":70,"pass":70,"fail":0,"flaky":0,"skip":0,"status":"finished"}
+```
+Real numbers matching the just-finished run (70/70), not a stale or empty room.
+
+⚠ **One wrinkle worth recording so the next reader doesn't re-diagnose it as a bug:** a bare `GET /rooms` (no
+query string) returned `[]` at first, which looked like a failure. It isn't — reading `suite-progress-worker/
+src/index.js`, `/rooms` has **no dedicated top-level route**; an unrecognized path falls through to
+`env.ROOM.get(idFromName(roomName || 'main'))`, so a bare `/rooms` query lands on the **`main`** room's own
+(unused) copy of that handler — always empty unless something posts to the `main` room specifically. The
+actual room **registry** is a separate fixed DO instance named `__rooms__`; querying it directly —
+`GET /rooms?room=__rooms__` — returned `["RENDERRANCHY","FRED-ASUS-TUF"]`, confirming registration. Both that
+and `/agg` (which reads the same registry internally) agree. Not a defect in the pusher or the dispatch's
+instruction, just an easy-to-mis-hit endpoint shape.
+
+### Scope discipline
+`playwright.config.js` untouched. No repo code changed. Three instrument runs only (this turn's full-shape w2
+run plus the already-completed t3005 runs it built on) — no full suite. `context/`, `NEXT-SESSION.md`
+untouched. `git pull --rebase` before committing; stash stack unchanged. The progress pusher (PID 20120) is
+being **left running** on purpose — it is the durable standing piece this turn was dispatched to establish,
+not a leftover; noting it here so it isn't flagged as a leak on the next `proc_health.py watch` (it is outside
+this session's tracked worker root by design, launched detached).
