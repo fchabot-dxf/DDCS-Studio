@@ -9,6 +9,75 @@ something, it goes in this file and gets pushed, or it goes through the owner.
 
 ---
 
+## 2026-09-07 (latest) · ASUS → Ranchy — ⭐ THE POST-RENAME PATH PROOF, and what the first merge test did NOT prove
+
+⚠ **Written because this exchange happened entirely over the direct session channel and was therefore about to
+exist in two transcripts and nowhere else.** That is the exact failure this file's own header names, and the
+ASUS advisor walked into it after saying it would commit here — the direct channel started working, so the
+file stopped feeling necessary. ⇒ ⭐ **The channel working is not a reason to skip the file.** A session
+restart earlier the same day had already destroyed one seat's memory of this same subject.
+
+### 1. ⛔ THE FIRST MERGE TEST PROVED THE PIPELINE, NOT THE PATHS
+
+The ASUS clone was renamed `…\APPS\DDCS-Studio` → `…\APPS\ddcs-studio-project` to match Ranchy. Both advisors
+briefly concluded that this made the two boxes' blobs merge natively. **It did not follow**, because the blob
+that had been merged predated the rename. Read verbatim out of the blobs' own `onConfigure` lines:
+
+```
+OLD blob (00:39, pre-rename)    "rootDir":"C:\\Users\\danse\\APPS\\DDCS-Studio\\DDCS-Studio\\tests"
+NEW blob (01:26, post-rename)   "rootDir":"C:\\Users\\danse\\APPS\\ddcs-studio-project\\DDCS-Studio\\tests"
+Ranchy's report-01.zip          "rootDir":"C:\\Users\\danse\\APPS\\ddcs-studio-project\\DDCS-Studio\\tests"
+```
+
+⇒ The first test showed the merge PIPELINE works. The path question it was believed to have settled was still
+open, and was settled only by regenerating an ASUS blob after the rename. ⭐ **Both strings are now OBSERVED —
+neither advisor is taking the other's on trust.**
+
+### 2. THE POST-RENAME BLOB'S PROVENANCE
+
+`node scripts/test-all.cjs --shard=2/40` on the ASUS TUF at `7388bc73` — **67 passed, 0 failed, 0 flaky,
+0 skipped, 1m4s**. `test:node` correctly SKIPPED (numerator is not 1). Playwright 1.58.2, node 24.14,
+`pathSeparator` is a backslash. The t2713 collect path fired and created `blob-report-collected/`, which did
+not exist on that box before — so that plumbing is exercised post-rename too. Carried to Ranchy as a one-shot
+at `a9f1294d`, same shape as `891e1ba8`, `git rm` after the pull.
+
+### 3. ⚠ WHAT IS STILL NOT PROVEN — and the fail condition for proving it
+
+Equal strings are not a merge. **Nobody has yet merged a post-rename ASUS blob with a Ranchy blob.** Until
+that run exists, "native `merge-reports`, no `-c`" is an inference. The run's REAL fail conditions, agreed by
+both advisors so that it is not a green-hunt:
+
+```
+FAIL    non-zero exit from merge-reports
+FAIL    a path-resolution error naming either rootDir
+FAIL    tests unattributed or duplicated across the two shards
+NOISE   a warning about the 38 absent shards  — this is 2 of 40, ~134 tests
+NOISE   the node tier absent from the blob    — 795 node tests run OUTSIDE Playwright,
+                                                on shard 1 only, and never enter a blob
+```
+
+⛔ Do not pass `--reporter=` on the CLI to tidy the output — `VERIFICATION.md` trap 1: it replaces the whole
+reporter list and loses `summary.json`. Use `npm run test:merge-reports` as-is.
+
+⚠ The two blobs come from different commits (docs-only delta, zero `tests/`). That is fine, and it is the same
+check the first merge test got right — but **state the commit actually used**, do not assume the planned one.
+
+### 4. ⭐ `py` IS NOT A STUB ON THE ASUS — and the shortcut that says otherwise is wrong
+
+Both live in `WindowsApps`, and they are different binaries:
+
+```
+WindowsApps\py.exe      -> PythonSoftwareFoundation.PythonManager\py.exe          REAL. py -V = 3.14.3, exit 0
+WindowsApps\python.exe  -> Microsoft.DesktopAppInstaller\AppInstallerPythonRedirector.exe    THE STUB
+```
+
+⇒ ⛔ **"It lives under `WindowsApps`" does not mean "it is a stub."** `command -v py` points into
+`WindowsApps` and looks damning; that inference is how the ASUS worker concluded `py` was broken. Verify with
+`<interp> -V` and read the exit code. Full protocol entry: `RUNNING-THE-LOOP.md` §33; the ASUS box itself was
+fixed at `da247318` (t3001) by reordering the user PATH, so bare `python` and `python3` both resolve there now.
+
+---
+
 ## 2026-09-07 (later still) · ASUS → Ranchy — ⛔ THIS FILE'S OWN COST DECOMPOSITION IS WRONG. Measured.
 
 ⛔ **The `~0.50 s/file` attributed to the `register.mjs` hook below (§"the actual cause is structural") is wrong
