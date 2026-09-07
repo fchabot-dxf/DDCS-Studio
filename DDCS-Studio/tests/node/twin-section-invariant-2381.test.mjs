@@ -1,4 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * t2381 — THE SECTION-METADATA INVARIANT, declared ONCE, table-driven, over EVERY registered twin.
@@ -135,7 +138,39 @@ import { test, expect } from '@playwright/test';
  * exception" straight to `TREE_MODE_TWINS` (exempt from the completeness check by the SAME mechanism drill/
  * edge/etc already use), never touching `VOCABULARY_EXCEPTIONS` at all. Every registered built-in-equivalent
  * twin is now tree-rendered — corner was the last one, deliberately deferred to be the gated pilot.
+ *
+ * ── NODE-TIER ADAPTATION (this file) ─────────────────────────────────────────────────────────────────────────────
+ * The browser original relies on `app.js`'s boot-time `seedDefaultPortedUserOps()` having already registered all
+ * 32 twins into the persisted store (`U.listUserOps()`) before the test body runs. `app.js` is not importable in
+ * this tier (it calls `finishBoot()` at module scope — the same finding already recorded in
+ * preview-spec-gate-1688.test.mjs / architecture-map-1698.test.mjs), so this file discovers the twin builders from
+ * `blocks/dataOps/*Data.js` (every `/DataDef$/` export — the same technique those two files use) and seeds them
+ * itself via `createUserOp`, existence-checked and re-run fresh at the top of every test (node persists the store
+ * across every test in this process).
  */
+
+const ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+const WEB = path.join(ROOT, 'web');
+
+async function collectBuilders() {
+    const dir = path.join(WEB, 'blocks', 'dataOps');
+    const files = fs.readdirSync(dir).filter((f) => /Data\.js$/.test(f)).sort();
+    const builders = [];
+    for (const f of files) {
+        const mod = await import('/blocks/dataOps/' + f);
+        for (const key of Object.keys(mod).filter((k) => /DataDef$/.test(k))) builders.push(mod[key]);
+    }
+    return builders;
+}
+
+async function seedAllTwins(U) {
+    const builders = await collectBuilders();
+    const have = new Set(U.listUserOps().map((d) => d.opType));
+    for (const fn of builders) {
+        const def = fn();
+        if (!have.has(def.opType)) { U.createUserOp(def); have.add(def.opType); }
+    }
+}
 
 // t2401 — 'FEATURE CONTEXT' added, mirroring formWidgets.js's own SECTION_RANK (a hand-typed copy here, not
 // an import — unchanged from before this turn; kept in sync by hand same as always). See formWidgets.js's
@@ -248,6 +283,7 @@ test('SURVEY: section-metadata completeness + vocabulary across every registered
     const rows = await page.evaluate(async ({ hasTreeLayoutSrc }) => {
         const hasTreeLayout = new Function('return ' + hasTreeLayoutSrc)();
         const U = await import('/blocks/userOps.js');
+        await seedAllTwins(U);
         const out = [];
         for (const s of U.listUserOps()) {
             const opType = s.opType;

@@ -1,4 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * t1581 — PIN THE INVARIANT: every REGISTERED data twin's form presents every declared binding.
@@ -9,38 +12,58 @@ import { test, expect } from '@playwright/test';
  * 22 fields gone from middle's form). Fixed at the one consumer: `formBindings()` now unions row-less bindings
  * back in at their declared position. This spec is the regression tripwire so that class cannot return silently.
  *
- * DATA-DRIVEN, not a hand-typed parallel list: `app.js`'s `SEED_BUILDERS` is the SAME registry the app itself uses
- * for boot-seeding every workspace and for each wizard's "Restore to factory" action (t1107) — read it only for
- * the opType strings (calling each builder is a pure, side-effect-free factory call), never used to register.
+ * DATA-DRIVEN, not a hand-typed parallel list: originally read `app.js`'s `SEED_BUILDERS` for the opType strings
+ * (calling each builder is a pure, side-effect-free factory call, never used to register).
  *
- * t1583/t1585 — DO NOT REGISTER MANUALLY. `app.js`'s `init()` already calls `seedDefaultPortedUserOps()` on every
- * page load, which registers all 32 twins via `createUserOp`/`updateUserOp` before this test's own code ever runs.
- * A test that ALSO calls `registerUserOp`/`createUserOp` on the same opType a second time in the same page session
- * is a REDUNDANT re-registration — and for 7 of the 32 twins (atc_warmup + the 6 lathe turning/probe ops) that
- * second call throws (a stale/colliding block-index derivation), even though the FIRST, real, boot-time
- * registration succeeded cleanly every time (confirmed: 15/15 fresh boots, real `openWiz()` opens + G-code emits
- * clean for all 7, and 4 of the 6 lathe ops have their OWN dedicated, already-passing tests exercising this exact
- * twin+emit path). The original version of this spec manually re-registered and asserted those 7 as a permanent
- * "known construction failure" set — a false claim the spec's own bug produced. Fixed by reading the ALREADY
- * boot-seeded def (`listUserOps()`) instead of building and registering a second one. THE CLASS, for the next
- * person writing a twin test: if your test's own `registerUserOp`/`createUserOp` call predates
- * `seedDefaultPortedUserOps` (or you're just not sure), don't register manually at all — resolve the boot-seeded
- * def/builder instead; a redundant registration is harmless for most twins but silently throws for a few.
+ * ── NODE-TIER ADAPTATION (this file) ─────────────────────────────────────────────────────────────────────────────
+ * `app.js` is NOT importable in this tier — it calls `finishBoot()` at module scope (real DOM / `Audio` etc.), the
+ * same finding already recorded in preview-spec-gate-1688.test.mjs and architecture-map-1698.test.mjs. So the twin
+ * set is DISCOVERED from `blocks/dataOps/*Data.js` (every `/DataDef$/` export) instead of read off `SEED_BUILDERS`
+ * — the same technique those two files already use, cross-checked elsewhere to agree with `SEED_BUILDERS` 32-for-32.
+ * The browser original also never registers manually — it relies on `app.js`'s own boot-time
+ * `seedDefaultPortedUserOps()` having already run before the test body executes. Here nothing boots automatically,
+ * so this file seeds every discovered twin via `createUserOp` (existence-checked, fresh each call — node persists
+ * the module-level store across every test in this process, so a twin seeded by test 1 must not be re-created by
+ * test 2's own seed pass) — the SAME seeding pattern already used elsewhere in this tier (pattern 3: a test that
+ * reads the PERSISTED store, not the live registry, needs `createUserOp` with an existence check).
  */
-test.use({ viewport: { width: 1400, height: 1000 } });
+
+const ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+const WEB = path.join(ROOT, 'web');
+
+async function collectBuilders() {
+    const dir = path.join(WEB, 'blocks', 'dataOps');
+    const files = fs.readdirSync(dir).filter((f) => /Data\.js$/.test(f)).sort();
+    const builders = [];
+    for (const f of files) {
+        const mod = await import('/blocks/dataOps/' + f);
+        for (const key of Object.keys(mod).filter((k) => /DataDef$/.test(k))) builders.push(mod[key]);
+    }
+    return builders;
+}
+
+// existence-checked, called fresh at the top of every test — never memoized (node persists the store across tests).
+async function seedAllTwins(U, builders) {
+    const have = new Set(U.listUserOps().map((d) => d.opType));
+    for (const fn of builders) {
+        const def = fn();
+        if (!have.has(def.opType)) { U.createUserOp(def); have.add(def.opType); }
+    }
+}
 
 test('every registered data twin: the form presents every declared binding (formBindings drops none)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram, undefined, { timeout: 20_000 });
 
     const r = await page.evaluate(async () => {
-        const A = await import('/app.js');
         const U = await import('/blocks/userOps.js');
         const OB = await import('/blocks/opBuilders.js');
         const FW = await import('/ui/formWidgets.js');
+        const builders = await collectBuilders();
+        await seedAllTwins(U, builders);
         const perTwin = [];
-        for (const fn of A.SEED_BUILDERS) {
-            const opType = fn().opType;   // pure factory call, just to read the opType string — never registered
+        for (const fn of builders) {
+            const opType = fn().opType;   // pure factory call, just to read the opType string — never registered here
             const stored = U.listUserOps().find((d) => d.opType === opType);   // the ALREADY boot-seeded def
             if (!stored) { perTwin.push({ opType, error: 'not found in the boot-seeded registry' }); continue; }
             if (!OB.builderOf(opType)) { perTwin.push({ opType, error: 'no working builder wired for a registered def' }); continue; }
@@ -87,12 +110,13 @@ test('every registered data twin: materialization preserves each binding\'s CONT
     await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram, undefined, { timeout: 20_000 });
 
     const r = await page.evaluate(async () => {
-        const A = await import('/app.js');
         const U = await import('/blocks/userOps.js');
         const FW = await import('/ui/formWidgets.js');
+        const builders = await collectBuilders();
+        await seedAllTwins(U, builders);
         const nameOf = (fn) => (Object.entries(FW.FORM_WIDGETS).find(([, v]) => v === fn) || ['<unregistered>'])[0];
         const perTwin = [];
-        for (const fn of A.SEED_BUILDERS) {
+        for (const fn of builders) {
             const opType = fn().opType;
             const stored = U.listUserOps().find((d) => d.opType === opType);
             if (!stored) { perTwin.push({ opType, error: 'not found in the boot-seeded registry' }); continue; }

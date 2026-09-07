@@ -1,8 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Suggestion system (A): a bigram model (curated seed + learned from the user's programs) drives a "Suggested
 // next" chip strip; clicking a chip appends that block.
-test.use({ viewport: { width: 1280, height: 900 } });
+//
+// TIER MIGRATION WORK PACKAGE B: split out of tests/block-suggest.spec.js — these two tests import
+// /blocks/suggest.js directly and assert on its plain returned arrays, no DOM. The third test (clicking a
+// real chip in the rendered UI) stays in tests/block-suggest-drive.spec.js.
 
 test('suggestion model: curated seed + learning from programs', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -39,19 +42,4 @@ test('curated seed matches the DDCS macro idioms (probe / tool-change / open)', 
   expect(r.probe, 'then the trigger position is read').toContain('proberead');
   expect(r.tool, 'a tool change ends with an auto tool-set probe').toContain('probe');
   expect(r.probecheck, 'after the check, read the trigger').toContain('proberead');
-});
-
-test('suggestion strip: clicking a chip appends a block', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
-  await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => window.__blkWs && document.querySelector('#blocks-app .blk-suggest'));
-  await page.waitForFunction(() => document.querySelector('#blocks-app .blk-suggest .blk-sug-chip'));
-
-  const opCount = () => page.evaluate(() => ((window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [])
-    .filter((b) => b && b.type !== 'progstart' && b.type !== 'progend').length);
-  const before = await opCount();
-  await page.click('#blocks-app .blk-suggest .blk-sug-chip');
-  await page.waitForTimeout(250);
-  expect(await opCount(), 'clicking a suggestion appended a block').toBeGreaterThan(before);
 });

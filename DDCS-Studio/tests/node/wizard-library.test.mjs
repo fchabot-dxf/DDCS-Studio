@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * The WIZARD LIBRARY — the catalog the wizard bar + the Settings manager render from. Locks: the default catalog

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t2543 (BACKLOG #71 owner ruling) — SEPARATE THE SLOT: `param_group.children` used to be shared by two
@@ -9,14 +9,16 @@ import { test, expect } from '@playwright/test';
  * tightening the guard instead made materialize OVERWRITE the declared structure outright (t2531, reverted).
  *
  * THE FIX: materialize now targets its OWN node, `param_table` (mirroring `materializeCamTable`'s own
- * `cam_table`, found by TYPE alone) — never reads, never writes, a twin's own `param_group` node. This is the
- * CANARY + PROOF file for the separation: t2531's own two real failures stay green (their own spec files,
- * unmodified, are the canary — asserted again here isn't needed, they ARE the regression test), and THIS file
- * proves the previously-impossible case directly: a twin declaring group_box nodes in `param_group.children`
- * now materializes cleanly, its own declared structure completely undisturbed.
+ * `cam_table`, found by TYPE alone) — never reads, never writes, a twin's own `param_group` node. See the
+ * sibling tests/param-group-table-separation-2543-drive.spec.js for the second test (`renderUiTree` render
+ * contract, built + queried on a real DOM tree) and its own full header comment.
  *
  * Per this turn's own explicit scope, NO real twin file is migrated — this builds a throwaway `def` object
  * only, demonstrating the mechanism without shipping it.
+ *
+ * TIER MIGRATION WORK PACKAGE B: split out of tests/param-group-table-separation-2543.spec.js — this is the
+ * ONE test in that 2-test file with zero DOM construction (`U.materializeParamGroup` mutates a plain `def`
+ * object, no `document.createElement`/`querySelectorAll`).
  */
 
 test('materializeParamGroup targets param_table exclusively -- a group_box-declaring param_group survives byte-identical', async ({ page }) => {
@@ -86,58 +88,4 @@ test('materializeParamGroup targets param_table exclusively -- a group_box-decla
     expect(r.paramTableChildCount, 'one param_field per value binding').toBe(2);
     expect(r.paramTableFieldParams.sort()).toEqual(['height', 'width']);
     expect(r.uiChildrenCountBefore, 'idempotent: a second call injects nothing further').toBe(r.uiChildrenCountAfter);
-});
-
-test('renderUiTree renders the group_box structure from param_group AND ignores a param_table sibling entirely -- both owners read their own slot, live', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => true);
-    const r = await page.evaluate(async () => {
-        const FW = await import('/ui/formWidgets.js');
-        // Hand-built, not run through materializeParamGroup: a group_box/field_ref structure (drill's own
-        // shape) side by side with a param_table (the shape materialize produces for a DIFFERENT def that has
-        // no field_ref coverage, per test 1 above) -- this isolates the RENDER contract (can the two node
-        // types coexist under one root without either corrupting the other) from materialize's OWN decision
-        // of when to produce that combination, which is a separate concern already covered by test 1's own
-        // field_ref-skip assertion and the drillSame precedent (cam-block-native-params-s52.spec.js).
-        const uiChildren = [
-            { type: 'param_group', params: { group: 'Test' }, children: [
-                { type: 'group_box', params: { title: 'GEOMETRY' }, children: [
-                    { type: 'field_ref', params: { param: 'width' } },
-                    { type: 'field_ref', params: { param: 'height' } },
-                ] },
-            ] },
-            { type: 'param_table', params: { group: 'Settings' }, children: [
-                { type: 'param_field', params: { param: 'feed', label: 'Feed', widget: 'number', type: 'number', dflt: '200', units: '', nmin: '', nmax: '', nstep: '', section: '', help: '', options: '' } },
-            ] },
-        ];
-        const bindings = [
-            { param: 'width', type: 'number', blockIndex: 0, key: 'rpm', default: 100, label: 'Width' },
-            { param: 'height', type: 'number', blockIndex: 0, key: 'rpm', default: 80, label: 'Height' },
-            { param: 'feed', type: 'number', blockIndex: 0, key: 'rpm', default: 200, label: 'Feed' },
-        ];
-
-        // field_ref RELOCATES an already-rendered row (formWidgets.js:1516) -- it needs byParam pre-populated
-        // by the flat render, same as every other renderUiTree(...) caller (userOpView.js's own render()).
-        const flatHost = document.createElement('div');
-        document.body.appendChild(flatHost);
-        const readers = FW.renderOpForm(flatHost, bindings) || [];
-        const byParam = {};
-        flatHost.querySelectorAll('[data-param]').forEach((inp, idx) => { byParam[inp.dataset.param] = { row: inp.closest('.form-row'), read: readers[idx] }; });
-
-        const treeHost = document.createElement('div');
-        document.body.appendChild(treeHost);
-        FW.renderUiTree(treeHost, uiChildren, bindings, byParam, null, null);
-
-        const treeRows = [...treeHost.querySelectorAll('[data-param]')].map((el) => el.dataset.param);
-        const unwiredTypes = [...treeHost.querySelectorAll('.unwired-block')].map((el) => el.dataset.blockType);
-
-        flatHost.remove(); treeHost.remove();
-        return { treeRows, unwiredTypes };
-    });
-
-    // width/height are placed BY the group_box's own field_ref rows, in its declared order; feed has no tree
-    // placement at all (param_table is a canvas-only no-op, never a form-tree placement node) so it surfaces
-    // via the orphan-net fallback -- appearing exactly ONCE, never doubled, never dropped.
-    expect(r.treeRows, 'group_box places width/height; feed reaches the form via the orphan net, not param_table').toEqual(['width', 'height', 'feed']);
-    expect(r.unwiredTypes, 'param_table renders as a silent no-op, never an unwired-placeholder').not.toContain('param_table');
 });

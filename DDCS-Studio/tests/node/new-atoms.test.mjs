@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // New universal atoms: Stop (M0/M1), Plane (G17-19), Feed Mode (G94/95), Home (G28), Call (M98), Return (M99).
 test('new atoms emit correct G-code and land in the right categories', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // The Region (Shapes) block gains polygon + ellipse (on top of rect + circle); fills/walls are contour-based so
 // the new shapes work wherever a region plugs in.

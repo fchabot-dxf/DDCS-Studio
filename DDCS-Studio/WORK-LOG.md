@@ -79399,3 +79399,101 @@ this batch that leaned on naming convention rather than a full read, unlike ever
 Process tree clean (all 4 background agents' own node/playwright processes exited on completion; no orphaned
 mem-server this batch).
 
+## t2707 — TIER-MIGRATION BATCH 11: blocks/authoring, the last big cluster (4 parallel agents + 4 solo confirms)
+
+The last big cluster before the final refuse/validation-guard batch. **41 tests moved across 19 files** (10
+whole-moves, 9 splits, one of which required restructuring a single mixed test into two). Node tier
+721->762 (+41 exact). Browser `--list` 2768->2728 (+/-40, not 41 -- see the one-test-manufactured exception
+below, fully explained, not a discrepancy).
+
+### Per-file outcomes
+
+**Whole moves (10 files, 20 tests):** `blocks-dialect-decode`(4 -- dispatch guessed 5, actual 4, still a
+clean whole move), `federated-registry`(1), `new-atoms`(1), `region-shapes`(1), `twin-form-completeness-1581`
+(2), `twin-section-invariant-2381`(1), `wizard-library`(3) -- all pure registry/emit/codec logic, no DOM.
+
+**Splits (9 files, 21 moved / 20 stayed + 1 manufactured):**
+- `canvas-widgets` -- 5 moved (pure `buildCanvasWidgets` gesture-math), 2 stayed (drill/text wizard "renders
+  its handles" -- real canvas DOM query) -> `canvas-widgets-drive.spec.js`. Matched dispatch's own 5/7 guess
+  exactly.
+- `formfield-block` -- 4 moved (round-trip/derive/isMaintainedAsData, all pure), 1 stayed ("DRIVE THE APP" --
+  real render + Class-B Blockly render guard) -> `formfield-block-drive.spec.js`.
+- `formfield-opparam-1640` -- 2 moved (MODEL + lossless round-trip, pure), 2 stayed (both "REAL APP"/dialog-
+  driven tests, real save dialog + `page.reload()`) -> `formfield-opparam-1640-drive.spec.js`.
+- `handle-target-fails-visibly-2525` -- 3 moved (`handleTargetReport`/gate checks on constructed arrays, no
+  DOM), 1 stayed (the marker-render test's pure first half is inseparable from its trailing `window.openWiz`+
+  `page.screenshot` second half -- a single test can't straddle tiers) -> `-drive.spec.js`.
+- `handle-form-render-fixes-2527` -- 3 moved (widget-key mismatch, `labelFor`, `resolveFormWidget` warning --
+  the last one uses the harness's supported `page.on('console', ...)` bridge), 2 stayed (the real drag/save
+  gesture, and "an unresolved handle's own fail-visibly stub" -- **gate trap #1**, builds
+  `document.createElement`+`querySelectorAll('[data-param]')`) -> `-drive.spec.js`.
+- `anchor-searchable-field-2679` / `wizard-shapes-1627` -- 2 moved each (pure `layoutSpecFromOp` calls), rest
+  stayed (real Blockly workspace round-trips reading `getField().getText()`, or a real modal). Both moved
+  tests dropped an unnecessary shared `boot()` helper call (`window.showApp('blocks')`+`__blkws` wait) since
+  neither test's own logic touched the Blocks workspace -- not a gate trap, just an unused setup call that
+  would have thrown under node (`window.showApp` undefined). -> matching `-drive.spec.js` files.
+- `block-suggest` -- 2 moved (pure `/blocks/suggest.js` calls), 1 stayed (real chip-click DOM) ->
+  `block-suggest-drive.spec.js`.
+- `param-group-table-separation-2543` -- 1 moved (`materializeParamGroup` on a plain object, no DOM), 1
+  stayed (**gate trap #1** again -- `renderUiTree` DOM construction+query) -> `-drive.spec.js`.
+- `gui-param-block` -- ⭐ the ONE file needing an actual TEST-LEVEL RESTRUCTURE, not just a split: the
+  original had exactly ONE test cramming pure registry/emit/extraction logic together with a Class-B Blockly
+  render guard in the same test body. No clean per-test boundary existed, so the agent split that single test
+  into two separate `test()` calls (mirroring the boundary its sibling files already used natively) -- 1
+  moved to node, 1 (the render guard) stayed. **This is why the browser `--list` delta is 40, not 41**: the
+  original file contributed exactly 1 test to the pre-batch browser count; after the restructure it still
+  contributes exactly 1 test (the drive file), so this file's split adds a genuinely NEW test to the node
+  tier without removing a full test's worth from the browser side -- a one-time, fully-accounted-for exception
+  to the usual "N moved = N browser-count delta" rule, not an unexplained discrepancy.
+
+**Also mixed, not called out by the dispatch's own scrutiny flag:** `gui-param-typed-widgets` (1 moved / 2
+stayed -- dispatch DID flag this name for extra scrutiny, confirmed mixed) and `gui-param-grouping` (2 moved
+/ 2 stayed -- NOT flagged by the dispatch, found mixed anyway by reading every test body).
+
+**Untouched -- confirmed 100% UI (10 of the 29 move-candidates):** `formfield-authoring-1610` (real
+save/reload/reopen cycle), `formfield-loud-mismatch-1636` (real save dialog + `page.on('dialog')`),
+`block-suggest-float` (dispatches a synthetic `KeyboardEvent` expecting a live listener -- **gate trap #2**),
+`wizard-value-persistence-1437` (all 8 tests call `window.openWiz`/`insertWiz`/`updateWiz`, none published
+under node), `region-pick-block` / `coord-list-block` (each ONE test mixing pure registry checks with a
+Class-B Blockly render guard, inseparable -- the dispatch's own naming-axis hint said "-block = logic" but
+these are NOT the logic half of their widget/editor pairs), `region-author-block` / `coord-author-block`
+(real modal DOM via `document.getElementById`), `value-token-ranges` (calls the real wizard-modal system
+directly -- gate trap #1's named trigger), `panel-types` (drives `wizardManager.open` then reads real
+rendered DOM; its trailing pure `def.panel` persistence check can't be split out of the single test it lives
+in).
+
+### Skip-candidates (4 files, confirmed by hand, not delegated)
+
+`region-pick-widget.spec.js`, `region-editor.spec.js`, `coord-list-widget.spec.js` -- all real-app/real-DOM
+(`.click()`, `document.getElementById`, or `document.createElement`+`querySelectorAll` DOM construction).
+`param-group-rows-1605.spec.js` -- an elaborate real-app-boot Blockly test (`page.goto('/')`,
+`window.__blkws`, live canvas manipulation); the dispatch's own "audit: redundant/UI" note confirmed correct.
+All 4 read in full, all 4 genuinely UI, zero conversion.
+
+### Verify (LIGHT model)
+
+- `npm run test:node`: 762/762 green (721 + 41 moved = 762 exact).
+- `npx playwright test --list`: 2728 (2768 - 40 = 2728 exact -- the -40-not--41 delta is the `gui-param-block`
+  restructure explained above, not an error).
+- Cluster-aggregate timing: restored all 19 deleted originals via `git checkout HEAD --`, ran them together in
+  real Playwright (58 tests: 41 original-moved-tests-worth + 17 stayed, matching the per-file original counts
+  exactly), summed durations from `test-results/summary.json`. Isolated the moved-only subtotal by title
+  (39210ms, EXCLUDING `gui-param-block`'s single 1963ms original test, whose duration can't be cleanly
+  attributed to "moved" vs "stayed" since it was one test before the restructure). Ran the 19 new node files
+  standalone: 41/41 green, **2483ms** total (this DOES include the extracted `gui-param-block` pure test).
+  Ratio ~= **15.9x** (39210 / 2483, on a slightly generous denominator given the above) -- consistent with the
+  batch's own established 7-16x range. One pre-existing flake noted in the browser run (57 passed + 1 flaky
+  out of 58, auto-retried green) -- not investigated further, unrelated to this batch's own changes (occurred
+  in an UNMODIFIED restored-original file during the timing-only restore cycle, not in the final delivered
+  state). Re-deleted the 19 restored originals afterward; confirmed `git status` back to the exact same
+  50-line diff (19 deleted + 19 new node + 12 new drive files) as before the restore cycle.
+- `tests/TIER-MIGRATION-PLAN.md`: confirmed untouched.
+- No full browser suite run this batch (milestone-only per the relaxed verify model).
+
+### Scope discipline
+
+All 33 named files (29 move-candidates + 4 skip-candidates) read in full this batch -- no naming-convention
+shortcuts taken (unlike batch 10's skip-list, which leaned on names for the final 24). Nothing outside the
+named blocks/authoring files touched. `register.mjs`/`harness.mjs` untouched. Process tree clean (all 4
+background agents' own processes exited on completion).
+

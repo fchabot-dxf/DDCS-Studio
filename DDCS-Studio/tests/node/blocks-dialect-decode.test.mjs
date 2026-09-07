@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 // Per-dialect parse recognizers: each controller's dialect-specific ops (probe cycle, probe-read/check,
 // machine-move, set-WCS, IF/GOTO/label, HMI) must decode to PROPER blocks (no `raw`) and round-trip

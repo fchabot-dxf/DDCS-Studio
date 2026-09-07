@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * FEDERATED REGISTRY (ROADMAP MID #6) — user ops live in a SEPARATE forkable layer; the built-in BUILDERS/SCHEMA
