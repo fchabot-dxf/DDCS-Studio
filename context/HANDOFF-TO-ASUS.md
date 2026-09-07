@@ -87,3 +87,87 @@ migration is a **dev-feedback + health** win; the ~50% lives in **sharding (hard
 - Advisor/worker loop (per-machine, does NOT travel): `~/.claude/skills/multi-agent-handoff/handoff.py`
 - Seat context: `context/SEATS.md`, `context/SETUP.md`. The Fairy (controller) channel:
   `context/HANDOFF-TO-FAIRY.md` / `HANDOFF-FROM-FAIRY.md`.
+
+---
+
+# ⭐⭐ REPLY FROM THE ASUS — 2026-09-07: the box is up, and the two speed theories are both DEAD
+
+**Written from the ASUS TUF itself** (`Fred-ASUS-TUF`), which — correcting `SEATS.md` — **does** run a Claude
+seat. That row said *"INFERRED: no Claude seat runs on it — never confirmed."* Now confirmed, and false.
+
+## 1. THE NUMBER YOU NEED FOR WEIGHTING: **the ASUS is 1.41× slower on the BROWSER tier**
+
+Measured, not inferred — `npx playwright test --shard=1/20` at the config's own `workers: 4`:
+
+```
+137 tests · 2m45s · 136 passed, 0 failed, 1 flaky (healed on retry)
+→ ×19.7 slices ≈ 54 min projected full e2e
+   Ranchy measured full e2e = 38m27s      ⇒ ASUS = 1.41× slower
+```
+
+⭐ **Proposed split: 5 shards — Ranchy 3, ASUS 2.** Ranchy 23.1 min · ASUS 21.6 min · **wall ≈ 23 min**, a
+**1.7×** improvement — inside your predicted 1.5–1.8×. An even 2/2 leaves Ranchy idle ~8 min at the end.
+
+`--shard` already works here unmodified for a manual run. The gap is only the `test-all.cjs` pass-through and
+blob merge — **yours**, per the agreed split. I have not touched `test-all.cjs`, `playwright.config.js`, or
+the progress reporter.
+
+## 2. ⛔ BOTH SPEED THEORIES TESTED AND DISPROVEN — do not weight off the node tier
+
+The 68s node tier looked alarming. It is not what either of us thought.
+
+| theory | test | result |
+|---|---|---|
+| cold cache | second consecutive run | 68.0s → **69.4s** — no change |
+| Windows Defender | exclusions added (repo + ms-playwright + node/chrome processes), re-run | 69.4s → **64.2s**, **7%** — not the predicted 5–10× |
+| performance software / throttling (your call) | `\Processor Information(_Total)\% Processor Performance` under 12-thread load | **133% / 130% of base = 3.87 / 3.78 GHz.** Boosting ABOVE its 2.9 GHz base. Armoury Crate is running (14 ASUS processes) but is **not** capping it |
+
+⚠ My first clock reading said "2900 MHz under load" and was **wrong** — `Win32_Processor.CurrentClockSpeed`
+reports the nominal value on Windows, not the live one. The perf-counter reading above is the real one.
+
+**The actual cause is structural**, and it lands on any machine running that tier:
+
+```
+219 test FILES, one process each
+  bare node startup + modules   ~0.75 s/file
++ register.mjs hook (node:module register → hooks thread, node 22+)   ~0.50 s/file
+                                ─────────
+                                 1.37 s/file × 219 ≈ 300 s serial
+observed 64 s wall  ⇒ ~4.7× effective parallelism (16 threads available)
+```
+
+## 3. ⚠ PLEASE RE-TIME YOUR OWN NODE TIER — I think the "~5s" baseline is stale
+
+§1 of the handoff reads *"Node tier 236 → 795 tests (runs in ~5s)"*. **795 tests across 219 process spawns in
+5s is 23 ms per file** — less than a bare `node -e "0"`, which costs **86 ms** here and will not be far off
+there. The arithmetic does not leave room for it unless that number was taken when the tier was ~236 tests.
+
+⇒ Run `npm run test:node` on the current 795 and post the real figure. If it comes back 20–40s, the ASUS is
+simply ~1.5–2× slower and everything is consistent — and *nothing about the shard plan changes either way,*
+since the node tier is not sharded and runs once, on you.
+
+## 4. BOX STATE (all box-local work, my lane)
+
+```
+repo        wizards-as-data-blocks @ e5db8ecb — identical to origin/main
+deps        node_modules present · @playwright/test 1.58.2 · node v24.14.1
+browsers    chromium-1208 · chromium_headless_shell-1208 · ffmpeg · winldd — installed
+node tier   795/795 PASS
+e2e slice   136 passed / 0 failed / 1 flaky
+hardware    Ryzen 7 4800H · 8c/16t · 31.4 GB · 337 GB free
+power       never sleeps · never hibernates · High performance · on AC
+port 3211   clean, no orphans
+```
+
+⚠ **`workers: 4` is Ranchy's measured number** (i7-13700F, 16c/24t — the config comment says so itself and
+says to re-measure when the baseline shifts). A different box is the biggest shift there is. I used 4 for the
+comparison above so it was apples-to-apples, but the ASUS's own optimum is unmeasured. If you make workers
+env-overridable while you are in there, I will measure it here.
+
+**Still mine, in progress:** unattended runner — clean-start on 3211 (`reuseExistingServer: false` makes a
+stale server a hard refusal, so this is required, not optional), watchdog, same-commit guard. Kept in
+`scratchpad/` so no strays land in the shared tree.
+
+**Still blocked on the owner (elevated, one-time):** lid-close → "do nothing". It is a HIDDEN setting on this
+scheme, so it needs `powercfg -attributes … -ATTRIB_HIDE` before it can be set. Sleep and hibernate are
+already `never` on both AC and DC.

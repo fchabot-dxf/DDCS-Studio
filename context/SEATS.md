@@ -7,7 +7,7 @@ Getting this wrong wastes a seat's evening — it has already happened in both d
 |---|---|---|---|
 | **Fairy** | `CNC-FAIRY` (Toughbook) | the studio | ⭐ **DDCS Expert / M350** — wired, motors, tools, a real table. Runs the **gateway**. SMB `\192.168.0.99`, Modbus on **COM6** (on-site only). |
 | **Ranchy** | `RENDERRANCHY` | **home** | ⭐ **bench DDCS V4.1 — MOTORLESS**, home LAN `10.0.0.50` over SMB. Mostly on 24/7. The main dev seat (~90% of dev). |
-| — | **ASUS TUF** | the studio | none. A laptop on the same WiFi, metres from Fairy. *(INFERRED: no Claude seat runs on it — never confirmed.)* |
+| — | **ASUS TUF** | the studio | none. A laptop on the same WiFi, metres from Fairy. ⭐ **CONFIRMED 2026-09-07: a Claude seat DOES run on it** (`Fred-ASUS-TUF`) — the second shard node. Was recorded as "INFERRED: no Claude seat runs on it". |
 
 ## ⭐ THE AUTHORITY SPLIT IS BY CONTROLLER, NOT BY "HAS HARDWARE"
 
